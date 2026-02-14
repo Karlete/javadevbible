@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / WebSocket
+            </nav>
+            <h1>WebSocket</h1>
+            <p class="topic-subtitle">Real-Time Bidirectional Communication</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is WebSocket?</h2>
+            <p><strong>Think of WebSocket like a phone call vs regular mail:</strong></p>
+            <ul>
+                <li>📬 HTTP = Mail (request → wait → response)</li>
+                <li>📞 WebSocket = Phone call (continuous two-way conversation)</li>
+                <li>⚡ Real-time updates without polling</li>
+                <li>💬 Perfect for chat, notifications, live updates</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>WebSocket</strong> provides full-duplex communication over a single TCP connection. Once established, both client and server can send messages anytime without requesting.</p>
+                <p><strong>Use cases:</strong> Chat apps, live notifications, multiplayer games, stock tickers, collaborative tools</p>
+            </div>
+
+            <h3>HTTP vs WebSocket</h3>
+            <pre><code><span class="comment">// HTTP - Request/Response (one-way)</span>
+Client → Request → Server
+Client ← Response ← Server
+<span class="comment">// Connection closes. Need new request for more data.</span>
+
+<span class="comment">// WebSocket - Persistent Connection (two-way)</span>
+Client ←→ Server
+<span class="comment">// Connection stays open. Both can send anytime!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Simple WebSocket Server</h2>
+
+            <pre><code><span class="keyword">import</span> jakarta.websocket.*;
+<span class="keyword">import</span> jakarta.websocket.server.*;
+
+<span class="annotation">@ServerEndpoint</span>(<span class="string">"/chat"</span>)  <span class="comment">// ws://localhost:8080/myapp/chat</span>
+<span class="keyword">public class</span> <span class="class-name">ChatEndpoint</span> {
+
+    <span class="annotation">@OnOpen</span>  <span class="comment">// Called when client connects</span>
+    <span class="keyword">public void</span> <span class="function">onOpen</span>(<span class="class-name">Session</span> session) {
+        <span class="class-name">System</span>.out.println(<span class="string">"New connection: "</span> + session.getId());
+    }
+
+    <span class="annotation">@OnMessage</span>  <span class="comment">// Called when message received</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">onMessage</span>(<span class="class-name">String</span> message, <span class="class-name">Session</span> session) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Received: "</span> + message);
+        <span class="keyword">return</span> <span class="string">"Echo: "</span> + message;  <span class="comment">// Send back to sender</span>
+    }
+
+    <span class="annotation">@OnClose</span>  <span class="comment">// Called when connection closes</span>
+    <span class="keyword">public void</span> <span class="function">onClose</span>(<span class="class-name">Session</span> session, <span class="class-name">CloseReason</span> reason) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Connection closed: "</span> + reason.getReasonPhrase());
+    }
+
+    <span class="annotation">@OnError</span>  <span class="comment">// Called on error</span>
+    <span class="keyword">public void</span> <span class="function">onError</span>(<span class="class-name">Session</span> session, <span class="class-name">Throwable</span> throwable) {
+        <span class="class-name">System</span>.err.println(<span class="string">"Error: "</span> + throwable.getMessage());
+    }
+}</code></pre>
+
+            <h3>JavaScript Client</h3>
+            <pre><code><span class="comment">// Connect to WebSocket</span>
+<span class="keyword">const</span> socket = <span class="keyword">new</span> WebSocket(<span class="string">"ws://localhost:8080/myapp/chat"</span>);
+
+<span class="comment">// Connection opened</span>
+socket.onopen = <span class="keyword">function</span>(event) {
+    console.log(<span class="string">"Connected!"</span>);
+    socket.send(<span class="string">"Hello Server!"</span>);
+};
+
+<span class="comment">// Message received</span>
+socket.onmessage = <span class="keyword">function</span>(event) {
+    console.log(<span class="string">"Server says: "</span> + event.data);
+};
+
+<span class="comment">// Connection closed</span>
+socket.onclose = <span class="keyword">function</span>(event) {
+    console.log(<span class="string">"Disconnected"</span>);
+};
+
+<span class="comment">// Error occurred</span>
+socket.onerror = <span class="keyword">function</span>(error) {
+    console.error(<span class="string">"Error: "</span>, error);
+};</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Broadcasting to All Clients</h2>
+
+            <pre><code><span class="keyword">import</span> java.util.*;
+<span class="keyword">import</span> java.util.concurrent.*;
+
+<span class="annotation">@ServerEndpoint</span>(<span class="string">"/chat"</span>)
+<span class="keyword">public class</span> <span class="class-name">ChatRoom</span> {
+
+    <span class="comment">// Store all connected sessions</span>
+    <span class="keyword">private static</span> <span class="class-name">Set</span>&lt;<span class="class-name">Session</span>&gt; sessions =
+        <span class="class-name">Collections</span>.newSetFromMap(<span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;());
+
+    <span class="annotation">@OnOpen</span>
+    <span class="keyword">public void</span> <span class="function">onOpen</span>(<span class="class-name">Session</span> session) {
+        sessions.add(session);
+        <span class="class-name">System</span>.out.println(<span class="string">"User joined. Total users: "</span> + sessions.size());
+
+        <span class="comment">// Notify all users</span>
+        broadcast(<span class="string">"A new user joined the chat!"</span>);
+    }
+
+    <span class="annotation">@OnMessage</span>
+    <span class="keyword">public void</span> <span class="function">onMessage</span>(<span class="class-name">String</span> message, <span class="class-name">Session</span> session) {
+        <span class="comment">// Send message to all connected users</span>
+        broadcast(session.getId() + <span class="string">": "</span> + message);
+    }
+
+    <span class="annotation">@OnClose</span>
+    <span class="keyword">public void</span> <span class="function">onClose</span>(<span class="class-name">Session</span> session) {
+        sessions.remove(session);
+        <span class="class-name">System</span>.out.println(<span class="string">"User left. Total users: "</span> + sessions.size());
+
+        broadcast(<span class="string">"A user left the chat"</span>);
+    }
+
+    <span class="comment">// Broadcast to all connected clients</span>
+    <span class="keyword">private static void</span> <span class="function">broadcast</span>(<span class="class-name">String</span> message) {
+        <span class="keyword">for</span> (<span class="class-name">Session</span> session : sessions) {
+            <span class="keyword">if</span> (session.isOpen()) {
+                <span class="keyword">try</span> {
+                    session.getBasicRemote().sendText(message);
+                } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Path Parameters</h2>
+
+            <pre><code><span class="annotation">@ServerEndpoint</span>(<span class="string">"/chat/{room}"</span>)  <span class="comment">// ws://localhost:8080/myapp/chat/general</span>
+<span class="keyword">public class</span> <span class="class-name">MultiRoomChat</span> {
+
+    <span class="annotation">@OnOpen</span>
+    <span class="keyword">public void</span> <span class="function">onOpen</span>(<span class="class-name">Session</span> session,
+                     <span class="annotation">@PathParam</span>(<span class="string">"room"</span>) <span class="class-name">String</span> roomName) {
+        <span class="class-name">System</span>.out.println(<span class="string">"User joined room: "</span> + roomName);
+
+        <span class="comment">// Store room name in session</span>
+        session.getUserProperties().put(<span class="string">"room"</span>, roomName);
+    }
+
+    <span class="annotation">@OnMessage</span>
+    <span class="keyword">public void</span> <span class="function">onMessage</span>(<span class="class-name">String</span> message, <span class="class-name">Session</span> session) {
+        <span class="class-name">String</span> room = (<span class="class-name">String</span>) session.getUserProperties().get(<span class="string">"room"</span>);
+        <span class="class-name">System</span>.out.println(<span class="string">"Message in "</span> + room + <span class="string">": "</span> + message);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Sending to Specific Client</h2>
+
+            <pre><code><span class="annotation">@ServerEndpoint</span>(<span class="string">"/notification"</span>)
+<span class="keyword">public class</span> <span class="class-name">NotificationEndpoint</span> {
+
+    <span class="keyword">private static</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Session</span>&gt; userSessions = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
+
+    <span class="annotation">@OnOpen</span>
+    <span class="keyword">public void</span> <span class="function">onOpen</span>(<span class="class-name">Session</span> session) {
+        <span class="comment">// Get username from query parameter</span>
+        <span class="class-name">String</span> username = session.getRequestParameterMap()
+                                    .get(<span class="string">"username"</span>)
+                                    .get(<span class="number">0</span>);
+
+        userSessions.put(username, session);
+        <span class="class-name">System</span>.out.println(username + <span class="string">" connected"</span>);
+    }
+
+    <span class="comment">// Send notification to specific user</span>
+    <span class="keyword">public static void</span> <span class="function">notifyUser</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> message) {
+        <span class="class-name">Session</span> session = userSessions.get(username);
+        <span class="keyword">if</span> (session != <span class="keyword">null</span> && session.isOpen()) {
+            <span class="keyword">try</span> {
+                session.getBasicRemote().sendText(message);
+            } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+<span class="comment">// Usage from anywhere in your app</span>
+<span class="class-name">NotificationEndpoint</span>.notifyUser(<span class="string">"alice"</span>, <span class="string">"New message from Bob!"</span>);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>JSON Messages</h2>
+
+            <h3>Message Class</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">ChatMessage</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> sender;
+    <span class="keyword">private</span> <span class="class-name">String</span> content;
+    <span class="keyword">private</span> <span class="class-name">long</span> timestamp;
+
+    <span class="comment">// Constructors, getters, setters</span>
+}</code></pre>
+
+            <h3>Endpoint with JSON</h3>
+            <pre><code><span class="keyword">import</span> jakarta.json.bind.*;
+
+<span class="annotation">@ServerEndpoint</span>(<span class="string">"/chat"</span>)
+<span class="keyword">public class</span> <span class="class-name">JsonChatEndpoint</span> {
+
+    <span class="keyword">private static</span> <span class="class-name">Jsonb</span> jsonb = <span class="class-name">JsonbBuilder</span>.create();
+
+    <span class="annotation">@OnMessage</span>
+    <span class="keyword">public void</span> <span class="function">onMessage</span>(<span class="class-name">String</span> jsonMessage) {
+        <span class="comment">// Parse JSON to object</span>
+        <span class="class-name">ChatMessage</span> message = jsonb.fromJson(jsonMessage, ChatMessage.<span class="keyword">class</span>);
+
+        <span class="class-name">System</span>.out.println(message.getSender() + <span class="string">": "</span> + message.getContent());
+
+        <span class="comment">// Create response</span>
+        <span class="class-name">ChatMessage</span> response = <span class="keyword">new</span> <span class="class-name">ChatMessage</span>();
+        response.setSender(<span class="string">"Server"</span>);
+        response.setContent(<span class="string">"Message received!"</span>);
+        response.setTimestamp(<span class="class-name">System</span>.currentTimeMillis());
+
+        <span class="comment">// Send as JSON</span>
+        <span class="class-name">String</span> jsonResponse = jsonb.toJson(response);
+        broadcast(jsonResponse);
+    }
+}</code></pre>
+
+            <h3>JavaScript Client with JSON</h3>
+            <pre><code><span class="keyword">const</span> socket = <span class="keyword">new</span> WebSocket(<span class="string">"ws://localhost:8080/myapp/chat"</span>);
+
+socket.onopen = <span class="keyword">function</span>() {
+    <span class="comment">// Send JSON message</span>
+    <span class="keyword">const</span> message = {
+        sender: <span class="string">"Alice"</span>,
+        content: <span class="string">"Hello everyone!"</span>,
+        timestamp: Date.now()
+    };
+    socket.send(JSON.stringify(message));
+};
+
+socket.onmessage = <span class="keyword">function</span>(event) {
+    <span class="comment">// Parse JSON response</span>
+    <span class="keyword">const</span> message = JSON.parse(event.data);
+    console.log(message.sender + <span class="string">": "</span> + message.content);
+};</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>CDI Integration</h2>
+
+            <pre><code><span class="annotation">@ServerEndpoint</span>(
+    value = <span class="string">"/chat"</span>,
+    configurator = CdiAwareConfigurator.<span class="keyword">class</span>  <span class="comment">// Enable CDI</span>
+)
+<span class="keyword">public class</span> <span class="class-name">CdiChatEndpoint</span> {
+
+    <span class="annotation">@Inject</span>  <span class="comment">// Inject services!</span>
+    <span class="keyword">private</span> <span class="class-name">MessageService</span> messageService;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">UserService</span> userService;
+
+    <span class="annotation">@OnMessage</span>
+    <span class="keyword">public void</span> <span class="function">onMessage</span>(<span class="class-name">String</span> message, <span class="class-name">Session</span> session) {
+        <span class="comment">// Use injected services</span>
+        messageService.saveMessage(message);
+
+        <span class="class-name">String</span> username = userService.getCurrentUser(session);
+        broadcast(username + <span class="string">": "</span> + message);
+    }
+}
+
+<span class="comment">// Configurator to enable CDI</span>
+<span class="keyword">public class</span> <span class="class-name">CdiAwareConfigurator</span> <span class="keyword">extends</span> <span class="class-name">ServerEndpointConfig.Configurator</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> &lt;T&gt; T <span class="function">getEndpointInstance</span>(<span class="class-name">Class</span>&lt;T&gt; endpointClass) <span class="keyword">throws</span> <span class="class-name">InstantiationException</span> {
+        <span class="keyword">return</span> <span class="class-name">CDI</span>.current().select(endpointClass).get();
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Timeouts and Idle Sessions</h2>
+
+            <pre><code><span class="annotation">@ServerEndpoint</span>(<span class="string">"/chat"</span>)
+<span class="keyword">public class</span> <span class="class-name">TimeoutEndpoint</span> {
+
+    <span class="annotation">@OnOpen</span>
+    <span class="keyword">public void</span> <span class="function">onOpen</span>(<span class="class-name">Session</span> session) {
+        <span class="comment">// Set max idle timeout (15 minutes)</span>
+        session.setMaxIdleTimeout(<span class="number">15</span> * <span class="number">60</span> * <span class="number">1000</span>);  <span class="comment">// milliseconds</span>
+
+        <span class="comment">// Set max message size (1MB)</span>
+        session.setMaxTextMessageBufferSize(<span class="number">1024</span> * <span class="number">1024</span>);
+
+        <span class="class-name">System</span>.out.println(<span class="string">"Session configured with timeout: "</span> +
+                           session.getMaxIdleTimeout());
+    }
+
+    <span class="annotation">@OnMessage</span>
+    <span class="keyword">public void</span> <span class="function">onMessage</span>(<span class="class-name">String</span> message, <span class="class-name">Session</span> session) {
+        <span class="comment">// Reset idle timeout on activity</span>
+        session.setMaxIdleTimeout(<span class="number">15</span> * <span class="number">60</span> * <span class="number">1000</span>);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Ping/Pong (Heartbeat)</h2>
+
+            <pre><code><span class="annotation">@ServerEndpoint</span>(<span class="string">"/heartbeat"</span>)
+<span class="keyword">public class</span> <span class="class-name">HeartbeatEndpoint</span> {
+
+    <span class="annotation">@OnMessage</span>
+    <span class="keyword">public void</span> <span class="function">onPong</span>(<span class="class-name">PongMessage</span> pong, <span class="class-name">Session</span> session) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Received pong from: "</span> + session.getId());
+    }
+
+    <span class="comment">// Send ping periodically to keep connection alive</span>
+    <span class="keyword">public static void</span> <span class="function">sendPing</span>(<span class="class-name">Session</span> session) {
+        <span class="keyword">if</span> (session.isOpen()) {
+            <span class="keyword">try</span> {
+                session.getBasicRemote().sendPing(<span class="class-name">ByteBuffer</span>.wrap(<span class="string">"ping"</span>.getBytes()));
+            } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}</code></pre>
+
+            <h3>Client-Side Heartbeat</h3>
+            <pre><code><span class="keyword">const</span> socket = <span class="keyword">new</span> WebSocket(<span class="string">"ws://localhost:8080/myapp/heartbeat"</span>);
+
+<span class="comment">// Send ping every 30 seconds</span>
+setInterval(() => {
+    <span class="keyword">if</span> (socket.readyState === WebSocket.OPEN) {
+        socket.send(<span class="string">"ping"</span>);
+    }
+}, <span class="number">30000</span>);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>✅ DO:</h3>
+                <ul>
+                    <li><strong>Use JSON for structured data</strong> - Easier to parse and extend</li>
+                    <li><strong>Implement heartbeat/ping-pong</strong> - Detect dead connections</li>
+                    <li><strong>Set timeouts</strong> - Clean up idle connections</li>
+                    <li><strong>Handle errors gracefully</strong> - Connection can drop anytime</li>
+                    <li><strong>Use ConcurrentHashMap for sessions</strong> - Thread-safe</li>
+                    <li><strong>Close connections properly</strong> - Free resources</li>
+                    <li><strong>Validate messages</strong> - Don't trust client data</li>
+                    <li><strong>Use async sending for broadcasts</strong> - Better performance</li>
+                </ul>
+
+                <h3>❌ DON'T:</h3>
+                <ul>
+                    <li><strong>Don't use WebSocket for everything</strong> - REST is often simpler</li>
+                    <li><strong>Don't send huge messages</strong> - Split large data</li>
+                    <li><strong>Don't forget authentication</strong> - Secure your endpoints</li>
+                    <li><strong>Don't block the thread</strong> - Use async for long operations</li>
+                    <li><strong>Don't forget to remove closed sessions</strong> - Memory leaks</li>
+                    <li><strong>Don't store state in endpoint</strong> - Use session attributes</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>WebSocket</strong> provides real-time bidirectional communication</li>
+                    <li><strong>@ServerEndpoint:</strong> Marks WebSocket endpoint</li>
+                    <li><strong>@OnOpen:</strong> Called when client connects</li>
+                    <li><strong>@OnMessage:</strong> Called when message received</li>
+                    <li><strong>@OnClose:</strong> Called when connection closes</li>
+                    <li><strong>@OnError:</strong> Called on error</li>
+                    <li><strong>Session:</strong> Represents connection to a client</li>
+                    <li><strong>Broadcasting:</strong> Send to all connected clients</li>
+                    <li><strong>JSON support:</strong> Send/receive structured data</li>
+                    <li><strong>Use cases:</strong> Chat, live notifications, multiplayer games, real-time dashboards</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jax-rs.html" class="related-link">JAX-RS (REST APIs)</a>
+                <a href="json.html" class="related-link">JSON Processing</a>
+                <a href="cdi.html" class="related-link">CDI (Dependency Injection)</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

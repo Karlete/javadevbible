@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAR vs JAR Files - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#servers">Application Servers</a> / WAR vs JAR Files
+            </nav>
+            <h1>WAR vs JAR Files</h1>
+            <p class="topic-subtitle">Java packaging formats explained</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is an Archive File?</h2>
+            <p>An archive file is simply a single file that contains many other files bundled together. Think of it like a <strong>ZIP file</strong>—because that's exactly what Java archives are!</p>
+
+            <div class="info-box">
+                <p><strong>Moving Box Analogy:</strong></p>
+                <p>Imagine you're moving to a new house. Instead of carrying thousands of individual items one at a time, you pack them into boxes. Each box:</p>
+                <ul>
+                    <li><strong>Contains many items</strong> organized in a specific way</li>
+                    <li><strong>Has a label</strong> describing its contents</li>
+                    <li><strong>Is easy to move</strong> as a single unit</li>
+                    <li><strong>Can be unpacked</strong> to access individual items</li>
+                </ul>
+                <p>Java archives (JAR and WAR) work the same way—they bundle all your application's files into a single, portable package.</p>
+            </div>
+
+            <h3>Why Not Just Use ZIP Files?</h3>
+            <p>Java archives ARE ZIP files with extra features:</p>
+            <ul>
+                <li><strong>Standard structure</strong> - Everyone agrees where files go</li>
+                <li><strong>Manifest file</strong> - Contains metadata about the archive</li>
+                <li><strong>JVM integration</strong> - Java can run code directly from archives</li>
+                <li><strong>Classpath support</strong> - The JVM knows how to find classes in archives</li>
+            </ul>
+
+            <pre><code><span class="comment"># You can actually open any JAR/WAR with a ZIP tool:</span>
+unzip myapp.jar -d extracted/
+
+<span class="comment"># Or use Java's jar command:</span>
+jar -tf myapp.jar        <span class="comment"># List contents</span>
+jar -xf myapp.jar        <span class="comment"># Extract contents</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>JAR Files: Java Archive</h2>
+            <p>A JAR (Java Archive) file is the standard packaging format for Java applications and libraries. It bundles compiled Java classes, resources, and metadata into a single file.</p>
+
+            <h3>JAR File Structure</h3>
+            <pre><code>myapp.jar
+├── <span class="keyword">META-INF/</span>
+│   ├── MANIFEST.MF          <span class="comment"># Manifest file (metadata)</span>
+│   └── maven/               <span class="comment"># (Optional) Maven info</span>
+├── <span class="keyword">com/</span>
+│   └── example/
+│       ├── Main.class       <span class="comment"># Compiled Java classes</span>
+│       ├── Service.class
+│       └── util/
+│           └── Helper.class
+├── application.properties   <span class="comment"># Configuration files</span>
+└── static/
+    └── logo.png             <span class="comment"># Static resources</span></code></pre>
+
+            <h3>The MANIFEST.MF File</h3>
+            <p>The manifest is a special file that contains metadata about the JAR:</p>
+            <pre><code><span class="comment"># META-INF/MANIFEST.MF</span>
+
+Manifest-Version: 1.0
+Created-By: 17.0.1 (Oracle Corporation)
+Main-Class: com.example.Main
+Class-Path: lib/gson-2.9.0.jar lib/commons-lang3-3.12.0.jar
+Implementation-Title: My Application
+Implementation-Version: 1.0.0</code></pre>
+
+            <h3>Types of JAR Files</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>How to Run</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Library JAR</strong></td>
+                        <td>Reusable code (no Main-Class)</td>
+                        <td>Add to classpath</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Executable JAR</strong></td>
+                        <td>Has Main-Class in manifest</td>
+                        <td><code>java -jar app.jar</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fat/Uber JAR</strong></td>
+                        <td>Includes all dependencies</td>
+                        <td><code>java -jar app.jar</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Creating JAR Files with Maven</h3>
+            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;packaging&gt;jar&lt;/packaging&gt;
+
+&lt;build&gt;
+    &lt;plugins&gt;
+        <span class="comment">&lt;!-- Standard JAR --&gt;</span>
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-jar-plugin&lt;/artifactId&gt;
+            &lt;configuration&gt;
+                &lt;archive&gt;
+                    &lt;manifest&gt;
+                        &lt;mainClass&gt;com.example.Main&lt;/mainClass&gt;
+                        &lt;addClasspath&gt;true&lt;/addClasspath&gt;
+                    &lt;/manifest&gt;
+                &lt;/archive&gt;
+            &lt;/configuration&gt;
+        &lt;/plugin&gt;
+
+        <span class="comment">&lt;!-- Fat JAR with shade plugin --&gt;</span>
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-shade-plugin&lt;/artifactId&gt;
+            &lt;executions&gt;
+                &lt;execution&gt;
+                    &lt;phase&gt;package&lt;/phase&gt;
+                    &lt;goals&gt;&lt;goal&gt;shade&lt;/goal&gt;&lt;/goals&gt;
+                &lt;/execution&gt;
+            &lt;/executions&gt;
+        &lt;/plugin&gt;
+    &lt;/plugins&gt;
+&lt;/build&gt;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>WAR Files: Web Application Archive</h2>
+            <p>A WAR (Web Application Archive) file is a specialized packaging format for Java web applications. It contains everything needed to deploy a web application to a servlet container.</p>
+
+            <div class="info-box">
+                <p><strong>WAR = JAR + Web Structure</strong></p>
+                <p>A WAR file is essentially a JAR file with a <strong>specific directory structure</strong> that servlet containers understand. This structure defines where to find servlets, JSP files, static resources, and dependencies.</p>
+            </div>
+
+            <h3>WAR File Structure</h3>
+            <pre><code>mywebapp.war
+├── <span class="keyword">META-INF/</span>
+│   └── MANIFEST.MF
+├── <span class="keyword">WEB-INF/</span>                    <span class="comment"># PROTECTED - Not accessible via URL!</span>
+│   ├── web.xml                 <span class="comment"># Deployment descriptor</span>
+│   ├── <span class="keyword">classes/</span>                <span class="comment"># Compiled Java classes</span>
+│   │   └── com/
+│   │       └── example/
+│   │           ├── HomeServlet.class
+│   │           └── ProductServlet.class
+│   └── <span class="keyword">lib/</span>                    <span class="comment"># JAR dependencies</span>
+│       ├── gson-2.9.0.jar
+│       └── mysql-connector-8.0.jar
+├── index.html                  <span class="comment"># PUBLIC - /mywebapp/index.html</span>
+├── css/
+│   └── style.css               <span class="comment"># PUBLIC - /mywebapp/css/style.css</span>
+├── js/
+│   └── app.js                  <span class="comment"># PUBLIC - /mywebapp/js/app.js</span>
+└── images/
+    └── logo.png                <span class="comment"># PUBLIC - /mywebapp/images/logo.png</span></code></pre>
+
+            <h3>The WEB-INF Directory: Understanding Protection</h3>
+            <p>The <code>WEB-INF</code> directory is special—its contents cannot be accessed directly by clients via HTTP requests:</p>
+
+            <pre><code><span class="comment"># What users CAN access (outside WEB-INF):</span>
+http://localhost:8080/mywebapp/index.html        ✓ Returns HTML
+http://localhost:8080/mywebapp/css/style.css     ✓ Returns CSS
+
+<span class="comment"># What users CANNOT access (inside WEB-INF):</span>
+http://localhost:8080/mywebapp/WEB-INF/web.xml   ✗ 404 or 403
+http://localhost:8080/mywebapp/WEB-INF/classes/  ✗ 404 or 403
+
+<span class="comment"># WHY? Security! WEB-INF contains:</span>
+<span class="comment"># - Configuration with database credentials</span>
+<span class="comment"># - Compiled code that could be decompiled</span>
+<span class="comment"># - Libraries that could reveal vulnerabilities</span></code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Security Best Practice</div>
+                <p>Always put sensitive files (JSP templates, configuration) inside <code>WEB-INF/</code>. Use servlets to forward requests to protected resources.</p>
+            </div>
+
+            <h3>Creating WAR Files with Maven</h3>
+            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;packaging&gt;war&lt;/packaging&gt;
+
+&lt;dependencies&gt;
+    <span class="comment">&lt;!-- Servlet API - provided by container --&gt;</span>
+    &lt;dependency&gt;
+        &lt;groupId&gt;jakarta.servlet&lt;/groupId&gt;
+        &lt;artifactId&gt;jakarta.servlet-api&lt;/artifactId&gt;
+        &lt;version&gt;6.0.0&lt;/version&gt;
+        &lt;scope&gt;provided&lt;/scope&gt;  <span class="comment">&lt;!-- Not included in WAR --&gt;</span>
+    &lt;/dependency&gt;
+&lt;/dependencies&gt;
+
+&lt;build&gt;
+    &lt;plugins&gt;
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-war-plugin&lt;/artifactId&gt;
+            &lt;configuration&gt;
+                &lt;failOnMissingWebXml&gt;false&lt;/failOnMissingWebXml&gt;
+            &lt;/configuration&gt;
+        &lt;/plugin&gt;
+    &lt;/plugins&gt;
+&lt;/build&gt;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>JAR vs WAR: Complete Comparison</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>JAR</th>
+                        <th>WAR</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Full Name</strong></td>
+                        <td>Java Archive</td>
+                        <td>Web Application Archive</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Purpose</strong></td>
+                        <td>General Java apps/libraries</td>
+                        <td>Web applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Structure</strong></td>
+                        <td>META-INF/ + classes + resources</td>
+                        <td>WEB-INF/ + public resources</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Deployment</strong></td>
+                        <td><code>java -jar</code> or classpath</td>
+                        <td>Deploy to servlet container</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Dependencies</strong></td>
+                        <td>Optional (fat JAR) or external</td>
+                        <td>Always in WEB-INF/lib</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Protected Area</strong></td>
+                        <td>None</td>
+                        <td>WEB-INF/ (hidden from web)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hot Deployment</strong></td>
+                        <td>Requires restart</td>
+                        <td>Supported by containers</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Spring Boot: JAR or WAR?</h2>
+            <p>Spring Boot applications can be packaged as either JAR or WAR:</p>
+
+            <h3>Spring Boot JAR (Recommended)</h3>
+            <pre><code>&lt;packaging&gt;jar&lt;/packaging&gt;
+
+<span class="comment"># Run with:</span>
+java -jar myapp-1.0.0.jar
+
+<span class="comment"># Benefits:</span>
+<span class="comment"># - Embedded Tomcat included</span>
+<span class="comment"># - Simple deployment</span>
+<span class="comment"># - Cloud-native friendly</span></code></pre>
+
+            <h3>Spring Boot WAR (For External Container)</h3>
+            <pre><code>&lt;packaging&gt;war&lt;/packaging&gt;
+
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-tomcat&lt;/artifactId&gt;
+    &lt;scope&gt;provided&lt;/scope&gt;  <span class="comment">&lt;!-- Don't include Tomcat --&gt;</span>
+&lt;/dependency&gt;
+
+<span class="comment">// Main class for WAR deployment</span>
+<span class="annotation">@SpringBootApplication</span>
+<span class="keyword">public class</span> <span class="class-name">MyApplication</span> <span class="keyword">extends</span> SpringBootServletInitializer {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected</span> SpringApplicationBuilder configure(SpringApplicationBuilder app) {
+        <span class="keyword">return</span> app.sources(MyApplication.<span class="keyword">class</span>);
+    }
+}</code></pre>
+
+            <h3>When to Use Each Format</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Use Case</th>
+                        <th>Recommended</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>New Spring Boot app</td>
+                        <td><strong>JAR</strong></td>
+                        <td>Simpler, embedded container</td>
+                    </tr>
+                    <tr>
+                        <td>Cloud deployment</td>
+                        <td><strong>JAR</strong></td>
+                        <td>Better for Docker</td>
+                    </tr>
+                    <tr>
+                        <td>Legacy system</td>
+                        <td><strong>WAR</strong></td>
+                        <td>May require existing container</td>
+                    </tr>
+                    <tr>
+                        <td>Corporate standard</td>
+                        <td><strong>WAR</strong></td>
+                        <td>WebLogic/WebSphere requirement</td>
+                    </tr>
+                    <tr>
+                        <td>Microservices</td>
+                        <td><strong>JAR</strong></td>
+                        <td>Independent deployment</td>
+                    </tr>
+                    <tr>
+                        <td>Reusable library</td>
+                        <td><strong>JAR</strong></td>
+                        <td>Not a web application</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>EAR Files: Enterprise Archive</h2>
+            <p>For completeness, EAR (Enterprise Archive) files bundle multiple modules (WARs, JARs) into a single deployable unit for full application servers:</p>
+
+            <pre><code>enterprise-app.ear
+├── META-INF/
+│   ├── MANIFEST.MF
+│   └── application.xml    <span class="comment"># Defines modules</span>
+├── web-module.war         <span class="comment"># Web tier</span>
+├── ejb-module.jar         <span class="comment"># EJB tier</span>
+└── lib/
+    └── shared-utils.jar   <span class="comment"># Shared libraries</span></code></pre>
+
+            <div class="info-box">
+                <p><strong>Modern Perspective:</strong> EAR files were common in the Java EE era but are less common today. Modern architectures favor microservices (independent JARs), Spring Boot (embedded containers), or containers (Docker).</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Issues and Troubleshooting</h2>
+
+            <h3>1. "No main manifest attribute"</h3>
+            <pre><code><span class="comment"># Error:</span>
+java -jar myapp.jar
+no main manifest attribute, in myapp.jar
+
+<span class="comment"># Solution: Add Main-Class to manifest in pom.xml</span>
+&lt;manifest&gt;
+    &lt;mainClass&gt;com.example.Main&lt;/mainClass&gt;
+&lt;/manifest&gt;</code></pre>
+
+            <h3>2. ClassNotFoundException in Fat JAR</h3>
+            <pre><code><span class="comment"># Error: Dependency classes not found at runtime</span>
+
+<span class="comment"># Cause: Dependencies not included in JAR</span>
+<span class="comment"># Solution: Use maven-shade-plugin for fat JAR</span>
+
+<span class="comment"># Check what's in your JAR:</span>
+jar -tf myapp.jar | grep gson
+<span class="comment"># Should show com/google/gson/... if using fat JAR</span></code></pre>
+
+            <h3>3. javax vs jakarta Package Issues</h3>
+            <pre><code><span class="comment"># Error in Tomcat 10+:</span>
+java.lang.NoClassDefFoundError: javax/servlet/Servlet
+
+<span class="comment"># Cause: Using javax.servlet with Tomcat 10+ (requires jakarta)</span>
+
+<span class="comment"># Solution: Update imports and dependencies</span>
+<span class="comment"># OLD: import javax.servlet.*;</span>
+<span class="comment"># NEW: import jakarta.servlet.*;</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>JAR:</strong> General-purpose Java archive for applications and libraries</li>
+                    <li><strong>WAR:</strong> Web application archive with specific structure for servlet containers</li>
+                    <li><strong>WEB-INF/:</strong> Protected directory in WAR, inaccessible via HTTP</li>
+                    <li><strong>Fat JAR:</strong> JAR with all dependencies bundled inside</li>
+                    <li><strong>Embedded containers:</strong> Modern approach, container inside your JAR</li>
+                    <li><strong>Spring Boot JAR:</strong> Preferred for new applications</li>
+                    <li><strong>WAR for legacy:</strong> Use when external container is required</li>
+                    <li><strong>MANIFEST.MF:</strong> Contains metadata, Main-Class for executables</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="servlet-container.html" class="related-link">Servlet Containers</a>
+                <a href="tomcat.html" class="related-link">Apache Tomcat</a>
+                <a href="web-xml.html" class="related-link">Deployment Descriptors</a>
+                <a href="context.html" class="related-link">Context & Deployment</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

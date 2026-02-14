@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Data JPA - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#spring">Spring Framework</a> / Spring Data JPA
+            </nav>
+            <h1>Spring Data JPA</h1>
+            <p class="topic-subtitle">Simplifying database access with Spring Data</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is Spring Data JPA?</h2>
+            <p><strong>Spring Data JPA eliminates boilerplate code:</strong></p>
+            <ul>
+                <li><strong>Without Spring Data:</strong> Write 100+ lines for CRUD operations</li>
+                <li><strong>With Spring Data:</strong> Just define an interface, get implementation free!</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Spring Data JPA</strong> is a layer on top of JPA (Java Persistence API) that provides:</p>
+                <ul>
+                    <li>Repository interfaces with auto-generated implementations</li>
+                    <li>Query derivation from method names</li>
+                    <li>Custom JPQL and native SQL queries</li>
+                    <li>Pagination and sorting support</li>
+                    <li>Auditing capabilities</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Setup</h2>
+
+            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-jpa&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+<span class="comment">&lt;!-- Database driver (e.g., H2 for development) --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.h2database&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;h2&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+<span class="comment">&lt;!-- Or PostgreSQL for production --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.postgresql&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;postgresql&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+            <pre><code><span class="comment"># application.properties</span>
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.username=sa
+spring.datasource.password=
+
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Entity Classes</h2>
+
+            <pre><code><span class="keyword">import</span> jakarta.persistence.*;
+<span class="keyword">import</span> java.time.LocalDateTime;
+
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = <span class="class-name">GenerationType</span>.IDENTITY)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@Column</span>(nullable = <span class="keyword">false</span>, length = <span class="number">100</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+
+    <span class="annotation">@Column</span>(unique = <span class="keyword">true</span>, nullable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+
+    <span class="annotation">@Enumerated</span>(<span class="class-name">EnumType</span>.STRING)
+    <span class="keyword">private</span> <span class="class-name">Status</span> status = <span class="class-name">Status</span>.ACTIVE;
+
+    <span class="annotation">@Column</span>(name = <span class="string">"created_at"</span>)
+    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> createdAt;
+
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"user"</span>, cascade = <span class="class-name">CascadeType</span>.ALL)
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="annotation">@ManyToMany</span>
+    <span class="annotation">@JoinTable</span>(
+        name = <span class="string">"user_roles"</span>,
+        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"user_id"</span>),
+        inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"role_id"</span>)
+    )
+    <span class="keyword">private</span> <span class="class-name">Set</span>&lt;<span class="class-name">Role</span>&gt; roles = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();
+
+    <span class="annotation">@PrePersist</span>
+    <span class="keyword">protected void</span> <span class="function">onCreate</span>() {
+        createdAt = <span class="class-name">LocalDateTime</span>.now();
+    }
+
+    <span class="comment">// Constructors, getters, setters</span>
+    <span class="keyword">public</span> <span class="function">User</span>() {}
+
+    <span class="keyword">public</span> <span class="function">User</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {
+        <span class="keyword">this</span>.name = name;
+        <span class="keyword">this</span>.email = email;
+    }
+
+    <span class="comment">// getters/setters...</span>
+}
+
+<span class="keyword">public enum</span> <span class="class-name">Status</span> {
+    ACTIVE, INACTIVE, SUSPENDED
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Repository Interfaces</h2>
+
+            <h3>Basic Repository</h3>
+            <pre><code><span class="keyword">import</span> org.springframework.data.jpa.repository.JpaRepository;
+
+<span class="comment">// That's it! Spring Data provides the implementation</span>
+<span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
+    <span class="comment">// Inherited methods:</span>
+    <span class="comment">// save(entity), saveAll(entities)</span>
+    <span class="comment">// findById(id), findAll(), findAllById(ids)</span>
+    <span class="comment">// count(), existsById(id)</span>
+    <span class="comment">// deleteById(id), delete(entity), deleteAll()</span>
+    <span class="comment">// findAll(Pageable), findAll(Sort)</span>
+}</code></pre>
+
+            <h3>Query Methods (Derived Queries)</h3>
+            <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
+
+    <span class="comment">// Spring Data generates queries from method names!</span>
+
+    <span class="comment">// SELECT * FROM users WHERE email = ?</span>
+    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email);
+
+    <span class="comment">// SELECT * FROM users WHERE name = ?</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByName</span>(<span class="class-name">String</span> name);
+
+    <span class="comment">// SELECT * FROM users WHERE status = ?</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">Status</span> status);
+
+    <span class="comment">// SELECT * FROM users WHERE name LIKE '%value%'</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByNameContaining</span>(<span class="class-name">String</span> name);
+
+    <span class="comment">// SELECT * FROM users WHERE name LIKE 'value%'</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByNameStartingWith</span>(<span class="class-name">String</span> prefix);
+
+    <span class="comment">// SELECT * FROM users WHERE status = ? AND name = ?</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByStatusAndName</span>(<span class="class-name">Status</span> status, <span class="class-name">String</span> name);
+
+    <span class="comment">// SELECT * FROM users WHERE status = ? OR name = ?</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByStatusOrName</span>(<span class="class-name">Status</span> status, <span class="class-name">String</span> name);
+
+    <span class="comment">// SELECT * FROM users WHERE created_at BETWEEN ? AND ?</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByCreatedAtBetween</span>(<span class="class-name">LocalDateTime</span> start, <span class="class-name">LocalDateTime</span> end);
+
+    <span class="comment">// SELECT * FROM users WHERE status IN (?, ?, ?)</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByStatusIn</span>(<span class="class-name">Collection</span>&lt;<span class="class-name">Status</span>&gt; statuses);
+
+    <span class="comment">// SELECT * FROM users WHERE email IS NOT NULL</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmailIsNotNull</span>();
+
+    <span class="comment">// SELECT * FROM users ORDER BY name ASC</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByStatusOrderByNameAsc</span>(<span class="class-name">Status</span> status);
+
+    <span class="comment">// SELECT * FROM users LIMIT 1</span>
+    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findFirstByStatus</span>(<span class="class-name">Status</span> status);
+
+    <span class="comment">// SELECT * FROM users LIMIT 5</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findTop5ByStatus</span>(<span class="class-name">Status</span> status);
+
+    <span class="comment">// SELECT COUNT(*) FROM users WHERE status = ?</span>
+    <span class="keyword">long</span> <span class="function">countByStatus</span>(<span class="class-name">Status</span> status);
+
+    <span class="comment">// SELECT EXISTS (SELECT 1 FROM users WHERE email = ?)</span>
+    <span class="keyword">boolean</span> <span class="function">existsByEmail</span>(<span class="class-name">String</span> email);
+
+    <span class="comment">// DELETE FROM users WHERE status = ?</span>
+    <span class="keyword">void</span> <span class="function">deleteByStatus</span>(<span class="class-name">Status</span> status);
+}</code></pre>
+
+            <h3>Custom JPQL Queries</h3>
+            <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
+
+    <span class="comment">// JPQL query</span>
+    <span class="annotation">@Query</span>(<span class="string">"SELECT u FROM User u WHERE u.email = :email"</span>)
+    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmailAddress</span>(<span class="annotation">@Param</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email);
+
+    <span class="comment">// JPQL with JOIN</span>
+    <span class="annotation">@Query</span>(<span class="string">"SELECT u FROM User u JOIN u.roles r WHERE r.name = :roleName"</span>)
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByRoleName</span>(<span class="annotation">@Param</span>(<span class="string">"roleName"</span>) <span class="class-name">String</span> roleName);
+
+    <span class="comment">// JPQL with FETCH (eager loading)</span>
+    <span class="annotation">@Query</span>(<span class="string">"SELECT u FROM User u LEFT JOIN FETCH u.orders WHERE u.id = :id"</span>)
+    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByIdWithOrders</span>(<span class="annotation">@Param</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id);
+
+    <span class="comment">// Native SQL query</span>
+    <span class="annotation">@Query</span>(value = <span class="string">"SELECT * FROM users WHERE email = ?1"</span>, nativeQuery = <span class="keyword">true</span>)
+    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmailNative</span>(<span class="class-name">String</span> email);
+
+    <span class="comment">// Projection (return specific fields)</span>
+    <span class="annotation">@Query</span>(<span class="string">"SELECT u.name as name, u.email as email FROM User u"</span>)
+    <span class="class-name">List</span>&lt;<span class="class-name">UserSummary</span>&gt; <span class="function">findAllSummaries</span>();
+
+    <span class="comment">// Update query</span>
+    <span class="annotation">@Modifying</span>
+    <span class="annotation">@Query</span>(<span class="string">"UPDATE User u SET u.status = :status WHERE u.id = :id"</span>)
+    <span class="keyword">int</span> <span class="function">updateStatus</span>(<span class="annotation">@Param</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id, <span class="annotation">@Param</span>(<span class="string">"status"</span>) <span class="class-name">Status</span> status);
+
+    <span class="comment">// Delete query</span>
+    <span class="annotation">@Modifying</span>
+    <span class="annotation">@Query</span>(<span class="string">"DELETE FROM User u WHERE u.status = :status"</span>)
+    <span class="keyword">int</span> <span class="function">deleteByStatusJpql</span>(<span class="annotation">@Param</span>(<span class="string">"status"</span>) <span class="class-name">Status</span> status);
+}
+
+<span class="comment">// Projection interface</span>
+<span class="keyword">public interface</span> <span class="class-name">UserSummary</span> {
+    <span class="class-name">String</span> <span class="function">getName</span>();
+    <span class="class-name">String</span> <span class="function">getEmail</span>();
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Pagination and Sorting</h2>
+
+            <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
+
+    <span class="comment">// Pageable support</span>
+    <span class="class-name">Page</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">Status</span> status, <span class="class-name">Pageable</span> pageable);
+
+    <span class="comment">// Sort support</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">Status</span> status, <span class="class-name">Sort</span> sort);
+
+    <span class="comment">// Slice (like Page but without total count)</span>
+    <span class="class-name">Slice</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByNameContaining</span>(<span class="class-name">String</span> name, <span class="class-name">Pageable</span> pageable);
+}
+
+<span class="comment">// Service using pagination</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">UserRepository</span> userRepository;
+
+    <span class="keyword">public</span> <span class="class-name">Page</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getUsers</span>(<span class="keyword">int</span> page, <span class="keyword">int</span> size) {
+        <span class="comment">// Page 0, size 10</span>
+        <span class="class-name">Pageable</span> pageable = <span class="class-name">PageRequest</span>.of(page, size);
+        <span class="keyword">return</span> userRepository.findAll(pageable);
+    }
+
+    <span class="keyword">public</span> <span class="class-name">Page</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getUsersSorted</span>(<span class="keyword">int</span> page, <span class="keyword">int</span> size) {
+        <span class="comment">// Sort by name ascending, then by createdAt descending</span>
+        <span class="class-name">Pageable</span> pageable = <span class="class-name">PageRequest</span>.of(page, size,
+            <span class="class-name">Sort</span>.by(<span class="string">"name"</span>).ascending()
+                 .and(<span class="class-name">Sort</span>.by(<span class="string">"createdAt"</span>).descending())
+        );
+        <span class="keyword">return</span> userRepository.findAll(pageable);
+    }
+
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getActiveUsersSorted</span>() {
+        <span class="comment">// Just sorting, no pagination</span>
+        <span class="keyword">return</span> userRepository.findByStatus(
+            <span class="class-name">Status</span>.ACTIVE,
+            <span class="class-name">Sort</span>.by(<span class="class-name">Sort.Direction</span>.DESC, <span class="string">"createdAt"</span>)
+        );
+    }
+}
+
+<span class="comment">// Controller with pagination</span>
+<span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+
+    <span class="annotation">@GetMapping</span>
+    <span class="keyword">public</span> <span class="class-name">Page</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getUsers</span>(
+            <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"0"</span>) <span class="keyword">int</span> page,
+            <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"10"</span>) <span class="keyword">int</span> size,
+            <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"id"</span>) <span class="class-name">String</span> sortBy) {
+
+        <span class="class-name">Pageable</span> pageable = <span class="class-name">PageRequest</span>.of(page, size, <span class="class-name">Sort</span>.by(sortBy));
+        <span class="keyword">return</span> userService.findAll(pageable);
+    }
+}
+
+<span class="comment">// Page response example:</span>
+<span class="comment">// {</span>
+<span class="comment">//   "content": [...users...],</span>
+<span class="comment">//   "totalElements": 100,</span>
+<span class="comment">//   "totalPages": 10,</span>
+<span class="comment">//   "number": 0,</span>
+<span class="comment">//   "size": 10,</span>
+<span class="comment">//   "first": true,</span>
+<span class="comment">//   "last": false</span>
+<span class="comment">// }</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Specifications (Dynamic Queries)</h2>
+
+            <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt;,
+                                       <span class="class-name">JpaSpecificationExecutor</span>&lt;<span class="class-name">User</span>&gt; {
+}
+
+<span class="comment">// Specification builder</span>
+<span class="keyword">public class</span> <span class="class-name">UserSpecifications</span> {
+
+    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">User</span>&gt; <span class="function">hasStatus</span>(<span class="class-name">Status</span> status) {
+        <span class="keyword">return</span> (root, query, cb) -> cb.equal(root.get(<span class="string">"status"</span>), status);
+    }
+
+    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">User</span>&gt; <span class="function">nameLike</span>(<span class="class-name">String</span> name) {
+        <span class="keyword">return</span> (root, query, cb) ->
+            cb.like(cb.lower(root.get(<span class="string">"name"</span>)), <span class="string">"%"</span> + name.toLowerCase() + <span class="string">"%"</span>);
+    }
+
+    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">User</span>&gt; <span class="function">createdAfter</span>(<span class="class-name">LocalDateTime</span> date) {
+        <span class="keyword">return</span> (root, query, cb) -> cb.greaterThan(root.get(<span class="string">"createdAt"</span>), date);
+    }
+
+    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">User</span>&gt; <span class="function">hasRole</span>(<span class="class-name">String</span> roleName) {
+        <span class="keyword">return</span> (root, query, cb) -> {
+            <span class="class-name">Join</span>&lt;<span class="class-name">User</span>, <span class="class-name">Role</span>&gt; roles = root.join(<span class="string">"roles"</span>);
+            <span class="keyword">return</span> cb.equal(roles.get(<span class="string">"name"</span>), roleName);
+        };
+    }
+}
+
+<span class="comment">// Using specifications</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">UserSearchService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">UserRepository</span> userRepository;
+
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">search</span>(<span class="class-name">UserSearchCriteria</span> criteria) {
+        <span class="class-name">Specification</span>&lt;<span class="class-name">User</span>&gt; spec = <span class="class-name">Specification</span>.where(<span class="keyword">null</span>);
+
+        <span class="keyword">if</span> (criteria.getStatus() != <span class="keyword">null</span>) {
+            spec = spec.and(<span class="class-name">UserSpecifications</span>.hasStatus(criteria.getStatus()));
+        }
+        <span class="keyword">if</span> (criteria.getName() != <span class="keyword">null</span>) {
+            spec = spec.and(<span class="class-name">UserSpecifications</span>.nameLike(criteria.getName()));
+        }
+        <span class="keyword">if</span> (criteria.getCreatedAfter() != <span class="keyword">null</span>) {
+            spec = spec.and(<span class="class-name">UserSpecifications</span>.createdAfter(criteria.getCreatedAfter()));
+        }
+
+        <span class="keyword">return</span> userRepository.findAll(spec);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Auditing</h2>
+
+            <pre><code><span class="comment">// Enable auditing</span>
+<span class="annotation">@Configuration</span>
+<span class="annotation">@EnableJpaAuditing</span>
+<span class="keyword">public class</span> <span class="class-name">JpaConfig</span> {
+}
+
+<span class="comment">// Base auditable entity</span>
+<span class="annotation">@MappedSuperclass</span>
+<span class="annotation">@EntityListeners</span>(<span class="class-name">AuditingEntityListener</span>.<span class="keyword">class</span>)
+<span class="keyword">public abstract class</span> <span class="class-name">Auditable</span> {
+
+    <span class="annotation">@CreatedDate</span>
+    <span class="annotation">@Column</span>(updatable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> createdAt;
+
+    <span class="annotation">@LastModifiedDate</span>
+    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> updatedAt;
+
+    <span class="annotation">@CreatedBy</span>
+    <span class="annotation">@Column</span>(updatable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> createdBy;
+
+    <span class="annotation">@LastModifiedBy</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> updatedBy;
+
+    <span class="comment">// getters/setters</span>
+}
+
+<span class="comment">// Entity extending Auditable</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> <span class="keyword">extends</span> <span class="class-name">Auditable</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = <span class="class-name">GenerationType</span>.IDENTITY)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+    <span class="comment">// other fields...</span>
+}
+
+<span class="comment">// Provide current user for @CreatedBy/@LastModifiedBy</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">AuditorAwareImpl</span> <span class="keyword">implements</span> <span class="class-name">AuditorAware</span>&lt;<span class="class-name">String</span>&gt; {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; <span class="function">getCurrentAuditor</span>() {
+        <span class="comment">// Get from Spring Security context</span>
+        <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(<span class="class-name">SecurityContextHolder</span>.getContext())
+            .map(<span class="class-name">SecurityContext</span>::getAuthentication)
+            .filter(<span class="class-name">Authentication</span>::isAuthenticated)
+            .map(<span class="class-name">Authentication</span>::getName);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>DO:</h3>
+                <ul>
+                    <li><strong>Use Optional for single results</strong> - findById returns Optional</li>
+                    <li><strong>Use pagination for large datasets</strong> - Page or Slice</li>
+                    <li><strong>Use projections for partial data</strong> - Better performance</li>
+                    <li><strong>Use @Transactional on service layer</strong> - Not repository</li>
+                    <li><strong>Use fetch joins for N+1 queries</strong> - LEFT JOIN FETCH</li>
+                    <li><strong>Use specifications for dynamic queries</strong> - Composable</li>
+                </ul>
+
+                <h3>DON'T:</h3>
+                <ul>
+                    <li><strong>Don't return entities to controllers</strong> - Use DTOs</li>
+                    <li><strong>Don't use findAll() without limits</strong> - Use pagination</li>
+                    <li><strong>Don't forget @Modifying</strong> - Required for UPDATE/DELETE</li>
+                    <li><strong>Don't ignore lazy loading</strong> - Use eager fetch when needed</li>
+                    <li><strong>Don't use native queries if JPQL works</strong> - Less portable</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Spring Data JPA:</strong> Simplifies JPA data access</li>
+                    <li><strong>JpaRepository:</strong> CRUD + pagination + sorting</li>
+                    <li><strong>Query Methods:</strong> findByX, countByX, deleteByX</li>
+                    <li><strong>@Query:</strong> Custom JPQL or native SQL</li>
+                    <li><strong>Pageable:</strong> Pagination with PageRequest.of()</li>
+                    <li><strong>Sort:</strong> Sorting with Sort.by()</li>
+                    <li><strong>Specifications:</strong> Dynamic, composable queries</li>
+                    <li><strong>Auditing:</strong> @CreatedDate, @LastModifiedDate</li>
+                    <li><strong>Projections:</strong> Return specific fields only</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="boot.html" class="related-link">Spring Boot Basics</a>
+                <a href="core.html" class="related-link">Spring Core</a>
+                <a href="../jakarta-ee/jpa.html" class="related-link">JPA (Jakarta EE)</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

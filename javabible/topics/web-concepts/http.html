@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP Protocol & Methods - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#web-concepts">Web Concepts</a> / HTTP Protocol
+            </nav>
+            <h1>HTTP Protocol & Methods</h1>
+            <p class="topic-subtitle">The language of the web</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is HTTP?</h2>
+            <p><strong>HTTP (HyperText Transfer Protocol)</strong> is the foundation of the World Wide Web and the protocol that makes the internet work as we know it. Every time you visit a website, check your email through a web browser, stream a video, or use a mobile app that connects to the internet, HTTP is working behind the scenes.</p>
+
+            <p>HTTP defines <strong>how messages are formatted and transmitted</strong>, and what actions web servers and browsers should take in response to various commands. It's the "language" that clients (like your browser) and servers speak to each other.</p>
+
+            <h3>A Simple Analogy: The Postal System</h3>
+            <p>Understanding HTTP becomes easier when you compare it to sending letters:</p>
+            <ul>
+                <li><strong>HTTP Request = Sending a Letter:</strong> You write a letter (the body), put it in an envelope with an address (the URL), specify what kind of response you want (headers like "Accept"), and indicate the purpose (GET to request information, POST to submit something).</li>
+                <li><strong>HTTP Response = Receiving a Reply:</strong> The recipient processes your request and sends back a response. The response includes a status (success, failure, not found), metadata about the content, and the actual content itself.</li>
+                <li><strong>Protocol = Postal Rules:</strong> Everyone follows the same rules—envelopes have addresses in specific places, stamps go in the corner, ZIP codes help with routing. HTTP has similar standardized rules that all web software follows.</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>HTTP (HyperText Transfer Protocol)</strong> is the application-layer protocol for transmitting hypermedia documents (like HTML). Its key characteristics:</p>
+                <ul>
+                    <li><strong>Request-Response Model:</strong> Communication is always initiated by the client. The server waits for requests and sends responses.</li>
+                    <li><strong>Stateless:</strong> Each request is completely independent. The server doesn't remember previous requests (though we can add state with sessions and cookies).</li>
+                    <li><strong>Text-based (HTTP/1.x):</strong> Requests and responses are human-readable plain text, making debugging easier.</li>
+                    <li><strong>Extensible:</strong> Headers can carry custom metadata, allowing protocols to be built on top of HTTP.</li>
+                    <li><strong>Port 80 (HTTP) / Port 443 (HTTPS):</strong> These are the default ports, though any port can be used.</li>
+                </ul>
+            </div>
+
+            <h3>A Brief History of HTTP</h3>
+            <p>Understanding HTTP's evolution helps explain why things work the way they do today:</p>
+            <ul>
+                <li><strong>HTTP/0.9 (1991):</strong> The original version. Only GET method, only HTML responses, no headers. Tim Berners-Lee created it at CERN.</li>
+                <li><strong>HTTP/1.0 (1996):</strong> Added headers, status codes, POST method, content types. Each request required a new TCP connection.</li>
+                <li><strong>HTTP/1.1 (1997):</strong> Added persistent connections (keep-alive), chunked transfers, caching improvements, the Host header. Still the most commonly used version.</li>
+                <li><strong>HTTP/2 (2015):</strong> Binary protocol (not text), multiplexing (multiple requests over one connection), server push, header compression. Major performance improvement.</li>
+                <li><strong>HTTP/3 (2022):</strong> Uses QUIC instead of TCP, even faster connection establishment, better handling of packet loss. Gradually being adopted.</li>
+            </ul>
+
+            <p>As a Java developer, you'll primarily work with HTTP/1.1 concepts, but the principles apply across versions.</p>
+
+            <pre><code><span class="comment">// HTTP communication flow</span>
+
+Client                                      Server
+   │                                           │
+   │   ─────── HTTP Request ──────────▶       │
+   │   GET /api/users HTTP/1.1                │
+   │   Host: api.example.com                  │
+   │                                           │
+   │   ◀────── HTTP Response ─────────        │
+   │   HTTP/1.1 200 OK                        │
+   │   Content-Type: application/json         │
+   │   {"users": [...]}                       │
+   │                                           │</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>HTTP Request Structure</h2>
+
+            <pre><code><span class="comment">// Complete HTTP Request breakdown</span>
+
+┌─────────────────────────────────────────────────────────────┐
+│ <span class="keyword">REQUEST LINE</span>                                                │
+│ GET /api/products/123?include=reviews HTTP/1.1              │
+│ ─── ─────────────────────────────────── ────────            │
+│  │           │                             │                 │
+│ Method     Path + Query                 Version              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ <span class="keyword">HEADERS</span>                                                     │
+│ Host: api.example.com                                       │
+│ Accept: application/json                                    │
+│ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...              │
+│ Content-Type: application/json                              │
+│ User-Agent: Mozilla/5.0                                     │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ <span class="keyword">BODY</span> (optional, for POST/PUT/PATCH)                        │
+│ {                                                           │
+│     "name": "New Product",                                  │
+│     "price": 29.99                                          │
+│ }                                                           │
+└─────────────────────────────────────────────────────────────┘</code></pre>
+
+            <h3>Reading Request in Java (Spring)</h3>
+            <pre><code><span class="annotation">@PostMapping</span>(<span class="string">"/api/products"</span>)
+<span class="keyword">public</span> Product createProduct(
+    <span class="comment">// Request body - automatically parsed from JSON</span>
+    <span class="annotation">@RequestBody</span> Product product,
+
+    <span class="comment">// Path variable - from URL</span>
+    <span class="annotation">@PathVariable</span>(<span class="string">"id"</span>) Long id,
+
+    <span class="comment">// Query parameter - ?category=electronics</span>
+    <span class="annotation">@RequestParam</span>(<span class="string">"category"</span>) String category,
+
+    <span class="comment">// Header value</span>
+    <span class="annotation">@RequestHeader</span>(<span class="string">"Authorization"</span>) String authHeader,
+
+    <span class="comment">// Full request access</span>
+    HttpServletRequest request
+) {
+    <span class="comment">// Access any part of the request</span>
+    String method = request.getMethod();        <span class="comment">// "POST"</span>
+    String uri = request.getRequestURI();       <span class="comment">// "/api/products"</span>
+    String query = request.getQueryString();    <span class="comment">// "category=electronics"</span>
+
+    <span class="keyword">return</span> productService.create(product);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>HTTP Methods (Verbs)</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Purpose</th>
+                        <th>Has Body</th>
+                        <th>Idempotent</th>
+                        <th>Safe</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>GET</strong></td>
+                        <td>Retrieve data</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>POST</strong></td>
+                        <td>Create resource</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PUT</strong></td>
+                        <td>Replace resource</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PATCH</strong></td>
+                        <td>Partial update</td>
+                        <td>Yes</td>
+                        <td>No*</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DELETE</strong></td>
+                        <td>Remove resource</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>HEAD</strong></td>
+                        <td>GET without body</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>OPTIONS</strong></td>
+                        <td>Get allowed methods</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box note">
+                <div class="info-box-title">Key Terms</div>
+                <ul>
+                    <li><strong>Idempotent:</strong> Same request multiple times = same result</li>
+                    <li><strong>Safe:</strong> Doesn't modify data (read-only)</li>
+                </ul>
+            </div>
+
+            <h3>GET - Retrieve Data</h3>
+            <pre><code><span class="comment">// GET requests retrieve data - never modify anything!</span>
+
+<span class="comment">// Request</span>
+GET /api/users/123 HTTP/1.1
+Host: api.example.com
+Accept: application/json
+
+<span class="comment">// Java handler</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{id}"</span>)
+<span class="keyword">public</span> User getUser(<span class="annotation">@PathVariable</span> Long id) {
+    <span class="keyword">return</span> userService.findById(id);
+}
+
+<span class="comment">// GET with query parameters</span>
+GET /api/users?page=1&size=10&sort=name HTTP/1.1
+
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/users"</span>)
+<span class="keyword">public</span> Page&lt;User&gt; getUsers(
+    <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"0"</span>) <span class="keyword">int</span> page,
+    <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"10"</span>) <span class="keyword">int</span> size,
+    <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"id"</span>) String sort
+) {
+    <span class="keyword">return</span> userService.findAll(PageRequest.of(page, size, Sort.by(sort)));
+}</code></pre>
+
+            <h3>POST - Create Resource</h3>
+            <pre><code><span class="comment">// POST creates new resources</span>
+
+<span class="comment">// Request</span>
+POST /api/users HTTP/1.1
+Host: api.example.com
+Content-Type: application/json
+
+{
+    "name": "John Doe",
+    "email": "john@example.com"
+}
+
+<span class="comment">// Java handler</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/api/users"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;User&gt; createUser(<span class="annotation">@RequestBody</span> User user) {
+    User created = userService.create(user);
+    URI location = URI.create(<span class="string">"/api/users/"</span> + created.getId());
+
+    <span class="keyword">return</span> ResponseEntity
+        .created(location)     <span class="comment">// 201 Created</span>
+        .body(created);
+}</code></pre>
+
+            <h3>PUT - Replace Resource</h3>
+            <pre><code><span class="comment">// PUT replaces entire resource (send all fields)</span>
+
+<span class="comment">// Request</span>
+PUT /api/users/123 HTTP/1.1
+Content-Type: application/json
+
+{
+    "name": "John Updated",
+    "email": "john.new@example.com",
+    "phone": "555-1234"
+}
+
+<span class="comment">// Java handler</span>
+<span class="annotation">@PutMapping</span>(<span class="string">"/api/users/{id}"</span>)
+<span class="keyword">public</span> User replaceUser(
+    <span class="annotation">@PathVariable</span> Long id,
+    <span class="annotation">@RequestBody</span> User user
+) {
+    <span class="comment">// Replace ALL fields</span>
+    <span class="keyword">return</span> userService.replace(id, user);
+}</code></pre>
+
+            <h3>PATCH - Partial Update</h3>
+            <pre><code><span class="comment">// PATCH updates only specified fields</span>
+
+<span class="comment">// Request - only updating email</span>
+PATCH /api/users/123 HTTP/1.1
+Content-Type: application/json
+
+{
+    "email": "new.email@example.com"
+}
+
+<span class="comment">// Java handler</span>
+<span class="annotation">@PatchMapping</span>(<span class="string">"/api/users/{id}"</span>)
+<span class="keyword">public</span> User updateUser(
+    <span class="annotation">@PathVariable</span> Long id,
+    <span class="annotation">@RequestBody</span> Map&lt;String, Object&gt; updates
+) {
+    <span class="comment">// Update only provided fields</span>
+    <span class="keyword">return</span> userService.partialUpdate(id, updates);
+}</code></pre>
+
+            <h3>DELETE - Remove Resource</h3>
+            <pre><code><span class="comment">// DELETE removes resources</span>
+
+<span class="comment">// Request</span>
+DELETE /api/users/123 HTTP/1.1
+Host: api.example.com
+
+<span class="comment">// Java handler</span>
+<span class="annotation">@DeleteMapping</span>(<span class="string">"/api/users/{id}"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;Void&gt; deleteUser(<span class="annotation">@PathVariable</span> Long id) {
+    userService.delete(id);
+    <span class="keyword">return</span> ResponseEntity.noContent().build();  <span class="comment">// 204 No Content</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>HTTP Status Codes</h2>
+
+            <h3>1xx - Informational</h3>
+            <pre><code><span class="comment">// Rarely used directly</span>
+100 Continue           <span class="comment">// Server received headers, send body</span>
+101 Switching Protocols<span class="comment">// Upgrading to WebSocket</span></code></pre>
+
+            <h3>2xx - Success</h3>
+            <pre><code><span class="comment">// Request succeeded</span>
+200 OK                 <span class="comment">// Standard success (GET, PUT, PATCH)</span>
+201 Created            <span class="comment">// Resource created (POST)</span>
+204 No Content         <span class="comment">// Success, no body (DELETE)</span>
+202 Accepted           <span class="comment">// Processing started (async operations)</span>
+
+<span class="comment">// Java examples</span>
+<span class="keyword">return</span> ResponseEntity.ok(user);                     <span class="comment">// 200</span>
+<span class="keyword">return</span> ResponseEntity.created(location).body(user); <span class="comment">// 201</span>
+<span class="keyword">return</span> ResponseEntity.noContent().build();          <span class="comment">// 204</span>
+<span class="keyword">return</span> ResponseEntity.accepted().build();           <span class="comment">// 202</span></code></pre>
+
+            <h3>3xx - Redirection</h3>
+            <pre><code><span class="comment">// Resource moved</span>
+301 Moved Permanently  <span class="comment">// URL changed forever</span>
+302 Found              <span class="comment">// Temporary redirect</span>
+304 Not Modified       <span class="comment">// Use cached version</span>
+307 Temporary Redirect <span class="comment">// Redirect, keep method</span>
+308 Permanent Redirect <span class="comment">// Permanent, keep method</span>
+
+<span class="comment">// Java redirect</span>
+<span class="keyword">return</span> ResponseEntity
+    .status(HttpStatus.MOVED_PERMANENTLY)
+    .location(URI.create(<span class="string">"/new-url"</span>))
+    .build();</code></pre>
+
+            <h3>4xx - Client Errors</h3>
+            <pre><code><span class="comment">// Client did something wrong</span>
+400 Bad Request        <span class="comment">// Invalid syntax, validation error</span>
+401 Unauthorized       <span class="comment">// Not authenticated (login required)</span>
+403 Forbidden          <span class="comment">// Authenticated but not allowed</span>
+404 Not Found          <span class="comment">// Resource doesn't exist</span>
+405 Method Not Allowed <span class="comment">// GET when only POST allowed</span>
+409 Conflict           <span class="comment">// Conflict with current state</span>
+422 Unprocessable      <span class="comment">// Valid syntax but invalid data</span>
+429 Too Many Requests  <span class="comment">// Rate limited</span>
+
+<span class="comment">// Java exception handling</span>
+<span class="annotation">@ExceptionHandler</span>(NotFoundException.<span class="keyword">class</span>)
+<span class="keyword">public</span> ResponseEntity&lt;?&gt; handleNotFound(NotFoundException e) {
+    <span class="keyword">return</span> ResponseEntity.notFound().build();  <span class="comment">// 404</span>
+}
+
+<span class="annotation">@ExceptionHandler</span>(ValidationException.<span class="keyword">class</span>)
+<span class="keyword">public</span> ResponseEntity&lt;?&gt; handleValidation(ValidationException e) {
+    <span class="keyword">return</span> ResponseEntity.badRequest().body(e.getMessage());  <span class="comment">// 400</span>
+}</code></pre>
+
+            <h3>5xx - Server Errors</h3>
+            <pre><code><span class="comment">// Server did something wrong</span>
+500 Internal Server Error  <span class="comment">// Generic server error</span>
+501 Not Implemented        <span class="comment">// Feature not supported</span>
+502 Bad Gateway            <span class="comment">// Upstream server error</span>
+503 Service Unavailable    <span class="comment">// Server overloaded/maintenance</span>
+504 Gateway Timeout        <span class="comment">// Upstream server timeout</span>
+
+<span class="comment">// Java - let Spring handle 500s for unhandled exceptions</span>
+<span class="annotation">@ExceptionHandler</span>(Exception.<span class="keyword">class</span>)
+<span class="keyword">public</span> ResponseEntity&lt;?&gt; handleGeneric(Exception e) {
+    log.error(<span class="string">"Unexpected error"</span>, e);
+    <span class="keyword">return</span> ResponseEntity
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(<span class="string">"An unexpected error occurred"</span>);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common HTTP Headers</h2>
+
+            <h3>Request Headers</h3>
+            <pre><code><span class="comment">// Headers the client sends</span>
+
+Accept: application/json           <span class="comment">// I want JSON response</span>
+Accept-Language: en-US             <span class="comment">// Preferred language</span>
+Authorization: Bearer eyJ...       <span class="comment">// Authentication token</span>
+Content-Type: application/json     <span class="comment">// Body format I'm sending</span>
+Cookie: sessionId=abc123           <span class="comment">// Send cookies</span>
+User-Agent: Mozilla/5.0...         <span class="comment">// Browser/client info</span>
+Origin: https://example.com        <span class="comment">// Where request came from</span>
+Cache-Control: no-cache            <span class="comment">// Caching preferences</span></code></pre>
+
+            <h3>Response Headers</h3>
+            <pre><code><span class="comment">// Headers the server sends</span>
+
+Content-Type: application/json     <span class="comment">// Response body format</span>
+Content-Length: 1234               <span class="comment">// Body size in bytes</span>
+Set-Cookie: sessionId=abc123       <span class="comment">// Store this cookie</span>
+Location: /api/users/456           <span class="comment">// Redirect URL (201, 3xx)</span>
+Cache-Control: max-age=3600        <span class="comment">// Cache for 1 hour</span>
+Access-Control-Allow-Origin: *     <span class="comment">// CORS header</span>
+WWW-Authenticate: Bearer           <span class="comment">// Auth method (401)</span>
+
+<span class="comment">// Setting headers in Java</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/report"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;byte[]&gt; downloadReport() {
+    <span class="keyword">byte</span>[] pdf = reportService.generatePdf();
+
+    <span class="keyword">return</span> ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION,
+                <span class="string">"attachment; filename=report.pdf"</span>)
+        .contentType(MediaType.APPLICATION_PDF)
+        .contentLength(pdf.length)
+        .body(pdf);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>HTTP vs HTTPS</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>HTTP</th>
+                        <th>HTTPS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Port</strong></td>
+                        <td>80</td>
+                        <td>443</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Encryption</strong></td>
+                        <td>None (plaintext)</td>
+                        <td>TLS/SSL encrypted</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Security</strong></td>
+                        <td>Can be intercepted</td>
+                        <td>Secure communication</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Certificate</strong></td>
+                        <td>Not required</td>
+                        <td>Required</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Use case</strong></td>
+                        <td>Development only</td>
+                        <td>Production (always!)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <pre><code><span class="comment">// Spring Boot HTTPS configuration</span>
+<span class="comment">// application.properties</span>
+
+server.port=<span class="number">8443</span>
+server.ssl.enabled=<span class="keyword">true</span>
+server.ssl.key-store=classpath:keystore.p12
+server.ssl.key-store-password=changeit
+server.ssl.key-store-type=PKCS12
+
+<span class="comment">// Redirect HTTP to HTTPS</span>
+<span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">HttpsRedirectConfig</span> {
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> ServletWebServerFactory servletContainer() {
+        TomcatServletWebServerFactory tomcat = <span class="keyword">new</span> TomcatServletWebServerFactory();
+        tomcat.addAdditionalTomcatConnectors(httpConnector());
+        <span class="keyword">return</span> tomcat;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>HTTP/1.1 vs HTTP/2 vs HTTP/3</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>HTTP/1.1</th>
+                        <th>HTTP/2</th>
+                        <th>HTTP/3</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Connections</strong></td>
+                        <td>One request per connection</td>
+                        <td>Multiplexed</td>
+                        <td>Multiplexed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Format</strong></td>
+                        <td>Text</td>
+                        <td>Binary</td>
+                        <td>Binary</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Transport</strong></td>
+                        <td>TCP</td>
+                        <td>TCP</td>
+                        <td>QUIC (UDP)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Header compression</strong></td>
+                        <td>No</td>
+                        <td>HPACK</td>
+                        <td>QPACK</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Server push</strong></td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <pre><code><span class="comment">// Most Java servers support HTTP/2 automatically</span>
+<span class="comment">// Spring Boot with HTTP/2</span>
+
+<span class="comment">// application.properties</span>
+server.http2.enabled=<span class="keyword">true</span>
+
+<span class="comment">// Note: HTTP/2 typically requires HTTPS</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Testing HTTP with Tools</h2>
+
+            <pre><code><span class="comment"># curl - Command line HTTP client</span>
+
+<span class="comment"># GET request</span>
+curl https://api.example.com/users
+
+<span class="comment"># GET with headers</span>
+curl -H "Authorization: Bearer token123" \
+     -H "Accept: application/json" \
+     https://api.example.com/users
+
+<span class="comment"># POST with JSON body</span>
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"name": "John", "email": "john@example.com"}' \
+     https://api.example.com/users
+
+<span class="comment"># See response headers</span>
+curl -i https://api.example.com/users
+
+<span class="comment"># Verbose mode (debug)</span>
+curl -v https://api.example.com/users
+
+<span class="comment"># PUT request</span>
+curl -X PUT \
+     -H "Content-Type: application/json" \
+     -d '{"name": "John Updated"}' \
+     https://api.example.com/users/123
+
+<span class="comment"># DELETE request</span>
+curl -X DELETE https://api.example.com/users/123</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>HTTP:</strong> Protocol for client-server communication</li>
+                    <li><strong>Methods:</strong> GET (read), POST (create), PUT (replace), PATCH (update), DELETE (remove)</li>
+                    <li><strong>Status codes:</strong> 2xx success, 4xx client error, 5xx server error</li>
+                    <li><strong>Headers:</strong> Metadata about the request/response</li>
+                    <li><strong>HTTPS:</strong> Always use in production (encrypted)</li>
+                    <li><strong>Stateless:</strong> Each request is independent</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="rest-principles.html" class="related-link">RESTful APIs</a>
+                <a href="request-response.html" class="related-link">Request/Response Cycle</a>
+                <a href="cors.html" class="related-link">CORS</a>
+                <a href="sessions-cookies.html" class="related-link">Sessions & Cookies</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

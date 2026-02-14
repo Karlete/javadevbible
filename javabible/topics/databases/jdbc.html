@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JDBC - Java Database Connectivity - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#databases">Databases & Persistence</a> / JDBC
+            </nav>
+            <h1>JDBC - Java Database Connectivity</h1>
+            <p class="topic-subtitle">The foundation of all Java database access</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is JDBC?</h2>
+            <p><strong>JDBC (Java Database Connectivity)</strong> is Java's standard API for connecting to and interacting with relational databases. It's the foundation upon which all Java database access is built, including JPA, Hibernate, and Spring Data.</p>
+
+            <div class="info-box">
+                <p><strong>JDBC is to databases what JDBC drivers are to specific databases.</strong> JDBC provides the API (interfaces), and database vendors provide the implementations (drivers). Your code uses the same JDBC API regardless of whether you're connecting to MySQL, PostgreSQL, Oracle, or any other database.</p>
+            </div>
+
+            <h3>JDBC Architecture</h3>
+            <pre><code><span class="comment">// JDBC Architecture - Layered Design</span>
+
+┌─────────────────────────────────────────────────────────────┐
+│                    YOUR JAVA APPLICATION                     │
+│      (Uses JDBC API: Connection, Statement, ResultSet)       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      JDBC API (java.sql)                     │
+│   Interfaces: Connection, Statement, PreparedStatement,      │
+│               ResultSet, DataSource, Driver                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   JDBC DRIVER MANAGER                        │
+│          (Loads and manages database drivers)                │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│ MySQL Driver │    │ PostgreSQL   │    │ Oracle       │
+│ (Connector/J)│    │ Driver       │    │ Driver       │
+└──────────────┘    └──────────────┘    └──────────────┘
+        │                     │                     │
+        ▼                     ▼                     ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│    MySQL     │    │  PostgreSQL  │    │   Oracle     │
+│   Database   │    │   Database   │    │   Database   │
+└──────────────┘    └──────────────┘    └──────────────┘</code></pre>
+
+            <h3>Key JDBC Components</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Interface/Class</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Driver</strong></td>
+                        <td>java.sql.Driver</td>
+                        <td>Vendor-specific database driver</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DriverManager</strong></td>
+                        <td>java.sql.DriverManager</td>
+                        <td>Loads drivers, creates connections</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DataSource</strong></td>
+                        <td>javax.sql.DataSource</td>
+                        <td>Factory for connections (preferred)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Connection</strong></td>
+                        <td>java.sql.Connection</td>
+                        <td>Session with the database</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Statement</strong></td>
+                        <td>java.sql.Statement</td>
+                        <td>Execute SQL statements</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PreparedStatement</strong></td>
+                        <td>java.sql.PreparedStatement</td>
+                        <td>Parameterized SQL (recommended)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CallableStatement</strong></td>
+                        <td>java.sql.CallableStatement</td>
+                        <td>Call stored procedures</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ResultSet</strong></td>
+                        <td>java.sql.ResultSet</td>
+                        <td>Query results (rows)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Setting Up JDBC</h2>
+
+            <h3>Adding the Driver Dependency</h3>
+            <pre><code><span class="comment">&lt;!-- Maven dependencies for common databases --&gt;</span>
+
+<span class="comment">&lt;!-- MySQL --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>com.mysql<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>mysql-connector-j<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>8.3.0<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">&lt;!-- PostgreSQL --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>org.postgresql<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>postgresql<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>42.7.1<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">&lt;!-- H2 (in-memory, great for testing) --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>com.h2database<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>h2<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>2.2.224<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">&lt;!-- Oracle --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>com.oracle.database.jdbc<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>ojdbc11<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>23.3.0.23.09<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">&lt;!-- Microsoft SQL Server --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>com.microsoft.sqlserver<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>mssql-jdbc<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>12.4.2.jre11<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span></code></pre>
+
+            <h3>JDBC URL Formats</h3>
+            <pre><code><span class="comment">// JDBC URL format: jdbc:subprotocol:subname</span>
+
+<span class="comment">// MySQL</span>
+<span class="string">"jdbc:mysql://localhost:3306/mydb"</span>
+<span class="string">"jdbc:mysql://localhost:3306/mydb?useSSL=true&serverTimezone=UTC"</span>
+
+<span class="comment">// PostgreSQL</span>
+<span class="string">"jdbc:postgresql://localhost:5432/mydb"</span>
+<span class="string">"jdbc:postgresql://localhost:5432/mydb?ssl=true"</span>
+
+<span class="comment">// H2 (in-memory)</span>
+<span class="string">"jdbc:h2:mem:testdb"</span>
+<span class="comment">// H2 (file-based)</span>
+<span class="string">"jdbc:h2:file:./data/mydb"</span>
+
+<span class="comment">// Oracle</span>
+<span class="string">"jdbc:oracle:thin:@localhost:1521:ORCL"</span>
+<span class="string">"jdbc:oracle:thin:@//localhost:1521/servicename"</span>
+
+<span class="comment">// SQL Server</span>
+<span class="string">"jdbc:sqlserver://localhost:1433;databaseName=mydb"</span>
+<span class="string">"jdbc:sqlserver://localhost:1433;databaseName=mydb;encrypt=true"</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Basic JDBC Operations</h2>
+
+            <h3>Establishing a Connection</h3>
+            <pre><code><span class="keyword">import</span> java.sql.Connection;
+<span class="keyword">import</span> java.sql.DriverManager;
+<span class="keyword">import</span> java.sql.SQLException;
+
+<span class="keyword">public class</span> <span class="class-name">JdbcBasics</span> {
+
+    <span class="comment">// Database connection parameters</span>
+    <span class="keyword">private static final</span> String URL = <span class="string">"jdbc:mysql://localhost:3306/mydb"</span>;
+    <span class="keyword">private static final</span> String USER = <span class="string">"root"</span>;
+    <span class="keyword">private static final</span> String PASSWORD = <span class="string">"password"</span>;
+
+    <span class="keyword">public static void</span> <span class="function">main</span>(String[] args) {
+        <span class="comment">// Method 1: Try-with-resources (recommended)</span>
+        <span class="keyword">try</span> (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD)) {
+            System.out.println(<span class="string">"Connected successfully!"</span>);
+            System.out.println(<span class="string">"Database: "</span> + conn.getCatalog());
+            System.out.println(<span class="string">"Auto-commit: "</span> + conn.getAutoCommit());
+        } <span class="keyword">catch</span> (SQLException e) {
+            System.err.println(<span class="string">"Connection failed: "</span> + e.getMessage());
+            e.printStackTrace();
+        }
+        <span class="comment">// Connection automatically closed here</span>
+    }
+
+    <span class="comment">// Method 2: Manual resource management (legacy)</span>
+    <span class="keyword">public void</span> <span class="function">connectManually</span>() {
+        Connection conn = <span class="keyword">null</span>;
+        <span class="keyword">try</span> {
+            conn = DriverManager.getConnection(URL, USER, PASSWORD);
+            <span class="comment">// Use connection...</span>
+        } <span class="keyword">catch</span> (SQLException e) {
+            e.printStackTrace();
+        } <span class="keyword">finally</span> {
+            <span class="keyword">if</span> (conn != <span class="keyword">null</span>) {
+                <span class="keyword">try</span> {
+                    conn.close();
+                } <span class="keyword">catch</span> (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}</code></pre>
+
+            <h3>Executing Queries (SELECT)</h3>
+            <pre><code><span class="keyword">import</span> java.sql.*;
+<span class="keyword">import</span> java.util.ArrayList;
+<span class="keyword">import</span> java.util.List;
+
+<span class="keyword">public class</span> <span class="class-name">EmployeeDao</span> {
+
+    <span class="comment">// Find all employees</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findAll</span>() {
+        List&lt;Employee&gt; employees = <span class="keyword">new</span> ArrayList&lt;&gt;();
+        String sql = <span class="string">"SELECT id, first_name, last_name, email, salary FROM employees"</span>;
+
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            <span class="keyword">while</span> (rs.next()) {
+                Employee emp = <span class="keyword">new</span> Employee();
+                emp.setId(rs.getLong(<span class="string">"id"</span>));
+                emp.setFirstName(rs.getString(<span class="string">"first_name"</span>));
+                emp.setLastName(rs.getString(<span class="string">"last_name"</span>));
+                emp.setEmail(rs.getString(<span class="string">"email"</span>));
+                emp.setSalary(rs.getBigDecimal(<span class="string">"salary"</span>));
+                employees.add(emp);
+            }
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error fetching employees"</span>, e);
+        }
+
+        <span class="keyword">return</span> employees;
+    }
+
+    <span class="comment">// Find by ID using PreparedStatement (ALWAYS use for parameters!)</span>
+    <span class="keyword">public</span> Employee <span class="function">findById</span>(<span class="keyword">long</span> id) {
+        String sql = <span class="string">"SELECT id, first_name, last_name, email, salary FROM employees WHERE id = ?"</span>;
+
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setLong(1, id);  <span class="comment">// Parameter index starts at 1!</span>
+
+            <span class="keyword">try</span> (ResultSet rs = pstmt.executeQuery()) {
+                <span class="keyword">if</span> (rs.next()) {
+                    Employee emp = <span class="keyword">new</span> Employee();
+                    emp.setId(rs.getLong(<span class="string">"id"</span>));
+                    emp.setFirstName(rs.getString(<span class="string">"first_name"</span>));
+                    emp.setLastName(rs.getString(<span class="string">"last_name"</span>));
+                    emp.setEmail(rs.getString(<span class="string">"email"</span>));
+                    emp.setSalary(rs.getBigDecimal(<span class="string">"salary"</span>));
+                    <span class="keyword">return</span> emp;
+                }
+            }
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error finding employee"</span>, e);
+        }
+
+        <span class="keyword">return null</span>;
+    }
+
+    <span class="comment">// Search with multiple parameters</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">search</span>(String lastName, BigDecimal minSalary) {
+        List&lt;Employee&gt; employees = <span class="keyword">new</span> ArrayList&lt;&gt;();
+        String sql = <span class="string">"SELECT * FROM employees WHERE last_name LIKE ? AND salary >= ?"</span>;
+
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, lastName + <span class="string">"%"</span>);  <span class="comment">// Wildcard for LIKE</span>
+            pstmt.setBigDecimal(2, minSalary);
+
+            <span class="keyword">try</span> (ResultSet rs = pstmt.executeQuery()) {
+                <span class="keyword">while</span> (rs.next()) {
+                    employees.add(mapResultSetToEmployee(rs));
+                }
+            }
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error searching employees"</span>, e);
+        }
+
+        <span class="keyword">return</span> employees;
+    }
+
+    <span class="keyword">private</span> Employee <span class="function">mapResultSetToEmployee</span>(ResultSet rs) <span class="keyword">throws</span> SQLException {
+        Employee emp = <span class="keyword">new</span> Employee();
+        emp.setId(rs.getLong(<span class="string">"id"</span>));
+        emp.setFirstName(rs.getString(<span class="string">"first_name"</span>));
+        emp.setLastName(rs.getString(<span class="string">"last_name"</span>));
+        emp.setEmail(rs.getString(<span class="string">"email"</span>));
+        emp.setSalary(rs.getBigDecimal(<span class="string">"salary"</span>));
+        <span class="keyword">return</span> emp;
+    }
+}</code></pre>
+
+            <div class="info-box important">
+                <div class="info-box-title">SQL Injection Prevention</div>
+                <p><strong>NEVER concatenate user input into SQL strings!</strong> Always use PreparedStatement with parameters.</p>
+                <pre><code><span class="comment">// DANGEROUS - SQL Injection vulnerability!</span>
+String sql = <span class="string">"SELECT * FROM users WHERE name = '"</span> + userInput + <span class="string">"'"</span>;
+<span class="comment">// If userInput = "'; DROP TABLE users; --" ... disaster!</span>
+
+<span class="comment">// SAFE - Use PreparedStatement</span>
+String sql = <span class="string">"SELECT * FROM users WHERE name = ?"</span>;
+pstmt.setString(1, userInput);  <span class="comment">// Properly escaped</span></code></pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>INSERT, UPDATE, DELETE Operations</h2>
+
+            <h3>INSERT - Creating Records</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">EmployeeDao</span> {
+
+    <span class="comment">// Basic INSERT</span>
+    <span class="keyword">public void</span> <span class="function">save</span>(Employee emp) {
+        String sql = <span class="string">"INSERT INTO employees (first_name, last_name, email, salary, hire_date) "</span>
+                   + <span class="string">"VALUES (?, ?, ?, ?, ?)"</span>;
+
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, emp.getFirstName());
+            pstmt.setString(2, emp.getLastName());
+            pstmt.setString(3, emp.getEmail());
+            pstmt.setBigDecimal(4, emp.getSalary());
+            pstmt.setDate(5, java.sql.Date.valueOf(emp.getHireDate()));
+
+            <span class="keyword">int</span> rowsAffected = pstmt.executeUpdate();
+            System.out.println(<span class="string">"Inserted "</span> + rowsAffected + <span class="string">" row(s)"</span>);
+
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error saving employee"</span>, e);
+        }
+    }
+
+    <span class="comment">// INSERT and get generated ID</span>
+    <span class="keyword">public long</span> <span class="function">saveAndGetId</span>(Employee emp) {
+        String sql = <span class="string">"INSERT INTO employees (first_name, last_name, email, salary) VALUES (?, ?, ?, ?)"</span>;
+
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            pstmt.setString(1, emp.getFirstName());
+            pstmt.setString(2, emp.getLastName());
+            pstmt.setString(3, emp.getEmail());
+            pstmt.setBigDecimal(4, emp.getSalary());
+
+            <span class="keyword">int</span> rowsAffected = pstmt.executeUpdate();
+
+            <span class="keyword">if</span> (rowsAffected > 0) {
+                <span class="keyword">try</span> (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
+                    <span class="keyword">if</span> (generatedKeys.next()) {
+                        <span class="keyword">long</span> id = generatedKeys.getLong(1);
+                        emp.setId(id);
+                        <span class="keyword">return</span> id;
+                    }
+                }
+            }
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error saving employee"</span>, e);
+        }
+        <span class="keyword">return</span> -1;
+    }
+
+    <span class="comment">// Batch INSERT for multiple records (much faster!)</span>
+    <span class="keyword">public void</span> <span class="function">saveAll</span>(List&lt;Employee&gt; employees) {
+        String sql = <span class="string">"INSERT INTO employees (first_name, last_name, email, salary) VALUES (?, ?, ?, ?)"</span>;
+
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            conn.setAutoCommit(<span class="keyword">false</span>);  <span class="comment">// Start transaction</span>
+
+            <span class="keyword">for</span> (Employee emp : employees) {
+                pstmt.setString(1, emp.getFirstName());
+                pstmt.setString(2, emp.getLastName());
+                pstmt.setString(3, emp.getEmail());
+                pstmt.setBigDecimal(4, emp.getSalary());
+                pstmt.addBatch();  <span class="comment">// Add to batch</span>
+            }
+
+            <span class="keyword">int</span>[] results = pstmt.executeBatch();  <span class="comment">// Execute all at once</span>
+            conn.commit();  <span class="comment">// Commit transaction</span>
+
+            System.out.println(<span class="string">"Inserted "</span> + results.length + <span class="string">" employees"</span>);
+
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error batch inserting employees"</span>, e);
+        }
+    }
+}</code></pre>
+
+            <h3>UPDATE - Modifying Records</h3>
+            <pre><code><span class="comment">// Update single record</span>
+<span class="keyword">public void</span> <span class="function">update</span>(Employee emp) {
+    String sql = <span class="string">"UPDATE employees SET first_name = ?, last_name = ?, email = ?, salary = ? WHERE id = ?"</span>;
+
+    <span class="keyword">try</span> (Connection conn = getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+        pstmt.setString(1, emp.getFirstName());
+        pstmt.setString(2, emp.getLastName());
+        pstmt.setString(3, emp.getEmail());
+        pstmt.setBigDecimal(4, emp.getSalary());
+        pstmt.setLong(5, emp.getId());
+
+        <span class="keyword">int</span> rowsAffected = pstmt.executeUpdate();
+
+        <span class="keyword">if</span> (rowsAffected == 0) {
+            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Employee not found: "</span> + emp.getId());
+        }
+    } <span class="keyword">catch</span> (SQLException e) {
+        <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error updating employee"</span>, e);
+    }
+}
+
+<span class="comment">// Bulk update with conditional logic</span>
+<span class="keyword">public int</span> <span class="function">giveRaise</span>(<span class="keyword">long</span> departmentId, BigDecimal percentage) {
+    String sql = <span class="string">"UPDATE employees SET salary = salary * (1 + ? / 100) WHERE department_id = ?"</span>;
+
+    <span class="keyword">try</span> (Connection conn = getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+        pstmt.setBigDecimal(1, percentage);
+        pstmt.setLong(2, departmentId);
+
+        <span class="keyword">return</span> pstmt.executeUpdate();  <span class="comment">// Returns number of rows updated</span>
+
+    } <span class="keyword">catch</span> (SQLException e) {
+        <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error giving raises"</span>, e);
+    }
+}</code></pre>
+
+            <h3>DELETE - Removing Records</h3>
+            <pre><code><span class="comment">// Delete single record</span>
+<span class="keyword">public boolean</span> <span class="function">delete</span>(<span class="keyword">long</span> id) {
+    String sql = <span class="string">"DELETE FROM employees WHERE id = ?"</span>;
+
+    <span class="keyword">try</span> (Connection conn = getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+        pstmt.setLong(1, id);
+        <span class="keyword">int</span> rowsAffected = pstmt.executeUpdate();
+
+        <span class="keyword">return</span> rowsAffected > 0;  <span class="comment">// true if deleted</span>
+
+    } <span class="keyword">catch</span> (SQLException e) {
+        <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error deleting employee"</span>, e);
+    }
+}
+
+<span class="comment">// Soft delete (recommended pattern)</span>
+<span class="keyword">public void</span> <span class="function">softDelete</span>(<span class="keyword">long</span> id) {
+    String sql = <span class="string">"UPDATE employees SET active = false, deleted_at = ? WHERE id = ?"</span>;
+
+    <span class="keyword">try</span> (Connection conn = getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+        pstmt.setTimestamp(1, Timestamp.from(Instant.now()));
+        pstmt.setLong(2, id);
+        pstmt.executeUpdate();
+
+    } <span class="keyword">catch</span> (SQLException e) {
+        <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error soft-deleting employee"</span>, e);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Transaction Management</h2>
+            <p>Transactions group multiple database operations into a single atomic unit. Either all operations succeed, or none do.</p>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">TransferService</span> {
+
+    <span class="comment">// Transfer money between accounts (classic transaction example)</span>
+    <span class="keyword">public void</span> <span class="function">transferMoney</span>(<span class="keyword">long</span> fromAccountId, <span class="keyword">long</span> toAccountId, BigDecimal amount) {
+        Connection conn = <span class="keyword">null</span>;
+
+        <span class="keyword">try</span> {
+            conn = getConnection();
+            conn.setAutoCommit(<span class="keyword">false</span>);  <span class="comment">// Start transaction</span>
+
+            <span class="comment">// Step 1: Debit from source account</span>
+            String debitSql = <span class="string">"UPDATE accounts SET balance = balance - ? WHERE id = ? AND balance >= ?"</span>;
+            <span class="keyword">try</span> (PreparedStatement debitStmt = conn.prepareStatement(debitSql)) {
+                debitStmt.setBigDecimal(1, amount);
+                debitStmt.setLong(2, fromAccountId);
+                debitStmt.setBigDecimal(3, amount);  <span class="comment">// Check sufficient funds</span>
+
+                <span class="keyword">int</span> debitRows = debitStmt.executeUpdate();
+                <span class="keyword">if</span> (debitRows == 0) {
+                    <span class="keyword">throw new</span> RuntimeException(<span class="string">"Insufficient funds or account not found"</span>);
+                }
+            }
+
+            <span class="comment">// Step 2: Credit to destination account</span>
+            String creditSql = <span class="string">"UPDATE accounts SET balance = balance + ? WHERE id = ?"</span>;
+            <span class="keyword">try</span> (PreparedStatement creditStmt = conn.prepareStatement(creditSql)) {
+                creditStmt.setBigDecimal(1, amount);
+                creditStmt.setLong(2, toAccountId);
+
+                <span class="keyword">int</span> creditRows = creditStmt.executeUpdate();
+                <span class="keyword">if</span> (creditRows == 0) {
+                    <span class="keyword">throw new</span> RuntimeException(<span class="string">"Destination account not found"</span>);
+                }
+            }
+
+            <span class="comment">// Step 3: Record the transaction</span>
+            String logSql = <span class="string">"INSERT INTO transactions (from_account, to_account, amount, timestamp) VALUES (?, ?, ?, ?)"</span>;
+            <span class="keyword">try</span> (PreparedStatement logStmt = conn.prepareStatement(logSql)) {
+                logStmt.setLong(1, fromAccountId);
+                logStmt.setLong(2, toAccountId);
+                logStmt.setBigDecimal(3, amount);
+                logStmt.setTimestamp(4, Timestamp.from(Instant.now()));
+                logStmt.executeUpdate();
+            }
+
+            <span class="comment">// All operations successful - commit!</span>
+            conn.commit();
+            System.out.println(<span class="string">"Transfer successful!"</span>);
+
+        } <span class="keyword">catch</span> (Exception e) {
+            <span class="comment">// Something went wrong - rollback everything!</span>
+            <span class="keyword">if</span> (conn != <span class="keyword">null</span>) {
+                <span class="keyword">try</span> {
+                    conn.rollback();
+                    System.out.println(<span class="string">"Transaction rolled back"</span>);
+                } <span class="keyword">catch</span> (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Transfer failed"</span>, e);
+
+        } <span class="keyword">finally</span> {
+            <span class="keyword">if</span> (conn != <span class="keyword">null</span>) {
+                <span class="keyword">try</span> {
+                    conn.setAutoCommit(<span class="keyword">true</span>);  <span class="comment">// Reset for connection pool</span>
+                    conn.close();
+                } <span class="keyword">catch</span> (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+}
+
+<span class="comment">// Using Savepoints for partial rollback</span>
+<span class="keyword">public void</span> <span class="function">processOrderWithSavepoint</span>(Order order) <span class="keyword">throws</span> SQLException {
+    Connection conn = getConnection();
+    Savepoint savepoint = <span class="keyword">null</span>;
+
+    <span class="keyword">try</span> {
+        conn.setAutoCommit(<span class="keyword">false</span>);
+
+        <span class="comment">// Create order header</span>
+        insertOrder(conn, order);
+        savepoint = conn.setSavepoint(<span class="string">"orderCreated"</span>);
+
+        <span class="comment">// Try to add items</span>
+        <span class="keyword">for</span> (OrderItem item : order.getItems()) {
+            <span class="keyword">try</span> {
+                insertOrderItem(conn, item);
+            } <span class="keyword">catch</span> (SQLException e) {
+                <span class="comment">// Rollback to savepoint, try alternative</span>
+                conn.rollback(savepoint);
+                insertBackorderItem(conn, item);
+            }
+        }
+
+        conn.commit();
+
+    } <span class="keyword">catch</span> (SQLException e) {
+        conn.rollback();
+        <span class="keyword">throw</span> e;
+    } <span class="keyword">finally</span> {
+        conn.setAutoCommit(<span class="keyword">true</span>);
+        conn.close();
+    }
+}</code></pre>
+
+            <h3>Transaction Isolation Levels</h3>
+            <pre><code><span class="comment">// Set isolation level on connection</span>
+conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+
+<span class="comment">// Isolation levels (from least to most restrictive):</span>
+
+<span class="comment">// READ_UNCOMMITTED - Can see uncommitted changes (dirty reads)</span>
+conn.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
+
+<span class="comment">// READ_COMMITTED - Only see committed changes (default for most DBs)</span>
+conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+
+<span class="comment">// REPEATABLE_READ - Same query returns same results within transaction</span>
+conn.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+
+<span class="comment">// SERIALIZABLE - Full isolation, transactions run as if serial</span>
+conn.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Working with ResultSet</h2>
+
+            <h3>ResultSet Navigation and Types</h3>
+            <pre><code><span class="comment">// ResultSet types</span>
+<span class="comment">// TYPE_FORWARD_ONLY - Can only move forward (default, most efficient)</span>
+<span class="comment">// TYPE_SCROLL_INSENSITIVE - Can scroll, doesn't see changes</span>
+<span class="comment">// TYPE_SCROLL_SENSITIVE - Can scroll, sees changes</span>
+
+<span class="comment">// ResultSet concurrency</span>
+<span class="comment">// CONCUR_READ_ONLY - Cannot update through ResultSet (default)</span>
+<span class="comment">// CONCUR_UPDATABLE - Can update through ResultSet</span>
+
+<span class="comment">// Creating scrollable, updatable ResultSet</span>
+Statement stmt = conn.createStatement(
+    ResultSet.TYPE_SCROLL_INSENSITIVE,
+    ResultSet.CONCUR_UPDATABLE
+);
+
+ResultSet rs = stmt.executeQuery(<span class="string">"SELECT * FROM employees"</span>);
+
+<span class="comment">// Navigation methods</span>
+rs.next();           <span class="comment">// Move to next row</span>
+rs.previous();       <span class="comment">// Move to previous row (scrollable only)</span>
+rs.first();          <span class="comment">// Move to first row</span>
+rs.last();           <span class="comment">// Move to last row</span>
+rs.absolute(5);      <span class="comment">// Move to row 5</span>
+rs.relative(-2);     <span class="comment">// Move 2 rows backward</span>
+rs.beforeFirst();    <span class="comment">// Move before first row</span>
+rs.afterLast();      <span class="comment">// Move after last row</span>
+
+<span class="comment">// Position checks</span>
+rs.isFirst();        <span class="comment">// Are we on first row?</span>
+rs.isLast();         <span class="comment">// Are we on last row?</span>
+rs.isBeforeFirst();  <span class="comment">// Are we before first row?</span>
+rs.isAfterLast();    <span class="comment">// Are we after last row?</span>
+rs.getRow();         <span class="comment">// Current row number</span></code></pre>
+
+            <h3>Getting Data from ResultSet</h3>
+            <pre><code><span class="comment">// Get by column name (preferred - more readable)</span>
+<span class="keyword">long</span> id = rs.getLong(<span class="string">"id"</span>);
+String name = rs.getString(<span class="string">"first_name"</span>);
+BigDecimal salary = rs.getBigDecimal(<span class="string">"salary"</span>);
+Date hireDate = rs.getDate(<span class="string">"hire_date"</span>);
+Timestamp createdAt = rs.getTimestamp(<span class="string">"created_at"</span>);
+<span class="keyword">boolean</span> active = rs.getBoolean(<span class="string">"active"</span>);
+<span class="keyword">byte</span>[] photo = rs.getBytes(<span class="string">"photo"</span>);
+
+<span class="comment">// Get by column index (slightly faster, but fragile)</span>
+<span class="keyword">long</span> id = rs.getLong(1);
+String name = rs.getString(2);
+
+<span class="comment">// Handle NULL values</span>
+<span class="keyword">int</span> managerId = rs.getInt(<span class="string">"manager_id"</span>);
+<span class="keyword">if</span> (rs.wasNull()) {
+    <span class="comment">// The value was NULL in the database</span>
+    managerId = -1;  <span class="comment">// Or handle differently</span>
+}
+
+<span class="comment">// Better approach for nullable primitives</span>
+Integer managerId = rs.getObject(<span class="string">"manager_id"</span>, Integer.<span class="keyword">class</span>);  <span class="comment">// Returns null if NULL</span>
+
+<span class="comment">// Get metadata about the ResultSet</span>
+ResultSetMetaData metaData = rs.getMetaData();
+<span class="keyword">int</span> columnCount = metaData.getColumnCount();
+
+<span class="keyword">for</span> (<span class="keyword">int</span> i = 1; i <= columnCount; i++) {
+    System.out.println(<span class="string">"Column: "</span> + metaData.getColumnName(i));
+    System.out.println(<span class="string">"Type: "</span> + metaData.getColumnTypeName(i));
+    System.out.println(<span class="string">"Nullable: "</span> + metaData.isNullable(i));
+}</code></pre>
+
+            <h3>Updatable ResultSet</h3>
+            <pre><code><span class="comment">// Update through ResultSet (rarely used, but possible)</span>
+Statement stmt = conn.createStatement(
+    ResultSet.TYPE_SCROLL_SENSITIVE,
+    ResultSet.CONCUR_UPDATABLE
+);
+
+ResultSet rs = stmt.executeQuery(<span class="string">"SELECT * FROM employees WHERE department_id = 1"</span>);
+
+<span class="keyword">while</span> (rs.next()) {
+    BigDecimal currentSalary = rs.getBigDecimal(<span class="string">"salary"</span>);
+    rs.updateBigDecimal(<span class="string">"salary"</span>, currentSalary.multiply(<span class="keyword">new</span> BigDecimal(<span class="string">"1.10"</span>)));
+    rs.updateRow();  <span class="comment">// Apply changes to database</span>
+}
+
+<span class="comment">// Insert new row through ResultSet</span>
+rs.moveToInsertRow();
+rs.updateString(<span class="string">"first_name"</span>, <span class="string">"New"</span>);
+rs.updateString(<span class="string">"last_name"</span>, <span class="string">"Employee"</span>);
+rs.updateString(<span class="string">"email"</span>, <span class="string">"new@example.com"</span>);
+rs.updateBigDecimal(<span class="string">"salary"</span>, <span class="keyword">new</span> BigDecimal(<span class="string">"50000"</span>));
+rs.insertRow();
+rs.moveToCurrentRow();
+
+<span class="comment">// Delete current row</span>
+rs.deleteRow();</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Stored Procedures with CallableStatement</h2>
+
+            <pre><code><span class="comment">// Assume we have this stored procedure in MySQL:</span>
+<span class="comment">/*
+DELIMITER //
+CREATE PROCEDURE get_employee_count(
+    IN dept_id INT,
+    OUT emp_count INT
+)
+BEGIN
+    SELECT COUNT(*) INTO emp_count
+    FROM employees
+    WHERE department_id = dept_id;
+END //
+DELIMITER ;
+*/</span>
+
+<span class="comment">// Calling stored procedure from Java</span>
+<span class="keyword">public int</span> <span class="function">getEmployeeCount</span>(<span class="keyword">int</span> departmentId) {
+    String sql = <span class="string">"{CALL get_employee_count(?, ?)}"</span>;
+
+    <span class="keyword">try</span> (Connection conn = getConnection();
+         CallableStatement cstmt = conn.prepareCall(sql)) {
+
+        <span class="comment">// Set IN parameter</span>
+        cstmt.setInt(1, departmentId);
+
+        <span class="comment">// Register OUT parameter</span>
+        cstmt.registerOutParameter(2, Types.INTEGER);
+
+        <span class="comment">// Execute</span>
+        cstmt.execute();
+
+        <span class="comment">// Get OUT parameter value</span>
+        <span class="keyword">return</span> cstmt.getInt(2);
+
+    } <span class="keyword">catch</span> (SQLException e) {
+        <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error calling stored procedure"</span>, e);
+    }
+}
+
+<span class="comment">// Stored procedure returning ResultSet</span>
+<span class="keyword">public</span> List&lt;Employee&gt; <span class="function">getEmployeesByDepartment</span>(<span class="keyword">int</span> deptId) {
+    String sql = <span class="string">"{CALL get_employees_by_dept(?)}"</span>;
+    List&lt;Employee&gt; employees = <span class="keyword">new</span> ArrayList&lt;&gt;();
+
+    <span class="keyword">try</span> (Connection conn = getConnection();
+         CallableStatement cstmt = conn.prepareCall(sql)) {
+
+        cstmt.setInt(1, deptId);
+
+        <span class="keyword">try</span> (ResultSet rs = cstmt.executeQuery()) {
+            <span class="keyword">while</span> (rs.next()) {
+                employees.add(mapResultSetToEmployee(rs));
+            }
+        }
+
+    } <span class="keyword">catch</span> (SQLException e) {
+        <span class="keyword">throw new</span> RuntimeException(<span class="string">"Error calling stored procedure"</span>, e);
+    }
+
+    <span class="keyword">return</span> employees;
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices and Patterns</h2>
+
+            <h3>DAO Pattern (Data Access Object)</h3>
+            <pre><code><span class="comment">// Interface defining data access operations</span>
+<span class="keyword">public interface</span> <span class="class-name">EmployeeDao</span> {
+    Employee findById(<span class="keyword">long</span> id);
+    List&lt;Employee&gt; findAll();
+    List&lt;Employee&gt; findByDepartment(<span class="keyword">long</span> deptId);
+    <span class="keyword">void</span> save(Employee employee);
+    <span class="keyword">void</span> update(Employee employee);
+    <span class="keyword">void</span> delete(<span class="keyword">long</span> id);
+}
+
+<span class="comment">// JDBC implementation</span>
+<span class="keyword">public class</span> <span class="class-name">JdbcEmployeeDao</span> <span class="keyword">implements</span> <span class="class-name">EmployeeDao</span> {
+
+    <span class="keyword">private final</span> DataSource dataSource;
+
+    <span class="keyword">public</span> <span class="function">JdbcEmployeeDao</span>(DataSource dataSource) {
+        <span class="keyword">this</span>.dataSource = dataSource;
+    }
+
+    <span class="keyword">private</span> Connection <span class="function">getConnection</span>() <span class="keyword">throws</span> SQLException {
+        <span class="keyword">return</span> dataSource.getConnection();
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> Employee <span class="function">findById</span>(<span class="keyword">long</span> id) {
+        String sql = <span class="string">"SELECT * FROM employees WHERE id = ?"</span>;
+
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setLong(1, id);
+
+            <span class="keyword">try</span> (ResultSet rs = pstmt.executeQuery()) {
+                <span class="keyword">if</span> (rs.next()) {
+                    <span class="keyword">return</span> mapRow(rs);
+                }
+            }
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> DataAccessException(<span class="string">"Error finding employee"</span>, e);
+        }
+        <span class="keyword">return null</span>;
+    }
+
+    <span class="keyword">private</span> Employee <span class="function">mapRow</span>(ResultSet rs) <span class="keyword">throws</span> SQLException {
+        <span class="keyword">return new</span> Employee(
+            rs.getLong(<span class="string">"id"</span>),
+            rs.getString(<span class="string">"first_name"</span>),
+            rs.getString(<span class="string">"last_name"</span>),
+            rs.getString(<span class="string">"email"</span>),
+            rs.getBigDecimal(<span class="string">"salary"</span>)
+        );
+    }
+}
+
+<span class="comment">// Custom exception for data access errors</span>
+<span class="keyword">public class</span> <span class="class-name">DataAccessException</span> <span class="keyword">extends</span> RuntimeException {
+    <span class="keyword">public</span> <span class="function">DataAccessException</span>(String message, Throwable cause) {
+        <span class="keyword">super</span>(message, cause);
+    }
+}</code></pre>
+
+            <h3>Connection Utility Class</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">DatabaseUtil</span> {
+
+    <span class="keyword">private static</span> DataSource dataSource;
+
+    <span class="keyword">static</span> {
+        <span class="comment">// Initialize connection pool (using HikariCP)</span>
+        HikariConfig config = <span class="keyword">new</span> HikariConfig();
+        config.setJdbcUrl(<span class="string">"jdbc:mysql://localhost:3306/mydb"</span>);
+        config.setUsername(<span class="string">"user"</span>);
+        config.setPassword(<span class="string">"password"</span>);
+        config.setMaximumPoolSize(10);
+        config.setMinimumIdle(2);
+        config.setConnectionTimeout(30000);
+        config.setIdleTimeout(600000);
+
+        dataSource = <span class="keyword">new</span> HikariDataSource(config);
+    }
+
+    <span class="keyword">public static</span> Connection <span class="function">getConnection</span>() <span class="keyword">throws</span> SQLException {
+        <span class="keyword">return</span> dataSource.getConnection();
+    }
+
+    <span class="keyword">public static</span> DataSource <span class="function">getDataSource</span>() {
+        <span class="keyword">return</span> dataSource;
+    }
+
+    <span class="comment">// Execute query with automatic resource management</span>
+    <span class="keyword">public static</span> &lt;T&gt; T <span class="function">executeQuery</span>(String sql, ResultSetHandler&lt;T&gt; handler, Object... params) {
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            <span class="keyword">for</span> (<span class="keyword">int</span> i = 0; i < params.length; i++) {
+                pstmt.setObject(i + 1, params[i]);
+            }
+
+            <span class="keyword">try</span> (ResultSet rs = pstmt.executeQuery()) {
+                <span class="keyword">return</span> handler.handle(rs);
+            }
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> DataAccessException(<span class="string">"Query failed: "</span> + sql, e);
+        }
+    }
+
+    <span class="comment">// Execute update with automatic resource management</span>
+    <span class="keyword">public static int</span> <span class="function">executeUpdate</span>(String sql, Object... params) {
+        <span class="keyword">try</span> (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            <span class="keyword">for</span> (<span class="keyword">int</span> i = 0; i < params.length; i++) {
+                pstmt.setObject(i + 1, params[i]);
+            }
+
+            <span class="keyword">return</span> pstmt.executeUpdate();
+        } <span class="keyword">catch</span> (SQLException e) {
+            <span class="keyword">throw new</span> DataAccessException(<span class="string">"Update failed: "</span> + sql, e);
+        }
+    }
+}
+
+<span class="annotation">@FunctionalInterface</span>
+<span class="keyword">public interface</span> <span class="class-name">ResultSetHandler</span>&lt;T&gt; {
+    T <span class="function">handle</span>(ResultSet rs) <span class="keyword">throws</span> SQLException;
+}
+
+<span class="comment">// Usage example</span>
+List&lt;Employee&gt; employees = DatabaseUtil.executeQuery(
+    <span class="string">"SELECT * FROM employees WHERE department_id = ?"</span>,
+    rs -> {
+        List&lt;Employee&gt; list = <span class="keyword">new</span> ArrayList&lt;&gt;();
+        <span class="keyword">while</span> (rs.next()) {
+            list.add(mapRow(rs));
+        }
+        <span class="keyword">return</span> list;
+    },
+    departmentId
+);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Pitfalls and Solutions</h2>
+
+            <div class="best-practices">
+                <h3>Resource Leaks</h3>
+                <pre><code><span class="comment">// BAD - Resources never closed!</span>
+<span class="keyword">public</span> List&lt;Employee&gt; <span class="function">badFindAll</span>() {
+    Connection conn = DriverManager.getConnection(url, user, pass);
+    Statement stmt = conn.createStatement();
+    ResultSet rs = stmt.executeQuery(<span class="string">"SELECT * FROM employees"</span>);
+    <span class="comment">// If exception occurs here, resources leak!</span>
+    <span class="keyword">return</span> mapResults(rs);
+}
+
+<span class="comment">// GOOD - Use try-with-resources</span>
+<span class="keyword">public</span> List&lt;Employee&gt; <span class="function">goodFindAll</span>() {
+    <span class="keyword">try</span> (Connection conn = getConnection();
+         Statement stmt = conn.createStatement();
+         ResultSet rs = stmt.executeQuery(<span class="string">"SELECT * FROM employees"</span>)) {
+
+        <span class="keyword">return</span> mapResults(rs);
+    } <span class="keyword">catch</span> (SQLException e) {
+        <span class="keyword">throw new</span> DataAccessException(<span class="string">"Query failed"</span>, e);
+    }
+}</code></pre>
+
+                <h3>N+1 Query Problem</h3>
+                <pre><code><span class="comment">// BAD - N+1 queries (1 for employees + N for departments)</span>
+List&lt;Employee&gt; employees = findAllEmployees();  <span class="comment">// 1 query</span>
+<span class="keyword">for</span> (Employee emp : employees) {
+    Department dept = findDepartmentById(emp.getDepartmentId());  <span class="comment">// N queries!</span>
+    emp.setDepartment(dept);
+}
+
+<span class="comment">// GOOD - Single query with JOIN</span>
+String sql = <span class="string">"""
+    SELECT e.*, d.name as dept_name
+    FROM employees e
+    LEFT JOIN departments d ON e.department_id = d.id
+    """</span>;
+<span class="comment">// 1 query for everything!</span></code></pre>
+
+                <h3>Handling Large Result Sets</h3>
+                <pre><code><span class="comment">// Set fetch size to prevent loading millions of rows into memory</span>
+PreparedStatement pstmt = conn.prepareStatement(sql);
+pstmt.setFetchSize(100);  <span class="comment">// Fetch 100 rows at a time</span>
+
+<span class="comment">// Or use streaming (database specific)</span>
+<span class="comment">// MySQL: add ?useCursorFetch=true to URL and set fetch size</span>
+
+<span class="comment">// For very large exports, consider:</span>
+<span class="comment">// 1. Pagination with LIMIT/OFFSET</span>
+<span class="comment">// 2. Cursor-based pagination (WHERE id > lastId LIMIT 1000)</span>
+<span class="comment">// 3. Database-specific streaming features</span></code></pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>JDBC:</strong> Java's standard API for database connectivity</li>
+                    <li><strong>Connection:</strong> Session with database, always close it!</li>
+                    <li><strong>PreparedStatement:</strong> Always use for parameterized queries (SQL injection prevention)</li>
+                    <li><strong>ResultSet:</strong> Query results, iterate with next()</li>
+                    <li><strong>Transactions:</strong> setAutoCommit(false), commit(), rollback()</li>
+                    <li><strong>Try-with-resources:</strong> Always use to prevent resource leaks</li>
+                    <li><strong>Connection Pooling:</strong> Use DataSource (HikariCP) in production</li>
+                    <li><strong>DAO Pattern:</strong> Encapsulate data access logic</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="sql.html" class="related-link">SQL Basics</a>
+                <a href="jpa-hibernate.html" class="related-link">JPA & Hibernate</a>
+                <a href="connection-pooling.html" class="related-link">Connection Pooling</a>
+                <a href="transactions.html" class="related-link">Transactions (ACID)</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

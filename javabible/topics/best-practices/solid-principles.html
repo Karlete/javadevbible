@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOLID Principles - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#best-practices">Best Practices</a> / SOLID Principles
+            </nav>
+            <h1>SOLID Principles</h1>
+            <p class="topic-subtitle">Five Principles of Object-Oriented Design</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is SOLID?</h2>
+            <p>SOLID is an acronym for five design principles that help developers create maintainable, flexible, and understandable object-oriented software.</p>
+
+            <div class="info-box note">
+                <div class="info-box-title">The Five Principles</div>
+                <ul>
+                    <li><strong>S</strong> - Single Responsibility Principle</li>
+                    <li><strong>O</strong> - Open/Closed Principle</li>
+                    <li><strong>L</strong> - Liskov Substitution Principle</li>
+                    <li><strong>I</strong> - Interface Segregation Principle</li>
+                    <li><strong>D</strong> - Dependency Inversion Principle</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>S - Single Responsibility Principle</h2>
+            <p><strong>"A class should have only one reason to change."</strong></p>
+            <p>Each class should focus on doing one thing well. If a class has multiple responsibilities, changes to one aspect might break another.</p>
+
+            <h3>Violation Example</h3>
+            <pre><code><span class="comment">// BAD: This class does too many things</span>
+<span class="keyword">public class</span> <span class="class-name">UserManager</span> {
+    <span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">User</span> user) {
+        <span class="comment">// Validate user</span>
+        <span class="keyword">if</span> (user.getEmail() == <span class="keyword">null</span>) {
+            <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Email required"</span>);
+        }
+
+        <span class="comment">// Save to database</span>
+        <span class="class-name">Connection</span> conn = <span class="class-name">DriverManager</span>.getConnection(url);
+        <span class="class-name">PreparedStatement</span> stmt = conn.prepareStatement(sql);
+        stmt.executeUpdate();
+
+        <span class="comment">// Send email</span>
+        <span class="class-name">Properties</span> props = <span class="keyword">new</span> <span class="class-name">Properties</span>();
+        <span class="class-name">Session</span> session = <span class="class-name">Session</span>.getInstance(props);
+        <span class="class-name">Transport</span>.send(message);
+
+        <span class="comment">// Log the action</span>
+        <span class="class-name">FileWriter</span> fw = <span class="keyword">new</span> <span class="class-name">FileWriter</span>(<span class="string">"log.txt"</span>);
+        fw.write(<span class="string">"User created: "</span> + user.getId());
+    }
+}</code></pre>
+
+            <h3>Correct Implementation</h3>
+            <pre><code><span class="comment">// GOOD: Each class has one responsibility</span>
+<span class="keyword">public class</span> <span class="class-name">UserValidator</span> {
+    <span class="keyword">public void</span> <span class="function">validate</span>(<span class="class-name">User</span> user) {
+        <span class="keyword">if</span> (user.getEmail() == <span class="keyword">null</span>) {
+            <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Email required"</span>);
+        }
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">UserRepository</span> {
+    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">User</span> user) {
+        <span class="comment">// Database operations only</span>
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">EmailService</span> {
+    <span class="keyword">public void</span> <span class="function">sendWelcomeEmail</span>(<span class="class-name">User</span> user) {
+        <span class="comment">// Email operations only</span>
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+    <span class="keyword">private final</span> <span class="class-name">UserValidator</span> validator;
+    <span class="keyword">private final</span> <span class="class-name">UserRepository</span> repository;
+    <span class="keyword">private final</span> <span class="class-name">EmailService</span> emailService;
+
+    <span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">User</span> user) {
+        validator.validate(user);
+        repository.save(user);
+        emailService.sendWelcomeEmail(user);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>O - Open/Closed Principle</h2>
+            <p><strong>"Software entities should be open for extension, but closed for modification."</strong></p>
+            <p>You should be able to add new functionality without changing existing code.</p>
+
+            <h3>Violation Example</h3>
+            <pre><code><span class="comment">// BAD: Must modify this class to add new payment types</span>
+<span class="keyword">public class</span> <span class="class-name">PaymentProcessor</span> {
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">String</span> type, <span class="keyword">double</span> amount) {
+        <span class="keyword">if</span> (type.equals(<span class="string">"credit_card"</span>)) {
+            <span class="comment">// Process credit card</span>
+        } <span class="keyword">else if</span> (type.equals(<span class="string">"paypal"</span>)) {
+            <span class="comment">// Process PayPal</span>
+        } <span class="keyword">else if</span> (type.equals(<span class="string">"crypto"</span>)) {
+            <span class="comment">// Adding new type requires modifying this class!</span>
+        }
+    }
+}</code></pre>
+
+            <h3>Correct Implementation</h3>
+            <pre><code><span class="comment">// GOOD: Open for extension via new implementations</span>
+<span class="keyword">public interface</span> <span class="class-name">PaymentMethod</span> {
+    <span class="keyword">void</span> <span class="function">process</span>(<span class="keyword">double</span> amount);
+}
+
+<span class="keyword">public class</span> <span class="class-name">CreditCardPayment</span> <span class="keyword">implements</span> <span class="class-name">PaymentMethod</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">process</span>(<span class="keyword">double</span> amount) {
+        <span class="comment">// Credit card logic</span>
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">PayPalPayment</span> <span class="keyword">implements</span> <span class="class-name">PaymentMethod</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">process</span>(<span class="keyword">double</span> amount) {
+        <span class="comment">// PayPal logic</span>
+    }
+}
+
+<span class="comment">// Adding crypto is just a new class - no modification needed!</span>
+<span class="keyword">public class</span> <span class="class-name">CryptoPayment</span> <span class="keyword">implements</span> <span class="class-name">PaymentMethod</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">process</span>(<span class="keyword">double</span> amount) {
+        <span class="comment">// Crypto logic</span>
+    }
+}
+
+<span class="comment">// Processor is closed for modification</span>
+<span class="keyword">public class</span> <span class="class-name">PaymentProcessor</span> {
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">PaymentMethod</span> method, <span class="keyword">double</span> amount) {
+        method.process(amount);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>L - Liskov Substitution Principle</h2>
+            <p><strong>"Objects of a superclass should be replaceable with objects of its subclasses without breaking the program."</strong></p>
+            <p>Subclasses must be usable through the base class interface without the need to know the difference.</p>
+
+            <h3>Violation Example</h3>
+            <pre><code><span class="comment">// BAD: Square violates LSP when used as Rectangle</span>
+<span class="keyword">public class</span> <span class="class-name">Rectangle</span> {
+    <span class="keyword">protected int</span> width;
+    <span class="keyword">protected int</span> height;
+
+    <span class="keyword">public void</span> <span class="function">setWidth</span>(<span class="keyword">int</span> width) {
+        <span class="keyword">this</span>.width = width;
+    }
+
+    <span class="keyword">public void</span> <span class="function">setHeight</span>(<span class="keyword">int</span> height) {
+        <span class="keyword">this</span>.height = height;
+    }
+
+    <span class="keyword">public int</span> <span class="function">getArea</span>() {
+        <span class="keyword">return</span> width * height;
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">Square</span> <span class="keyword">extends</span> <span class="class-name">Rectangle</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">setWidth</span>(<span class="keyword">int</span> width) {
+        <span class="keyword">this</span>.width = width;
+        <span class="keyword">this</span>.height = width;  <span class="comment">// Breaks expected behavior!</span>
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">setHeight</span>(<span class="keyword">int</span> height) {
+        <span class="keyword">this</span>.height = height;
+        <span class="keyword">this</span>.width = height;  <span class="comment">// Breaks expected behavior!</span>
+    }
+}
+
+<span class="comment">// This test fails with Square!</span>
+<span class="keyword">void</span> <span class="function">testRectangle</span>(<span class="class-name">Rectangle</span> r) {
+    r.setWidth(<span class="number">5</span>);
+    r.setHeight(<span class="number">4</span>);
+    assert r.getArea() == <span class="number">20</span>;  <span class="comment">// Fails for Square (returns 16)</span>
+}</code></pre>
+
+            <h3>Correct Implementation</h3>
+            <pre><code><span class="comment">// GOOD: Use interface instead of inheritance</span>
+<span class="keyword">public interface</span> <span class="class-name">Shape</span> {
+    <span class="keyword">int</span> <span class="function">getArea</span>();
+}
+
+<span class="keyword">public class</span> <span class="class-name">Rectangle</span> <span class="keyword">implements</span> <span class="class-name">Shape</span> {
+    <span class="keyword">private final int</span> width;
+    <span class="keyword">private final int</span> height;
+
+    <span class="keyword">public</span> <span class="function">Rectangle</span>(<span class="keyword">int</span> width, <span class="keyword">int</span> height) {
+        <span class="keyword">this</span>.width = width;
+        <span class="keyword">this</span>.height = height;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public int</span> <span class="function">getArea</span>() {
+        <span class="keyword">return</span> width * height;
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">Square</span> <span class="keyword">implements</span> <span class="class-name">Shape</span> {
+    <span class="keyword">private final int</span> side;
+
+    <span class="keyword">public</span> <span class="function">Square</span>(<span class="keyword">int</span> side) {
+        <span class="keyword">this</span>.side = side;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public int</span> <span class="function">getArea</span>() {
+        <span class="keyword">return</span> side * side;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>I - Interface Segregation Principle</h2>
+            <p><strong>"Clients should not be forced to depend on interfaces they don't use."</strong></p>
+            <p>Create smaller, focused interfaces rather than large, general-purpose ones.</p>
+
+            <h3>Violation Example</h3>
+            <pre><code><span class="comment">// BAD: Fat interface forces implementations to include unused methods</span>
+<span class="keyword">public interface</span> <span class="class-name">Worker</span> {
+    <span class="keyword">void</span> <span class="function">work</span>();
+    <span class="keyword">void</span> <span class="function">eat</span>();
+    <span class="keyword">void</span> <span class="function">sleep</span>();
+}
+
+<span class="comment">// Robot doesn't eat or sleep!</span>
+<span class="keyword">public class</span> <span class="class-name">Robot</span> <span class="keyword">implements</span> <span class="class-name">Worker</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">work</span>() {
+        <span class="comment">// Robot works</span>
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">eat</span>() {
+        <span class="comment">// Forced to implement - throws exception or does nothing</span>
+        <span class="keyword">throw new</span> <span class="class-name">UnsupportedOperationException</span>();
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">sleep</span>() {
+        <span class="keyword">throw new</span> <span class="class-name">UnsupportedOperationException</span>();
+    }
+}</code></pre>
+
+            <h3>Correct Implementation</h3>
+            <pre><code><span class="comment">// GOOD: Segregated interfaces</span>
+<span class="keyword">public interface</span> <span class="class-name">Workable</span> {
+    <span class="keyword">void</span> <span class="function">work</span>();
+}
+
+<span class="keyword">public interface</span> <span class="class-name">Eatable</span> {
+    <span class="keyword">void</span> <span class="function">eat</span>();
+}
+
+<span class="keyword">public interface</span> <span class="class-name">Sleepable</span> {
+    <span class="keyword">void</span> <span class="function">sleep</span>();
+}
+
+<span class="comment">// Human implements all</span>
+<span class="keyword">public class</span> <span class="class-name">Human</span> <span class="keyword">implements</span> <span class="class-name">Workable</span>, <span class="class-name">Eatable</span>, <span class="class-name">Sleepable</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">work</span>() { }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">eat</span>() { }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">sleep</span>() { }
+}
+
+<span class="comment">// Robot only implements what it needs</span>
+<span class="keyword">public class</span> <span class="class-name">Robot</span> <span class="keyword">implements</span> <span class="class-name">Workable</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">work</span>() {
+        <span class="comment">// Robot works</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>D - Dependency Inversion Principle</h2>
+            <p><strong>"High-level modules should not depend on low-level modules. Both should depend on abstractions."</strong></p>
+            <p>Depend on interfaces rather than concrete implementations.</p>
+
+            <h3>Violation Example</h3>
+            <pre><code><span class="comment">// BAD: High-level class depends on concrete low-level class</span>
+<span class="keyword">public class</span> <span class="class-name">MySQLDatabase</span> {
+    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">String</span> data) {
+        <span class="comment">// MySQL-specific code</span>
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+    <span class="keyword">private</span> <span class="class-name">MySQLDatabase</span> database = <span class="keyword">new</span> <span class="class-name">MySQLDatabase</span>();  <span class="comment">// Tight coupling!</span>
+
+    <span class="keyword">public void</span> <span class="function">saveUser</span>(<span class="class-name">User</span> user) {
+        database.save(user.toString());
+        <span class="comment">// Can't easily switch to PostgreSQL or test with mock</span>
+    }
+}</code></pre>
+
+            <h3>Correct Implementation</h3>
+            <pre><code><span class="comment">// GOOD: Both depend on abstraction</span>
+<span class="keyword">public interface</span> <span class="class-name">Database</span> {
+    <span class="keyword">void</span> <span class="function">save</span>(<span class="class-name">String</span> data);
+}
+
+<span class="keyword">public class</span> <span class="class-name">MySQLDatabase</span> <span class="keyword">implements</span> <span class="class-name">Database</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">String</span> data) {
+        <span class="comment">// MySQL implementation</span>
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">PostgreSQLDatabase</span> <span class="keyword">implements</span> <span class="class-name">Database</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">String</span> data) {
+        <span class="comment">// PostgreSQL implementation</span>
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+    <span class="keyword">private final</span> <span class="class-name">Database</span> database;  <span class="comment">// Depends on abstraction</span>
+
+    <span class="comment">// Dependency injected</span>
+    <span class="keyword">public</span> <span class="function">UserService</span>(<span class="class-name">Database</span> database) {
+        <span class="keyword">this</span>.database = database;
+    }
+
+    <span class="keyword">public void</span> <span class="function">saveUser</span>(<span class="class-name">User</span> user) {
+        database.save(user.toString());
+    }
+}
+
+<span class="comment">// Usage - can swap implementations easily</span>
+<span class="class-name">UserService</span> service1 = <span class="keyword">new</span> <span class="class-name">UserService</span>(<span class="keyword">new</span> <span class="class-name">MySQLDatabase</span>());
+<span class="class-name">UserService</span> service2 = <span class="keyword">new</span> <span class="class-name">UserService</span>(<span class="keyword">new</span> <span class="class-name">PostgreSQLDatabase</span>());
+
+<span class="comment">// Testing - can use mock</span>
+<span class="class-name">Database</span> mockDb = mock(<span class="class-name">Database</span>.<span class="keyword">class</span>);
+<span class="class-name">UserService</span> testService = <span class="keyword">new</span> <span class="class-name">UserService</span>(mockDb);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>SOLID Summary</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Quick Reference</div>
+                <table class="info-table">
+                    <thead>
+                        <tr>
+                            <th>Principle</th>
+                            <th>Key Idea</th>
+                            <th>Benefit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>SRP</td>
+                            <td>One reason to change</td>
+                            <td>Easier maintenance</td>
+                        </tr>
+                        <tr>
+                            <td>OCP</td>
+                            <td>Extend, don't modify</td>
+                            <td>Safer additions</td>
+                        </tr>
+                        <tr>
+                            <td>LSP</td>
+                            <td>Substitutable subclasses</td>
+                            <td>Reliable polymorphism</td>
+                        </tr>
+                        <tr>
+                            <td>ISP</td>
+                            <td>Small, focused interfaces</td>
+                            <td>Flexible implementations</td>
+                        </tr>
+                        <tr>
+                            <td>DIP</td>
+                            <td>Depend on abstractions</td>
+                            <td>Testable, decoupled code</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="clean-code.html" class="related-link">Clean Code Principles</a>
+                <a href="../advanced/design-patterns.html" class="related-link">Design Patterns</a>
+                <a href="../fundamentals/interfaces-abstract.html" class="related-link">Interfaces vs Abstract Classes</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

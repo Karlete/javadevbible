@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servlet Containers - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#servers">Application Servers</a> / Servlet Containers
+            </nav>
+            <h1>Servlet Containers</h1>
+            <p class="topic-subtitle">The heart of Java web applications</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is a Servlet Container?</h2>
+            <p>A <strong>Servlet Container</strong> (also called a "Servlet Engine" or "Web Container") is the runtime environment that manages the lifecycle and execution of Java Servlets. It's the essential component that transforms your Java code into a web application capable of handling HTTP requests and generating dynamic responses.</p>
+
+            <p>Understanding servlet containers is fundamental to Java web development because every Java web framework—from raw servlets to Spring Boot—ultimately relies on this core technology.</p>
+
+            <h3>Why Do Servlet Containers Exist?</h3>
+            <p>In the early days of web development, creating dynamic web applications in Java was challenging. You needed to:</p>
+            <ul>
+                <li><strong>Handle raw TCP/IP connections</strong> - Managing socket programming for HTTP</li>
+                <li><strong>Parse HTTP requests</strong> - Manually reading headers, query parameters, form data</li>
+                <li><strong>Manage concurrent users</strong> - Creating and managing threads for each request</li>
+                <li><strong>Handle sessions</strong> - Tracking users across stateless HTTP requests</li>
+                <li><strong>Manage security</strong> - Authentication, authorization, SSL/TLS</li>
+                <li><strong>Deploy and update code</strong> - Hot-deploying without server restarts</li>
+            </ul>
+
+            <p>The servlet specification and servlet containers emerged to provide a standardized solution, letting developers focus on business logic instead of plumbing.</p>
+
+            <div class="info-box">
+                <p><strong>The Restaurant Kitchen Analogy:</strong></p>
+                <p>Think of a servlet container like the <em>kitchen management system</em> in a restaurant:</p>
+                <ul>
+                    <li>Takes orders from waiters → Receives HTTP requests</li>
+                    <li>Routes orders to the right chef station → Routes requests to the right servlet</li>
+                    <li>Manages multiple orders simultaneously → Handles concurrent requests with threads</li>
+                    <li>Provides cooking tools and ingredients → Provides APIs (request, response, session objects)</li>
+                    <li>Ensures dishes are prepared correctly → Manages servlet lifecycle (init, service, destroy)</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>What is a Servlet?</h2>
+            <p>Before diving deeper into containers, let's understand what they contain. A <strong>Servlet</strong> is a Java class that handles HTTP requests and generates responses. It's the fundamental building block of Java web applications.</p>
+
+            <h3>A Simple Servlet Example</h3>
+            <pre><code><span class="keyword">import</span> jakarta.servlet.*;
+<span class="keyword">import</span> jakarta.servlet.http.*;
+<span class="keyword">import</span> java.io.*;
+
+<span class="comment">// A servlet is just a Java class that extends HttpServlet</span>
+<span class="keyword">public class</span> <span class="class-name">HelloServlet</span> <span class="keyword">extends</span> HttpServlet {
+
+    <span class="comment">// Called once when the servlet is first loaded</span>
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> init() <span class="keyword">throws</span> ServletException {
+        System.out.println(<span class="string">"HelloServlet initialized!"</span>);
+        <span class="comment">// Initialize resources: database connections, load config, etc.</span>
+    }
+
+    <span class="comment">// Called for every GET request</span>
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> doGet(HttpServletRequest request,
+                         HttpServletResponse response)
+            <span class="keyword">throws</span> ServletException, IOException {
+
+        <span class="comment">// Get data from the request</span>
+        String name = request.getParameter(<span class="string">"name"</span>);
+        <span class="keyword">if</span> (name == <span class="keyword">null</span>) name = <span class="string">"World"</span>;
+
+        <span class="comment">// Set response type</span>
+        response.setContentType(<span class="string">"text/html"</span>);
+
+        <span class="comment">// Write the response</span>
+        PrintWriter out = response.getWriter();
+        out.println(<span class="string">"&lt;html&gt;&lt;body&gt;"</span>);
+        out.println(<span class="string">"&lt;h1&gt;Hello, "</span> + name + <span class="string">"!&lt;/h1&gt;"</span>);
+        out.println(<span class="string">"&lt;/body&gt;&lt;/html&gt;"</span>);
+    }
+
+    <span class="comment">// Called once when the servlet is being unloaded</span>
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> destroy() {
+        System.out.println(<span class="string">"HelloServlet destroyed!"</span>);
+        <span class="comment">// Clean up resources: close connections, release memory</span>
+    }
+}</code></pre>
+
+            <h3>The Servlet Lifecycle</h3>
+            <p>The servlet container manages the complete lifecycle of every servlet:</p>
+            <ol>
+                <li><strong>Loading:</strong> Container loads the servlet class into memory (on first request or at startup)</li>
+                <li><strong>Instantiation:</strong> Container creates exactly ONE instance of the servlet class</li>
+                <li><strong>Initialization:</strong> Container calls <code>init()</code> method once—set up resources here</li>
+                <li><strong>Service:</strong> Container calls <code>service()</code> (doGet/doPost) for EVERY request (multi-threaded!)</li>
+                <li><strong>Destruction:</strong> Container calls <code>destroy()</code> once before unloading—cleanup here</li>
+            </ol>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Critical: Single Instance, Multiple Threads</div>
+                <p>The servlet container creates only <strong>one instance</strong> of each servlet, but calls its service methods from <strong>multiple threads simultaneously</strong>. This means:</p>
+                <ul>
+                    <li>Servlets must be <strong>thread-safe</strong></li>
+                    <li>Never store request-specific data in instance variables</li>
+                    <li>Use local variables or synchronized blocks for shared mutable state</li>
+                </ul>
+            </div>
+
+            <pre><code><span class="comment">// BAD - NOT thread-safe!</span>
+<span class="keyword">public class</span> <span class="class-name">UnsafeServlet</span> <span class="keyword">extends</span> HttpServlet {
+    <span class="keyword">private</span> String username; <span class="comment">// Instance variable shared by all threads!</span>
+
+    <span class="keyword">protected void</span> doGet(HttpServletRequest req, HttpServletResponse resp) {
+        username = req.getParameter(<span class="string">"user"</span>); <span class="comment">// Thread A writes "Alice"</span>
+        <span class="comment">// ... meanwhile Thread B writes "Bob"</span>
+        resp.getWriter().println(<span class="string">"Hello, "</span> + username); <span class="comment">// Could print wrong name!</span>
+    }
+}
+
+<span class="comment">// GOOD - Thread-safe</span>
+<span class="keyword">public class</span> <span class="class-name">SafeServlet</span> <span class="keyword">extends</span> HttpServlet {
+    <span class="keyword">protected void</span> doGet(HttpServletRequest req, HttpServletResponse resp) {
+        String username = req.getParameter(<span class="string">"user"</span>); <span class="comment">// Local variable - thread-safe</span>
+        resp.getWriter().println(<span class="string">"Hello, "</span> + username);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>What Does a Servlet Container Do?</h2>
+            <p>The servlet container provides a rich set of services that your application relies on.</p>
+
+            <h3>1. HTTP Protocol Handling</h3>
+            <pre><code><span class="comment">// You write this simple code...</span>
+String name = request.getParameter(<span class="string">"name"</span>);
+
+<span class="comment">// The container already did all of this:</span>
+<span class="comment">// 1. Opened a TCP socket on port 8080</span>
+<span class="comment">// 2. Read raw bytes from the network</span>
+<span class="comment">// 3. Parsed the HTTP request line: "GET /hello?name=John HTTP/1.1"</span>
+<span class="comment">// 4. Parsed all headers: Content-Type, Cookie, Accept, etc.</span>
+<span class="comment">// 5. Decoded URL-encoded parameters (%20 → space)</span>
+<span class="comment">// 6. Created the HttpServletRequest object wrapping all this data</span>
+<span class="comment">// 7. Created a thread to handle this request</span>
+<span class="comment">// 8. Found and invoked your servlet's doGet method</span></code></pre>
+
+            <h3>2. Request Routing (URL Mapping)</h3>
+            <pre><code><span class="comment">// In web.xml or using annotations</span>
+<span class="annotation">@WebServlet</span>(<span class="string">"/products/*"</span>)      <span class="comment">// Matches /products, /products/123</span>
+<span class="annotation">@WebServlet</span>(<span class="string">"*.do"</span>)             <span class="comment">// Matches /login.do, /checkout.do</span>
+<span class="annotation">@WebServlet</span>(<span class="string">"/api/v1/users"</span>)    <span class="comment">// Matches exactly this URL</span>
+<span class="annotation">@WebServlet</span>(<span class="string">""</span>)                 <span class="comment">// Default servlet for the context root</span>
+
+<span class="comment">// URL Pattern Matching Rules (in order of precedence):</span>
+<span class="comment">// 1. Exact match:     /catalog/products</span>
+<span class="comment">// 2. Path match:      /catalog/*</span>
+<span class="comment">// 3. Extension match: *.jsp</span>
+<span class="comment">// 4. Default:         /</span></code></pre>
+
+            <h3>3. Thread Management</h3>
+            <pre><code><span class="comment">// Tomcat's default thread pool configuration (server.xml)</span>
+&lt;Connector port=<span class="string">"8080"</span> protocol=<span class="string">"HTTP/1.1"</span>
+           maxThreads=<span class="string">"200"</span>        <span class="comment">&lt;!-- Maximum concurrent requests --&gt;</span>
+           minSpareThreads=<span class="string">"10"</span>    <span class="comment">&lt;!-- Threads kept ready --&gt;</span>
+           acceptCount=<span class="string">"100"</span>       <span class="comment">&lt;!-- Queue size when all threads busy --&gt;</span>
+           connectionTimeout=<span class="string">"20000"</span> /&gt;</code></pre>
+
+            <h3>4. Session Management</h3>
+            <pre><code><span class="comment">// Getting/creating a session - container does the heavy lifting</span>
+HttpSession session = request.getSession(); <span class="comment">// true = create if doesn't exist</span>
+
+<span class="comment">// Behind the scenes, the container:</span>
+<span class="comment">// 1. Checks for JSESSIONID cookie in the request</span>
+<span class="comment">// 2. If found, looks up existing session in memory</span>
+<span class="comment">// 3. If not found or expired, creates new session</span>
+<span class="comment">// 4. Generates unique session ID (cryptographically random)</span>
+<span class="comment">// 5. Sets JSESSIONID cookie in response</span>
+<span class="comment">// 6. Returns HttpSession object to your code</span>
+
+<span class="comment">// Store data in session</span>
+session.setAttribute(<span class="string">"user"</span>, currentUser);
+session.setAttribute(<span class="string">"cart"</span>, shoppingCart);
+
+<span class="comment">// Retrieve data later (even in different servlet)</span>
+User user = (User) session.getAttribute(<span class="string">"user"</span>);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Filters and Listeners</h2>
+            <p>Beyond servlets, containers support two other powerful components.</p>
+
+            <h3>Servlet Filters</h3>
+            <p>Filters intercept requests <em>before</em> they reach servlets and responses <em>after</em> servlets generate them. They're perfect for cross-cutting concerns.</p>
+
+            <pre><code><span class="keyword">import</span> jakarta.servlet.*;
+<span class="keyword">import</span> jakarta.servlet.annotation.*;
+
+<span class="annotation">@WebFilter</span>(<span class="string">"/*"</span>)  <span class="comment">// Apply to all URLs</span>
+<span class="keyword">public class</span> <span class="class-name">LoggingFilter</span> <span class="keyword">implements</span> Filter {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> doFilter(ServletRequest request,
+                         ServletResponse response,
+                         FilterChain chain)
+            <span class="keyword">throws</span> IOException, ServletException {
+
+        HttpServletRequest req = (HttpServletRequest) request;
+        <span class="keyword">long</span> startTime = System.currentTimeMillis();
+
+        <span class="comment">// Log before processing</span>
+        System.out.println(<span class="string">"Request: "</span> + req.getMethod() + <span class="string">" "</span> + req.getRequestURI());
+
+        <span class="comment">// Pass to next filter or servlet</span>
+        chain.doFilter(request, response);
+
+        <span class="comment">// Log after processing</span>
+        <span class="keyword">long</span> duration = System.currentTimeMillis() - startTime;
+        System.out.println(<span class="string">"Response completed in "</span> + duration + <span class="string">"ms"</span>);
+    }
+}</code></pre>
+
+            <p><strong>Common uses for filters:</strong></p>
+            <ul>
+                <li><strong>Authentication/Authorization</strong> - Check login status before protected resources</li>
+                <li><strong>Logging</strong> - Log all requests and responses</li>
+                <li><strong>Compression</strong> - GZIP compress responses</li>
+                <li><strong>Character Encoding</strong> - Set UTF-8 for all requests</li>
+                <li><strong>CORS Headers</strong> - Add cross-origin headers to responses</li>
+            </ul>
+
+            <h3>Servlet Listeners</h3>
+            <p>Listeners respond to lifecycle events in the container:</p>
+            <pre><code><span class="annotation">@WebListener</span>
+<span class="keyword">public class</span> <span class="class-name">AppLifecycleListener</span> <span class="keyword">implements</span> ServletContextListener {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> contextInitialized(ServletContextEvent sce) {
+        <span class="comment">// Called when application starts</span>
+        System.out.println(<span class="string">"Application starting up!"</span>);
+        <span class="comment">// Initialize connection pools, load config, start background services</span>
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> contextDestroyed(ServletContextEvent sce) {
+        <span class="comment">// Called when application shuts down</span>
+        System.out.println(<span class="string">"Application shutting down!"</span>);
+        <span class="comment">// Cleanup resources, close connections, stop threads</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Popular Servlet Containers</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Container</th>
+                        <th>Type</th>
+                        <th>Best For</th>
+                        <th>Key Features</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Apache Tomcat</strong></td>
+                        <td>Servlet Container</td>
+                        <td>Most Java web apps</td>
+                        <td>Industry standard, widely documented</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Eclipse Jetty</strong></td>
+                        <td>Servlet Container</td>
+                        <td>Embedded use, microservices</td>
+                        <td>Small footprint, fast startup</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Undertow</strong></td>
+                        <td>Servlet Container</td>
+                        <td>High performance</td>
+                        <td>Non-blocking I/O, embedded in WildFly</td>
+                    </tr>
+                    <tr>
+                        <td><strong>GlassFish</strong></td>
+                        <td>Full App Server</td>
+                        <td>Jakarta EE reference</td>
+                        <td>Reference implementation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>WildFly</strong></td>
+                        <td>Full App Server</td>
+                        <td>Enterprise applications</td>
+                        <td>Modular, Jakarta EE certified</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Embedded Servlet Containers</h2>
+            <p>Modern frameworks like Spring Boot use <em>embedded</em> servlet containers—the container runs inside your application rather than your application inside the container.</p>
+
+            <pre><code><span class="comment">// Spring Boot - embedded Tomcat by default</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+    <span class="comment">&lt;!-- Includes embedded Tomcat --&gt;</span>
+&lt;/dependency&gt;
+
+<span class="comment">// To switch to Jetty:</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+    &lt;exclusions&gt;
+        &lt;exclusion&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-tomcat&lt;/artifactId&gt;
+        &lt;/exclusion&gt;
+    &lt;/exclusions&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-jetty&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+
+            <h3>Why Embedded Containers?</h3>
+            <ul>
+                <li><strong>Simpler Deployment:</strong> Just copy one JAR file, run with <code>java -jar</code></li>
+                <li><strong>Version Control:</strong> Container version is part of your project dependencies</li>
+                <li><strong>Development Parity:</strong> Same container in dev, test, and production</li>
+                <li><strong>Cloud-Native:</strong> Perfect for Docker containers and Kubernetes</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>The javax to jakarta Migration</h2>
+            <p>In 2017, Oracle transferred Java EE to the Eclipse Foundation, creating Jakarta EE. Due to Oracle's trademark on "Java," all packages changed:</p>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Servlet Version</th>
+                        <th>Java Version</th>
+                        <th>Package</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Servlet 4.0 and earlier</td>
+                        <td>Java 8+</td>
+                        <td>javax.servlet</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Servlet 5.0+</strong></td>
+                        <td>Java 8+</td>
+                        <td><strong>jakarta.servlet</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Migration Tip</div>
+                <p>When upgrading to Tomcat 10+, Spring Boot 3+, or Jakarta EE 9+, you must update all imports from <code>javax</code> to <code>jakarta</code>.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Servlet Container:</strong> The runtime environment that manages servlet lifecycle and handles HTTP requests</li>
+                    <li><strong>Single Instance, Multiple Threads:</strong> Only one servlet instance handles all requests concurrently</li>
+                    <li><strong>Lifecycle:</strong> init() once → service() many times → destroy() once</li>
+                    <li><strong>Filters:</strong> Intercept requests/responses for cross-cutting concerns</li>
+                    <li><strong>Listeners:</strong> React to lifecycle events in the container</li>
+                    <li><strong>Embedded Containers:</strong> Modern approach where container is inside your app</li>
+                    <li><strong>Jakarta Migration:</strong> javax.* packages became jakarta.* in Servlet 5.0+</li>
+                    <li><strong>Thread Safety:</strong> Always use local variables for request data</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="app-server.html" class="related-link">What is an Application Server?</a>
+                <a href="tomcat.html" class="related-link">Apache Tomcat</a>
+                <a href="war-jar.html" class="related-link">WAR vs JAR</a>
+                <a href="web-xml.html" class="related-link">Deployment Descriptors</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server vs Client Execution - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#web-concepts">Web Concepts</a> / Server vs Client Execution
+            </nav>
+            <h1>Server vs Client Execution</h1>
+            <p class="topic-subtitle">Understanding where your code runs</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>The Fundamental Question: Where Does Code Run?</h2>
+            <p>One of the most important concepts in web development is understanding <strong>where your code executes</strong>. This isn't just a technical detail—it has profound implications for security, performance, user experience, and how you architect your entire application.</p>
+
+            <p>When you write a web application, you're actually writing code that runs in <strong>two completely different environments</strong>:</p>
+            <ul>
+                <li><strong>Server-side code</strong> runs on machines you control (your servers, cloud instances)</li>
+                <li><strong>Client-side code</strong> runs on machines you DON'T control (users' browsers, phones)</li>
+            </ul>
+
+            <p>This distinction affects everything from what languages you can use, to what data you can access, to how secure your application can be.</p>
+
+            <h3>A Helpful Analogy: Movie Production</h3>
+            <p><strong>Think of it like making and showing a movie:</strong></p>
+            <ul>
+                <li><strong>Server-side (The Movie Studio):</strong> This is where the magic happens behind closed doors. The studio has expensive equipment, professional staff, proprietary techniques, and tight security. Viewers never see the raw footage, special effects breakdown, or production secrets. You control everything here.</li>
+                <li><strong>Client-side (The Movie Theater):</strong> This is where the final product is experienced. The theater (browser) just receives and displays what you send it. The viewer can pause, rewind, adjust brightness—but they can't change the movie itself. However, nothing stops them from recording the screen or analyzing what they see.</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>In web development, code executes in two distinct environments:</strong></p>
+                <ul>
+                    <li><strong>Server-side (Backend):</strong> Code runs on YOUR servers. You control the environment completely. Languages: Java, Python, Node.js, Go, C#, Ruby, etc.</li>
+                    <li><strong>Client-side (Frontend):</strong> Code runs in the USER'S browser. You send code to them, but they control the environment. Languages: JavaScript (primarily), plus HTML and CSS for structure and styling.</li>
+                </ul>
+            </div>
+
+            <h3>Why This Matters</h3>
+            <p>Understanding this distinction is crucial because:</p>
+            <ul>
+                <li><strong>Security:</strong> Code on your server is private; code sent to the browser is public. Never put secrets in client-side code!</li>
+                <li><strong>Trust:</strong> You can trust server-side operations; you can NEVER trust client-side data or validation.</li>
+                <li><strong>Capabilities:</strong> Servers can access databases, file systems, and external services directly. Browsers are sandboxed for security.</li>
+                <li><strong>Performance:</strong> Server processing happens once; client processing happens on each user's device.</li>
+                <li><strong>User Experience:</strong> Client-side code provides instant feedback; server-side operations require network round-trips.</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Visual Overview: The Complete Picture</h2>
+
+            <pre><code><span class="comment">// Visual overview:</span>
+
+┌─────────────────────────────────────────────────────────────────┐
+│                         YOUR SERVER                              │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  Java / Spring Boot                                      │    │
+│  │  - Business logic                                        │    │
+│  │  - Database access                                       │    │
+│  │  - Authentication                                        │    │
+│  │  - API endpoints                                         │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                         HTTP Response
+                      (HTML, JSON, etc.)
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      USER'S BROWSER                              │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │  JavaScript / HTML / CSS                                 │    │
+│  │  - UI rendering                                          │    │
+│  │  - User interactions                                     │    │
+│  │  - Form validation                                       │    │
+│  │  - Animations                                            │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Server-Side Execution (Backend)</h2>
+
+            <pre><code><span class="comment">// Server-side code runs on YOUR infrastructure</span>
+<span class="comment">// Language: Java, Python, C#, Node.js, Go, etc.</span>
+
+<span class="annotation">@RestController</span>
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> UserRepository userRepository;  <span class="comment">// Database access</span>
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> PasswordEncoder encoder;  <span class="comment">// Security</span>
+
+    <span class="annotation">@PostMapping</span>(<span class="string">"/api/register"</span>)
+    <span class="keyword">public</span> User register(<span class="annotation">@RequestBody</span> RegisterRequest request) {
+        <span class="comment">// ALL of this runs on the SERVER:</span>
+
+        <span class="comment">// 1. Validate data (server-side validation is REQUIRED)</span>
+        <span class="keyword">if</span> (userRepository.existsByEmail(request.getEmail())) {
+            <span class="keyword">throw new</span> EmailExistsException();
+        }
+
+        <span class="comment">// 2. Hash password (NEVER trust client with security)</span>
+        String hashedPassword = encoder.encode(request.getPassword());
+
+        <span class="comment">// 3. Save to database (client can't access DB directly)</span>
+        User user = <span class="keyword">new</span> User();
+        user.setEmail(request.getEmail());
+        user.setPassword(hashedPassword);
+
+        <span class="keyword">return</span> userRepository.save(user);
+    }
+}</code></pre>
+
+            <h3>What Runs on the Server</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Why Server?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Database operations</td>
+                        <td>Security - clients can't access DB directly</td>
+                    </tr>
+                    <tr>
+                        <td>Authentication</td>
+                        <td>Security - passwords, tokens, sessions</td>
+                    </tr>
+                    <tr>
+                        <td>Business logic</td>
+                        <td>Consistency - same rules for all clients</td>
+                    </tr>
+                    <tr>
+                        <td>Data validation</td>
+                        <td>Security - client validation can be bypassed</td>
+                    </tr>
+                    <tr>
+                        <td>File processing</td>
+                        <td>Performance - heavy computation</td>
+                    </tr>
+                    <tr>
+                        <td>Third-party API calls</td>
+                        <td>Security - hide API keys</td>
+                    </tr>
+                    <tr>
+                        <td>Email sending</td>
+                        <td>Security - SMTP credentials</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Client-Side Execution (Frontend)</h2>
+
+            <pre><code><span class="comment">// Client-side code runs in the USER'S BROWSER</span>
+<span class="comment">// Language: JavaScript (or TypeScript compiled to JS)</span>
+
+<span class="comment">// React/JavaScript example</span>
+<span class="keyword">function</span> RegistrationForm() {
+    <span class="keyword">const</span> [email, setEmail] = useState(<span class="string">''</span>);
+    <span class="keyword">const</span> [password, setPassword] = useState(<span class="string">''</span>);
+    <span class="keyword">const</span> [error, setError] = useState(<span class="string">''</span>);
+
+    <span class="comment">// ALL of this runs in the BROWSER:</span>
+
+    <span class="comment">// 1. Handle user input</span>
+    <span class="keyword">const</span> handleEmailChange = (e) => {
+        setEmail(e.target.value);
+    };
+
+    <span class="comment">// 2. Client-side validation (for UX, not security!)</span>
+    <span class="keyword">const</span> validateForm = () => {
+        <span class="keyword">if</span> (!email.includes(<span class="string">'@'</span>)) {
+            setError(<span class="string">'Invalid email'</span>);
+            <span class="keyword">return false</span>;
+        }
+        <span class="keyword">return true</span>;
+    };
+
+    <span class="comment">// 3. Submit to server</span>
+    <span class="keyword">const</span> handleSubmit = <span class="keyword">async</span> (e) => {
+        e.preventDefault();
+        <span class="keyword">if</span> (!validateForm()) <span class="keyword">return</span>;
+
+        <span class="comment">// Send data to server for REAL processing</span>
+        <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(<span class="string">'/api/register'</span>, {
+            method: <span class="string">'POST'</span>,
+            headers: { <span class="string">'Content-Type'</span>: <span class="string">'application/json'</span> },
+            body: JSON.stringify({ email, password })
+        });
+    };
+
+    <span class="comment">// 4. Render UI</span>
+    <span class="keyword">return</span> (
+        &lt;form onSubmit={handleSubmit}&gt;
+            &lt;input value={email} onChange={handleEmailChange} /&gt;
+            &lt;button type=<span class="string">"submit"</span>&gt;Register&lt;/button&gt;
+        &lt;/form&gt;
+    );
+}</code></pre>
+
+            <h3>What Runs on the Client</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Why Client?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>UI rendering</td>
+                        <td>User sees it - must be in browser</td>
+                    </tr>
+                    <tr>
+                        <td>User interactions</td>
+                        <td>Immediate response - no round trip</td>
+                    </tr>
+                    <tr>
+                        <td>Form validation (UX)</td>
+                        <td>Instant feedback - better experience</td>
+                    </tr>
+                    <tr>
+                        <td>Animations</td>
+                        <td>Smooth - no network latency</td>
+                    </tr>
+                    <tr>
+                        <td>Local storage</td>
+                        <td>Offline capability, preferences</td>
+                    </tr>
+                    <tr>
+                        <td>Single Page App routing</td>
+                        <td>Fast navigation without reload</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>The Complete Picture</h2>
+
+            <pre><code><span class="comment">// Example: User submits a login form</span>
+
+<span class="comment">// ═══════════════════════════════════════════════════════════════</span>
+<span class="comment">// STEP 1: CLIENT - User fills form (Browser/JavaScript)</span>
+<span class="comment">// ═══════════════════════════════════════════════════════════════</span>
+
+<span class="comment">// JavaScript in browser</span>
+<span class="keyword">const</span> form = document.getElementById(<span class="string">'loginForm'</span>);
+form.addEventListener(<span class="string">'submit'</span>, <span class="keyword">async</span> (e) => {
+    e.preventDefault();
+
+    <span class="comment">// Client-side validation (instant feedback)</span>
+    <span class="keyword">const</span> email = document.getElementById(<span class="string">'email'</span>).value;
+    <span class="keyword">if</span> (!email) {
+        showError(<span class="string">'Email required'</span>);  <span class="comment">// Immediate, no server needed</span>
+        <span class="keyword">return</span>;
+    }
+
+    <span class="comment">// Send to server</span>
+    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(<span class="string">'/api/login'</span>, {
+        method: <span class="string">'POST'</span>,
+        body: JSON.stringify({ email, password })
+    });
+});
+
+<span class="comment">// ═══════════════════════════════════════════════════════════════</span>
+<span class="comment">// STEP 2: SERVER - Process login (Your Server/Java)</span>
+<span class="comment">// ═══════════════════════════════════════════════════════════════</span>
+
+<span class="annotation">@PostMapping</span>(<span class="string">"/api/login"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;?&gt; login(<span class="annotation">@RequestBody</span> LoginRequest request) {
+
+    <span class="comment">// Server-side validation (REQUIRED - client can be bypassed)</span>
+    <span class="keyword">if</span> (request.getEmail() == <span class="keyword">null</span>) {
+        <span class="keyword">return</span> ResponseEntity.badRequest().body(<span class="string">"Email required"</span>);
+    }
+
+    <span class="comment">// Database lookup (only server can do this)</span>
+    User user = userRepository.findByEmail(request.getEmail());
+    <span class="keyword">if</span> (user == <span class="keyword">null</span>) {
+        <span class="keyword">return</span> ResponseEntity.status(<span class="number">401</span>).body(<span class="string">"Invalid credentials"</span>);
+    }
+
+    <span class="comment">// Password verification (server has the hash)</span>
+    <span class="keyword">if</span> (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        <span class="keyword">return</span> ResponseEntity.status(<span class="number">401</span>).body(<span class="string">"Invalid credentials"</span>);
+    }
+
+    <span class="comment">// Generate JWT token (server secret key)</span>
+    String token = jwtService.generateToken(user);
+
+    <span class="keyword">return</span> ResponseEntity.ok(<span class="keyword">new</span> LoginResponse(token));
+}
+
+<span class="comment">// ═══════════════════════════════════════════════════════════════</span>
+<span class="comment">// STEP 3: CLIENT - Handle response (Browser/JavaScript)</span>
+<span class="comment">// ═══════════════════════════════════════════════════════════════</span>
+
+<span class="comment">// Back in the browser</span>
+<span class="keyword">if</span> (response.ok) {
+    <span class="keyword">const</span> { token } = <span class="keyword">await</span> response.json();
+    localStorage.setItem(<span class="string">'token'</span>, token);  <span class="comment">// Store locally</span>
+    window.location.href = <span class="string">'/dashboard'</span>;   <span class="comment">// Navigate</span>
+} <span class="keyword">else</span> {
+    showError(<span class="string">'Login failed'</span>);  <span class="comment">// Update UI</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Security: Never Trust the Client</h2>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Critical Security Rule</div>
+                <p><strong>NEVER</strong> trust data from the client. Everything can be manipulated!</p>
+            </div>
+
+            <pre><code><span class="comment">// ❌ BAD: Trusting client-side validation only</span>
+
+<span class="comment">// Client (JavaScript) - can be bypassed!</span>
+<span class="keyword">if</span> (age >= <span class="number">18</span>) {
+    submitOrder();  <span class="comment">// User can remove this check in browser DevTools</span>
+}
+
+<span class="comment">// Server (Java) - no validation</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/order"</span>)
+<span class="keyword">public void</span> createOrder(<span class="annotation">@RequestBody</span> Order order) {
+    orderRepository.save(order);  <span class="comment">// 💀 Saves anything!</span>
+}
+
+<span class="comment">// ═══════════════════════════════════════════════════════════════</span>
+
+<span class="comment">// ✅ GOOD: Server-side validation (always!)</span>
+
+<span class="comment">// Client (JavaScript) - for UX only</span>
+<span class="keyword">if</span> (age >= <span class="number">18</span>) {
+    submitOrder();  <span class="comment">// Nice UX, but not security</span>
+}
+
+<span class="comment">// Server (Java) - THE REAL CHECK</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/order"</span>)
+<span class="keyword">public void</span> createOrder(<span class="annotation">@RequestBody</span> Order order) {
+    <span class="comment">// Validate EVERYTHING on server</span>
+    <span class="keyword">if</span> (order.getUser().getAge() < <span class="number">18</span>) {
+        <span class="keyword">throw new</span> ValidationException(<span class="string">"Must be 18+"</span>);
+    }
+    <span class="keyword">if</span> (order.getQuantity() <= <span class="number">0</span>) {
+        <span class="keyword">throw new</span> ValidationException(<span class="string">"Invalid quantity"</span>);
+    }
+    orderRepository.save(order);
+}</code></pre>
+
+            <h3>What Can Be Manipulated on Client</h3>
+            <pre><code><span class="comment">// EVERYTHING the client sends can be forged:</span>
+
+<span class="comment">// 1. Form data</span>
+<span class="comment">//    User can change hidden fields, prices, quantities</span>
+
+<span class="comment">// 2. JavaScript validation</span>
+<span class="comment">//    Can be disabled in browser DevTools</span>
+
+<span class="comment">// 3. HTTP headers</span>
+<span class="comment">//    Can be modified with curl or Postman</span>
+
+<span class="comment">// 4. Cookies (if not HttpOnly)</span>
+<span class="comment">//    Can be read/modified via JavaScript</span>
+
+<span class="comment">// 5. Local storage</span>
+<span class="comment">//    User has full access</span>
+
+<span class="comment">// Example attack:</span>
+curl -X POST https://shop.com/api/order \
+  -H "Content-Type: application/json" \
+  -d '{"productId": 1, "price": 0.01}'  <span class="comment"># Changed price!</span>
+
+<span class="comment">// Server MUST verify price from database, not trust the request</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Server-Side Rendering vs Client-Side Rendering</h2>
+
+            <h3>Server-Side Rendering (SSR)</h3>
+            <pre><code><span class="comment">// Server generates complete HTML</span>
+
+<span class="comment">// Thymeleaf (Java template engine)</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/products"</span>)
+<span class="keyword">public</span> String productList(Model model) {
+    List&lt;Product&gt; products = productService.findAll();
+    model.addAttribute(<span class="string">"products"</span>, products);
+    <span class="keyword">return</span> <span class="string">"products"</span>;  <span class="comment">// Renders products.html template</span>
+}
+
+<span class="comment">&lt;!-- products.html --&gt;</span>
+&lt;html&gt;
+&lt;body&gt;
+    &lt;h1&gt;Products&lt;/h1&gt;
+    &lt;ul&gt;
+        <span class="comment">&lt;!-- Server fills this in BEFORE sending to browser --&gt;</span>
+        &lt;li th:each="product : ${products}"&gt;
+            &lt;span th:text="${product.name}"&gt;Product Name&lt;/span&gt;
+        &lt;/li&gt;
+    &lt;/ul&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+<span class="comment">// Browser receives COMPLETE HTML - no JavaScript needed</span></code></pre>
+
+            <h3>Client-Side Rendering (CSR)</h3>
+            <pre><code><span class="comment">// Server sends minimal HTML + JavaScript</span>
+<span class="comment">// JavaScript fetches data and builds UI</span>
+
+<span class="comment">// Server (Java) - just an API</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/products"</span>)
+<span class="keyword">public</span> List&lt;Product&gt; getProducts() {
+    <span class="keyword">return</span> productService.findAll();  <span class="comment">// Returns JSON</span>
+}
+
+<span class="comment">// Client (React/JavaScript) - builds the UI</span>
+<span class="keyword">function</span> ProductList() {
+    <span class="keyword">const</span> [products, setProducts] = useState([]);
+
+    useEffect(() => {
+        fetch(<span class="string">'/api/products'</span>)
+            .then(res => res.json())
+            .then(data => setProducts(data));
+    }, []);
+
+    <span class="keyword">return</span> (
+        &lt;ul&gt;
+            {products.map(p => &lt;li key={p.id}&gt;{p.name}&lt;/li&gt;)}
+        &lt;/ul&gt;
+    );
+}</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Server-Side Rendering</th>
+                        <th>Client-Side Rendering</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Initial load</strong></td>
+                        <td>Faster (HTML ready)</td>
+                        <td>Slower (wait for JS)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SEO</strong></td>
+                        <td>Better (content visible)</td>
+                        <td>Needs extra work</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Interactivity</strong></td>
+                        <td>Page reloads</td>
+                        <td>Smooth SPA experience</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Server load</strong></td>
+                        <td>Higher (renders HTML)</td>
+                        <td>Lower (just API)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Examples</strong></td>
+                        <td>Thymeleaf, JSP</td>
+                        <td>React, Vue, Angular</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Modern Hybrid Approaches</h2>
+
+            <pre><code><span class="comment">// Modern apps often combine both approaches</span>
+
+<span class="comment">// 1. Next.js (React) - SSR + CSR</span>
+<span class="comment">//    - Server renders initial page (fast, SEO)</span>
+<span class="comment">//    - Client takes over for interactivity</span>
+
+<span class="comment">// 2. Spring Boot + Thymeleaf + HTMX</span>
+<span class="comment">//    - Server renders HTML fragments</span>
+<span class="comment">//    - HTMX swaps them without full page reload</span>
+
+<span class="annotation">@GetMapping</span>(<span class="string">"/products/search"</span>)
+<span class="keyword">public</span> String searchProducts(
+        <span class="annotation">@RequestParam</span> String query,
+        Model model) {
+    model.addAttribute(<span class="string">"products"</span>, productService.search(query));
+    <span class="keyword">return</span> <span class="string">"fragments/product-list"</span>;  <span class="comment">// Just the list HTML</span>
+}
+
+<span class="comment">&lt;!-- HTML with HTMX --&gt;</span>
+&lt;input type="search"
+       hx-get="/products/search"
+       hx-trigger="keyup changed delay:300ms"
+       hx-target="#results"&gt;
+
+&lt;div id="results"&gt;
+    <span class="comment">&lt;!-- Server-rendered HTML inserted here --&gt;</span>
+&lt;/div&gt;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Quick Reference</h2>
+
+            <div class="best-practices">
+                <h3>Server-Side (Java)</h3>
+                <ul>
+                    <li>Database operations</li>
+                    <li>Authentication & authorization</li>
+                    <li>Business logic & rules</li>
+                    <li>Data validation (REQUIRED)</li>
+                    <li>API keys & secrets</li>
+                    <li>Heavy computations</li>
+                    <li>Email/SMS sending</li>
+                </ul>
+
+                <h3>Client-Side (JavaScript)</h3>
+                <ul>
+                    <li>UI rendering & updates</li>
+                    <li>User interactions</li>
+                    <li>Form validation (for UX)</li>
+                    <li>Animations & transitions</li>
+                    <li>Local storage access</li>
+                    <li>SPA navigation</li>
+                    <li>Real-time updates (with WebSocket)</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Server-side:</strong> Runs on your servers - Java, secure, database access</li>
+                    <li><strong>Client-side:</strong> Runs in browser - JavaScript, UI, interactions</li>
+                    <li><strong>Security:</strong> NEVER trust client data - always validate on server</li>
+                    <li><strong>SSR:</strong> Server generates HTML - fast initial load, good SEO</li>
+                    <li><strong>CSR:</strong> JavaScript builds UI - smooth SPA experience</li>
+                    <li><strong>Modern apps:</strong> Often combine both approaches</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="client-server.html" class="related-link">Client-Server Architecture</a>
+                <a href="http.html" class="related-link">HTTP Protocol</a>
+                <a href="rest-principles.html" class="related-link">RESTful APIs</a>
+                <a href="sessions-cookies.html" class="related-link">Sessions & Cookies</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

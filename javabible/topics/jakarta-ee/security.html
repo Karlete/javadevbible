@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jakarta Security - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / Security
+            </nav>
+            <h1>Jakarta Security & Authentication</h1>
+            <p class="topic-subtitle">Securing enterprise Java applications</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is Jakarta Security?</h2>
+            <p><strong>Think of security like a building's access system:</strong></p>
+            <ul>
+                <li><strong>Authentication:</strong> Checking your ID at the entrance (Who are you?)</li>
+                <li><strong>Authorization:</strong> Key card access to specific floors (What can you do?)</li>
+                <li><strong>Identity Store:</strong> The database of employees and their access levels</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Jakarta Security</strong> is the standard security API for Jakarta EE applications. It provides:</p>
+                <ul>
+                    <li>Authentication mechanisms (form login, HTTP Basic, custom)</li>
+                    <li>Identity stores (LDAP, database, custom)</li>
+                    <li>Authorization (role-based access control)</li>
+                    <li>Security context for programmatic security</li>
+                </ul>
+            </div>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Concept</th>
+                        <th>Question</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Authentication</strong></td>
+                        <td>Who are you?</td>
+                        <td>Login with username/password</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Authorization</strong></td>
+                        <td>What can you access?</td>
+                        <td>Admin can delete, User can only view</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Principal</strong></td>
+                        <td>Who is logged in?</td>
+                        <td>The current user object</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Role</strong></td>
+                        <td>What group?</td>
+                        <td>ADMIN, USER, MANAGER</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Basic Authentication Setup</h2>
+
+            <h3>Form-Based Authentication</h3>
+            <pre><code><span class="keyword">import</span> jakarta.security.enterprise.authentication.mechanism.http.*;
+<span class="keyword">import</span> jakarta.enterprise.context.ApplicationScoped;
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="annotation">@FormAuthenticationMechanismDefinition</span>(
+    loginToContinue = <span class="annotation">@LoginToContinue</span>(
+        loginPage = <span class="string">"/login.html"</span>,
+        errorPage = <span class="string">"/login-error.html"</span>
+    )
+)
+<span class="keyword">public class</span> <span class="class-name">ApplicationConfig</span> {
+    <span class="comment">// Configuration class, no code needed</span>
+}</code></pre>
+
+            <h3>HTTP Basic Authentication</h3>
+            <pre><code><span class="annotation">@ApplicationScoped</span>
+<span class="annotation">@BasicAuthenticationMechanismDefinition</span>(
+    realmName = <span class="string">"MyAppRealm"</span>
+)
+<span class="keyword">public class</span> <span class="class-name">BasicAuthConfig</span> {
+    <span class="comment">// Browser shows login popup</span>
+}</code></pre>
+
+            <h3>Custom Authentication Mechanism</h3>
+            <pre><code><span class="keyword">import</span> jakarta.security.enterprise.authentication.mechanism.http.*;
+<span class="keyword">import</span> jakarta.security.enterprise.credential.*;
+<span class="keyword">import</span> jakarta.security.enterprise.identitystore.*;
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">JwtAuthenticationMechanism</span>
+    <span class="keyword">implements</span> <span class="class-name">HttpAuthenticationMechanism</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">IdentityStoreHandler</span> identityStoreHandler;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">JwtService</span> jwtService;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">AuthenticationStatus</span> <span class="function">validateRequest</span>(
+            <span class="class-name">HttpServletRequest</span> request,
+            <span class="class-name">HttpServletResponse</span> response,
+            <span class="class-name">HttpMessageContext</span> context) {
+
+        <span class="comment">// Extract JWT from Authorization header</span>
+        <span class="class-name">String</span> authHeader = request.getHeader(<span class="string">"Authorization"</span>);
+
+        <span class="keyword">if</span> (authHeader != <span class="keyword">null</span> && authHeader.startsWith(<span class="string">"Bearer "</span>)) {
+            <span class="class-name">String</span> token = authHeader.substring(<span class="number">7</span>);
+
+            <span class="keyword">try</span> {
+                <span class="comment">// Validate and extract claims from JWT</span>
+                <span class="class-name">Claims</span> claims = jwtService.validateToken(token);
+                <span class="class-name">String</span> username = claims.getSubject();
+                <span class="class-name">Set</span>&lt;<span class="class-name">String</span>&gt; roles = claims.get(<span class="string">"roles"</span>, <span class="class-name">Set</span>.<span class="keyword">class</span>);
+
+                <span class="comment">// Notify container of successful authentication</span>
+                <span class="keyword">return</span> context.notifyContainerAboutLogin(
+                    <span class="keyword">new</span> <span class="class-name">CallerPrincipal</span>(username),
+                    roles
+                );
+
+            } <span class="keyword">catch</span> (<span class="class-name">JwtException</span> e) {
+                <span class="comment">// Invalid token</span>
+                <span class="keyword">return</span> context.responseUnauthorized();
+            }
+        }
+
+        <span class="comment">// No token provided - check if resource is protected</span>
+        <span class="keyword">if</span> (context.isProtected()) {
+            <span class="keyword">return</span> context.responseUnauthorized();
+        }
+
+        <span class="comment">// Allow anonymous access to unprotected resources</span>
+        <span class="keyword">return</span> context.doNothing();
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Identity Stores</h2>
+
+            <h3>Database Identity Store</h3>
+            <pre><code><span class="annotation">@ApplicationScoped</span>
+<span class="annotation">@DatabaseIdentityStoreDefinition</span>(
+    dataSourceLookup = <span class="string">"java:comp/DefaultDataSource"</span>,
+    callerQuery = <span class="string">"SELECT password FROM users WHERE username = ?"</span>,
+    groupsQuery = <span class="string">"SELECT role FROM user_roles WHERE username = ?"</span>,
+    hashAlgorithm = <span class="class-name">Pbkdf2PasswordHash</span>.<span class="keyword">class</span>,
+    hashAlgorithmParameters = {
+        <span class="string">"Pbkdf2PasswordHash.Iterations=210000"</span>,
+        <span class="string">"Pbkdf2PasswordHash.Algorithm=PBKDF2WithHmacSHA512"</span>,
+        <span class="string">"Pbkdf2PasswordHash.SaltSizeBytes=32"</span>
+    }
+)
+<span class="keyword">public class</span> <span class="class-name">DatabaseIdentityStoreConfig</span> {
+    <span class="comment">// Users and roles stored in database</span>
+}</code></pre>
+
+            <h3>LDAP Identity Store</h3>
+            <pre><code><span class="annotation">@ApplicationScoped</span>
+<span class="annotation">@LdapIdentityStoreDefinition</span>(
+    url = <span class="string">"ldap://ldap.example.com:389"</span>,
+    bindDn = <span class="string">"cn=admin,dc=example,dc=com"</span>,
+    bindDnPassword = <span class="string">"adminPassword"</span>,
+    callerSearchBase = <span class="string">"ou=users,dc=example,dc=com"</span>,
+    callerNameAttribute = <span class="string">"uid"</span>,
+    groupSearchBase = <span class="string">"ou=groups,dc=example,dc=com"</span>,
+    groupMemberAttribute = <span class="string">"member"</span>
+)
+<span class="keyword">public class</span> <span class="class-name">LdapIdentityStoreConfig</span> {
+    <span class="comment">// Enterprise LDAP authentication</span>
+}</code></pre>
+
+            <h3>Custom Identity Store</h3>
+            <pre><code><span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">CustomIdentityStore</span> <span class="keyword">implements</span> <span class="class-name">IdentityStore</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">UserRepository</span> userRepository;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">PasswordHash</span> passwordHash;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">CredentialValidationResult</span> <span class="function">validate</span>(<span class="class-name">Credential</span> credential) {
+        <span class="keyword">if</span> (credential <span class="keyword">instanceof</span> <span class="class-name">UsernamePasswordCredential</span>) {
+            <span class="class-name">UsernamePasswordCredential</span> upc = (<span class="class-name">UsernamePasswordCredential</span>) credential;
+
+            <span class="class-name">String</span> username = upc.getCaller();
+            <span class="class-name">String</span> password = upc.getPasswordAsString();
+
+            <span class="comment">// Look up user in database</span>
+            <span class="class-name">User</span> user = userRepository.findByUsername(username);
+
+            <span class="keyword">if</span> (user != <span class="keyword">null</span> && passwordHash.verify(password, user.getPasswordHash())) {
+                <span class="comment">// Valid credentials</span>
+                <span class="keyword">return new</span> <span class="class-name">CredentialValidationResult</span>(
+                    username,
+                    user.getRoles()  <span class="comment">// Set&lt;String&gt; of roles</span>
+                );
+            }
+        }
+
+        <span class="keyword">return</span> <span class="class-name">CredentialValidationResult</span>.INVALID_RESULT;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">Set</span>&lt;<span class="class-name">ValidationType</span>&gt; <span class="function">validationTypes</span>() {
+        <span class="keyword">return</span> <span class="class-name">EnumSet</span>.of(<span class="class-name">ValidationType</span>.VALIDATE, <span class="class-name">ValidationType</span>.PROVIDE_GROUPS);
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public int</span> <span class="function">priority</span>() {
+        <span class="keyword">return</span> <span class="number">100</span>;  <span class="comment">// Higher priority = checked first</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Securing Endpoints</h2>
+
+            <h3>Servlet Security</h3>
+            <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/admin/*"</span>)
+<span class="annotation">@ServletSecurity</span>(
+    <span class="annotation">@HttpConstraint</span>(rolesAllowed = <span class="string">"ADMIN"</span>)
+)
+<span class="keyword">public class</span> <span class="class-name">AdminServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
+    <span class="comment">// Only users with ADMIN role can access</span>
+}
+
+<span class="comment">// Different constraints for different methods</span>
+<span class="annotation">@WebServlet</span>(<span class="string">"/data"</span>)
+<span class="annotation">@ServletSecurity</span>(
+    httpMethodConstraints = {
+        <span class="annotation">@HttpMethodConstraint</span>(value = <span class="string">"GET"</span>, rolesAllowed = {<span class="string">"USER"</span>, <span class="string">"ADMIN"</span>}),
+        <span class="annotation">@HttpMethodConstraint</span>(value = <span class="string">"POST"</span>, rolesAllowed = <span class="string">"ADMIN"</span>),
+        <span class="annotation">@HttpMethodConstraint</span>(value = <span class="string">"DELETE"</span>, rolesAllowed = <span class="string">"ADMIN"</span>)
+    }
+)
+<span class="keyword">public class</span> <span class="class-name">DataServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
+    <span class="comment">// GET: USER or ADMIN, POST/DELETE: ADMIN only</span>
+}</code></pre>
+
+            <h3>JAX-RS Security</h3>
+            <pre><code><span class="keyword">import</span> jakarta.annotation.security.*;
+
+<span class="annotation">@Path</span>(<span class="string">"/api"</span>)
+<span class="annotation">@RequestScoped</span>
+<span class="keyword">public class</span> <span class="class-name">SecuredResource</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">SecurityContext</span> securityContext;
+
+    <span class="comment">// Anyone can access</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/public"</span>)
+    <span class="annotation">@PermitAll</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">publicEndpoint</span>() {
+        <span class="keyword">return</span> <span class="string">"Public data"</span>;
+    }
+
+    <span class="comment">// Must be authenticated (any role)</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/user"</span>)
+    <span class="annotation">@RolesAllowed</span>({<span class="string">"USER"</span>, <span class="string">"ADMIN"</span>})
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">userEndpoint</span>() {
+        <span class="class-name">String</span> username = securityContext.getCallerPrincipal().getName();
+        <span class="keyword">return</span> <span class="string">"Hello, "</span> + username;
+    }
+
+    <span class="comment">// Admin only</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/admin"</span>)
+    <span class="annotation">@RolesAllowed</span>(<span class="string">"ADMIN"</span>)
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">adminEndpoint</span>() {
+        <span class="keyword">return</span> <span class="string">"Admin data"</span>;
+    }
+
+    <span class="comment">// No one can access (useful for deprecation)</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/deprecated"</span>)
+    <span class="annotation">@DenyAll</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">deprecatedEndpoint</span>() {
+        <span class="keyword">return</span> <span class="string">"Never accessible"</span>;
+    }
+}</code></pre>
+
+            <h3>EJB Security</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="annotation">@DeclareRoles</span>({<span class="string">"USER"</span>, <span class="string">"ADMIN"</span>, <span class="string">"MANAGER"</span>})
+<span class="keyword">public class</span> <span class="class-name">SecuredService</span> {
+
+    <span class="annotation">@Resource</span>
+    <span class="keyword">private</span> <span class="class-name">SessionContext</span> ctx;
+
+    <span class="annotation">@RolesAllowed</span>(<span class="string">"USER"</span>)
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getUserData</span>() {
+        <span class="keyword">return</span> <span class="string">"User data"</span>;
+    }
+
+    <span class="annotation">@RolesAllowed</span>({<span class="string">"ADMIN"</span>, <span class="string">"MANAGER"</span>})
+    <span class="keyword">public void</span> <span class="function">deleteData</span>(<span class="class-name">Long</span> id) {
+        <span class="comment">// Admin or Manager can delete</span>
+    }
+
+    <span class="annotation">@PermitAll</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getPublicData</span>() {
+        <span class="comment">// Programmatic security check</span>
+        <span class="keyword">if</span> (ctx.isCallerInRole(<span class="string">"ADMIN"</span>)) {
+            <span class="keyword">return</span> <span class="string">"Full data for admin"</span>;
+        }
+        <span class="keyword">return</span> <span class="string">"Limited data"</span>;
+    }
+
+    <span class="annotation">@RolesAllowed</span>(<span class="string">"ADMIN"</span>)
+    <span class="annotation">@RunAs</span>(<span class="string">"SYSTEM"</span>)  <span class="comment">// Execute as SYSTEM role</span>
+    <span class="keyword">public void</span> <span class="function">systemOperation</span>() {
+        <span class="comment">// Runs with SYSTEM privileges</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Security Context</h2>
+
+            <pre><code><span class="keyword">import</span> jakarta.security.enterprise.*;
+
+<span class="annotation">@RequestScoped</span>
+<span class="keyword">public class</span> <span class="class-name">UserInfoService</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">SecurityContext</span> securityContext;
+
+    <span class="keyword">public</span> <span class="class-name">UserInfo</span> <span class="function">getCurrentUser</span>() {
+        <span class="comment">// Get current principal (logged-in user)</span>
+        <span class="class-name">Principal</span> principal = securityContext.getCallerPrincipal();
+
+        <span class="keyword">if</span> (principal == <span class="keyword">null</span>) {
+            <span class="keyword">return</span> <span class="keyword">null</span>;  <span class="comment">// Not authenticated</span>
+        }
+
+        <span class="class-name">String</span> username = principal.getName();
+
+        <span class="comment">// Check roles</span>
+        <span class="keyword">boolean</span> isAdmin = securityContext.isCallerInRole(<span class="string">"ADMIN"</span>);
+        <span class="keyword">boolean</span> isUser = securityContext.isCallerInRole(<span class="string">"USER"</span>);
+
+        <span class="comment">// Get all principals (custom principal types)</span>
+        <span class="class-name">Set</span>&lt;<span class="class-name">Principal</span>&gt; principals = securityContext.getPrincipalsByType(<span class="class-name">Principal</span>.<span class="keyword">class</span>);
+
+        <span class="keyword">return new</span> <span class="class-name">UserInfo</span>(username, isAdmin, isUser);
+    }
+
+    <span class="keyword">public boolean</span> <span class="function">hasPermission</span>(<span class="class-name">String</span> resource, <span class="class-name">String</span> action) {
+        <span class="comment">// Custom permission check</span>
+        <span class="keyword">if</span> (securityContext.isCallerInRole(<span class="string">"ADMIN"</span>)) {
+            <span class="keyword">return true</span>;  <span class="comment">// Admins can do anything</span>
+        }
+
+        <span class="keyword">if</span> (<span class="string">"read"</span>.equals(action)) {
+            <span class="keyword">return</span> securityContext.isCallerInRole(<span class="string">"USER"</span>);
+        }
+
+        <span class="keyword">return false</span>;
+    }
+}</code></pre>
+
+            <h3>Programmatic Authentication</h3>
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/auth"</span>)
+<span class="keyword">public class</span> <span class="class-name">AuthResource</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">SecurityContext</span> securityContext;
+
+    <span class="annotation">@POST</span>
+    <span class="annotation">@Path</span>(<span class="string">"/login"</span>)
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">login</span>(<span class="class-name">LoginRequest</span> loginRequest) {
+        <span class="comment">// Programmatic authentication</span>
+        <span class="class-name">AuthenticationStatus</span> status = securityContext.authenticate(
+            request,
+            response,
+            <span class="class-name">AuthenticationParameters</span>.withParams()
+                .credential(<span class="keyword">new</span> <span class="class-name">UsernamePasswordCredential</span>(
+                    loginRequest.getUsername(),
+                    loginRequest.getPassword()
+                ))
+        );
+
+        <span class="keyword">if</span> (status == <span class="class-name">AuthenticationStatus</span>.SUCCESS) {
+            <span class="keyword">return</span> <span class="class-name">Response</span>.ok(<span class="string">"Login successful"</span>).build();
+        }
+
+        <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="number">401</span>).entity(<span class="string">"Invalid credentials"</span>).build();
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Password Hashing</h2>
+
+            <pre><code><span class="keyword">import</span> jakarta.security.enterprise.identitystore.*;
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">Pbkdf2PasswordHash</span> passwordHash;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">UserRepository</span> userRepo;
+
+    <span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> password) {
+        <span class="comment">// Initialize with parameters</span>
+        <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">String</span>&gt; params = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
+        params.put(<span class="string">"Pbkdf2PasswordHash.Iterations"</span>, <span class="string">"210000"</span>);
+        params.put(<span class="string">"Pbkdf2PasswordHash.Algorithm"</span>, <span class="string">"PBKDF2WithHmacSHA512"</span>);
+        params.put(<span class="string">"Pbkdf2PasswordHash.SaltSizeBytes"</span>, <span class="string">"32"</span>);
+        passwordHash.initialize(params);
+
+        <span class="comment">// Hash the password</span>
+        <span class="class-name">String</span> hashedPassword = passwordHash.generate(password.toCharArray());
+
+        <span class="comment">// Store user with hashed password</span>
+        <span class="class-name">User</span> user = <span class="keyword">new</span> <span class="class-name">User</span>();
+        user.setUsername(username);
+        user.setPassword(hashedPassword);  <span class="comment">// Store hash, never plain text!</span>
+        userRepo.save(user);
+    }
+
+    <span class="keyword">public boolean</span> <span class="function">verifyPassword</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> password) {
+        <span class="class-name">User</span> user = userRepo.findByUsername(username);
+        <span class="keyword">if</span> (user == <span class="keyword">null</span>) {
+            <span class="keyword">return false</span>;
+        }
+
+        <span class="comment">// Verify password against stored hash</span>
+        <span class="keyword">return</span> passwordHash.verify(password.toCharArray(), user.getPassword());
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Remember Me</h2>
+
+            <pre><code><span class="annotation">@ApplicationScoped</span>
+<span class="annotation">@FormAuthenticationMechanismDefinition</span>(
+    loginToContinue = <span class="annotation">@LoginToContinue</span>(
+        loginPage = <span class="string">"/login.html"</span>,
+        errorPage = <span class="string">"/login-error.html"</span>
+    )
+)
+<span class="annotation">@RememberMe</span>(
+    cookieMaxAgeSeconds = <span class="number">604800</span>,  <span class="comment">// 7 days</span>
+    cookieSecureOnly = <span class="keyword">true</span>,
+    cookieHttpOnly = <span class="keyword">true</span>,
+    isRememberMeExpression = <span class="string">"#{self.isRememberMe(httpServletRequest)}"</span>
+)
+<span class="keyword">public class</span> <span class="class-name">RememberMeConfig</span> {
+
+    <span class="keyword">public boolean</span> <span class="function">isRememberMe</span>(<span class="class-name">HttpServletRequest</span> request) {
+        <span class="keyword">return</span> <span class="string">"true"</span>.equals(request.getParameter(<span class="string">"rememberMe"</span>));
+    }
+}
+
+<span class="comment">// Custom RememberMe Identity Store</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">CustomRememberMeIdentityStore</span>
+    <span class="keyword">implements</span> <span class="class-name">RememberMeIdentityStore</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">TokenRepository</span> tokenRepo;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">CredentialValidationResult</span> <span class="function">validate</span>(<span class="class-name">RememberMeCredential</span> credential) {
+        <span class="class-name">String</span> token = credential.getToken();
+        <span class="class-name">RememberMeToken</span> storedToken = tokenRepo.findByToken(token);
+
+        <span class="keyword">if</span> (storedToken != <span class="keyword">null</span> && !storedToken.isExpired()) {
+            <span class="keyword">return new</span> <span class="class-name">CredentialValidationResult</span>(
+                storedToken.getUsername(),
+                storedToken.getRoles()
+            );
+        }
+
+        <span class="keyword">return</span> <span class="class-name">CredentialValidationResult</span>.INVALID_RESULT;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateLoginToken</span>(<span class="class-name">CallerPrincipal</span> principal, <span class="class-name">Set</span>&lt;<span class="class-name">String</span>&gt; groups) {
+        <span class="class-name">String</span> token = <span class="class-name">UUID</span>.randomUUID().toString();
+        tokenRepo.save(<span class="keyword">new</span> <span class="class-name">RememberMeToken</span>(token, principal.getName(), groups));
+        <span class="keyword">return</span> token;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">removeLoginToken</span>(<span class="class-name">String</span> token) {
+        tokenRepo.deleteByToken(token);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>web.xml Security Constraints</h2>
+
+            <pre><code><span class="comment">&lt;!-- WEB-INF/web.xml --&gt;</span>
+&lt;<span class="keyword">web-app</span>&gt;
+    <span class="comment">&lt;!-- Security constraint --&gt;</span>
+    &lt;<span class="keyword">security-constraint</span>&gt;
+        &lt;<span class="keyword">web-resource-collection</span>&gt;
+            &lt;<span class="keyword">web-resource-name</span>&gt;Admin Area&lt;/<span class="keyword">web-resource-name</span>&gt;
+            &lt;<span class="keyword">url-pattern</span>&gt;/admin/*&lt;/<span class="keyword">url-pattern</span>&gt;
+            &lt;<span class="keyword">http-method</span>&gt;GET&lt;/<span class="keyword">http-method</span>&gt;
+            &lt;<span class="keyword">http-method</span>&gt;POST&lt;/<span class="keyword">http-method</span>&gt;
+        &lt;/<span class="keyword">web-resource-collection</span>&gt;
+        &lt;<span class="keyword">auth-constraint</span>&gt;
+            &lt;<span class="keyword">role-name</span>&gt;ADMIN&lt;/<span class="keyword">role-name</span>&gt;
+        &lt;/<span class="keyword">auth-constraint</span>&gt;
+        &lt;<span class="keyword">user-data-constraint</span>&gt;
+            &lt;<span class="keyword">transport-guarantee</span>&gt;CONFIDENTIAL&lt;/<span class="keyword">transport-guarantee</span>&gt;
+        &lt;/<span class="keyword">user-data-constraint</span>&gt;
+    &lt;/<span class="keyword">security-constraint</span>&gt;
+
+    <span class="comment">&lt;!-- Login configuration --&gt;</span>
+    &lt;<span class="keyword">login-config</span>&gt;
+        &lt;<span class="keyword">auth-method</span>&gt;FORM&lt;/<span class="keyword">auth-method</span>&gt;
+        &lt;<span class="keyword">form-login-config</span>&gt;
+            &lt;<span class="keyword">form-login-page</span>&gt;/login.html&lt;/<span class="keyword">form-login-page</span>&gt;
+            &lt;<span class="keyword">form-error-page</span>&gt;/login-error.html&lt;/<span class="keyword">form-error-page</span>&gt;
+        &lt;/<span class="keyword">form-login-config</span>&gt;
+    &lt;/<span class="keyword">login-config</span>&gt;
+
+    <span class="comment">&lt;!-- Security roles --&gt;</span>
+    &lt;<span class="keyword">security-role</span>&gt;
+        &lt;<span class="keyword">role-name</span>&gt;ADMIN&lt;/<span class="keyword">role-name</span>&gt;
+    &lt;/<span class="keyword">security-role</span>&gt;
+    &lt;<span class="keyword">security-role</span>&gt;
+        &lt;<span class="keyword">role-name</span>&gt;USER&lt;/<span class="keyword">role-name</span>&gt;
+    &lt;/<span class="keyword">security-role</span>&gt;
+&lt;/<span class="keyword">web-app</span>&gt;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Security Patterns</h2>
+
+            <h3>Method-Level Security with Interceptor</h3>
+            <pre><code><span class="comment">// Custom security annotation</span>
+<span class="annotation">@Retention</span>(<span class="class-name">RetentionPolicy</span>.RUNTIME)
+<span class="annotation">@Target</span>(<span class="class-name">ElementType</span>.METHOD)
+<span class="annotation">@InterceptorBinding</span>
+<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">Secured</span> {
+    <span class="class-name">String</span>[] <span class="function">roles</span>() <span class="keyword">default</span> {};
+}
+
+<span class="comment">// Security interceptor</span>
+<span class="annotation">@Interceptor</span>
+<span class="annotation">@Secured</span>
+<span class="annotation">@Priority</span>(Interceptor.Priority.APPLICATION)
+<span class="keyword">public class</span> <span class="class-name">SecurityInterceptor</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">SecurityContext</span> securityContext;
+
+    <span class="annotation">@AroundInvoke</span>
+    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">checkSecurity</span>(<span class="class-name">InvocationContext</span> ctx) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="class-name">Secured</span> secured = ctx.getMethod().getAnnotation(<span class="class-name">Secured</span>.<span class="keyword">class</span>);
+        <span class="class-name">String</span>[] requiredRoles = secured.roles();
+
+        <span class="keyword">for</span> (<span class="class-name">String</span> role : requiredRoles) {
+            <span class="keyword">if</span> (securityContext.isCallerInRole(role)) {
+                <span class="keyword">return</span> ctx.proceed();  <span class="comment">// Has required role</span>
+            }
+        }
+
+        <span class="keyword">throw new</span> <span class="class-name">SecurityException</span>(<span class="string">"Access denied"</span>);
+    }
+}
+
+<span class="comment">// Usage</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">ReportService</span> {
+
+    <span class="annotation">@Secured</span>(roles = {<span class="string">"ADMIN"</span>, <span class="string">"MANAGER"</span>})
+    <span class="keyword">public</span> <span class="class-name">Report</span> <span class="function">generateSensitiveReport</span>() {
+        <span class="comment">// Only ADMIN or MANAGER can call this</span>
+    }
+}</code></pre>
+
+            <h3>Audit Logging</h3>
+            <pre><code><span class="annotation">@Interceptor</span>
+<span class="annotation">@Priority</span>(Interceptor.Priority.APPLICATION + <span class="number">100</span>)
+<span class="keyword">public class</span> <span class="class-name">SecurityAuditInterceptor</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">SecurityContext</span> securityContext;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">AuditService</span> auditService;
+
+    <span class="annotation">@AroundInvoke</span>
+    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">audit</span>(<span class="class-name">InvocationContext</span> ctx) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="class-name">String</span> user = securityContext.getCallerPrincipal() != <span class="keyword">null</span>
+            ? securityContext.getCallerPrincipal().getName()
+            : <span class="string">"anonymous"</span>;
+
+        <span class="class-name">String</span> method = ctx.getMethod().getName();
+        <span class="class-name">String</span> className = ctx.getTarget().getClass().getSimpleName();
+
+        <span class="keyword">try</span> {
+            <span class="class-name">Object</span> result = ctx.proceed();
+            auditService.logSuccess(user, className, method);
+            <span class="keyword">return</span> result;
+        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+            auditService.logFailure(user, className, method, e.getMessage());
+            <span class="keyword">throw</span> e;
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>DO:</h3>
+                <ul>
+                    <li><strong>Use HTTPS everywhere</strong> - transport-guarantee="CONFIDENTIAL"</li>
+                    <li><strong>Hash passwords</strong> - Use Pbkdf2PasswordHash with strong params</li>
+                    <li><strong>Use HttpOnly and Secure cookies</strong> - Prevent XSS attacks</li>
+                    <li><strong>Implement proper logout</strong> - Invalidate sessions and tokens</li>
+                    <li><strong>Use role-based access control</strong> - @RolesAllowed annotations</li>
+                    <li><strong>Validate all inputs</strong> - Prevent injection attacks</li>
+                    <li><strong>Log security events</strong> - Audit trail for compliance</li>
+                    <li><strong>Use CSRF protection</strong> - For form submissions</li>
+                </ul>
+
+                <h3>DON'T:</h3>
+                <ul>
+                    <li><strong>Don't store plain text passwords</strong> - Always hash!</li>
+                    <li><strong>Don't trust client-side validation</strong> - Always validate server-side</li>
+                    <li><strong>Don't expose sensitive data in errors</strong> - Generic error messages</li>
+                    <li><strong>Don't use GET for sensitive operations</strong> - Use POST</li>
+                    <li><strong>Don't hardcode secrets</strong> - Use environment variables</li>
+                    <li><strong>Don't ignore security headers</strong> - X-Frame-Options, CSP, etc.</li>
+                    <li><strong>Don't use weak session IDs</strong> - Let container manage sessions</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Jakarta Security:</strong> Standard security API for Jakarta EE</li>
+                    <li><strong>Authentication:</strong> Verifying user identity (login)</li>
+                    <li><strong>Authorization:</strong> Controlling access (roles, permissions)</li>
+                    <li><strong>Identity Store:</strong> Where user credentials are stored</li>
+                    <li><strong>SecurityContext:</strong> Access current user and roles</li>
+                    <li><strong>@RolesAllowed:</strong> Declarative role-based security</li>
+                    <li><strong>@FormAuthenticationMechanismDefinition:</strong> Form login</li>
+                    <li><strong>@DatabaseIdentityStoreDefinition:</strong> DB user store</li>
+                    <li><strong>Pbkdf2PasswordHash:</strong> Secure password hashing</li>
+                    <li><strong>Custom mechanisms:</strong> JWT, OAuth, etc.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jax-rs.html" class="related-link">JAX-RS (REST)</a>
+                <a href="cdi.html" class="related-link">CDI</a>
+                <a href="ejb.html" class="related-link">EJB</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

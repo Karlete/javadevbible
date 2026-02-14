@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Quality Tools - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#tools">Tools & Ecosystem</a> / Code Quality Tools
+            </nav>
+            <h1>Code Quality Tools</h1>
+            <p class="topic-subtitle">Static Analysis, Linting, and Code Quality for Java</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Why Code Quality Matters</h2>
+            <p>Code quality tools help maintain consistent, readable, and bug-free code. They catch issues early in the development cycle, reducing technical debt and making code easier to maintain.</p>
+
+            <div class="info-box note">
+                <div class="info-box-title">Code Quality Benefits</div>
+                <ul>
+                    <li><strong>Bug Prevention</strong> - Catch potential issues before runtime</li>
+                    <li><strong>Consistency</strong> - Enforce coding standards across teams</li>
+                    <li><strong>Maintainability</strong> - Easier to read and modify code</li>
+                    <li><strong>Security</strong> - Identify security vulnerabilities early</li>
+                    <li><strong>Knowledge Sharing</strong> - New team members learn standards quickly</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Static Analysis Tools Overview</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tool</th>
+                        <th>Purpose</th>
+                        <th>Integration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>SonarQube/SonarCloud</strong></td>
+                        <td>Comprehensive quality platform</td>
+                        <td>CI/CD, IDE plugins</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Checkstyle</strong></td>
+                        <td>Code style enforcement</td>
+                        <td>Maven/Gradle, IDE</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PMD</strong></td>
+                        <td>Bug patterns, best practices</td>
+                        <td>Maven/Gradle, IDE</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SpotBugs</strong></td>
+                        <td>Bug detection via bytecode analysis</td>
+                        <td>Maven/Gradle, IDE</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Error Prone</strong></td>
+                        <td>Compile-time bug detection</td>
+                        <td>Compiler plugin</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>SonarQube</h2>
+            <p>SonarQube is the most comprehensive code quality platform, analyzing code for bugs, vulnerabilities, code smells, and technical debt.</p>
+
+            <h3>Key Metrics</h3>
+            <ul>
+                <li><strong>Bugs</strong> - Code that will likely cause unexpected behavior</li>
+                <li><strong>Vulnerabilities</strong> - Security issues</li>
+                <li><strong>Code Smells</strong> - Maintainability issues</li>
+                <li><strong>Coverage</strong> - Test coverage percentage</li>
+                <li><strong>Duplications</strong> - Repeated code blocks</li>
+                <li><strong>Technical Debt</strong> - Estimated time to fix all issues</li>
+            </ul>
+
+            <h3>Maven Configuration</h3>
+            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;properties&gt;
+    &lt;sonar.projectKey&gt;my-project&lt;/sonar.projectKey&gt;
+    &lt;sonar.organization&gt;my-org&lt;/sonar.organization&gt;
+    &lt;sonar.host.url&gt;https://sonarcloud.io&lt;/sonar.host.url&gt;
+&lt;/properties&gt;
+
+<span class="comment">&lt;!-- Run analysis --&gt;</span>
+<span class="comment"># mvn sonar:sonar -Dsonar.token=YOUR_TOKEN</span></code></pre>
+
+            <h3>GitHub Actions Integration</h3>
+            <pre><code><span class="comment"># .github/workflows/sonar.yml</span>
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Cache SonarCloud packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.sonar/cache
+        key: ${{ runner.os }}-sonar
+
+    - name: Build and analyze
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      run: mvn -B verify sonar:sonar</code></pre>
+
+            <h3>Quality Gate</h3>
+            <pre><code><span class="comment">// SonarQube Quality Gate conditions (customizable)</span>
+<span class="comment">// Default "Sonar way" gate:</span>
+
+New Code Coverage:        &gt; 80%
+New Duplicated Lines:     &lt; 3%
+New Maintainability Rating: A
+New Reliability Rating:   A
+New Security Rating:      A
+New Security Hotspots:    100% reviewed
+
+<span class="comment">// Quality Gate status blocks CI/CD if conditions not met</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Checkstyle</h2>
+            <p>Checkstyle enforces coding conventions and style guidelines. It's highly configurable and can use Google or Sun coding standards.</p>
+
+            <h3>Maven Plugin Configuration</h3>
+            <pre><code>&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-checkstyle-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.3.1&lt;/version&gt;
+    &lt;configuration&gt;
+        <span class="comment">&lt;!-- Use Google's coding style --&gt;</span>
+        &lt;configLocation&gt;google_checks.xml&lt;/configLocation&gt;
+        <span class="comment">&lt;!-- Or use Sun's style --&gt;</span>
+        <span class="comment">&lt;!-- &lt;configLocation&gt;sun_checks.xml&lt;/configLocation&gt; --&gt;</span>
+        &lt;consoleOutput&gt;true&lt;/consoleOutput&gt;
+        &lt;failsOnError&gt;true&lt;/failsOnError&gt;
+    &lt;/configuration&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;id&gt;validate&lt;/id&gt;
+            &lt;phase&gt;validate&lt;/phase&gt;
+            &lt;goals&gt;
+                &lt;goal&gt;check&lt;/goal&gt;
+            &lt;/goals&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;</code></pre>
+
+            <h3>Custom Configuration</h3>
+            <pre><code><span class="comment">&lt;!-- checkstyle.xml --&gt;</span>
+&lt;?xml version="1.0"?&gt;
+&lt;!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd"&gt;
+
+&lt;module name="Checker"&gt;
+    &lt;property name="charset" value="UTF-8"/&gt;
+
+    &lt;module name="TreeWalker"&gt;
+        <span class="comment">&lt;!-- Naming conventions --&gt;</span>
+        &lt;module name="ConstantName"/&gt;
+        &lt;module name="LocalVariableName"/&gt;
+        &lt;module name="MethodName"/&gt;
+        &lt;module name="ParameterName"/&gt;
+        &lt;module name="TypeName"/&gt;
+
+        <span class="comment">&lt;!-- Imports --&gt;</span>
+        &lt;module name="AvoidStarImport"/&gt;
+        &lt;module name="UnusedImports"/&gt;
+
+        <span class="comment">&lt;!-- Size violations --&gt;</span>
+        &lt;module name="LineLength"&gt;
+            &lt;property name="max" value="120"/&gt;
+        &lt;/module&gt;
+        &lt;module name="MethodLength"&gt;
+            &lt;property name="max" value="50"/&gt;
+        &lt;/module&gt;
+
+        <span class="comment">&lt;!-- Whitespace --&gt;</span>
+        &lt;module name="WhitespaceAfter"/&gt;
+        &lt;module name="WhitespaceAround"/&gt;
+
+        <span class="comment">&lt;!-- Coding --&gt;</span>
+        &lt;module name="EmptyStatement"/&gt;
+        &lt;module name="EqualsHashCode"/&gt;
+        &lt;module name="MissingSwitchDefault"/&gt;
+    &lt;/module&gt;
+&lt;/module&gt;</code></pre>
+
+            <h3>Common Checkstyle Rules</h3>
+            <pre><code><span class="comment">// VIOLATION: Star import</span>
+<span class="keyword">import</span> java.util.*;  <span class="comment">// Avoid!</span>
+
+<span class="comment">// CORRECT: Explicit imports</span>
+<span class="keyword">import</span> java.util.List;
+<span class="keyword">import</span> java.util.ArrayList;
+
+<span class="comment">// VIOLATION: Line too long (>120 chars)</span>
+<span class="keyword">public void</span> <span class="function">processUserDataAndSendNotificationWithAllRequiredParametersAndValidation</span>(...) { }
+
+<span class="comment">// VIOLATION: Missing braces</span>
+<span class="keyword">if</span> (condition)
+    doSomething();
+
+<span class="comment">// CORRECT: Always use braces</span>
+<span class="keyword">if</span> (condition) {
+    doSomething();
+}
+
+<span class="comment">// VIOLATION: Constant naming</span>
+<span class="keyword">public static final int</span> maxSize = <span class="number">100</span>;  <span class="comment">// Should be MAX_SIZE</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>PMD</h2>
+            <p>PMD finds common programming flaws, unused code, suboptimal code, and overly complicated expressions.</p>
+
+            <h3>Maven Configuration</h3>
+            <pre><code>&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-pmd-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.21.2&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;rulesets&gt;
+            &lt;ruleset&gt;/category/java/bestpractices.xml&lt;/ruleset&gt;
+            &lt;ruleset&gt;/category/java/codestyle.xml&lt;/ruleset&gt;
+            &lt;ruleset&gt;/category/java/design.xml&lt;/ruleset&gt;
+            &lt;ruleset&gt;/category/java/errorprone.xml&lt;/ruleset&gt;
+            &lt;ruleset&gt;/category/java/performance.xml&lt;/ruleset&gt;
+        &lt;/rulesets&gt;
+        &lt;failOnViolation&gt;true&lt;/failOnViolation&gt;
+        &lt;printFailingErrors&gt;true&lt;/printFailingErrors&gt;
+    &lt;/configuration&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;goals&gt;
+                &lt;goal&gt;check&lt;/goal&gt;
+            &lt;/goals&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;</code></pre>
+
+            <h3>Common PMD Rules</h3>
+            <pre><code><span class="comment">// UnusedLocalVariable</span>
+<span class="keyword">public void</span> <span class="function">process</span>() {
+    <span class="keyword">int</span> unused = <span class="number">5</span>;  <span class="comment">// PMD: Variable 'unused' is never used</span>
+}
+
+<span class="comment">// EmptyCatchBlock</span>
+<span class="keyword">try</span> {
+    riskyOperation();
+} <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+    <span class="comment">// PMD: Empty catch block - at least log the exception!</span>
+}
+
+<span class="comment">// AvoidReassigningParameters</span>
+<span class="keyword">public void</span> <span class="function">process</span>(<span class="class-name">String</span> input) {
+    input = input.trim();  <span class="comment">// PMD: Don't reassign parameters</span>
+}
+
+<span class="comment">// UseCollectionIsEmpty</span>
+<span class="keyword">if</span> (list.size() == <span class="number">0</span>) { }  <span class="comment">// PMD: Use isEmpty()</span>
+<span class="keyword">if</span> (list.isEmpty()) { }    <span class="comment">// Better!</span>
+
+<span class="comment">// SimplifyBooleanReturns</span>
+<span class="keyword">if</span> (condition) {
+    <span class="keyword">return true</span>;
+} <span class="keyword">else</span> {
+    <span class="keyword">return false</span>;
+}
+<span class="comment">// Should be: return condition;</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>SpotBugs</h2>
+            <p>SpotBugs (successor to FindBugs) analyzes bytecode to find potential bugs, including null pointer dereferences, infinite loops, and resource leaks.</p>
+
+            <h3>Maven Configuration</h3>
+            <pre><code>&lt;plugin&gt;
+    &lt;groupId&gt;com.github.spotbugs&lt;/groupId&gt;
+    &lt;artifactId&gt;spotbugs-maven-plugin&lt;/artifactId&gt;
+    &lt;version&gt;4.8.2.0&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;effort&gt;Max&lt;/effort&gt;
+        &lt;threshold&gt;Low&lt;/threshold&gt;
+        &lt;failOnError&gt;true&lt;/failOnError&gt;
+        &lt;plugins&gt;
+            <span class="comment">&lt;!-- Additional plugins --&gt;</span>
+            &lt;plugin&gt;
+                &lt;groupId&gt;com.h3xstream.findsecbugs&lt;/groupId&gt;
+                &lt;artifactId&gt;findsecbugs-plugin&lt;/artifactId&gt;
+                &lt;version&gt;1.12.0&lt;/version&gt;
+            &lt;/plugin&gt;
+        &lt;/plugins&gt;
+    &lt;/configuration&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;goals&gt;
+                &lt;goal&gt;check&lt;/goal&gt;
+            &lt;/goals&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;</code></pre>
+
+            <h3>Common SpotBugs Findings</h3>
+            <pre><code><span class="comment">// NP_NULL_ON_SOME_PATH - Possible null pointer dereference</span>
+<span class="keyword">public void</span> <span class="function">process</span>(<span class="class-name">User</span> user) {
+    <span class="class-name">String</span> name = user.getName();  <span class="comment">// user could be null!</span>
+    name.toUpperCase();
+}
+
+<span class="comment">// RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE</span>
+<span class="class-name">String</span> s = <span class="string">"hello"</span>;
+<span class="keyword">if</span> (s != <span class="keyword">null</span>) { }  <span class="comment">// Redundant - string literal is never null</span>
+
+<span class="comment">// OBL_UNSATISFIED_OBLIGATION - Resource leak</span>
+<span class="keyword">public void</span> <span class="function">readFile</span>() {
+    <span class="class-name">FileInputStream</span> fis = <span class="keyword">new</span> <span class="class-name">FileInputStream</span>(<span class="string">"file.txt"</span>);
+    <span class="comment">// SpotBugs: Stream not closed!</span>
+}
+
+<span class="comment">// DM_BOXED_PRIMITIVE_FOR_PARSING</span>
+<span class="keyword">int</span> value = <span class="keyword">new</span> <span class="class-name">Integer</span>(<span class="string">"123"</span>);  <span class="comment">// Inefficient</span>
+<span class="keyword">int</span> value = <span class="class-name">Integer</span>.parseInt(<span class="string">"123"</span>);  <span class="comment">// Better</span>
+
+<span class="comment">// EQ_COMPARETO_USE_OBJECT_EQUALS</span>
+<span class="comment">// Class implements compareTo but not equals - inconsistent!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Error Prone</h2>
+            <p>Error Prone is a compile-time static analysis tool from Google that catches common Java mistakes.</p>
+
+            <h3>Maven Configuration</h3>
+            <pre><code>&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.12.1&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;release&gt;17&lt;/release&gt;
+        &lt;compilerArgs&gt;
+            &lt;arg&gt;-XDcompilePolicy=simple&lt;/arg&gt;
+            &lt;arg&gt;-Xplugin:ErrorProne&lt;/arg&gt;
+        &lt;/compilerArgs&gt;
+        &lt;annotationProcessorPaths&gt;
+            &lt;path&gt;
+                &lt;groupId&gt;com.google.errorprone&lt;/groupId&gt;
+                &lt;artifactId&gt;error_prone_core&lt;/artifactId&gt;
+                &lt;version&gt;2.24.1&lt;/version&gt;
+            &lt;/path&gt;
+        &lt;/annotationProcessorPaths&gt;
+    &lt;/configuration&gt;
+&lt;/plugin&gt;</code></pre>
+
+            <h3>Common Error Prone Checks</h3>
+            <pre><code><span class="comment">// StringSplitter - split() has surprising behavior with regex</span>
+<span class="class-name">String</span>[] parts = <span class="string">"a.b.c"</span>.split(<span class="string">"."</span>);  <span class="comment">// Returns empty array!</span>
+<span class="class-name">String</span>[] parts = <span class="string">"a.b.c"</span>.split(<span class="string">"\\."</span>);  <span class="comment">// Correct</span>
+
+<span class="comment">// CollectionIncompatibleType</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; strings = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+strings.contains(<span class="number">123</span>);  <span class="comment">// Always returns false!</span>
+
+<span class="comment">// EqualsHashCode</span>
+<span class="keyword">class</span> <span class="class-name">User</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public boolean</span> <span class="function">equals</span>(<span class="class-name">Object</span> o) { ... }
+    <span class="comment">// Missing hashCode()!</span>
+}
+
+<span class="comment">// MissingOverride</span>
+<span class="keyword">class</span> <span class="class-name">Child</span> <span class="keyword">extends</span> <span class="class-name">Parent</span> {
+    <span class="keyword">public void</span> <span class="function">process</span>() { }  <span class="comment">// Should have @Override</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Combining Tools</h2>
+            <p>Use multiple tools together for comprehensive coverage. Each tool has different strengths.</p>
+
+            <h3>Recommended Combination</h3>
+            <pre><code><span class="comment">&lt;!-- Complete quality setup in pom.xml --&gt;</span>
+&lt;build&gt;
+    &lt;plugins&gt;
+        <span class="comment">&lt;!-- Checkstyle - Style and formatting --&gt;</span>
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-checkstyle-plugin&lt;/artifactId&gt;
+            &lt;version&gt;3.3.1&lt;/version&gt;
+            <span class="comment">&lt;!-- ... configuration ... --&gt;</span>
+        &lt;/plugin&gt;
+
+        <span class="comment">&lt;!-- PMD - Code patterns and best practices --&gt;</span>
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-pmd-plugin&lt;/artifactId&gt;
+            &lt;version&gt;3.21.2&lt;/version&gt;
+            <span class="comment">&lt;!-- ... configuration ... --&gt;</span>
+        &lt;/plugin&gt;
+
+        <span class="comment">&lt;!-- SpotBugs - Bug detection --&gt;</span>
+        &lt;plugin&gt;
+            &lt;groupId&gt;com.github.spotbugs&lt;/groupId&gt;
+            &lt;artifactId&gt;spotbugs-maven-plugin&lt;/artifactId&gt;
+            &lt;version&gt;4.8.2.0&lt;/version&gt;
+            <span class="comment">&lt;!-- ... configuration ... --&gt;</span>
+        &lt;/plugin&gt;
+
+        <span class="comment">&lt;!-- JaCoCo - Code coverage --&gt;</span>
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.jacoco&lt;/groupId&gt;
+            &lt;artifactId&gt;jacoco-maven-plugin&lt;/artifactId&gt;
+            &lt;version&gt;0.8.11&lt;/version&gt;
+            <span class="comment">&lt;!-- ... configuration ... --&gt;</span>
+        &lt;/plugin&gt;
+    &lt;/plugins&gt;
+&lt;/build&gt;
+
+<span class="comment"># Run all checks</span>
+mvn verify</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>IDE Integration</h2>
+
+            <h3>IntelliJ IDEA</h3>
+            <pre><code><span class="comment">// Built-in inspections: Settings -> Editor -> Inspections</span>
+
+<span class="comment">// Checkstyle plugin</span>
+<span class="comment">// 1. Install "CheckStyle-IDEA" plugin</span>
+<span class="comment">// 2. Settings -> Tools -> Checkstyle</span>
+<span class="comment">// 3. Add configuration file</span>
+
+<span class="comment">// SonarLint plugin</span>
+<span class="comment">// 1. Install "SonarLint" plugin</span>
+<span class="comment">// 2. Connect to SonarQube/SonarCloud for synchronized rules</span>
+<span class="comment">// 3. Real-time analysis as you code</span></code></pre>
+
+            <h3>Eclipse</h3>
+            <pre><code><span class="comment">// Checkstyle plugin: eclipse-cs</span>
+<span class="comment">// PMD plugin: pmd-eclipse-plugin</span>
+<span class="comment">// SpotBugs plugin: spotbugs-eclipse-plugin</span>
+<span class="comment">// SonarLint: Available from Eclipse Marketplace</span></code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">IDE Best Practice</div>
+                <p>Configure your IDE to run static analysis on save. This provides immediate feedback and prevents issues from accumulating.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Code Formatting</h2>
+
+            <h3>Spotless (Format Enforcement)</h3>
+            <pre><code>&lt;plugin&gt;
+    &lt;groupId&gt;com.diffplug.spotless&lt;/groupId&gt;
+    &lt;artifactId&gt;spotless-maven-plugin&lt;/artifactId&gt;
+    &lt;version&gt;2.41.1&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;java&gt;
+            <span class="comment">&lt;!-- Use Google Java Format --&gt;</span>
+            &lt;googleJavaFormat&gt;
+                &lt;version&gt;1.18.1&lt;/version&gt;
+                &lt;style&gt;GOOGLE&lt;/style&gt;
+            &lt;/googleJavaFormat&gt;
+            <span class="comment">&lt;!-- Or use Eclipse formatter --&gt;</span>
+            <span class="comment">&lt;!-- &lt;eclipse&gt;&lt;file&gt;eclipse-formatter.xml&lt;/file&gt;&lt;/eclipse&gt; --&gt;</span>
+            &lt;removeUnusedImports/&gt;
+        &lt;/java&gt;
+    &lt;/configuration&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;goals&gt;
+                &lt;goal&gt;check&lt;/goal&gt;
+            &lt;/goals&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+
+<span class="comment"># Check formatting</span>
+mvn spotless:check
+
+<span class="comment"># Apply formatting</span>
+mvn spotless:apply</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Code Quality Strategy</div>
+                <ul>
+                    <li><strong>Start early</strong> - Add tools to new projects from the beginning</li>
+                    <li><strong>Fail the build</strong> - Don't allow new violations</li>
+                    <li><strong>Fix gradually</strong> - For legacy code, use baselines and fix incrementally</li>
+                    <li><strong>Customize rules</strong> - Disable rules that don't apply to your project</li>
+                    <li><strong>Review false positives</strong> - Suppress with proper justification</li>
+                    <li><strong>Integrate in CI/CD</strong> - Make quality gates mandatory</li>
+                </ul>
+            </div>
+
+            <h3>Suppressing False Positives</h3>
+            <pre><code><span class="comment">// Suppress specific SpotBugs warning</span>
+<span class="annotation">@SuppressFBWarnings</span>(value = <span class="string">"NP_NULL_ON_SOME_PATH"</span>,
+    justification = <span class="string">"Null check happens in caller"</span>)
+<span class="keyword">public void</span> <span class="function">process</span>(<span class="class-name">User</span> user) { }
+
+<span class="comment">// Suppress PMD warning</span>
+<span class="annotation">@SuppressWarnings</span>(<span class="string">"PMD.AvoidDuplicateLiterals"</span>)
+<span class="keyword">public void</span> <span class="function">test</span>() { }
+
+<span class="comment">// Suppress Checkstyle (in checkstyle-suppressions.xml)</span>
+&lt;suppressions&gt;
+    &lt;suppress checks="MagicNumber" files="Constants\.java"/&gt;
+&lt;/suppressions&gt;
+
+<span class="comment">// SonarQube - suppress with @SuppressWarnings or //NOSONAR</span>
+<span class="annotation">@SuppressWarnings</span>(<span class="string">"java:S1135"</span>)  <span class="comment">// Track uses of "TODO" tags</span>
+<span class="keyword">public void</span> <span class="function">method</span>() {
+    <span class="comment">// TODO: implement this  //NOSONAR</span>
+}</code></pre>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="testing.html" class="related-link">Testing (JUnit, Mockito)</a>
+                <a href="cicd.html" class="related-link">CI/CD Basics</a>
+                <a href="../best-practices/clean-code.html" class="related-link">Clean Code</a>
+                <a href="../best-practices/sonarqube-code-quality.html" class="related-link">SonarQube & Code Quality</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

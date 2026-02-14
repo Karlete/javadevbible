@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI/CD Basics - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#tools">Tools & Ecosystem</a> / CI/CD Basics
+            </nav>
+            <h1>CI/CD Basics</h1>
+            <p class="topic-subtitle">Continuous Integration and Continuous Deployment for Java Projects</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is CI/CD?</h2>
+            <p>CI/CD stands for Continuous Integration and Continuous Deployment (or Delivery). It's a set of practices that automate the building, testing, and deployment of applications, enabling teams to deliver software faster and more reliably.</p>
+
+            <div class="info-box note">
+                <div class="info-box-title">CI/CD Components</div>
+                <ul>
+                    <li><strong>Continuous Integration (CI)</strong> - Automatically build and test code when changes are pushed</li>
+                    <li><strong>Continuous Delivery</strong> - Automatically prepare releases for deployment (manual trigger)</li>
+                    <li><strong>Continuous Deployment</strong> - Automatically deploy to production after passing all tests</li>
+                </ul>
+            </div>
+
+            <h3>The CI/CD Pipeline</h3>
+            <pre><code><span class="comment">// Typical CI/CD Pipeline Flow</span>
+
+Code Push &rarr; Build &rarr; Unit Tests &rarr; Integration Tests &rarr; Package &rarr; Deploy
+
+<span class="comment">// Detailed stages:</span>
+1. Source        <span class="comment">// Developer pushes code to Git</span>
+2. Build         <span class="comment">// Compile Java code (mvn compile)</span>
+3. Unit Test     <span class="comment">// Run unit tests (mvn test)</span>
+4. Code Analysis <span class="comment">// SonarQube, checkstyle</span>
+5. Package       <span class="comment">// Create JAR/WAR (mvn package)</span>
+6. Integration   <span class="comment">// Run integration tests</span>
+7. Deploy Stage  <span class="comment">// Deploy to staging environment</span>
+8. Deploy Prod   <span class="comment">// Deploy to production</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Benefits of CI/CD</h2>
+
+            <h3>For Development Teams</h3>
+            <ul>
+                <li><strong>Early Bug Detection</strong> - Issues caught immediately after commit</li>
+                <li><strong>Reduced Integration Problems</strong> - Frequent merges prevent "integration hell"</li>
+                <li><strong>Faster Feedback</strong> - Know within minutes if code breaks something</li>
+                <li><strong>Consistent Builds</strong> - Same build process every time</li>
+            </ul>
+
+            <h3>For Business</h3>
+            <ul>
+                <li><strong>Faster Time to Market</strong> - Deploy features more frequently</li>
+                <li><strong>Reduced Risk</strong> - Smaller changes are easier to debug</li>
+                <li><strong>Higher Quality</strong> - Automated testing catches issues</li>
+                <li><strong>Reliable Releases</strong> - Consistent deployment process</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Popular CI/CD Tools</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tool</th>
+                        <th>Type</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>GitHub Actions</strong></td>
+                        <td>Cloud-hosted</td>
+                        <td>GitHub repositories, easy setup</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Jenkins</strong></td>
+                        <td>Self-hosted</td>
+                        <td>Enterprise, highly customizable</td>
+                    </tr>
+                    <tr>
+                        <td><strong>GitLab CI</strong></td>
+                        <td>Cloud/Self-hosted</td>
+                        <td>GitLab users, integrated DevOps</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CircleCI</strong></td>
+                        <td>Cloud-hosted</td>
+                        <td>Fast builds, Docker support</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Azure DevOps</strong></td>
+                        <td>Cloud-hosted</td>
+                        <td>Microsoft ecosystem, enterprise</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Travis CI</strong></td>
+                        <td>Cloud-hosted</td>
+                        <td>Open source projects</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>GitHub Actions for Java</h2>
+            <p>GitHub Actions is integrated directly into GitHub repositories, making it easy to set up CI/CD pipelines.</p>
+
+            <h3>Basic Java Build Workflow</h3>
+            <pre><code><span class="comment"># .github/workflows/build.yml</span>
+name: Java CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build with Maven
+      run: mvn -B package --file pom.xml
+
+    - name: Run tests
+      run: mvn test
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-jar
+        path: target/*.jar</code></pre>
+
+            <h3>Multi-Version Testing</h3>
+            <pre><code><span class="comment"># Test on multiple Java versions</span>
+name: Multi-Version CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: [11, 17, 21]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ matrix.java }}
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build and Test
+      run: mvn -B verify</code></pre>
+
+            <h3>Spring Boot Deployment</h3>
+            <pre><code><span class="comment"># Deploy Spring Boot to Docker Hub</span>
+name: Build and Push Docker
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Build with Maven
+      run: mvn -B package -DskipTests
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          username/myapp:latest
+          username/myapp:${{ github.sha }}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Jenkins Pipeline</h2>
+            <p>Jenkins is the most widely used self-hosted CI/CD server, offering maximum flexibility and control.</p>
+
+            <h3>Declarative Pipeline (Jenkinsfile)</h3>
+            <pre><code><span class="comment">// Jenkinsfile in project root</span>
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven-3.9'
+        jdk 'JDK-17'
+    }
+
+    environment {
+        APP_NAME = 'my-java-app'
+        DEPLOY_ENV = 'staging'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean compile'
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Code Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'mvn package -DskipTests'
+                archiveArtifacts artifacts: 'target/*.jar'
+            }
+        }
+
+        stage('Deploy to Staging') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                sh './deploy.sh staging'
+            }
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                input message: 'Deploy to production?'
+                sh './deploy.sh production'
+            }
+        }
+    }
+
+    post {
+        success {
+            slackSend color: 'good', message: "Build successful: ${env.JOB_NAME}"
+        }
+        failure {
+            slackSend color: 'danger', message: "Build failed: ${env.JOB_NAME}"
+        }
+    }
+}</code></pre>
+
+            <h3>Parallel Stages</h3>
+            <pre><code>pipeline {
+    agent any
+
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mvn clean compile'
+            }
+        }
+
+        stage('Tests') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        sh 'mvn test -Dtest=*UnitTest'
+                    }
+                }
+                stage('Integration Tests') {
+                    steps {
+                        sh 'mvn test -Dtest=*IntegrationTest'
+                    }
+                }
+                stage('Code Coverage') {
+                    steps {
+                        sh 'mvn jacoco:report'
+                    }
+                }
+            }
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>GitLab CI/CD</h2>
+            <p>GitLab CI/CD is integrated into GitLab and configured via a .gitlab-ci.yml file.</p>
+
+            <pre><code><span class="comment"># .gitlab-ci.yml</span>
+image: maven:3.9-eclipse-temurin-17
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+
+cache:
+  paths:
+    - .m2/repository/
+
+stages:
+  - build
+  - test
+  - analyze
+  - package
+  - deploy
+
+build:
+  stage: build
+  script:
+    - mvn compile
+
+unit-tests:
+  stage: test
+  script:
+    - mvn test
+  artifacts:
+    reports:
+      junit: target/surefire-reports/TEST-*.xml
+
+integration-tests:
+  stage: test
+  script:
+    - mvn verify -DskipUnitTests
+  artifacts:
+    reports:
+      junit: target/failsafe-reports/TEST-*.xml
+
+sonarqube:
+  stage: analyze
+  script:
+    - mvn sonar:sonar -Dsonar.host.url=$SONAR_URL
+  only:
+    - main
+    - develop
+
+package:
+  stage: package
+  script:
+    - mvn package -DskipTests
+  artifacts:
+    paths:
+      - target/*.jar
+
+deploy-staging:
+  stage: deploy
+  script:
+    - ./deploy.sh staging
+  environment:
+    name: staging
+    url: https://staging.example.com
+  only:
+    - develop
+
+deploy-production:
+  stage: deploy
+  script:
+    - ./deploy.sh production
+  environment:
+    name: production
+    url: https://example.com
+  when: manual
+  only:
+    - main</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Maven Configuration for CI/CD</h2>
+
+            <h3>CI-Friendly POM Configuration</h3>
+            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;project&gt;
+    &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+    &lt;groupId&gt;com.example&lt;/groupId&gt;
+    &lt;artifactId&gt;my-app&lt;/artifactId&gt;
+    &lt;version&gt;${revision}&lt;/version&gt;
+
+    &lt;properties&gt;
+        &lt;revision&gt;1.0.0-SNAPSHOT&lt;/revision&gt;
+        &lt;maven.compiler.release&gt;17&lt;/maven.compiler.release&gt;
+        &lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;
+    &lt;/properties&gt;
+
+    &lt;build&gt;
+        &lt;plugins&gt;
+            <span class="comment">&lt;!-- Flatten POM for CI --&gt;</span>
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;
+                &lt;artifactId&gt;flatten-maven-plugin&lt;/artifactId&gt;
+                &lt;version&gt;1.5.0&lt;/version&gt;
+                &lt;executions&gt;
+                    &lt;execution&gt;
+                        &lt;goals&gt;
+                            &lt;goal&gt;flatten&lt;/goal&gt;
+                        &lt;/goals&gt;
+                    &lt;/execution&gt;
+                &lt;/executions&gt;
+            &lt;/plugin&gt;
+
+            <span class="comment">&lt;!-- Surefire for unit tests --&gt;</span>
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+                &lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;
+                &lt;version&gt;3.2.2&lt;/version&gt;
+            &lt;/plugin&gt;
+
+            <span class="comment">&lt;!-- Failsafe for integration tests --&gt;</span>
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+                &lt;artifactId&gt;maven-failsafe-plugin&lt;/artifactId&gt;
+                &lt;version&gt;3.2.2&lt;/version&gt;
+                &lt;executions&gt;
+                    &lt;execution&gt;
+                        &lt;goals&gt;
+                            &lt;goal&gt;integration-test&lt;/goal&gt;
+                            &lt;goal&gt;verify&lt;/goal&gt;
+                        &lt;/goals&gt;
+                    &lt;/execution&gt;
+                &lt;/executions&gt;
+            &lt;/plugin&gt;
+
+            <span class="comment">&lt;!-- JaCoCo for code coverage --&gt;</span>
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.jacoco&lt;/groupId&gt;
+                &lt;artifactId&gt;jacoco-maven-plugin&lt;/artifactId&gt;
+                &lt;version&gt;0.8.11&lt;/version&gt;
+                &lt;executions&gt;
+                    &lt;execution&gt;
+                        &lt;goals&gt;
+                            &lt;goal&gt;prepare-agent&lt;/goal&gt;
+                        &lt;/goals&gt;
+                    &lt;/execution&gt;
+                    &lt;execution&gt;
+                        &lt;id&gt;report&lt;/id&gt;
+                        &lt;phase&gt;test&lt;/phase&gt;
+                        &lt;goals&gt;
+                            &lt;goal&gt;report&lt;/goal&gt;
+                        &lt;/goals&gt;
+                    &lt;/execution&gt;
+                &lt;/executions&gt;
+            &lt;/plugin&gt;
+        &lt;/plugins&gt;
+    &lt;/build&gt;
+&lt;/project&gt;</code></pre>
+
+            <h3>Maven CI Commands</h3>
+            <pre><code><span class="comment"># Batch mode (no interactive prompts)</span>
+mvn -B clean install
+
+<span class="comment"># Set version from CI</span>
+mvn -B -Drevision=1.2.3 clean package
+
+<span class="comment"># Skip tests for quick builds</span>
+mvn -B package -DskipTests
+
+<span class="comment"># Run only unit tests</span>
+mvn test
+
+<span class="comment"># Run only integration tests</span>
+mvn verify -DskipUnitTests
+
+<span class="comment"># Generate site with reports</span>
+mvn site</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Docker in CI/CD</h2>
+
+            <h3>Dockerfile for Spring Boot</h3>
+            <pre><code><span class="comment"># Multi-stage Dockerfile</span>
+FROM maven:3.9-eclipse-temurin-17 AS build
+WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn -B package -DskipTests
+
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+
+<span class="comment"># Create non-root user</span>
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring
+
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+
+            <h3>Docker Compose for Testing</h3>
+            <pre><code><span class="comment"># docker-compose.yml for integration tests</span>
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=test
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/testdb
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=testdb
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+    ports:
+      - "5432:5432"</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>CI/CD Best Practices</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Pipeline Best Practices</div>
+                <ul>
+                    <li><strong>Fail Fast</strong> - Run quick checks (lint, compile) before slow tests</li>
+                    <li><strong>Cache Dependencies</strong> - Speed up builds by caching Maven/Gradle dependencies</li>
+                    <li><strong>Parallelize</strong> - Run independent stages concurrently</li>
+                    <li><strong>Use Artifacts</strong> - Build once, deploy the same artifact everywhere</li>
+                    <li><strong>Keep Pipelines Short</strong> - Target under 10 minutes for feedback</li>
+                    <li><strong>Secure Secrets</strong> - Never hardcode credentials, use secret management</li>
+                </ul>
+            </div>
+
+            <h3>Security Scanning</h3>
+            <pre><code><span class="comment"># GitHub Actions with security scanning</span>
+name: Security Scan
+
+on: [push, pull_request]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'my-app'
+        path: '.'
+        format: 'HTML'
+
+    - name: Upload Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-check-report
+        path: reports/</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Deployment Strategies</h2>
+
+            <h3>Blue-Green Deployment</h3>
+            <pre><code><span class="comment">// Two identical production environments</span>
+Blue (current)  &lt;-- Production traffic
+Green (new)     &lt;-- Deploy and test new version
+
+<span class="comment">// After testing, switch traffic</span>
+Blue (old)
+Green (current) &lt;-- Production traffic now here
+
+<span class="comment">// Easy rollback: switch back to Blue</span></code></pre>
+
+            <h3>Canary Deployment</h3>
+            <pre><code><span class="comment">// Gradual rollout to subset of users</span>
+v1.0 (current) &lt;-- 95% of traffic
+v1.1 (canary)  &lt;-- 5% of traffic
+
+<span class="comment">// Monitor metrics, gradually increase</span>
+v1.0 (current) &lt;-- 80% of traffic
+v1.1 (canary)  &lt;-- 20% of traffic
+
+<span class="comment">// Full rollout when confident</span>
+v1.1           &lt;-- 100% of traffic</code></pre>
+
+            <h3>Rolling Deployment</h3>
+            <pre><code><span class="comment">// Update instances one at a time</span>
+Instance 1: v1.0 -&gt; v1.1 (updating)
+Instance 2: v1.0
+Instance 3: v1.0
+
+Instance 1: v1.1 (done)
+Instance 2: v1.0 -&gt; v1.1 (updating)
+Instance 3: v1.0
+
+<span class="comment">// Continue until all updated</span></code></pre>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="git.html" class="related-link">Version Control (Git)</a>
+                <a href="testing.html" class="related-link">Testing (JUnit, Mockito)</a>
+                <a href="code-quality.html" class="related-link">Code Quality Tools</a>
+                <a href="../build-tools/maven.html" class="related-link">Maven</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

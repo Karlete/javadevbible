@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication vs Authorization - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#security">Security & Authentication</a> / Authentication vs Authorization
+            </nav>
+            <h1>Authentication vs Authorization</h1>
+            <p class="topic-subtitle">The two fundamental pillars of application security</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Understanding the Difference</h2>
+            <p><strong>Authentication (AuthN)</strong> and <strong>Authorization (AuthZ)</strong> are often confused but serve completely different purposes. Understanding this distinction is fundamental to building secure applications.</p>
+
+            <div class="info-box">
+                <p><strong>Simple Analogy:</strong> Authentication is showing your ID at the airport (proving who you are). Authorization is your boarding pass determining which flight you can board (what you're allowed to do).</p>
+            </div>
+
+            <h3>The Core Distinction</h3>
+            <pre><code><span class="comment">// Authentication: "WHO are you?"</span>
+<span class="comment">// - Verifies identity</span>
+<span class="comment">// - Happens FIRST</span>
+<span class="comment">// - Results in: User identity (principal)</span>
+
+<span class="comment">// Authorization: "WHAT can you do?"</span>
+<span class="comment">// - Verifies permissions</span>
+<span class="comment">// - Happens AFTER authentication</span>
+<span class="comment">// - Results in: Access granted or denied</span>
+
+<span class="comment">// Visual flow:</span>
+┌─────────────┐      ┌─────────────────┐      ┌──────────────────┐
+│   Request   │ ───▶ │ Authentication  │ ───▶ │  Authorization   │
+│   arrives   │      │  "Who is this?" │      │ "Can they do X?" │
+└─────────────┘      └─────────────────┘      └──────────────────┘
+                              │                        │
+                              ▼                        ▼
+                     ┌─────────────────┐      ┌──────────────────┐
+                     │  401 Unauthorized│      │  403 Forbidden   │
+                     │  (Not logged in) │      │ (No permission)  │
+                     └─────────────────┘      └──────────────────┘</code></pre>
+
+            <h3>HTTP Status Codes</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Authentication</th>
+                        <th>Authorization</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Question</strong></td>
+                        <td>Who are you?</td>
+                        <td>What can you do?</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Verifies</strong></td>
+                        <td>Identity</td>
+                        <td>Permissions</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Failure Code</strong></td>
+                        <td>401 Unauthorized</td>
+                        <td>403 Forbidden</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Examples</strong></td>
+                        <td>Login, Password, Biometrics</td>
+                        <td>Roles, Permissions, ACLs</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Occurs</strong></td>
+                        <td>First</td>
+                        <td>After authentication</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Authentication Methods</h2>
+
+            <h3>1. Knowledge-Based (Something You Know)</h3>
+            <pre><code><span class="comment">// Password-based authentication</span>
+<span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/auth"</span>)
+<span class="keyword">public class</span> <span class="class-name">AuthController</span> {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> <span class="class-name">AuthenticationManager</span> authManager;
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> <span class="class-name">PasswordEncoder</span> passwordEncoder;
+
+    <span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">AuthResponse</span>&gt; <span class="function">login</span>(
+            <span class="annotation">@RequestBody</span> <span class="class-name">LoginRequest</span> request) {
+
+        <span class="comment">// Create authentication token from credentials</span>
+        <span class="class-name">UsernamePasswordAuthenticationToken</span> authToken =
+            <span class="keyword">new</span> <span class="class-name">UsernamePasswordAuthenticationToken</span>(
+                request.getUsername(),
+                request.getPassword()
+            );
+
+        <span class="comment">// Attempt authentication</span>
+        <span class="class-name">Authentication</span> auth = authManager.<span class="function">authenticate</span>(authToken);
+
+        <span class="comment">// If we get here, authentication succeeded</span>
+        <span class="class-name">String</span> token = jwtService.<span class="function">generateToken</span>(auth);
+
+        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(
+            <span class="keyword">new</span> <span class="class-name">AuthResponse</span>(token)
+        );
+    }
+}
+
+<span class="comment">// Custom UserDetailsService implementation</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">CustomUserDetailsService</span> <span class="keyword">implements</span> <span class="class-name">UserDetailsService</span> {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> <span class="class-name">UserRepository</span> userRepository;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">UserDetails</span> <span class="function">loadUserByUsername</span>(<span class="class-name">String</span> username) {
+        <span class="class-name">User</span> user = userRepository.<span class="function">findByUsername</span>(username)
+            .<span class="function">orElseThrow</span>(() -> <span class="keyword">new</span> <span class="class-name">UsernameNotFoundException</span>(
+                <span class="string">"User not found: "</span> + username
+            ));
+
+        <span class="keyword">return</span> <span class="keyword">new</span> <span class="class-name">org.springframework.security.core.userdetails.User</span>(
+            user.<span class="function">getUsername</span>(),
+            user.<span class="function">getPassword</span>(),  <span class="comment">// Hashed password</span>
+            user.<span class="function">isEnabled</span>(),
+            <span class="keyword">true</span>, <span class="keyword">true</span>, <span class="keyword">true</span>,  <span class="comment">// Account status flags</span>
+            <span class="function">getAuthorities</span>(user.<span class="function">getRoles</span>())
+        );
+    }
+}</code></pre>
+
+            <h3>2. Possession-Based (Something You Have)</h3>
+            <pre><code><span class="comment">// Two-Factor Authentication (2FA) with TOTP</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">TwoFactorAuthService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">GoogleAuthenticator</span> gAuth = <span class="keyword">new</span> <span class="class-name">GoogleAuthenticator</span>();
+
+    <span class="comment">// Generate secret for user (shown as QR code)</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateSecret</span>() {
+        <span class="class-name">GoogleAuthenticatorKey</span> key = gAuth.<span class="function">createCredentials</span>();
+        <span class="keyword">return</span> key.<span class="function">getKey</span>();  <span class="comment">// Store this securely per user</span>
+    }
+
+    <span class="comment">// Generate QR code URL for authenticator apps</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getQRCodeUrl</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> secret) {
+        <span class="keyword">return</span> <span class="class-name">GoogleAuthenticatorQRGenerator</span>.<span class="function">getOtpAuthURL</span>(
+            <span class="string">"MyApp"</span>,
+            username,
+            <span class="keyword">new</span> <span class="class-name">GoogleAuthenticatorKey</span>.<span class="class-name">Builder</span>(secret).<span class="function">build</span>()
+        );
+    }
+
+    <span class="comment">// Verify the 6-digit code from user's authenticator app</span>
+    <span class="keyword">public boolean</span> <span class="function">verifyCode</span>(<span class="class-name">String</span> secret, <span class="keyword">int</span> code) {
+        <span class="keyword">return</span> gAuth.<span class="function">authorize</span>(secret, code);
+    }
+}
+
+<span class="comment">// Enhanced login with 2FA</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
+<span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;?&gt; <span class="function">login</span>(<span class="annotation">@RequestBody</span> <span class="class-name">LoginRequest</span> request) {
+    <span class="comment">// Step 1: Verify password</span>
+    <span class="class-name">Authentication</span> auth = authManager.<span class="function">authenticate</span>(
+        <span class="keyword">new</span> <span class="class-name">UsernamePasswordAuthenticationToken</span>(
+            request.<span class="function">getUsername</span>(),
+            request.<span class="function">getPassword</span>()
+        )
+    );
+
+    <span class="class-name">User</span> user = userService.<span class="function">findByUsername</span>(request.<span class="function">getUsername</span>());
+
+    <span class="comment">// Step 2: Check if 2FA is enabled</span>
+    <span class="keyword">if</span> (user.<span class="function">isTwoFactorEnabled</span>()) {
+        <span class="keyword">if</span> (request.<span class="function">getTotpCode</span>() == <span class="keyword">null</span>) {
+            <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(
+                <span class="keyword">new</span> <span class="class-name">TwoFactorRequiredResponse</span>()
+            );
+        }
+
+        <span class="comment">// Verify TOTP code</span>
+        <span class="keyword">if</span> (!twoFactorService.<span class="function">verifyCode</span>(
+                user.<span class="function">getTotpSecret</span>(),
+                request.<span class="function">getTotpCode</span>())) {
+            <span class="keyword">throw new</span> <span class="class-name">BadCredentialsException</span>(<span class="string">"Invalid 2FA code"</span>);
+        }
+    }
+
+    <span class="comment">// Generate JWT token</span>
+    <span class="class-name">String</span> token = jwtService.<span class="function">generateToken</span>(auth);
+    <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(<span class="keyword">new</span> <span class="class-name">AuthResponse</span>(token));
+}</code></pre>
+
+            <h3>3. Inherence-Based (Something You Are)</h3>
+            <pre><code><span class="comment">// Biometric authentication concepts</span>
+<span class="comment">// Typically handled on client side (mobile/desktop)</span>
+
+<span class="comment">// Server receives a signed assertion from the device</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/biometric-auth"</span>)
+<span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">AuthResponse</span>&gt; <span class="function">biometricAuth</span>(
+        <span class="annotation">@RequestBody</span> <span class="class-name">BiometricAuthRequest</span> request) {
+
+    <span class="comment">// The device verified biometrics locally</span>
+    <span class="comment">// Server verifies the cryptographic signature</span>
+
+    <span class="keyword">boolean</span> valid = webAuthnService.<span class="function">verifyAssertion</span>(
+        request.<span class="function">getUserId</span>(),
+        request.<span class="function">getAuthenticatorData</span>(),
+        request.<span class="function">getSignature</span>(),
+        request.<span class="function">getClientDataJson</span>()
+    );
+
+    <span class="keyword">if</span> (!valid) {
+        <span class="keyword">throw new</span> <span class="class-name">AuthenticationException</span>(<span class="string">"Biometric verification failed"</span>);
+    }
+
+    <span class="class-name">User</span> user = userService.<span class="function">findById</span>(request.<span class="function">getUserId</span>());
+    <span class="class-name">String</span> token = jwtService.<span class="function">generateToken</span>(user);
+
+    <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(<span class="keyword">new</span> <span class="class-name">AuthResponse</span>(token));
+}</code></pre>
+
+            <h3>Authentication Factors Comparison</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Factor Type</th>
+                        <th>Examples</th>
+                        <th>Pros</th>
+                        <th>Cons</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Knowledge</strong></td>
+                        <td>Passwords, PINs, Security questions</td>
+                        <td>Easy to implement, No hardware needed</td>
+                        <td>Can be stolen, forgotten, guessed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Possession</strong></td>
+                        <td>Phone (SMS/TOTP), Hardware tokens, Smart cards</td>
+                        <td>Hard to steal remotely</td>
+                        <td>Can be lost, SIM swapping attacks</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Inherence</strong></td>
+                        <td>Fingerprint, Face ID, Voice, Retina</td>
+                        <td>Can't be forgotten or lost</td>
+                        <td>Privacy concerns, can't be changed if compromised</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Authorization Models</h2>
+
+            <h3>1. Role-Based Access Control (RBAC)</h3>
+            <pre><code><span class="comment">// Simple RBAC - Users have roles, roles have permissions</span>
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+    <span class="annotation">@Id</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> username;
+
+    <span class="annotation">@ManyToMany</span>(fetch = <span class="class-name">FetchType</span>.EAGER)
+    <span class="annotation">@JoinTable</span>(
+        name = <span class="string">"user_roles"</span>,
+        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"user_id"</span>),
+        inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"role_id"</span>)
+    )
+    <span class="keyword">private</span> <span class="class-name">Set</span>&lt;<span class="class-name">Role</span>&gt; roles = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Role</span> {
+    <span class="annotation">@Id</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> name;  <span class="comment">// ROLE_ADMIN, ROLE_USER, ROLE_MANAGER</span>
+
+    <span class="annotation">@ManyToMany</span>(fetch = <span class="class-name">FetchType</span>.EAGER)
+    <span class="annotation">@JoinTable</span>(
+        name = <span class="string">"role_permissions"</span>,
+        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"role_id"</span>),
+        inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"permission_id"</span>)
+    )
+    <span class="keyword">private</span> <span class="class-name">Set</span>&lt;<span class="class-name">Permission</span>&gt; permissions = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Permission</span> {
+    <span class="annotation">@Id</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> name;  <span class="comment">// READ_USERS, WRITE_USERS, DELETE_USERS</span>
+}
+
+<span class="comment">// Spring Security role-based authorization</span>
+<span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+
+    <span class="comment">// Only admins can access</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)
+    <span class="annotation">@GetMapping</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getAllUsers</span>() {
+        <span class="keyword">return</span> userService.<span class="function">findAll</span>();
+    }
+
+    <span class="comment">// Admin or Manager can access</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasAnyRole('ADMIN', 'MANAGER')"</span>)
+    <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> userService.<span class="function">findById</span>(id);
+    }
+
+    <span class="comment">// Only Admin can delete</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)
+    <span class="annotation">@DeleteMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public void</span> <span class="function">deleteUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        userService.<span class="function">delete</span>(id);
+    }
+}</code></pre>
+
+            <h3>2. Permission-Based Access Control</h3>
+            <pre><code><span class="comment">// Fine-grained permission checking</span>
+<span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/documents"</span>)
+<span class="keyword">public class</span> <span class="class-name">DocumentController</span> {
+
+    <span class="comment">// Check specific permission</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasAuthority('DOCUMENT_READ')"</span>)
+    <span class="annotation">@GetMapping</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Document</span>&gt; <span class="function">getDocuments</span>() {
+        <span class="keyword">return</span> documentService.<span class="function">findAll</span>();
+    }
+
+    <span class="comment">// Multiple permissions (OR logic)</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasAnyAuthority('DOCUMENT_WRITE', 'DOCUMENT_ADMIN')"</span>)
+    <span class="annotation">@PostMapping</span>
+    <span class="keyword">public</span> <span class="class-name">Document</span> <span class="function">createDocument</span>(<span class="annotation">@RequestBody</span> <span class="class-name">Document</span> doc) {
+        <span class="keyword">return</span> documentService.<span class="function">create</span>(doc);
+    }
+
+    <span class="comment">// Complex permission logic with SpEL</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasAuthority('DOCUMENT_DELETE') and #doc.owner == authentication.name"</span>)
+    <span class="annotation">@DeleteMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public void</span> <span class="function">deleteDocument</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        documentService.<span class="function">delete</span>(id);
+    }
+}
+
+<span class="comment">// Custom permission evaluator for complex rules</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">CustomPermissionEvaluator</span> <span class="keyword">implements</span> <span class="class-name">PermissionEvaluator</span> {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public boolean</span> <span class="function">hasPermission</span>(
+            <span class="class-name">Authentication</span> auth,
+            <span class="class-name">Object</span> targetDomainObject,
+            <span class="class-name">Object</span> permission) {
+
+        <span class="keyword">if</span> (targetDomainObject <span class="keyword">instanceof</span> <span class="class-name">Document</span> doc) {
+            <span class="class-name">String</span> perm = (<span class="class-name">String</span>) permission;
+            <span class="class-name">String</span> username = auth.<span class="function">getName</span>();
+
+            <span class="keyword">return switch</span> (perm) {
+                <span class="keyword">case</span> <span class="string">"READ"</span> -> doc.<span class="function">isPublic</span>() ||
+                               doc.<span class="function">getOwner</span>().<span class="function">equals</span>(username) ||
+                               doc.<span class="function">getSharedWith</span>().<span class="function">contains</span>(username);
+                <span class="keyword">case</span> <span class="string">"WRITE"</span> -> doc.<span class="function">getOwner</span>().<span class="function">equals</span>(username);
+                <span class="keyword">case</span> <span class="string">"DELETE"</span> -> doc.<span class="function">getOwner</span>().<span class="function">equals</span>(username);
+                <span class="keyword">default</span> -> <span class="keyword">false</span>;
+            };
+        }
+        <span class="keyword">return false</span>;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public boolean</span> <span class="function">hasPermission</span>(
+            <span class="class-name">Authentication</span> auth,
+            <span class="class-name">Serializable</span> targetId,
+            <span class="class-name">String</span> targetType,
+            <span class="class-name">Object</span> permission) {
+        <span class="comment">// Load object by ID and check permission</span>
+        <span class="keyword">return false</span>;
+    }
+}
+
+<span class="comment">// Using the custom evaluator</span>
+<span class="annotation">@PreAuthorize</span>(<span class="string">"hasPermission(#document, 'WRITE')"</span>)
+<span class="keyword">public void</span> <span class="function">updateDocument</span>(<span class="class-name">Document</span> document) {
+    <span class="comment">// Only called if permission check passes</span>
+}</code></pre>
+
+            <h3>3. Attribute-Based Access Control (ABAC)</h3>
+            <pre><code><span class="comment">// ABAC considers multiple attributes for authorization</span>
+<span class="comment">// - Subject attributes (user department, clearance level)</span>
+<span class="comment">// - Resource attributes (document classification, owner)</span>
+<span class="comment">// - Environment attributes (time, location, device)</span>
+<span class="comment">// - Action attributes (read, write, delete)</span>
+
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">AbacService</span> {
+
+    <span class="keyword">public boolean</span> <span class="function">canAccess</span>(
+            <span class="class-name">User</span> user,
+            <span class="class-name">Document</span> document,
+            <span class="class-name">String</span> action,
+            <span class="class-name">AccessContext</span> context) {
+
+        <span class="comment">// Policy: Users can read documents from their department</span>
+        <span class="comment">//         during business hours from trusted locations</span>
+
+        <span class="comment">// Check subject attributes</span>
+        <span class="keyword">boolean</span> sameDepartment = user.<span class="function">getDepartment</span>()
+            .<span class="function">equals</span>(document.<span class="function">getDepartment</span>());
+
+        <span class="comment">// Check clearance level</span>
+        <span class="keyword">boolean</span> hasClearance = user.<span class="function">getClearanceLevel</span>() >=
+            document.<span class="function">getClassificationLevel</span>();
+
+        <span class="comment">// Check environment attributes</span>
+        <span class="keyword">boolean</span> isBusinessHours = <span class="function">isWithinBusinessHours</span>(context.<span class="function">getTime</span>());
+        <span class="keyword">boolean</span> isTrustedLocation = trustedIps.<span class="function">contains</span>(context.<span class="function">getIpAddress</span>());
+
+        <span class="comment">// Combine policies</span>
+        <span class="keyword">if</span> (<span class="string">"READ"</span>.<span class="function">equals</span>(action)) {
+            <span class="keyword">return</span> sameDepartment && hasClearance;
+        }
+
+        <span class="keyword">if</span> (<span class="string">"WRITE"</span>.<span class="function">equals</span>(action)) {
+            <span class="keyword">return</span> sameDepartment && hasClearance &&
+                   isBusinessHours && isTrustedLocation;
+        }
+
+        <span class="keyword">if</span> (<span class="string">"DELETE"</span>.<span class="function">equals</span>(action)) {
+            <span class="keyword">return</span> document.<span class="function">getOwner</span>().<span class="function">equals</span>(user.<span class="function">getId</span>()) &&
+                   user.<span class="function">getClearanceLevel</span>() >= 4;
+        }
+
+        <span class="keyword">return false</span>;
+    }
+}</code></pre>
+
+            <h3>Authorization Models Comparison</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Best For</th>
+                        <th>Complexity</th>
+                        <th>Flexibility</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>RBAC</strong></td>
+                        <td>Most applications, clear role hierarchies</td>
+                        <td>Low</td>
+                        <td>Medium</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Permission-Based</strong></td>
+                        <td>Fine-grained control needed</td>
+                        <td>Medium</td>
+                        <td>High</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ABAC</strong></td>
+                        <td>Complex policies, context-aware decisions</td>
+                        <td>High</td>
+                        <td>Very High</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ACL</strong></td>
+                        <td>Per-object permissions (files, documents)</td>
+                        <td>Medium</td>
+                        <td>High</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Spring Security Configuration</h2>
+
+            <h3>Complete Security Configuration</h3>
+            <pre><code><span class="annotation">@Configuration</span>
+<span class="annotation">@EnableWebSecurity</span>
+<span class="annotation">@EnableMethodSecurity</span>  <span class="comment">// Enables @PreAuthorize, @PostAuthorize</span>
+<span class="keyword">public class</span> <span class="class-name">SecurityConfig</span> {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> <span class="class-name">JwtAuthenticationFilter</span> jwtFilter;
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> <span class="class-name">CustomUserDetailsService</span> userDetailsService;
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">return</span> http
+            <span class="comment">// Disable CSRF for stateless API</span>
+            .<span class="function">csrf</span>(csrf -> csrf.<span class="function">disable</span>())
+
+            <span class="comment">// Configure session management</span>
+            .<span class="function">sessionManagement</span>(session -> session
+                .<span class="function">sessionCreationPolicy</span>(<span class="class-name">SessionCreationPolicy</span>.STATELESS)
+            )
+
+            <span class="comment">// Configure authorization rules</span>
+            .<span class="function">authorizeHttpRequests</span>(auth -> auth
+                <span class="comment">// Public endpoints</span>
+                .<span class="function">requestMatchers</span>(<span class="string">"/api/auth/**"</span>).<span class="function">permitAll</span>()
+                .<span class="function">requestMatchers</span>(<span class="string">"/api/public/**"</span>).<span class="function">permitAll</span>()
+                .<span class="function">requestMatchers</span>(<span class="string">"/swagger-ui/**"</span>, <span class="string">"/v3/api-docs/**"</span>).<span class="function">permitAll</span>()
+
+                <span class="comment">// Role-based rules</span>
+                .<span class="function">requestMatchers</span>(<span class="string">"/api/admin/**"</span>).<span class="function">hasRole</span>(<span class="string">"ADMIN"</span>)
+                .<span class="function">requestMatchers</span>(<span class="string">"/api/manager/**"</span>).<span class="function">hasAnyRole</span>(<span class="string">"ADMIN"</span>, <span class="string">"MANAGER"</span>)
+
+                <span class="comment">// Permission-based rules</span>
+                .<span class="function">requestMatchers</span>(<span class="class-name">HttpMethod</span>.DELETE, <span class="string">"/api/**"</span>)
+                    .<span class="function">hasAuthority</span>(<span class="string">"DELETE_PRIVILEGE"</span>)
+
+                <span class="comment">// All other requests require authentication</span>
+                .<span class="function">anyRequest</span>().<span class="function">authenticated</span>()
+            )
+
+            <span class="comment">// Add JWT filter before UsernamePasswordAuthenticationFilter</span>
+            .<span class="function">addFilterBefore</span>(jwtFilter, <span class="class-name">UsernamePasswordAuthenticationFilter</span>.<span class="keyword">class</span>)
+
+            <span class="comment">// Exception handling</span>
+            .<span class="function">exceptionHandling</span>(ex -> ex
+                .<span class="function">authenticationEntryPoint</span>((req, res, e) -> {
+                    res.<span class="function">setStatus</span>(<span class="class-name">HttpServletResponse</span>.SC_UNAUTHORIZED);
+                    res.<span class="function">getWriter</span>().<span class="function">write</span>(<span class="string">"Unauthorized: "</span> + e.<span class="function">getMessage</span>());
+                })
+                .<span class="function">accessDeniedHandler</span>((req, res, e) -> {
+                    res.<span class="function">setStatus</span>(<span class="class-name">HttpServletResponse</span>.SC_FORBIDDEN);
+                    res.<span class="function">getWriter</span>().<span class="function">write</span>(<span class="string">"Access Denied: "</span> + e.<span class="function">getMessage</span>());
+                })
+            )
+
+            .<span class="function">build</span>();
+    }
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> <span class="class-name">AuthenticationManager</span> <span class="function">authenticationManager</span>(
+            <span class="class-name">AuthenticationConfiguration</span> config) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">return</span> config.<span class="function">getAuthenticationManager</span>();
+    }
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> <span class="class-name">PasswordEncoder</span> <span class="function">passwordEncoder</span>() {
+        <span class="keyword">return new</span> <span class="class-name">BCryptPasswordEncoder</span>();
+    }
+}</code></pre>
+
+            <h3>Method-Level Security</h3>
+            <pre><code><span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="comment">// Only authenticated users can access</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"isAuthenticated()"</span>)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">getMyOrders</span>() {
+        <span class="class-name">String</span> username = <span class="class-name">SecurityContextHolder</span>.<span class="function">getContext</span>()
+            .<span class="function">getAuthentication</span>().<span class="function">getName</span>();
+        <span class="keyword">return</span> orderRepository.<span class="function">findByUsername</span>(username);
+    }
+
+    <span class="comment">// Check parameter against authenticated user</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"#username == authentication.name or hasRole('ADMIN')"</span>)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">getOrdersByUsername</span>(<span class="class-name">String</span> username) {
+        <span class="keyword">return</span> orderRepository.<span class="function">findByUsername</span>(username);
+    }
+
+    <span class="comment">// Post-authorize: filter return value</span>
+    <span class="annotation">@PostAuthorize</span>(<span class="string">"returnObject.owner == authentication.name"</span>)
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">getOrder</span>(<span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> orderRepository.<span class="function">findById</span>(id)
+            .<span class="function">orElseThrow</span>(() -> <span class="keyword">new</span> <span class="class-name">OrderNotFoundException</span>(id));
+    }
+
+    <span class="comment">// Filter collections</span>
+    <span class="annotation">@PostFilter</span>(<span class="string">"filterObject.owner == authentication.name or hasRole('ADMIN')"</span>)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">getAllOrders</span>() {
+        <span class="keyword">return</span> orderRepository.<span class="function">findAll</span>();
+    }
+
+    <span class="comment">// Combine with custom permission evaluator</span>
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasPermission(#order, 'CANCEL')"</span>)
+    <span class="keyword">public void</span> <span class="function">cancelOrder</span>(<span class="class-name">Order</span> order) {
+        order.<span class="function">setStatus</span>(<span class="class-name">OrderStatus</span>.CANCELLED);
+        orderRepository.<span class="function">save</span>(order);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Security Patterns</h2>
+
+            <h3>Principal Hierarchy Pattern</h3>
+            <pre><code><span class="comment">// Role hierarchy: ADMIN > MANAGER > USER</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">RoleHierarchy</span> <span class="function">roleHierarchy</span>() {
+    <span class="keyword">return</span> <span class="class-name">RoleHierarchyImpl</span>.<span class="function">withDefaultRolePrefix</span>()
+        .<span class="function">role</span>(<span class="string">"ADMIN"</span>).<span class="function">implies</span>(<span class="string">"MANAGER"</span>)
+        .<span class="function">role</span>(<span class="string">"MANAGER"</span>).<span class="function">implies</span>(<span class="string">"USER"</span>)
+        .<span class="function">build</span>();
+}
+
+<span class="comment">// Now ADMIN automatically has MANAGER and USER permissions</span></code></pre>
+
+            <h3>Resource Owner Pattern</h3>
+            <pre><code><span class="comment">// Users can only access their own resources</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{userId}/orders"</span>)
+<span class="annotation">@PreAuthorize</span>(<span class="string">"#userId == authentication.principal.id or hasRole('ADMIN')"</span>)
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">getUserOrders</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> userId) {
+    <span class="keyword">return</span> orderService.<span class="function">findByUserId</span>(userId);
+}
+
+<span class="comment">// Alternative: Verify in service layer</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">getOrder</span>(<span class="class-name">Long</span> orderId) {
+        <span class="class-name">Order</span> order = orderRepository.<span class="function">findById</span>(orderId)
+            .<span class="function">orElseThrow</span>(() -> <span class="keyword">new</span> <span class="class-name">NotFoundException</span>());
+
+        <span class="class-name">String</span> currentUser = <span class="class-name">SecurityContextHolder</span>.<span class="function">getContext</span>()
+            .<span class="function">getAuthentication</span>().<span class="function">getName</span>();
+
+        <span class="keyword">if</span> (!order.<span class="function">getOwner</span>().<span class="function">equals</span>(currentUser)) {
+            <span class="keyword">throw new</span> <span class="class-name">AccessDeniedException</span>(<span class="string">"Not your order"</span>);
+        }
+
+        <span class="keyword">return</span> order;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>Authentication Best Practices</h3>
+                <ul>
+                    <li><strong>Use MFA:</strong> Always offer multi-factor authentication for sensitive operations</li>
+                    <li><strong>Secure password storage:</strong> Use bcrypt, Argon2, or PBKDF2 with high work factors</li>
+                    <li><strong>Implement rate limiting:</strong> Prevent brute force attacks on login endpoints</li>
+                    <li><strong>Account lockout:</strong> Temporarily lock accounts after failed attempts</li>
+                    <li><strong>Secure session tokens:</strong> Use cryptographically strong random tokens</li>
+                    <li><strong>Audit authentication events:</strong> Log successful and failed login attempts</li>
+                </ul>
+
+                <h3>Authorization Best Practices</h3>
+                <ul>
+                    <li><strong>Principle of Least Privilege:</strong> Grant minimum permissions needed</li>
+                    <li><strong>Default deny:</strong> Require explicit permission grants</li>
+                    <li><strong>Defense in depth:</strong> Check authorization at multiple layers</li>
+                    <li><strong>Avoid direct object references:</strong> Use indirect references or verify ownership</li>
+                    <li><strong>Log authorization failures:</strong> Detect potential attacks</li>
+                    <li><strong>Regular permission audits:</strong> Review and clean up unused permissions</li>
+                </ul>
+            </div>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Common Mistakes to Avoid</div>
+                <ul>
+                    <li><strong>Client-side authorization only:</strong> Always verify on the server</li>
+                    <li><strong>Hardcoding credentials:</strong> Use environment variables or secrets management</li>
+                    <li><strong>Security through obscurity:</strong> Don't rely on hidden URLs for protection</li>
+                    <li><strong>Missing authorization checks:</strong> Every endpoint needs verification</li>
+                    <li><strong>Verbose error messages:</strong> Don't reveal whether username or password was wrong</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Authentication</strong> verifies identity (WHO you are)</li>
+                    <li><strong>Authorization</strong> verifies permissions (WHAT you can do)</li>
+                    <li><strong>401 Unauthorized</strong> = authentication failure</li>
+                    <li><strong>403 Forbidden</strong> = authorization failure</li>
+                    <li><strong>RBAC</strong> is suitable for most applications</li>
+                    <li><strong>ABAC</strong> provides maximum flexibility for complex policies</li>
+                    <li>Always implement both at the server layer</li>
+                    <li>Follow the principle of least privilege</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jwt.html" class="related-link">JWT (JSON Web Tokens)</a>
+                <a href="oauth2.html" class="related-link">OAuth 2.0</a>
+                <a href="session-management.html" class="related-link">Session Management</a>
+                <a href="password-hashing.html" class="related-link">Password Hashing</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

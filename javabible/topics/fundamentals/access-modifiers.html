@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Access Modifiers - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#fundamentals">Java Fundamentals</a> / Access Modifiers
+            </nav>
+            <h1>Access Modifiers</h1>
+            <p class="topic-subtitle">Controlling Access to Classes, Methods, and Variables</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What Are Access Modifiers?</h2>
+            <p>Access modifiers are keywords in Java that determine the visibility and accessibility of classes, methods, constructors, and variables. They are the gatekeepers of your code, controlling who can see and use different parts of your program. Understanding access modifiers is fundamental to writing well-structured, secure, and maintainable Java code. They form the foundation of <strong>encapsulation</strong>&mdash;one of the four pillars of object-oriented programming.</p>
+
+            <p>In real-world terms, think of access modifiers like security levels in a building. A public lobby is open to everyone, a private office is restricted to one person, and a protected conference room might be accessible to employees and approved guests. Similarly, Java provides four access levels: <code>public</code>, <code>protected</code>, default (package-private), and <code>private</code>&mdash;each offering a different degree of visibility and restriction.</p>
+
+            <p>The concept of access control in programming emerged from the need to manage complexity in large software systems. As programs grew larger, developers realized they needed ways to hide implementation details and prevent unintended interactions between different parts of the codebase. Java's access modifier system was designed with these principles in mind, drawing from experiences with languages like C++ and Smalltalk. The result is a clean, hierarchical access control system that balances flexibility with protection.</p>
+
+            <p>Access modifiers serve multiple purposes in software design. They enable <strong>information hiding</strong>, allowing you to change internal implementations without affecting code that uses your class. They provide <strong>security</strong>, preventing sensitive data from being accessed or modified inappropriately. They support <strong>API design</strong>, clearly distinguishing what's meant for public consumption versus internal use. And they facilitate <strong>team collaboration</strong>, making it clear which parts of code are stable interfaces versus implementation details that might change.</p>
+
+            <p>Choosing the right access modifier is one of the most important decisions you make when designing classes. The general rule is to make things as restrictive as possible&mdash;start with <code>private</code> and only increase visibility when there's a genuine need. This principle of least privilege helps create robust, maintainable code where changes in one area don't unexpectedly break other parts of your application.</p>
+
+            <h3>Real-World Analogy: Security Zones</h3>
+            <ul>
+                <li><strong>Private (Your Bedroom)</strong> &ndash; Only you can enter</li>
+                <li><strong>Default (Living Room)</strong> &ndash; Family members can access</li>
+                <li><strong>Protected (Front Yard)</strong> &ndash; Family and close neighbors</li>
+                <li><strong>Public (Street)</strong> &ndash; Anyone can walk by</li>
+            </ul>
+
+            <div class="info-box note">
+                <div class="info-box-title">The Four Access Levels (Most to Least Restrictive)</div>
+                <ul>
+                    <li><strong>private</strong> &ndash; Visible only within the declaring class</li>
+                    <li><strong>default (no modifier)</strong> &ndash; Visible within the same package</li>
+                    <li><strong>protected</strong> &ndash; Visible within package + subclasses everywhere</li>
+                    <li><strong>public</strong> &ndash; Visible everywhere</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Under the Hood: How Access Control Works</h2>
+            <p>Access modifiers are enforced at compile time and runtime by the JVM. Understanding how this works helps you use them effectively.</p>
+
+            <pre><code><span class="comment">/*
+ * Access Modifier Visibility Diagram
+ * ===================================
+ *
+ *  ┌─────────────────────────────────────────────────────────────────────────┐
+ *  │                           UNIVERSE (All Code)                            │
+ *  │                                                                          │
+ *  │   public members are visible here                                        │
+ *  │                                                                          │
+ *  │  ┌───────────────────────────────────────────────────────────────────┐  │
+ *  │  │                        DIFFERENT PACKAGES                          │  │
+ *  │  │                                                                    │  │
+ *  │  │  ┌──────────────────────────┐  ┌──────────────────────────────┐   │  │
+ *  │  │  │ Package: com.app.model   │  │ Package: com.app.service     │   │  │
+ *  │  │  │                          │  │                              │   │  │
+ *  │  │  │  class User              │  │  class UserService           │   │  │
+ *  │  │  │    private password ─────┼──┼──► NOT visible               │   │  │
+ *  │  │  │    (default) helper ─────┼──┼──► NOT visible               │   │  │
+ *  │  │  │    protected data ───────┼──┼──► visible (if subclass)     │   │  │
+ *  │  │  │    public name ──────────┼──┼──► VISIBLE                   │   │  │
+ *  │  │  │                          │  │                              │   │  │
+ *  │  │  └──────────────────────────┘  └──────────────────────────────┘   │  │
+ *  │  │                                                                    │  │
+ *  │  └────────────────────────────────────────────────────────────────────┘  │
+ *  │                                                                          │
+ *  │  ┌────────────────────────────────────────────────────────────────────┐  │
+ *  │  │                         SAME PACKAGE                                │  │
+ *  │  │  Package: com.app.model                                             │  │
+ *  │  │                                                                     │  │
+ *  │  │  ┌─────────────────────┐    ┌─────────────────────┐                │  │
+ *  │  │  │ class User          │    │ class UserValidator │                │  │
+ *  │  │  │                     │    │                     │                │  │
+ *  │  │  │  private password ──┼────┼──► NOT visible      │                │  │
+ *  │  │  │  (default) helper ──┼────┼──► VISIBLE          │                │  │
+ *  │  │  │  protected data ────┼────┼──► VISIBLE          │                │  │
+ *  │  │  │  public name ───────┼────┼──► VISIBLE          │                │  │
+ *  │  │  │                     │    │                     │                │  │
+ *  │  │  │ ┌─────────────────┐ │    └─────────────────────┘                │  │
+ *  │  │  │ │ SAME CLASS      │ │                                           │  │
+ *  │  │  │ │ All members     │ │                                           │  │
+ *  │  │  │ │ VISIBLE here    │ │                                           │  │
+ *  │  │  │ └─────────────────┘ │                                           │  │
+ *  │  │  └─────────────────────┘                                           │  │
+ *  │  │                                                                     │  │
+ *  │  └─────────────────────────────────────────────────────────────────────┘  │
+ *  │                                                                          │
+ *  └──────────────────────────────────────────────────────────────────────────┘
+ */</span></code></pre>
+
+            <h3>JVM Enforcement</h3>
+            <pre><code><span class="comment">// The compiler checks access at compile time</span>
+<span class="keyword">public class</span> <span class="class-name">Example</span> {
+    <span class="keyword">private</span> <span class="keyword">int</span> secret = <span class="number">42</span>;
+}
+
+<span class="comment">// In another class:</span>
+<span class="class-name">Example</span> e = <span class="keyword">new</span> <span class="class-name">Example</span>();
+<span class="comment">// e.secret = 10;  // Compile ERROR: secret has private access in Example</span>
+
+<span class="comment">// Even reflection respects access (by default)</span>
+<span class="class-name">Field</span> field = <span class="class-name">Example</span>.<span class="keyword">class</span>.getDeclaredField(<span class="string">"secret"</span>);
+<span class="comment">// field.get(e);  // Runtime ERROR: IllegalAccessException</span>
+
+<span class="comment">// Reflection CAN bypass access control (but shouldn't normally)</span>
+field.setAccessible(<span class="keyword">true</span>);  <span class="comment">// Breaks encapsulation!</span>
+<span class="keyword">int</span> value = (<span class="class-name">Integer</span>) field.get(e);  <span class="comment">// Now works: 42</span></code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Reflection and Security</div>
+                <p>While reflection can bypass access control with <code>setAccessible(true)</code>, this should be avoided in normal code. Modern Java (9+) has module system restrictions that can prevent this. Access modifiers are a design contract, not a security guarantee.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Private Access</h2>
+            <p>The most restrictive access level. Private members are visible only within the declaring class&mdash;not even subclasses or other classes in the same package can access them.</p>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
+    <span class="comment">// Private fields - completely hidden from outside</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> accountNumber;
+    <span class="keyword">private</span> <span class="keyword">double</span> balance;
+    <span class="keyword">private</span> <span class="class-name">String</span> pin;
+
+    <span class="keyword">public</span> <span class="function">BankAccount</span>(<span class="class-name">String</span> accountNumber, <span class="class-name">String</span> pin) {
+        <span class="keyword">this</span>.accountNumber = accountNumber;
+        <span class="keyword">this</span>.pin = pin;
+        <span class="keyword">this</span>.balance = <span class="number">0.0</span>;
+    }
+
+    <span class="comment">// Public method provides controlled access</span>
+    <span class="keyword">public double</span> <span class="function">getBalance</span>() {
+        <span class="keyword">return</span> balance;
+    }
+
+    <span class="comment">// Public method with validation</span>
+    <span class="keyword">public boolean</span> <span class="function">withdraw</span>(<span class="keyword">double</span> amount, <span class="class-name">String</span> enteredPin) {
+        <span class="keyword">if</span> (!validatePin(enteredPin)) {
+            <span class="keyword">return false</span>;
+        }
+        <span class="keyword">if</span> (amount &lt;= <span class="number">0</span> || amount > balance) {
+            <span class="keyword">return false</span>;
+        }
+        balance -= amount;
+        logTransaction(<span class="string">"WITHDRAW"</span>, amount);
+        <span class="keyword">return true</span>;
+    }
+
+    <span class="comment">// Private helper methods - internal implementation</span>
+    <span class="keyword">private boolean</span> <span class="function">validatePin</span>(<span class="class-name">String</span> enteredPin) {
+        <span class="keyword">return</span> <span class="keyword">this</span>.pin.equals(enteredPin);
+    }
+
+    <span class="keyword">private void</span> <span class="function">logTransaction</span>(<span class="class-name">String</span> type, <span class="keyword">double</span> amount) {
+        <span class="class-name">System</span>.out.println(type + <span class="string">": $"</span> + amount);
+    }
+}
+
+<span class="comment">// Usage from another class</span>
+<span class="class-name">BankAccount</span> account = <span class="keyword">new</span> <span class="class-name">BankAccount</span>(<span class="string">"123456"</span>, <span class="string">"1234"</span>);
+
+<span class="comment">// ✅ These work - public interface</span>
+<span class="keyword">double</span> bal = account.getBalance();
+<span class="keyword">boolean</span> success = account.withdraw(<span class="number">100</span>, <span class="string">"1234"</span>);
+
+<span class="comment">// ❌ These fail - private members</span>
+<span class="comment">// account.balance = 1000000;     // ERROR: balance has private access</span>
+<span class="comment">// account.pin = "0000";          // ERROR: pin has private access</span>
+<span class="comment">// account.validatePin("1234");   // ERROR: validatePin has private access</span></code></pre>
+
+            <h3>Private Constructors</h3>
+            <pre><code><span class="comment">// Singleton pattern uses private constructor</span>
+<span class="keyword">public class</span> <span class="class-name">DatabaseConnection</span> {
+    <span class="keyword">private static</span> <span class="class-name">DatabaseConnection</span> instance;
+
+    <span class="comment">// Private constructor - cannot instantiate from outside</span>
+    <span class="keyword">private</span> <span class="function">DatabaseConnection</span>() {
+        <span class="comment">// Initialize connection</span>
+    }
+
+    <span class="comment">// Controlled access through static method</span>
+    <span class="keyword">public static</span> <span class="class-name">DatabaseConnection</span> <span class="function">getInstance</span>() {
+        <span class="keyword">if</span> (instance == <span class="keyword">null</span>) {
+            instance = <span class="keyword">new</span> <span class="class-name">DatabaseConnection</span>();
+        }
+        <span class="keyword">return</span> instance;
+    }
+}
+
+<span class="comment">// new DatabaseConnection();  // ERROR: constructor is private</span>
+<span class="class-name">DatabaseConnection</span> db = <span class="class-name">DatabaseConnection</span>.getInstance();  <span class="comment">// OK</span>
+
+<span class="comment">// Utility class with private constructor</span>
+<span class="keyword">public final class</span> <span class="class-name">MathUtils</span> {
+    <span class="keyword">private</span> <span class="function">MathUtils</span>() {
+        <span class="keyword">throw new</span> <span class="class-name">AssertionError</span>(<span class="string">"Cannot instantiate utility class"</span>);
+    }
+
+    <span class="keyword">public static int</span> <span class="function">square</span>(<span class="keyword">int</span> n) {
+        <span class="keyword">return</span> n * n;
+    }
+}</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">When to Use Private</div>
+                <ul>
+                    <li>Instance variables (almost always)</li>
+                    <li>Helper methods used only within the class</li>
+                    <li>Implementation details that might change</li>
+                    <li>Constructors in singleton/utility classes</li>
+                    <li>Internal state that should never be directly modified</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Default (Package-Private) Access</h2>
+            <p>When you don't specify any access modifier, Java uses default access. Members are visible to all classes within the same package, but invisible outside it.</p>
+
+            <pre><code><span class="keyword">package</span> com.app.internal;
+
+<span class="comment">// Default access class - only visible in com.app.internal</span>
+<span class="keyword">class</span> <span class="class-name">InternalHelper</span> {
+
+    <span class="comment">// Default access field</span>
+    <span class="class-name">String</span> data;
+
+    <span class="comment">// Default access method</span>
+    <span class="keyword">void</span> <span class="function">processData</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Processing: "</span> + data);
+    }
+}
+
+<span class="comment">// In the same package - full access</span>
+<span class="keyword">package</span> com.app.internal;
+
+<span class="keyword">public class</span> <span class="class-name">MainProcessor</span> {
+    <span class="keyword">public void</span> <span class="function">process</span>() {
+        <span class="class-name">InternalHelper</span> helper = <span class="keyword">new</span> <span class="class-name">InternalHelper</span>();  <span class="comment">// ✅ OK</span>
+        helper.data = <span class="string">"test"</span>;  <span class="comment">// ✅ OK</span>
+        helper.processData();   <span class="comment">// ✅ OK</span>
+    }
+}
+
+<span class="comment">// In a DIFFERENT package - NO access</span>
+<span class="keyword">package</span> com.app.api;
+
+<span class="keyword">import</span> com.app.internal.InternalHelper;  <span class="comment">// ERROR: not visible</span>
+
+<span class="keyword">public class</span> <span class="class-name">ApiService</span> {
+    <span class="keyword">public void</span> <span class="function">serve</span>() {
+        <span class="comment">// InternalHelper helper = new InternalHelper();  // ERROR!</span>
+    }
+}</code></pre>
+
+            <h3>Package-Private for API Design</h3>
+            <pre><code><span class="comment">/*
+ * Package Structure for Clean API Design
+ * =======================================
+ *
+ *  com.myapp
+ *  ├── api/                      ← Public API package
+ *  │   ├── UserService.java      (public class)
+ *  │   └── User.java             (public class)
+ *  │
+ *  └── internal/                 ← Internal implementation
+ *      ├── UserRepository.java   (package-private class)
+ *      ├── UserValidator.java    (package-private class)
+ *      └── CacheManager.java     (package-private class)
+ *
+ *  Users of your library only see: UserService, User
+ *  Implementation details are hidden in 'internal' package
+ */</span>
+
+<span class="keyword">package</span> com.myapp.api;
+
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+    <span class="comment">// This is the public API</span>
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="keyword">int</span> id) { ... }
+    <span class="keyword">public void</span> <span class="function">saveUser</span>(<span class="class-name">User</span> user) { ... }
+}
+
+<span class="keyword">package</span> com.myapp.internal;
+
+<span class="comment">// Package-private - hidden from API users</span>
+<span class="keyword">class</span> <span class="class-name">UserRepository</span> {
+    <span class="class-name">User</span> <span class="function">findById</span>(<span class="keyword">int</span> id) { ... }
+    <span class="keyword">void</span> <span class="function">save</span>(<span class="class-name">User</span> user) { ... }
+}</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">When to Use Default Access</div>
+                <ul>
+                    <li>Implementation classes not meant for public use</li>
+                    <li>Helper classes within a package</li>
+                    <li>Test classes that need package access</li>
+                    <li>Internal utilities shared within a module</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Protected Access</h2>
+            <p>Protected members are visible within the same package (like default) AND to subclasses in any package. This makes it ideal for inheritance scenarios where child classes need access to parent implementation.</p>
+
+            <pre><code><span class="keyword">package</span> com.app.model;
+
+<span class="keyword">public class</span> <span class="class-name">Animal</span> {
+    <span class="comment">// Protected - accessible in subclasses</span>
+    <span class="keyword">protected</span> <span class="class-name">String</span> name;
+    <span class="keyword">protected int</span> age;
+
+    <span class="comment">// Private - not accessible even in subclasses</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> internalId;
+
+    <span class="keyword">public</span> <span class="function">Animal</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> age) {
+        <span class="keyword">this</span>.name = name;
+        <span class="keyword">this</span>.age = age;
+        <span class="keyword">this</span>.internalId = generateId();
+    }
+
+    <span class="comment">// Protected method - subclasses can override</span>
+    <span class="keyword">protected void</span> <span class="function">makeSound</span>() {
+        <span class="class-name">System</span>.out.println(name + <span class="string">" makes a sound"</span>);
+    }
+
+    <span class="comment">// Protected - accessible for extension</span>
+    <span class="keyword">protected void</span> <span class="function">sleep</span>() {
+        <span class="class-name">System</span>.out.println(name + <span class="string">" is sleeping"</span>);
+    }
+
+    <span class="keyword">private</span> <span class="class-name">String</span> <span class="function">generateId</span>() {
+        <span class="keyword">return</span> <span class="string">"ANIMAL-"</span> + <span class="class-name">System</span>.currentTimeMillis();
+    }
+}
+
+<span class="comment">// Subclass in a DIFFERENT package</span>
+<span class="keyword">package</span> com.app.pets;
+
+<span class="keyword">import</span> com.app.model.Animal;
+
+<span class="keyword">public class</span> <span class="class-name">Dog</span> <span class="keyword">extends</span> <span class="class-name">Animal</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> breed;
+
+    <span class="keyword">public</span> <span class="function">Dog</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> age, <span class="class-name">String</span> breed) {
+        <span class="keyword">super</span>(name, age);
+        <span class="keyword">this</span>.breed = breed;
+    }
+
+    <span class="keyword">public void</span> <span class="function">displayInfo</span>() {
+        <span class="comment">// ✅ Can access protected members from parent</span>
+        <span class="class-name">System</span>.out.println(<span class="string">"Name: "</span> + name);
+        <span class="class-name">System</span>.out.println(<span class="string">"Age: "</span> + age);
+
+        <span class="comment">// ❌ Cannot access private members</span>
+        <span class="comment">// System.out.println(internalId);  // ERROR!</span>
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> <span class="function">makeSound</span>() {
+        <span class="class-name">System</span>.out.println(name + <span class="string">" barks: Woof!"</span>);
+    }
+
+    <span class="keyword">public void</span> <span class="function">napTime</span>() {
+        <span class="keyword">super</span>.sleep();  <span class="comment">// ✅ Can call protected parent method</span>
+    }
+}</code></pre>
+
+            <h3>Protected Access Rules</h3>
+            <pre><code><span class="comment">/*
+ * Protected Access - Subtle Rules
+ * ================================
+ *
+ *  In SAME package: Acts like default access (visible to all)
+ *  In DIFFERENT package: Only visible through inheritance
+ *
+ *  Key point: A subclass can access protected members of the parent
+ *  through 'this' or 'super', but NOT through a different instance!
+ */</span>
+
+<span class="keyword">package</span> other;
+
+<span class="keyword">public class</span> <span class="class-name">Cat</span> <span class="keyword">extends</span> <span class="class-name">Animal</span> {
+
+    <span class="keyword">public void</span> <span class="function">test</span>() {
+        <span class="comment">// ✅ OK: Access through this</span>
+        <span class="class-name">System</span>.out.println(<span class="keyword">this</span>.name);
+
+        <span class="comment">// ✅ OK: Access through super</span>
+        <span class="keyword">super</span>.makeSound();
+
+        <span class="comment">// ❌ NOT OK: Access through a different Animal instance!</span>
+        <span class="class-name">Animal</span> other = <span class="keyword">new</span> <span class="class-name">Animal</span>(<span class="string">"Other"</span>, <span class="number">1</span>);
+        <span class="comment">// System.out.println(other.name);  // ERROR in different package!</span>
+    }
+}</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">When to Use Protected</div>
+                <ul>
+                    <li>Template method pattern (methods meant to be overridden)</li>
+                    <li>Fields that subclasses legitimately need to access</li>
+                    <li>Hook methods in frameworks</li>
+                    <li>When you're designing for inheritance</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Public Access</h2>
+            <p>Public members are visible everywhere&mdash;any class in any package can access them. This is the least restrictive access level and should be used thoughtfully for your public API.</p>
+
+            <pre><code><span class="keyword">package</span> com.app.api;
+
+<span class="comment">// Public class - accessible from anywhere</span>
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+
+    <span class="comment">// Public constant - globally accessible</span>
+    <span class="keyword">public static final int</span> MAX_USERNAME_LENGTH = <span class="number">50</span>;
+
+    <span class="comment">// Public method - the API</span>
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">createUser</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) {
+        validateInput(username, email);
+        <span class="class-name">User</span> user = <span class="keyword">new</span> <span class="class-name">User</span>(username, email);
+        saveToDatabase(user);
+        <span class="keyword">return</span> user;
+    }
+
+    <span class="comment">// Public method - part of API</span>
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findByUsername</span>(<span class="class-name">String</span> username) {
+        <span class="keyword">return</span> queryDatabase(username);
+    }
+
+    <span class="comment">// Private - implementation detail</span>
+    <span class="keyword">private void</span> <span class="function">validateInput</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) {
+        <span class="comment">// validation logic</span>
+    }
+
+    <span class="keyword">private void</span> <span class="function">saveToDatabase</span>(<span class="class-name">User</span> user) {
+        <span class="comment">// database logic</span>
+    }
+
+    <span class="keyword">private</span> <span class="class-name">User</span> <span class="function">queryDatabase</span>(<span class="class-name">String</span> username) {
+        <span class="comment">// query logic</span>
+        <span class="keyword">return null</span>;
+    }
+}
+
+<span class="comment">// From ANY class in ANY package</span>
+<span class="keyword">import</span> com.app.api.UserService;
+
+<span class="keyword">public class</span> <span class="class-name">MyApp</span> {
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+        <span class="class-name">UserService</span> service = <span class="keyword">new</span> <span class="class-name">UserService</span>();
+
+        <span class="comment">// ✅ Public methods accessible</span>
+        <span class="class-name">User</span> user = service.createUser(<span class="string">"john"</span>, <span class="string">"john@example.com"</span>);
+        <span class="keyword">int</span> max = <span class="class-name">UserService</span>.MAX_USERNAME_LENGTH;
+
+        <span class="comment">// ❌ Private methods NOT accessible</span>
+        <span class="comment">// service.validateInput(...);  // ERROR</span>
+    }
+}</code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Public Fields - Usually a Bad Idea</div>
+                <pre><code><span class="comment">// ❌ BAD: Public mutable field</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+    <span class="keyword">public</span> <span class="class-name">String</span> password;  <span class="comment">// Anyone can set to anything!</span>
+}
+
+<span class="comment">// ✅ GOOD: Private field with controlled access</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> password;
+
+    <span class="keyword">public void</span> <span class="function">setPassword</span>(<span class="class-name">String</span> password) {
+        <span class="keyword">if</span> (password.length() < <span class="number">8</span>) {
+            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Too short"</span>);
+        }
+        <span class="keyword">this</span>.password = hashPassword(password);
+    }
+}
+
+<span class="comment">// ✅ OK: Public immutable field (constant)</span>
+<span class="keyword">public static final int</span> MAX_SIZE = <span class="number">100</span>;</code></pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Complete Access Level Comparison</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Modifier</th>
+                        <th>Same Class</th>
+                        <th>Same Package</th>
+                        <th>Subclass (diff pkg)</th>
+                        <th>Everywhere</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>private</code></td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>No</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><code>(default)</code></td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><code>protected</code></td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes*</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><code>public</code></td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><em>*Protected access in subclasses only through inheritance (this/super), not arbitrary instances.</em></p>
+
+            <h3>Access Modifiers for Different Elements</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Element</th>
+                        <th>public</th>
+                        <th>protected</th>
+                        <th>default</th>
+                        <th>private</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Top-level class</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>Nested class</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Constructor</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Method</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Field</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Interface method</td>
+                        <td>Yes*</td>
+                        <td>No</td>
+                        <td>No</td>
+                        <td>Yes**</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p><em>*Interface methods are implicitly public. **Private interface methods added in Java 9.</em></p>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices and Design Guidelines</h2>
+
+            <pre><code><span class="comment">// ✅ BEST PRACTICE: Start restrictive, widen as needed</span>
+
+<span class="keyword">public class</span> <span class="class-name">WellDesignedClass</span> {
+
+    <span class="comment">// Private fields - always</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="keyword">private int</span> value;
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; items;
+
+    <span class="comment">// Public constants are OK</span>
+    <span class="keyword">public static final int</span> DEFAULT_VALUE = <span class="number">10</span>;
+
+    <span class="comment">// Public constructor for API users</span>
+    <span class="keyword">public</span> <span class="function">WellDesignedClass</span>(<span class="class-name">String</span> name) {
+        <span class="keyword">this</span>.name = name;
+        <span class="keyword">this</span>.value = DEFAULT_VALUE;
+        <span class="keyword">this</span>.items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    }
+
+    <span class="comment">// Public API methods</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getName</span>() {
+        <span class="keyword">return</span> name;
+    }
+
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">String</span> item) {
+        <span class="keyword">if</span> (validateItem(item)) {
+            items.add(item);
+        }
+    }
+
+    <span class="comment">// Return defensive copy for mutable collections</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; <span class="function">getItems</span>() {
+        <span class="keyword">return new</span> <span class="class-name">ArrayList</span>&lt;&gt;(items);  <span class="comment">// Defensive copy!</span>
+    }
+
+    <span class="comment">// Protected for subclass extension points</span>
+    <span class="keyword">protected void</span> <span class="function">onItemAdded</span>(<span class="class-name">String</span> item) {
+        <span class="comment">// Hook for subclasses</span>
+    }
+
+    <span class="comment">// Private helper methods</span>
+    <span class="keyword">private boolean</span> <span class="function">validateItem</span>(<span class="class-name">String</span> item) {
+        <span class="keyword">return</span> item != <span class="keyword">null</span> && !item.isEmpty();
+    }
+}</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Access Modifier Checklist</div>
+                <ol>
+                    <li><strong>Fields</strong>: Almost always <code>private</code></li>
+                    <li><strong>Getters/Setters</strong>: <code>public</code> only if needed externally</li>
+                    <li><strong>Helper methods</strong>: <code>private</code></li>
+                    <li><strong>Template/hook methods</strong>: <code>protected</code></li>
+                    <li><strong>API methods</strong>: <code>public</code></li>
+                    <li><strong>Implementation classes</strong>: package-private (default)</li>
+                    <li><strong>Constants</strong>: <code>public static final</code></li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Pitfalls</h2>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Pitfall 1: Exposing Mutable Objects</div>
+                <pre><code><span class="comment">// ❌ BAD: Returning internal mutable list</span>
+<span class="keyword">public class</span> <span class="class-name">Team</span> {
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Player</span>&gt; players = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Player</span>&gt; <span class="function">getPlayers</span>() {
+        <span class="keyword">return</span> players;  <span class="comment">// Exposes internal state!</span>
+    }
+}
+
+<span class="comment">// Caller can modify internal state:</span>
+team.getPlayers().clear();  <span class="comment">// Oops! Team now has no players</span>
+
+<span class="comment">// ✅ GOOD: Return defensive copy or unmodifiable view</span>
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Player</span>&gt; <span class="function">getPlayers</span>() {
+    <span class="keyword">return</span> <span class="class-name">Collections</span>.unmodifiableList(players);
+    <span class="comment">// OR: return new ArrayList&lt;&gt;(players);</span>
+}</code></pre>
+            </div>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Pitfall 2: Package Structure Mismatch</div>
+                <pre><code><span class="comment">// Problem: Default access doesn't work across packages!</span>
+
+<span class="keyword">package</span> com.app.model;
+<span class="keyword">class</span> <span class="class-name">Helper</span> { }  <span class="comment">// Default access</span>
+
+<span class="keyword">package</span> com.app.service;  <span class="comment">// DIFFERENT package!</span>
+<span class="keyword">import</span> com.app.model.Helper;  <span class="comment">// ERROR: Helper is not public</span>
+
+<span class="comment">// Solution: Either make public or move to same package</span></code></pre>
+            </div>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Pitfall 3: Protected Doesn't Mean What You Think</div>
+                <pre><code><span class="comment">// Common misconception: protected = "protected from outside"</span>
+<span class="comment">// Reality: protected = accessible in same package + subclasses</span>
+
+<span class="keyword">package</span> com.app;
+
+<span class="keyword">public class</span> <span class="class-name">Parent</span> {
+    <span class="keyword">protected</span> <span class="class-name">String</span> data;
+}
+
+<span class="keyword">class</span> <span class="class-name">NotASubclass</span> {
+    <span class="keyword">void</span> <span class="function">test</span>() {
+        <span class="class-name">Parent</span> p = <span class="keyword">new</span> <span class="class-name">Parent</span>();
+        p.data = <span class="string">"accessible"</span>;  <span class="comment">// ✅ Works! Same package</span>
+    }
+}</code></pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Interview Questions</h2>
+
+            <div class="info-box note">
+                <div class="info-box-title">Q1: What are the four access modifiers in Java?</div>
+                <p><strong>Answer:</strong> <code>private</code> (class only), default/package-private (same package), <code>protected</code> (same package + subclasses), and <code>public</code> (everywhere). Note that "default" is not a keyword&mdash;it's the absence of a modifier.</p>
+            </div>
+
+            <div class="info-box note">
+                <div class="info-box-title">Q2: Can a top-level class be private or protected?</div>
+                <p><strong>Answer:</strong> No. Top-level classes can only be <code>public</code> or default (package-private). Private and protected only apply to class members and nested classes. A private top-level class would be useless since nothing could access it.</p>
+            </div>
+
+            <div class="info-box note">
+                <div class="info-box-title">Q3: What's the difference between protected and default access?</div>
+                <p><strong>Answer:</strong> Default access is limited to the same package. Protected also includes subclasses in different packages. So protected is more permissive than default, specifically for inheritance across packages.</p>
+            </div>
+
+            <div class="info-box note">
+                <div class="info-box-title">Q4: Can we access private members using reflection?</div>
+                <p><strong>Answer:</strong> Yes, using <code>setAccessible(true)</code> on the Field/Method object. However, this breaks encapsulation and may be restricted by the module system in Java 9+. It should generally be avoided in production code.</p>
+            </div>
+
+            <div class="info-box note">
+                <div class="info-box-title">Q5: What access modifier should you use for instance variables?</div>
+                <p><strong>Answer:</strong> Almost always <code>private</code>. This is fundamental to encapsulation. Provide public getters/setters only if external access is needed, and include validation in setters. This allows you to change internal representation without affecting external code.</p>
+            </div>
+
+            <div class="info-box note">
+                <div class="info-box-title">Q6: Can an overriding method have more restrictive access?</div>
+                <p><strong>Answer:</strong> No. An overriding method must have the same or less restrictive access. For example, if parent method is <code>protected</code>, child can make it <code>protected</code> or <code>public</code>, but not <code>private</code>. This ensures substitutability (Liskov Substitution Principle).</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Troubleshooting Guide</h2>
+
+            <h3>Error: "X has private access in Y"</h3>
+            <pre><code><span class="comment">// Problem: Trying to access private member from outside class</span>
+account.balance = <span class="number">1000</span>;  <span class="comment">// ERROR: balance has private access</span>
+
+<span class="comment">// Solutions:</span>
+<span class="comment">// 1. Use public getter/setter</span>
+<span class="keyword">double</span> bal = account.getBalance();
+
+<span class="comment">// 2. If you own the class, add appropriate accessor</span>
+<span class="keyword">public double</span> <span class="function">getBalance</span>() { <span class="keyword">return</span> balance; }</code></pre>
+
+            <h3>Error: "X is not public in Y; cannot be accessed from outside package"</h3>
+            <pre><code><span class="comment">// Problem: Class or member has default access, accessed from different package</span>
+<span class="keyword">import</span> other.Helper;  <span class="comment">// ERROR: Helper is not public</span>
+
+<span class="comment">// Solutions:</span>
+<span class="comment">// 1. Make the class public (if appropriate)</span>
+<span class="keyword">public class</span> <span class="class-name">Helper</span> { }
+
+<span class="comment">// 2. Move your class to the same package</span>
+<span class="comment">// 3. Expose through a public interface</span></code></pre>
+
+            <h3>Error: "attempting to assign weaker access privileges"</h3>
+            <pre><code><span class="comment">// Problem: Overriding method has more restrictive access than parent</span>
+<span class="keyword">public class</span> <span class="class-name">Parent</span> {
+    <span class="keyword">public void</span> <span class="function">doSomething</span>() { }
+}
+
+<span class="keyword">public class</span> <span class="class-name">Child</span> <span class="keyword">extends</span> <span class="class-name">Parent</span> {
+    <span class="keyword">private void</span> <span class="function">doSomething</span>() { }  <span class="comment">// ERROR!</span>
+}
+
+<span class="comment">// Solution: Use same or less restrictive access</span>
+<span class="keyword">public void</span> <span class="function">doSomething</span>() { }  <span class="comment">// OK</span>
+<span class="comment">// OR</span>
+<span class="keyword">protected void</span> <span class="function">doSomething</span>() { }  <span class="comment">// ERROR - still more restrictive</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>See Also</h2>
+            <ul>
+                <li><a href="oop-principles.html">OOP Principles</a> &ndash; Encapsulation in depth</li>
+                <li><a href="static-instance.html">Static vs Instance</a> &ndash; Access in static context</li>
+                <li><a href="interfaces-abstract.html">Interfaces & Abstract Classes</a> &ndash; Access in inheritance</li>
+                <li><a href="../best-practices/solid-principles.html">SOLID Principles</a> &ndash; Design principles related to access</li>
+            </ul>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="oop-principles.html" class="related-link">OOP Principles</a>
+                <a href="static-instance.html" class="related-link">Static vs Instance</a>
+                <a href="interfaces-abstract.html" class="related-link">Interfaces & Abstract Classes</a>
+                <a href="constructors.html" class="related-link">Constructors</a>
+                <a href="methods.html" class="related-link">Methods & Functions</a>
+                <a href="../best-practices/code-conventions.html" class="related-link">Code Conventions</a>
+                <a href="../best-practices/solid-principles.html" class="related-link">SOLID Principles</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

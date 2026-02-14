@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Handling Patterns - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#best-practices">Best Practices</a> / Error Handling Patterns
+            </nav>
+            <h1>Error Handling Patterns</h1>
+            <p class="topic-subtitle">Robust Exception Management in Java</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Exception Hierarchy Strategy</h2>
+            <p>Organize exceptions in a meaningful hierarchy that reflects your domain.</p>
+
+            <pre><code><span class="comment">// Base exception for your application</span>
+<span class="keyword">public class</span> <span class="class-name">ApplicationException</span> <span class="keyword">extends</span> <span class="class-name">RuntimeException</span> {
+    <span class="keyword">private final</span> <span class="class-name">ErrorCode</span> errorCode;
+
+    <span class="keyword">public</span> <span class="function">ApplicationException</span>(<span class="class-name">ErrorCode</span> code, <span class="class-name">String</span> message) {
+        <span class="keyword">super</span>(message);
+        <span class="keyword">this</span>.errorCode = code;
+    }
+
+    <span class="keyword">public</span> <span class="function">ApplicationException</span>(<span class="class-name">ErrorCode</span> code, <span class="class-name">String</span> message, <span class="class-name">Throwable</span> cause) {
+        <span class="keyword">super</span>(message, cause);
+        <span class="keyword">this</span>.errorCode = code;
+    }
+
+    <span class="keyword">public</span> <span class="class-name">ErrorCode</span> <span class="function">getErrorCode</span>() {
+        <span class="keyword">return</span> errorCode;
+    }
+}
+
+<span class="comment">// Domain-specific exceptions</span>
+<span class="keyword">public class</span> <span class="class-name">EntityNotFoundException</span> <span class="keyword">extends</span> <span class="class-name">ApplicationException</span> {
+    <span class="keyword">public</span> <span class="function">EntityNotFoundException</span>(<span class="class-name">String</span> entityType, <span class="class-name">Object</span> id) {
+        <span class="keyword">super</span>(<span class="class-name">ErrorCode</span>.NOT_FOUND,
+              <span class="class-name">String</span>.format(<span class="string">"%s not found with id: %s"</span>, entityType, id));
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">ValidationException</span> <span class="keyword">extends</span> <span class="class-name">ApplicationException</span> {
+    <span class="keyword">private final</span> <span class="class-name">List</span>&lt;<span class="class-name">FieldError</span>&gt; fieldErrors;
+
+    <span class="keyword">public</span> <span class="function">ValidationException</span>(<span class="class-name">List</span>&lt;<span class="class-name">FieldError</span>&gt; errors) {
+        <span class="keyword">super</span>(<span class="class-name">ErrorCode</span>.VALIDATION_FAILED, <span class="string">"Validation failed"</span>);
+        <span class="keyword">this</span>.fieldErrors = errors;
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">BusinessRuleException</span> <span class="keyword">extends</span> <span class="class-name">ApplicationException</span> {
+    <span class="keyword">public</span> <span class="function">BusinessRuleException</span>(<span class="class-name">String</span> message) {
+        <span class="keyword">super</span>(<span class="class-name">ErrorCode</span>.BUSINESS_RULE_VIOLATION, message);
+    }
+}</code></pre>
+
+            <h3>Error Codes</h3>
+            <pre><code><span class="keyword">public enum</span> <span class="class-name">ErrorCode</span> {
+    NOT_FOUND(<span class="string">"E001"</span>, <span class="number">404</span>),
+    VALIDATION_FAILED(<span class="string">"E002"</span>, <span class="number">400</span>),
+    BUSINESS_RULE_VIOLATION(<span class="string">"E003"</span>, <span class="number">422</span>),
+    UNAUTHORIZED(<span class="string">"E004"</span>, <span class="number">401</span>),
+    INTERNAL_ERROR(<span class="string">"E999"</span>, <span class="number">500</span>);
+
+    <span class="keyword">private final</span> <span class="class-name">String</span> code;
+    <span class="keyword">private final int</span> httpStatus;
+
+    <span class="class-name">ErrorCode</span>(<span class="class-name">String</span> code, <span class="keyword">int</span> httpStatus) {
+        <span class="keyword">this</span>.code = code;
+        <span class="keyword">this</span>.httpStatus = httpStatus;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Try-with-Resources Pattern</h2>
+
+            <pre><code><span class="comment">// Always use try-with-resources for AutoCloseable resources</span>
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; <span class="function">readLines</span>(<span class="class-name">Path</span> path) <span class="keyword">throws</span> <span class="class-name">IOException</span> {
+    <span class="keyword">try</span> (<span class="class-name">BufferedReader</span> reader = <span class="class-name">Files</span>.newBufferedReader(path)) {
+        <span class="keyword">return</span> reader.lines().collect(<span class="class-name">Collectors</span>.toList());
+    }
+    <span class="comment">// Resource automatically closed, even on exception</span>
+}
+
+<span class="comment">// Multiple resources</span>
+<span class="keyword">public void</span> <span class="function">copyData</span>(<span class="class-name">Path</span> source, <span class="class-name">Path</span> target) <span class="keyword">throws</span> <span class="class-name">IOException</span> {
+    <span class="keyword">try</span> (
+        <span class="class-name">InputStream</span> in = <span class="class-name">Files</span>.newInputStream(source);
+        <span class="class-name">OutputStream</span> out = <span class="class-name">Files</span>.newOutputStream(target)
+    ) {
+        in.transferTo(out);
+    }
+}
+
+<span class="comment">// Custom AutoCloseable</span>
+<span class="keyword">public class</span> <span class="class-name">DatabaseConnection</span> <span class="keyword">implements</span> <span class="class-name">AutoCloseable</span> {
+    <span class="keyword">private final</span> <span class="class-name">Connection</span> connection;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">close</span>() {
+        <span class="keyword">try</span> {
+            connection.close();
+        } <span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+            <span class="comment">// Log but don't rethrow in close()</span>
+            log.warn(<span class="string">"Failed to close connection"</span>, e);
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Fail-Fast Principle</h2>
+
+            <pre><code><span class="comment">// Validate early, fail fast</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">createOrder</span>(<span class="class-name">OrderRequest</span> request) {
+        <span class="comment">// Validate at the entry point</span>
+        validateRequest(request);
+        validateBusinessRules(request);
+
+        <span class="comment">// If we get here, we know the request is valid</span>
+        <span class="keyword">return</span> processOrder(request);
+    }
+
+    <span class="keyword">private void</span> <span class="function">validateRequest</span>(<span class="class-name">OrderRequest</span> request) {
+        <span class="class-name">Objects</span>.requireNonNull(request, <span class="string">"Request cannot be null"</span>);
+        <span class="class-name">Objects</span>.requireNonNull(request.getCustomerId(), <span class="string">"Customer ID required"</span>);
+
+        <span class="keyword">if</span> (request.getItems().isEmpty()) {
+            <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Order must have at least one item"</span>);
+        }
+    }
+
+    <span class="keyword">private void</span> <span class="function">validateBusinessRules</span>(<span class="class-name">OrderRequest</span> request) {
+        <span class="class-name">Customer</span> customer = customerRepository.findById(request.getCustomerId())
+            .orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">EntityNotFoundException</span>(<span class="string">"Customer"</span>, request.getCustomerId()));
+
+        <span class="keyword">if</span> (customer.hasOutstandingDebt()) {
+            <span class="keyword">throw new</span> <span class="class-name">BusinessRuleException</span>(<span class="string">"Cannot create order: customer has outstanding debt"</span>);
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Optional for Nullable Returns</h2>
+
+            <pre><code><span class="comment">// BAD: Returns null</span>
+<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findByEmail</span>(<span class="class-name">String</span> email) {
+    <span class="keyword">return</span> userMap.get(email);  <span class="comment">// Could be null!</span>
+}
+
+<span class="comment">// GOOD: Returns Optional</span>
+<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email) {
+    <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(userMap.get(email));
+}
+
+<span class="comment">// Using Optional effectively</span>
+<span class="keyword">public</span> <span class="class-name">UserDto</span> <span class="function">getUserProfile</span>(<span class="class-name">String</span> email) {
+    <span class="keyword">return</span> userRepository.findByEmail(email)
+        .map(<span class="keyword">this</span>::toDto)
+        .orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">EntityNotFoundException</span>(<span class="string">"User"</span>, email));
+}
+
+<span class="comment">// Optional with default value</span>
+<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getOrCreateGuest</span>(<span class="class-name">String</span> email) {
+    <span class="keyword">return</span> userRepository.findByEmail(email)
+        .orElseGet(() -&gt; createGuestUser(email));
+}
+
+<span class="comment">// DON'T use Optional for:</span>
+<span class="comment">// - Fields (use null instead)</span>
+<span class="comment">// - Method parameters (overload or use @Nullable)</span>
+<span class="comment">// - Collections (return empty collection)</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Global Exception Handling (Spring)</h2>
+
+            <pre><code><span class="annotation">@RestControllerAdvice</span>
+<span class="keyword">public class</span> <span class="class-name">GlobalExceptionHandler</span> {
+
+    <span class="keyword">private static final</span> <span class="class-name">Logger</span> log = <span class="class-name">LoggerFactory</span>.getLogger(<span class="class-name">GlobalExceptionHandler</span>.<span class="keyword">class</span>);
+
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">EntityNotFoundException</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handleNotFound</span>(<span class="class-name">EntityNotFoundException</span> ex) {
+        log.debug(<span class="string">"Entity not found: {}"</span>, ex.getMessage());
+        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>
+            .status(<span class="class-name">HttpStatus</span>.NOT_FOUND)
+            .body(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(ex.getErrorCode(), ex.getMessage()));
+    }
+
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">ValidationException</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handleValidation</span>(<span class="class-name">ValidationException</span> ex) {
+        log.debug(<span class="string">"Validation failed: {}"</span>, ex.getFieldErrors());
+        <span class="class-name">ErrorResponse</span> response = <span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(
+            ex.getErrorCode(),
+            ex.getMessage(),
+            ex.getFieldErrors()
+        );
+        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.badRequest().body(response);
+    }
+
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">Exception</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handleGeneric</span>(<span class="class-name">Exception</span> ex) {
+        <span class="comment">// Log full stack trace for unexpected errors</span>
+        log.error(<span class="string">"Unexpected error"</span>, ex);
+
+        <span class="comment">// Don't expose internal details to client</span>
+        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>
+            .status(<span class="class-name">HttpStatus</span>.INTERNAL_SERVER_ERROR)
+            .body(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(
+                <span class="class-name">ErrorCode</span>.INTERNAL_ERROR,
+                <span class="string">"An unexpected error occurred"</span>
+            ));
+    }
+}
+
+<span class="comment">// Standardized error response</span>
+<span class="keyword">public record</span> <span class="class-name">ErrorResponse</span>(
+    <span class="class-name">String</span> code,
+    <span class="class-name">String</span> message,
+    <span class="class-name">Instant</span> timestamp,
+    <span class="class-name">List</span>&lt;<span class="class-name">FieldError</span>&gt; fieldErrors
+) {
+    <span class="keyword">public</span> <span class="function">ErrorResponse</span>(<span class="class-name">ErrorCode</span> code, <span class="class-name">String</span> message) {
+        <span class="keyword">this</span>(code.getCode(), message, <span class="class-name">Instant</span>.now(), <span class="class-name">List</span>.of());
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Logging Best Practices</h2>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">PaymentService</span> {
+    <span class="keyword">private static final</span> <span class="class-name">Logger</span> log = <span class="class-name">LoggerFactory</span>.getLogger(<span class="class-name">PaymentService</span>.<span class="keyword">class</span>);
+
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">Payment</span> payment) {
+        log.info(<span class="string">"Processing payment: id={}, amount={}"</span>,
+                 payment.getId(), payment.getAmount());
+
+        <span class="keyword">try</span> {
+            gateway.process(payment);
+            log.info(<span class="string">"Payment processed successfully: id={}"</span>, payment.getId());
+
+        } <span class="keyword">catch</span> (<span class="class-name">GatewayTimeoutException</span> e) {
+            <span class="comment">// Recoverable - log as warning</span>
+            log.warn(<span class="string">"Payment gateway timeout, will retry: id={}"</span>, payment.getId());
+            <span class="keyword">throw new</span> <span class="class-name">RetryableException</span>(e);
+
+        } <span class="keyword">catch</span> (<span class="class-name">PaymentDeclinedException</span> e) {
+            <span class="comment">// Expected business case - log as info or debug</span>
+            log.info(<span class="string">"Payment declined: id={}, reason={}"</span>,
+                     payment.getId(), e.getReason());
+            <span class="keyword">throw</span> e;
+
+        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+            <span class="comment">// Unexpected - log as error with stack trace</span>
+            log.error(<span class="string">"Unexpected error processing payment: id={}"</span>,
+                      payment.getId(), e);
+            <span class="keyword">throw new</span> <span class="class-name">PaymentException</span>(<span class="string">"Failed to process payment"</span>, e);
+        }
+    }
+}</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Logging Levels</div>
+                <ul>
+                    <li><strong>ERROR</strong> - Application failure, needs attention</li>
+                    <li><strong>WARN</strong> - Potential problem, recoverable</li>
+                    <li><strong>INFO</strong> - Important business events</li>
+                    <li><strong>DEBUG</strong> - Detailed diagnostic info</li>
+                    <li><strong>TRACE</strong> - Very detailed, typically for debugging</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Exception Translation</h2>
+
+            <pre><code><span class="comment">// Translate low-level exceptions to domain exceptions</span>
+<span class="keyword">public class</span> <span class="class-name">UserRepository</span> {
+
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">save</span>(<span class="class-name">User</span> user) {
+        <span class="keyword">try</span> {
+            <span class="keyword">return</span> jdbcTemplate.update(sql, user.getName(), user.getEmail());
+        } <span class="keyword">catch</span> (<span class="class-name">DuplicateKeyException</span> e) {
+            <span class="comment">// Translate to domain exception</span>
+            <span class="keyword">throw new</span> <span class="class-name">UserAlreadyExistsException</span>(user.getEmail(), e);
+        } <span class="keyword">catch</span> (<span class="class-name">DataAccessException</span> e) {
+            <span class="comment">// Wrap infrastructure exception</span>
+            <span class="keyword">throw new</span> <span class="class-name">RepositoryException</span>(<span class="string">"Failed to save user"</span>, e);
+        }
+    }
+}
+
+<span class="comment">// Preserve the cause chain</span>
+<span class="keyword">public class</span> <span class="class-name">UserAlreadyExistsException</span> <span class="keyword">extends</span> <span class="class-name">ApplicationException</span> {
+    <span class="keyword">public</span> <span class="function">UserAlreadyExistsException</span>(<span class="class-name">String</span> email, <span class="class-name">Throwable</span> cause) {
+        <span class="keyword">super</span>(<span class="class-name">ErrorCode</span>.DUPLICATE_ENTITY,
+              <span class="string">"User already exists with email: "</span> + email,
+              cause);  <span class="comment">// Important: preserve the cause!</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Anti-Patterns to Avoid</h2>
+
+            <pre><code><span class="comment">// BAD: Empty catch block</span>
+<span class="keyword">try</span> {
+    riskyOperation();
+} <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+    <span class="comment">// Silently swallowed!</span>
+}
+
+<span class="comment">// BAD: Catching Throwable or Error</span>
+<span class="keyword">try</span> {
+    operation();
+} <span class="keyword">catch</span> (<span class="class-name">Throwable</span> t) {
+    <span class="comment">// Catches OutOfMemoryError, StackOverflowError, etc.</span>
+}
+
+<span class="comment">// BAD: Using exceptions for flow control</span>
+<span class="keyword">try</span> {
+    <span class="keyword">int</span> value = <span class="class-name">Integer</span>.parseInt(input);
+} <span class="keyword">catch</span> (<span class="class-name">NumberFormatException</span> e) {
+    value = <span class="number">0</span>;  <span class="comment">// Use validation instead!</span>
+}
+
+<span class="comment">// GOOD: Validate first</span>
+<span class="keyword">if</span> (input.matches(<span class="string">"\\d+"</span>)) {
+    value = <span class="class-name">Integer</span>.parseInt(input);
+} <span class="keyword">else</span> {
+    value = <span class="number">0</span>;
+}
+
+<span class="comment">// BAD: Log and rethrow</span>
+<span class="keyword">try</span> {
+    operation();
+} <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+    log.error(<span class="string">"Error"</span>, e);
+    <span class="keyword">throw</span> e;  <span class="comment">// Logs twice if caller also logs!</span>
+}
+
+<span class="comment">// BAD: throw new Exception()</span>
+<span class="keyword">throw new</span> <span class="class-name">Exception</span>(<span class="string">"Something went wrong"</span>);  <span class="comment">// Too generic!</span>
+
+<span class="comment">// GOOD: Use specific exceptions</span>
+<span class="keyword">throw new</span> <span class="class-name">InvalidOrderStateException</span>(order.getId(), order.getStatus());</code></pre>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="../fundamentals/exceptions.html" class="related-link">Exception Handling</a>
+                <a href="../fundamentals/optional.html" class="related-link">Optional Class</a>
+                <a href="clean-code.html" class="related-link">Clean Code Principles</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

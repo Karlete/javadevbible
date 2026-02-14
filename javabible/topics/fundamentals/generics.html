@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generics - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#fundamentals">Java Fundamentals</a> / Generics
+            </nav>
+            <h1>Generics</h1>
+            <p class="topic-subtitle">Type-Safe Programming with Parameterized Types</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Introduction to Generics</h2>
+            <p>Generics are one of the most powerful features introduced in Java 5. They enable you to write code that works with different types while providing compile-time type safety. Before generics, developers had to use raw types and casts, leading to runtime errors that could have been caught at compile time.</p>
+
+            <p>The core idea behind generics is simple: instead of writing code that works with a specific type like <code>String</code> or <code>Integer</code>, you write code that works with a <em>type parameter</em>—a placeholder that gets replaced with an actual type when the code is used. This allows you to write a single class or method that works correctly and safely with many different types.</p>
+
+            <p>Generics are everywhere in modern Java. The Collections Framework, Stream API, Optional class, and countless libraries all rely heavily on generics. Understanding them deeply is essential for reading and writing professional Java code.</p>
+
+            <div class="info-box note">
+                <div class="info-box-title">Why Generics Matter</div>
+                <ul>
+                    <li><strong>Type Safety</strong> - Catch type errors at compile time, not runtime</li>
+                    <li><strong>Elimination of Casts</strong> - No more explicit type casting when retrieving elements</li>
+                    <li><strong>Code Reusability</strong> - Write once, use with any type</li>
+                    <li><strong>Self-Documenting Code</strong> - Types declare what data structures hold</li>
+                    <li><strong>Better IDE Support</strong> - Auto-completion and refactoring work correctly</li>
+                    <li><strong>API Design</strong> - Express constraints and relationships between types</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>The Problem Generics Solve</h2>
+            <p>To understand why generics exist, let's look at what Java code looked like before Java 5.</p>
+
+            <h3>Life Before Generics (The Dark Ages)</h3>
+            <pre><code><span class="comment">/*
+ * Before Java 5: Collections stored Objects
+ * This led to runtime errors and required casting
+ */</span>
+
+<span class="comment">// Creating a list the old way (raw type)</span>
+<span class="class-name">List</span> names = <span class="keyword">new</span> <span class="class-name">ArrayList</span>();
+
+<span class="comment">// You could add anything - no type checking!</span>
+names.add(<span class="string">"Alice"</span>);
+names.add(<span class="string">"Bob"</span>);
+names.add(<span class="number">123</span>);        <span class="comment">// Oops! Added an Integer to a "names" list</span>
+names.add(<span class="keyword">new</span> <span class="class-name">Date</span>());  <span class="comment">// Oops! Added a Date too</span>
+
+<span class="comment">// When retrieving, you had to cast</span>
+<span class="class-name">String</span> first = (<span class="class-name">String</span>) names.get(<span class="number">0</span>);  <span class="comment">// Works</span>
+<span class="class-name">String</span> third = (<span class="class-name">String</span>) names.get(<span class="number">2</span>);  <span class="comment">// ClassCastException at RUNTIME!</span>
+
+<span class="comment">// The compiler couldn't help you catch this bug
+// You'd only discover it when your program crashed</span></code></pre>
+
+            <h3>With Generics (The Modern Way)</h3>
+            <pre><code><span class="comment">/*
+ * With Generics: Type safety at compile time
+ */</span>
+
+<span class="comment">// The type parameter &lt;String&gt; tells the compiler what this list holds</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; names = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">String</span>&gt;();
+
+<span class="comment">// Now the compiler enforces the type</span>
+names.add(<span class="string">"Alice"</span>);  <span class="comment">// OK</span>
+names.add(<span class="string">"Bob"</span>);    <span class="comment">// OK</span>
+<span class="comment">// names.add(123);    // COMPILE ERROR! Integer is not a String</span>
+<span class="comment">// names.add(new Date()); // COMPILE ERROR!</span>
+
+<span class="comment">// No casting needed - the compiler knows it's a String</span>
+<span class="class-name">String</span> first = names.get(<span class="number">0</span>);  <span class="comment">// Clean and safe</span>
+
+<span class="comment">// Java 7+: Diamond operator infers the type</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; modernList = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();  <span class="comment">// Type inferred</span></code></pre>
+
+            <pre><code><span class="comment">/*
+ * Visual comparison of the difference:
+ *
+ *  WITHOUT GENERICS                    WITH GENERICS
+ *  ─────────────────                   ─────────────────
+ *  List list = ...                     List&lt;String&gt; list = ...
+ *       │                                    │
+ *       ▼                                    ▼
+ *  ┌─────────────┐                    ┌─────────────┐
+ *  │   Object    │ ◄─ stores          │   String    │ ◄─ stores
+ *  │   Object    │    anything        │   String    │    only Strings
+ *  │   Object    │                    │   String    │
+ *  └─────────────┘                    └─────────────┘
+ *       │                                    │
+ *       ▼                                    ▼
+ *  (String) list.get(0)               list.get(0)
+ *  ↑ Cast required                    ↑ No cast needed
+ *  ↑ Can fail at runtime              ↑ Always safe
+ */</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Generic Classes</h2>
+            <p>A generic class is a class that can work with any type. You define type parameters in angle brackets after the class name.</p>
+
+            <h3>Defining a Generic Class</h3>
+            <pre><code><span class="comment">/**
+ * A simple container that holds a value of any type.
+ * T is a type parameter - it's a placeholder for an actual type.
+ *
+ * Common type parameter naming conventions:
+ * T - Type (general purpose)
+ * E - Element (used in collections)
+ * K - Key (used in maps)
+ * V - Value (used in maps)
+ * N - Number
+ * S, U, V - 2nd, 3rd, 4th types
+ */</span>
+<span class="keyword">public class</span> <span class="class-name">Box</span>&lt;<span class="class-name">T</span>&gt; {
+    <span class="keyword">private</span> <span class="class-name">T</span> content;
+
+    <span class="keyword">public void</span> <span class="function">set</span>(<span class="class-name">T</span> content) {
+        <span class="keyword">this</span>.content = content;
+    }
+
+    <span class="keyword">public</span> <span class="class-name">T</span> <span class="function">get</span>() {
+        <span class="keyword">return</span> content;
+    }
+
+    <span class="keyword">public boolean</span> <span class="function">isEmpty</span>() {
+        <span class="keyword">return</span> content == <span class="keyword">null</span>;
+    }
+}
+
+<span class="comment">// Usage: T is replaced with actual types</span>
+<span class="class-name">Box</span>&lt;<span class="class-name">String</span>&gt; stringBox = <span class="keyword">new</span> <span class="class-name">Box</span>&lt;&gt;();
+stringBox.set(<span class="string">"Hello, Generics!"</span>);
+<span class="class-name">String</span> message = stringBox.get();  <span class="comment">// No cast needed</span>
+
+<span class="class-name">Box</span>&lt;<span class="class-name">Integer</span>&gt; intBox = <span class="keyword">new</span> <span class="class-name">Box</span>&lt;&gt;();
+intBox.set(<span class="number">42</span>);
+<span class="keyword">int</span> number = intBox.get();  <span class="comment">// Auto-unboxing</span>
+
+<span class="class-name">Box</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt;&gt; listBox = <span class="keyword">new</span> <span class="class-name">Box</span>&lt;&gt;();  <span class="comment">// Nested generics work too!</span></code></pre>
+
+            <h3>Multiple Type Parameters</h3>
+            <pre><code><span class="comment">/**
+ * A class with multiple type parameters.
+ * Think of Map&lt;K, V&gt; - it has two type parameters.
+ */</span>
+<span class="keyword">public class</span> <span class="class-name">Pair</span>&lt;<span class="class-name">K</span>, <span class="class-name">V</span>&gt; {
+    <span class="keyword">private final</span> <span class="class-name">K</span> key;
+    <span class="keyword">private final</span> <span class="class-name">V</span> value;
+
+    <span class="keyword">public</span> <span class="function">Pair</span>(<span class="class-name">K</span> key, <span class="class-name">V</span> value) {
+        <span class="keyword">this</span>.key = key;
+        <span class="keyword">this</span>.value = value;
+    }
+
+    <span class="keyword">public</span> <span class="class-name">K</span> <span class="function">getKey</span>() { <span class="keyword">return</span> key; }
+    <span class="keyword">public</span> <span class="class-name">V</span> <span class="function">getValue</span>() { <span class="keyword">return</span> value; }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">toString</span>() {
+        <span class="keyword">return</span> <span class="string">"("</span> + key + <span class="string">", "</span> + value + <span class="string">")"</span>;
+    }
+}
+
+<span class="comment">// Usage with different type combinations</span>
+<span class="class-name">Pair</span>&lt;<span class="class-name">String</span>, <span class="class-name">Integer</span>&gt; nameAge = <span class="keyword">new</span> <span class="class-name">Pair</span>&lt;&gt;(<span class="string">"Alice"</span>, <span class="number">30</span>);
+<span class="class-name">Pair</span>&lt;<span class="class-name">Integer</span>, <span class="class-name">Boolean</span>&gt; idActive = <span class="keyword">new</span> <span class="class-name">Pair</span>&lt;&gt;(<span class="number">1001</span>, <span class="keyword">true</span>);
+<span class="class-name">Pair</span>&lt;<span class="class-name">String</span>, <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt;&gt; personFriends = <span class="keyword">new</span> <span class="class-name">Pair</span>&lt;&gt;(<span class="string">"Bob"</span>, <span class="class-name">List</span>.of(<span class="string">"Alice"</span>, <span class="string">"Charlie"</span>));
+
+<span class="class-name">String</span> name = nameAge.getKey();    <span class="comment">// String</span>
+<span class="class-name">Integer</span> age = nameAge.getValue();  <span class="comment">// Integer</span></code></pre>
+
+            <h3>Real-World Example: Result Type</h3>
+            <pre><code><span class="comment">/**
+ * A Result type that can hold either a success value or an error.
+ * Common pattern in functional programming and modern APIs.
+ */</span>
+<span class="keyword">public class</span> <span class="class-name">Result</span>&lt;<span class="class-name">T</span>, <span class="class-name">E</span>&gt; {
+    <span class="keyword">private final</span> <span class="class-name">T</span> value;
+    <span class="keyword">private final</span> <span class="class-name">E</span> error;
+    <span class="keyword">private final boolean</span> success;
+
+    <span class="keyword">private</span> <span class="function">Result</span>(<span class="class-name">T</span> value, <span class="class-name">E</span> error, <span class="keyword">boolean</span> success) {
+        <span class="keyword">this</span>.value = value;
+        <span class="keyword">this</span>.error = error;
+        <span class="keyword">this</span>.success = success;
+    }
+
+    <span class="keyword">public static</span> &lt;<span class="class-name">T</span>, <span class="class-name">E</span>&gt; <span class="class-name">Result</span>&lt;<span class="class-name">T</span>, <span class="class-name">E</span>&gt; <span class="function">success</span>(<span class="class-name">T</span> value) {
+        <span class="keyword">return new</span> <span class="class-name">Result</span>&lt;&gt;(value, <span class="keyword">null</span>, <span class="keyword">true</span>);
+    }
+
+    <span class="keyword">public static</span> &lt;<span class="class-name">T</span>, <span class="class-name">E</span>&gt; <span class="class-name">Result</span>&lt;<span class="class-name">T</span>, <span class="class-name">E</span>&gt; <span class="function">failure</span>(<span class="class-name">E</span> error) {
+        <span class="keyword">return new</span> <span class="class-name">Result</span>&lt;&gt;(<span class="keyword">null</span>, error, <span class="keyword">false</span>);
+    }
+
+    <span class="keyword">public boolean</span> <span class="function">isSuccess</span>() { <span class="keyword">return</span> success; }
+    <span class="keyword">public</span> <span class="class-name">T</span> <span class="function">getValue</span>() { <span class="keyword">return</span> value; }
+    <span class="keyword">public</span> <span class="class-name">E</span> <span class="function">getError</span>() { <span class="keyword">return</span> error; }
+}
+
+<span class="comment">// Usage</span>
+<span class="keyword">public</span> <span class="class-name">Result</span>&lt;<span class="class-name">User</span>, <span class="class-name">String</span>&gt; <span class="function">findUser</span>(<span class="keyword">int</span> id) {
+    <span class="class-name">User</span> user = database.findById(id);
+    <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
+        <span class="keyword">return</span> <span class="class-name">Result</span>.success(user);
+    }
+    <span class="keyword">return</span> <span class="class-name">Result</span>.failure(<span class="string">"User not found: "</span> + id);
+}
+
+<span class="class-name">Result</span>&lt;<span class="class-name">User</span>, <span class="class-name">String</span>&gt; result = findUser(<span class="number">123</span>);
+<span class="keyword">if</span> (result.isSuccess()) {
+    <span class="class-name">User</span> user = result.getValue();
+    <span class="comment">// process user</span>
+} <span class="keyword">else</span> {
+    <span class="class-name">String</span> error = result.getError();
+    <span class="comment">// handle error</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Generic Methods</h2>
+            <p>Generic methods have their own type parameters, independent of any class-level type parameters. They can be defined in both generic and non-generic classes.</p>
+
+            <h3>Defining Generic Methods</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">Utils</span> {
+
+    <span class="comment">/**
+     * A generic method - note the &lt;T&gt; before the return type.
+     * This declares a new type parameter T just for this method.
+     */</span>
+    <span class="keyword">public static</span> &lt;<span class="class-name">T</span>&gt; <span class="keyword">void</span> <span class="function">printArray</span>(<span class="class-name">T</span>[] array) {
+        <span class="keyword">for</span> (<span class="class-name">T</span> element : array) {
+            <span class="class-name">System</span>.out.print(element + <span class="string">" "</span>);
+        }
+        <span class="class-name">System</span>.out.println();
+    }
+
+    <span class="comment">/**
+     * Generic method that returns a value of the type parameter.
+     */</span>
+    <span class="keyword">public static</span> &lt;<span class="class-name">T</span>&gt; <span class="class-name">T</span> <span class="function">getFirst</span>(<span class="class-name">List</span>&lt;<span class="class-name">T</span>&gt; list) {
+        <span class="keyword">if</span> (list.isEmpty()) {
+            <span class="keyword">return null</span>;
+        }
+        <span class="keyword">return</span> list.get(<span class="number">0</span>);
+    }
+
+    <span class="comment">/**
+     * Generic method with multiple type parameters.
+     */</span>
+    <span class="keyword">public static</span> &lt;<span class="class-name">K</span>, <span class="class-name">V</span>&gt; <span class="class-name">Map</span>&lt;<span class="class-name">K</span>, <span class="class-name">V</span>&gt; <span class="function">createMap</span>(<span class="class-name">K</span> key, <span class="class-name">V</span> value) {
+        <span class="class-name">Map</span>&lt;<span class="class-name">K</span>, <span class="class-name">V</span>&gt; map = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
+        map.put(key, value);
+        <span class="keyword">return</span> map;
+    }
+}
+
+<span class="comment">// Usage - type inference usually figures out the types</span>
+<span class="class-name">Integer</span>[] numbers = {<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>};
+<span class="class-name">String</span>[] names = {<span class="string">"Alice"</span>, <span class="string">"Bob"</span>, <span class="string">"Charlie"</span>};
+
+<span class="class-name">Utils</span>.printArray(numbers);  <span class="comment">// T is inferred as Integer</span>
+<span class="class-name">Utils</span>.printArray(names);    <span class="comment">// T is inferred as String</span>
+
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; nameList = <span class="class-name">List</span>.of(<span class="string">"Alice"</span>, <span class="string">"Bob"</span>);
+<span class="class-name">String</span> first = <span class="class-name">Utils</span>.getFirst(nameList);  <span class="comment">// Returns String</span>
+
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Integer</span>&gt; map = <span class="class-name">Utils</span>.createMap(<span class="string">"age"</span>, <span class="number">30</span>);
+
+<span class="comment">// Explicit type specification (rarely needed)</span>
+<span class="class-name">Utils</span>.&lt;<span class="class-name">String</span>&gt;printArray(<span class="keyword">new</span> <span class="class-name">String</span>[]{<span class="string">"a"</span>, <span class="string">"b"</span>});</code></pre>
+
+            <h3>Generic Methods in Generic Classes</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">Container</span>&lt;<span class="class-name">T</span>&gt; {
+    <span class="keyword">private</span> <span class="class-name">T</span> item;
+
+    <span class="keyword">public void</span> <span class="function">setItem</span>(<span class="class-name">T</span> item) {
+        <span class="keyword">this</span>.item = item;
+    }
+
+    <span class="keyword">public</span> <span class="class-name">T</span> <span class="function">getItem</span>() {
+        <span class="keyword">return</span> item;
+    }
+
+    <span class="comment">/**
+     * This method has its OWN type parameter U.
+     * U is independent of the class's T.
+     */</span>
+    <span class="keyword">public</span> &lt;<span class="class-name">U</span>&gt; <span class="keyword">void</span> <span class="function">inspect</span>(<span class="class-name">U</span> element) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Type of T: "</span> + item.getClass().getName());
+        <span class="class-name">System</span>.out.println(<span class="string">"Type of U: "</span> + element.getClass().getName());
+    }
+
+    <span class="comment">/**
+     * Method that transforms T to a different type U.
+     */</span>
+    <span class="keyword">public</span> &lt;<span class="class-name">U</span>&gt; <span class="class-name">Container</span>&lt;<span class="class-name">U</span>&gt; <span class="function">map</span>(<span class="class-name">Function</span>&lt;<span class="class-name">T</span>, <span class="class-name">U</span>&gt; mapper) {
+        <span class="class-name">Container</span>&lt;<span class="class-name">U</span>&gt; result = <span class="keyword">new</span> <span class="class-name">Container</span>&lt;&gt;();
+        result.setItem(mapper.apply(item));
+        <span class="keyword">return</span> result;
+    }
+}
+
+<span class="comment">// Usage</span>
+<span class="class-name">Container</span>&lt;<span class="class-name">String</span>&gt; stringContainer = <span class="keyword">new</span> <span class="class-name">Container</span>&lt;&gt;();
+stringContainer.setItem(<span class="string">"Hello"</span>);
+stringContainer.inspect(<span class="number">42</span>);  <span class="comment">// U is Integer, T is String</span>
+
+<span class="class-name">Container</span>&lt;<span class="class-name">Integer</span>&gt; lengthContainer = stringContainer.map(<span class="class-name">String</span>::length);
+<span class="class-name">System</span>.out.println(lengthContainer.getItem());  <span class="comment">// 5</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Bounded Type Parameters</h2>
+            <p>Sometimes you need to restrict what types can be used as type arguments. Bounded type parameters let you specify that a type must be a subtype of a particular class or implement certain interfaces.</p>
+
+            <h3>Upper Bounds (extends)</h3>
+            <pre><code><span class="comment">/**
+ * T must be Number or a subclass of Number.
+ * This gives us access to Number's methods.
+ */</span>
+<span class="keyword">public class</span> <span class="class-name">NumericBox</span>&lt;<span class="class-name">T</span> <span class="keyword">extends</span> <span class="class-name">Number</span>&gt; {
+    <span class="keyword">private</span> <span class="class-name">T</span> value;
+
+    <span class="keyword">public</span> <span class="function">NumericBox</span>(<span class="class-name">T</span> value) {
+        <span class="keyword">this</span>.value = value;
+    }
+
+    <span class="comment">// Because T extends Number, we can call Number methods</span>
+    <span class="keyword">public double</span> <span class="function">doubleValue</span>() {
+        <span class="keyword">return</span> value.doubleValue();
+    }
+
+    <span class="keyword">public double</span> <span class="function">square</span>() {
+        <span class="keyword">double</span> d = value.doubleValue();
+        <span class="keyword">return</span> d * d;
+    }
+
+    <span class="keyword">public boolean</span> <span class="function">isPositive</span>() {
+        <span class="keyword">return</span> value.doubleValue() > <span class="number">0</span>;
+    }
+}
+
+<span class="comment">// Valid: Integer, Double, Long, etc. all extend Number</span>
+<span class="class-name">NumericBox</span>&lt;<span class="class-name">Integer</span>&gt; intBox = <span class="keyword">new</span> <span class="class-name">NumericBox</span>&lt;&gt;(<span class="number">5</span>);
+<span class="class-name">NumericBox</span>&lt;<span class="class-name">Double</span>&gt; doubleBox = <span class="keyword">new</span> <span class="class-name">NumericBox</span>&lt;&gt;(<span class="number">3.14</span>);
+<span class="class-name">NumericBox</span>&lt;<span class="class-name">BigDecimal</span>&gt; bigBox = <span class="keyword">new</span> <span class="class-name">NumericBox</span>&lt;&gt;(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"100.50"</span>));
+
+<span class="class-name">System</span>.out.println(intBox.square());    <span class="comment">// 25.0</span>
+<span class="class-name">System</span>.out.println(doubleBox.square()); <span class="comment">// 9.8596</span>
+
+<span class="comment">// Invalid: String doesn't extend Number</span>
+<span class="comment">// NumericBox&lt;String&gt; stringBox = new NumericBox&lt;&gt;("hello"); // COMPILE ERROR!</span></code></pre>
+
+            <h3>Multiple Bounds</h3>
+            <pre><code><span class="comment">/**
+ * T must extend Number AND implement Comparable.
+ * Multiple bounds use & (ampersand) separator.
+ * Class bound must come first, then interface bounds.
+ */</span>
+<span class="keyword">public class</span> <span class="class-name">SortableNumericBox</span>&lt;<span class="class-name">T</span> <span class="keyword">extends</span> <span class="class-name">Number</span> &amp; <span class="class-name">Comparable</span>&lt;<span class="class-name">T</span>&gt;&gt; {
+    <span class="keyword">private</span> <span class="class-name">T</span> value;
+
+    <span class="keyword">public</span> <span class="function">SortableNumericBox</span>(<span class="class-name">T</span> value) {
+        <span class="keyword">this</span>.value = value;
+    }
+
+    <span class="comment">// Can use Number methods</span>
+    <span class="keyword">public double</span> <span class="function">doubleValue</span>() {
+        <span class="keyword">return</span> value.doubleValue();
+    }
+
+    <span class="comment">// Can use Comparable methods</span>
+    <span class="keyword">public boolean</span> <span class="function">isGreaterThan</span>(<span class="class-name">T</span> other) {
+        <span class="keyword">return</span> value.compareTo(other) > <span class="number">0</span>;
+    }
+}
+
+<span class="comment">// Integer extends Number and implements Comparable&lt;Integer&gt;</span>
+<span class="class-name">SortableNumericBox</span>&lt;<span class="class-name">Integer</span>&gt; box = <span class="keyword">new</span> <span class="class-name">SortableNumericBox</span>&lt;&gt;(<span class="number">10</span>);
+<span class="class-name">System</span>.out.println(box.isGreaterThan(<span class="number">5</span>));  <span class="comment">// true</span></code></pre>
+
+            <h3>Bounded Type Parameters in Methods</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">MathUtils</span> {
+    <span class="comment">/**
+     * Find the maximum element in an array.
+     * T must implement Comparable so we can compare elements.
+     */</span>
+    <span class="keyword">public static</span> &lt;<span class="class-name">T</span> <span class="keyword">extends</span> <span class="class-name">Comparable</span>&lt;<span class="class-name">T</span>&gt;&gt; <span class="class-name">T</span> <span class="function">max</span>(<span class="class-name">T</span>[] array) {
+        <span class="keyword">if</span> (array == <span class="keyword">null</span> || array.length == <span class="number">0</span>) {
+            <span class="keyword">return null</span>;
+        }
+        <span class="class-name">T</span> max = array[<span class="number">0</span>];
+        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i < array.length; i++) {
+            <span class="keyword">if</span> (array[i].compareTo(max) > <span class="number">0</span>) {
+                max = array[i];
+            }
+        }
+        <span class="keyword">return</span> max;
+    }
+
+    <span class="comment">/**
+     * Sum all numbers in a list.
+     * T must extend Number.
+     */</span>
+    <span class="keyword">public static</span> &lt;<span class="class-name">T</span> <span class="keyword">extends</span> <span class="class-name">Number</span>&gt; <span class="keyword">double</span> <span class="function">sum</span>(<span class="class-name">List</span>&lt;<span class="class-name">T</span>&gt; numbers) {
+        <span class="keyword">double</span> total = <span class="number">0</span>;
+        <span class="keyword">for</span> (<span class="class-name">T</span> num : numbers) {
+            total += num.doubleValue();
+        }
+        <span class="keyword">return</span> total;
+    }
+}
+
+<span class="comment">// Usage</span>
+<span class="class-name">Integer</span>[] nums = {<span class="number">3</span>, <span class="number">1</span>, <span class="number">4</span>, <span class="number">1</span>, <span class="number">5</span>, <span class="number">9</span>};
+<span class="class-name">Integer</span> max = <span class="class-name">MathUtils</span>.max(nums);  <span class="comment">// 9</span>
+
+<span class="class-name">String</span>[] words = {<span class="string">"apple"</span>, <span class="string">"zebra"</span>, <span class="string">"banana"</span>};
+<span class="class-name">String</span> maxWord = <span class="class-name">MathUtils</span>.max(words);  <span class="comment">// "zebra"</span>
+
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; integers = <span class="class-name">List</span>.of(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>);
+<span class="class-name">List</span>&lt;<span class="class-name">Double</span>&gt; doubles = <span class="class-name">List</span>.of(<span class="number">1.5</span>, <span class="number">2.5</span>, <span class="number">3.5</span>);
+
+<span class="keyword">double</span> intSum = <span class="class-name">MathUtils</span>.sum(integers);  <span class="comment">// 6.0</span>
+<span class="keyword">double</span> doubleSum = <span class="class-name">MathUtils</span>.sum(doubles);  <span class="comment">// 7.5</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Wildcards</h2>
+            <p>Wildcards (<code>?</code>) represent unknown types. They're especially useful in method parameters when you want to accept collections of different types.</p>
+
+            <h3>Unbounded Wildcard (?)</h3>
+            <pre><code><span class="comment">/**
+ * Unbounded wildcard: accepts List of ANY type.
+ * Use when you only need methods from Object class.
+ */</span>
+<span class="keyword">public static void</span> <span class="function">printList</span>(<span class="class-name">List</span>&lt;?&gt; list) {
+    <span class="keyword">for</span> (<span class="class-name">Object</span> item : list) {
+        <span class="class-name">System</span>.out.println(item);
+    }
+}
+
+<span class="comment">// Can pass any List</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; strings = <span class="class-name">List</span>.of(<span class="string">"A"</span>, <span class="string">"B"</span>);
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; integers = <span class="class-name">List</span>.of(<span class="number">1</span>, <span class="number">2</span>);
+<span class="class-name">List</span>&lt;<span class="class-name">Object</span>&gt; objects = <span class="class-name">List</span>.of(<span class="string">"Hello"</span>, <span class="number">42</span>);
+
+printList(strings);   <span class="comment">// Works</span>
+printList(integers);  <span class="comment">// Works</span>
+printList(objects);   <span class="comment">// Works</span></code></pre>
+
+            <h3>Upper Bounded Wildcard (? extends)</h3>
+            <pre><code><span class="comment">/**
+ * Upper bounded: accepts Number or any subtype.
+ * Use when you need to READ from the collection.
+ * "Producer Extends" - the collection produces elements.
+ */</span>
+<span class="keyword">public static double</span> <span class="function">sumOfList</span>(<span class="class-name">List</span>&lt;? <span class="keyword">extends</span> <span class="class-name">Number</span>&gt; list) {
+    <span class="keyword">double</span> sum = <span class="number">0</span>;
+    <span class="keyword">for</span> (<span class="class-name">Number</span> num : list) {
+        sum += num.doubleValue();
+    }
+    <span class="keyword">return</span> sum;
+}
+
+<span class="comment">// Can pass List of Number or any subclass</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; integers = <span class="class-name">List</span>.of(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>);
+<span class="class-name">List</span>&lt;<span class="class-name">Double</span>&gt; doubles = <span class="class-name">List</span>.of(<span class="number">1.5</span>, <span class="number">2.5</span>);
+<span class="class-name">List</span>&lt;<span class="class-name">Number</span>&gt; numbers = <span class="class-name">List</span>.of(<span class="number">1</span>, <span class="number">2.5</span>, <span class="number">3L</span>);
+
+<span class="keyword">double</span> sum1 = sumOfList(integers);  <span class="comment">// 6.0</span>
+<span class="keyword">double</span> sum2 = sumOfList(doubles);   <span class="comment">// 4.0</span>
+<span class="keyword">double</span> sum3 = sumOfList(numbers);   <span class="comment">// 6.5</span>
+
+<span class="comment">// CANNOT add to a List&lt;? extends Number&gt; (except null)</span>
+<span class="keyword">public static void</span> <span class="function">cannotAdd</span>(<span class="class-name">List</span>&lt;? <span class="keyword">extends</span> <span class="class-name">Number</span>&gt; list) {
+    <span class="comment">// list.add(1);      // COMPILE ERROR!</span>
+    <span class="comment">// list.add(1.0);    // COMPILE ERROR!</span>
+    <span class="comment">// Compiler doesn't know the actual type</span>
+}</code></pre>
+
+            <h3>Lower Bounded Wildcard (? super)</h3>
+            <pre><code><span class="comment">/**
+ * Lower bounded: accepts Integer or any supertype (Number, Object).
+ * Use when you need to WRITE to the collection.
+ * "Consumer Super" - the collection consumes elements.
+ */</span>
+<span class="keyword">public static void</span> <span class="function">addIntegers</span>(<span class="class-name">List</span>&lt;? <span class="keyword">super</span> <span class="class-name">Integer</span>&gt; list) {
+    list.add(<span class="number">1</span>);    <span class="comment">// OK</span>
+    list.add(<span class="number">2</span>);    <span class="comment">// OK</span>
+    list.add(<span class="number">3</span>);    <span class="comment">// OK</span>
+}
+
+<span class="comment">// Can pass List of Integer or any supertype</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; integers = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="class-name">List</span>&lt;<span class="class-name">Number</span>&gt; numbers = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="class-name">List</span>&lt;<span class="class-name">Object</span>&gt; objects = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+addIntegers(integers);  <span class="comment">// Works</span>
+addIntegers(numbers);   <span class="comment">// Works</span>
+addIntegers(objects);   <span class="comment">// Works</span>
+
+<span class="comment">// CANNOT reliably read from List&lt;? super Integer&gt;</span>
+<span class="keyword">public static void</span> <span class="function">cannotRead</span>(<span class="class-name">List</span>&lt;? <span class="keyword">super</span> <span class="class-name">Integer</span>&gt; list) {
+    <span class="comment">// Integer i = list.get(0);  // COMPILE ERROR!</span>
+    <span class="class-name">Object</span> o = list.get(<span class="number">0</span>);      <span class="comment">// OK, but only as Object</span>
+}</code></pre>
+
+            <h3>PECS Principle: Producer Extends, Consumer Super</h3>
+            <pre><code><span class="comment">/*
+ * PECS is the key rule for wildcards:
+ *
+ * - Use "? extends T" when you GET values from a structure (producer)
+ * - Use "? super T" when you PUT values into a structure (consumer)
+ * - Use neither (just T) when you do both
+ *
+ * Example: Collections.copy(dest, src)
+ */</span>
+<span class="keyword">public static</span> &lt;<span class="class-name">T</span>&gt; <span class="keyword">void</span> <span class="function">copy</span>(
+        <span class="class-name">List</span>&lt;? <span class="keyword">super</span> <span class="class-name">T</span>&gt; dest,      <span class="comment">// Consumer - we PUT into dest</span>
+        <span class="class-name">List</span>&lt;? <span class="keyword">extends</span> <span class="class-name">T</span>&gt; src) {   <span class="comment">// Producer - we GET from src</span>
+    <span class="keyword">for</span> (<span class="class-name">T</span> item : src) {
+        dest.add(item);
+    }
+}
+
+<span class="comment">// This works because:</span>
+<span class="comment">// - We read from src (? extends)</span>
+<span class="comment">// - We write to dest (? super)</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Number</span>&gt; dest = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; src = <span class="class-name">List</span>.of(<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>);
+copy(dest, src);  <span class="comment">// Copies Integer elements into Number list</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Type Erasure</h2>
+            <p>Java implements generics through type erasure, meaning generic type information is removed at compile time. This has important implications.</p>
+
+            <pre><code><span class="comment">/*
+ * TYPE ERASURE - What happens at compile time:
+ *
+ * YOUR CODE:                           AFTER ERASURE:
+ * ──────────                           ──────────────
+ * List&lt;String&gt; list = ...              List list = ...
+ * String s = list.get(0);              String s = (String) list.get(0);
+ *
+ * Box&lt;Integer&gt; box = ...               Box box = ...
+ * Integer i = box.get();               Integer i = (Integer) box.get();
+ *
+ * The compiler:
+ * 1. Checks types at compile time
+ * 2. Removes generic type info
+ * 3. Inserts casts where needed
+ */</span>
+
+<span class="comment">// Because of type erasure, these are the SAME class at runtime:</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; stringList = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; intList = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+<span class="class-name">System</span>.out.println(stringList.getClass() == intList.getClass());  <span class="comment">// true!</span>
+<span class="class-name">System</span>.out.println(stringList.getClass().getName());  <span class="comment">// java.util.ArrayList</span>
+
+<span class="comment">// You CANNOT do these because of type erasure:</span>
+
+<span class="comment">// 1. Create generic arrays</span>
+<span class="comment">// T[] array = new T[10];  // COMPILE ERROR!</span>
+
+<span class="comment">// 2. Use instanceof with generic types</span>
+<span class="comment">// if (obj instanceof List&lt;String&gt;) {}  // COMPILE ERROR!</span>
+<span class="keyword">if</span> (obj <span class="keyword">instanceof</span> <span class="class-name">List</span>&lt;?&gt;) {}  <span class="comment">// OK with wildcard</span>
+
+<span class="comment">// 3. Create instances of type parameters</span>
+<span class="comment">// T item = new T();  // COMPILE ERROR!</span>
+
+<span class="comment">// Workaround: Pass a Class object or use a factory</span>
+<span class="keyword">public</span> &lt;<span class="class-name">T</span>&gt; <span class="class-name">T</span> <span class="function">create</span>(<span class="class-name">Class</span>&lt;<span class="class-name">T</span>&gt; clazz) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    <span class="keyword">return</span> clazz.getDeclaredConstructor().newInstance();
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Generic Interfaces</h2>
+            <pre><code><span class="comment">/**
+ * A generic interface.
+ */</span>
+<span class="keyword">public interface</span> <span class="class-name">Repository</span>&lt;<span class="class-name">T</span>, <span class="class-name">ID</span>&gt; {
+    <span class="class-name">T</span> <span class="function">findById</span>(<span class="class-name">ID</span> id);
+    <span class="class-name">List</span>&lt;<span class="class-name">T</span>&gt; <span class="function">findAll</span>();
+    <span class="class-name">T</span> <span class="function">save</span>(<span class="class-name">T</span> entity);
+    <span class="keyword">void</span> <span class="function">delete</span>(<span class="class-name">T</span> entity);
+}
+
+<span class="comment">// Implementation specifies the actual types</span>
+<span class="keyword">public class</span> <span class="class-name">UserRepository</span> <span class="keyword">implements</span> <span class="class-name">Repository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findById</span>(<span class="class-name">Long</span> id) {
+        <span class="comment">// implementation</span>
+        <span class="keyword">return null</span>;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findAll</span>() {
+        <span class="comment">// implementation</span>
+        <span class="keyword">return new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">save</span>(<span class="class-name">User</span> user) {
+        <span class="comment">// implementation</span>
+        <span class="keyword">return</span> user;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">delete</span>(<span class="class-name">User</span> user) {
+        <span class="comment">// implementation</span>
+    }
+}
+
+<span class="comment">// Usage</span>
+<span class="class-name">Repository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; userRepo = <span class="keyword">new</span> <span class="class-name">UserRepository</span>();
+<span class="class-name">User</span> user = userRepo.findById(<span class="number">1L</span>);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Pitfalls</h2>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Pitfall 1: Using Raw Types</div>
+                <pre><code><span class="comment">// BAD: Raw type - loses all type safety</span>
+<span class="class-name">List</span> rawList = <span class="keyword">new</span> <span class="class-name">ArrayList</span>();
+rawList.add(<span class="string">"string"</span>);
+rawList.add(<span class="number">123</span>);  <span class="comment">// No compile error, but dangerous!</span>
+
+<span class="comment">// GOOD: Always specify type parameters</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; typedList = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="comment">// typedList.add(123);  // Compile error - caught early!</span></code></pre>
+            </div>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Pitfall 2: Generic Array Creation</div>
+                <pre><code><span class="comment">// BAD: Cannot create generic arrays directly</span>
+<span class="comment">// List&lt;String&gt;[] array = new ArrayList&lt;String&gt;[10]; // COMPILE ERROR!</span>
+
+<span class="comment">// GOOD: Use List of Lists instead</span>
+<span class="class-name">List</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt;&gt; listOfLists = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+<span class="comment">// Or use @SuppressWarnings with caution</span>
+<span class="annotation">@SuppressWarnings</span>(<span class="string">"unchecked"</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt;[] array = (<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt;[]) <span class="keyword">new</span> <span class="class-name">List</span>&lt;?&gt;[<span class="number">10</span>];</code></pre>
+            </div>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Pitfall 3: Comparing Generic Types</div>
+                <pre><code><span class="comment">// BAD: This doesn't work as expected</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; strings = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; integers = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+<span class="comment">// These are the same class at runtime!</span>
+<span class="class-name">System</span>.out.println(strings.getClass() == integers.getClass());  <span class="comment">// true</span>
+
+<span class="comment">// Cannot use instanceof with parameterized types</span>
+<span class="comment">// if (obj instanceof List&lt;String&gt;) {}  // COMPILE ERROR!</span>
+<span class="keyword">if</span> (obj <span class="keyword">instanceof</span> <span class="class-name">List</span>&lt;?&gt;) {}  <span class="comment">// OK</span></code></pre>
+            </div>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Pitfall 4: Confusing extends/super</div>
+                <pre><code><span class="comment">// Remember PECS: Producer Extends, Consumer Super</span>
+
+<span class="comment">// WRONG: Trying to add to "? extends"</span>
+<span class="keyword">public void</span> <span class="function">wrong</span>(<span class="class-name">List</span>&lt;? <span class="keyword">extends</span> <span class="class-name">Number</span>&gt; list) {
+    <span class="comment">// list.add(1);  // COMPILE ERROR - can only read!</span>
+}
+
+<span class="comment">// RIGHT: Use "? super" when you need to add</span>
+<span class="keyword">public void</span> <span class="function">right</span>(<span class="class-name">List</span>&lt;? <span class="keyword">super</span> <span class="class-name">Integer</span>&gt; list) {
+    list.add(<span class="number">1</span>);  <span class="comment">// OK</span>
+}</code></pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Interview Questions</h2>
+
+            <div class="info-box note">
+                <div class="info-box-title">Common Interview Questions</div>
+
+                <p><strong>Q: What are generics and why were they introduced?</strong></p>
+                <p>A: Generics allow type parameters in classes, interfaces, and methods. They were introduced in Java 5 to provide compile-time type safety and eliminate the need for casting when working with collections. They catch type errors at compile time instead of runtime.</p>
+
+                <p><strong>Q: What is type erasure?</strong></p>
+                <p>A: Type erasure is Java's implementation of generics where generic type information is removed at compile time. The compiler checks types, then erases them and inserts casts. This means <code>List&lt;String&gt;</code> and <code>List&lt;Integer&gt;</code> are the same class at runtime.</p>
+
+                <p><strong>Q: What's the difference between <code>&lt;?&gt;</code>, <code>&lt;? extends T&gt;</code>, and <code>&lt;? super T&gt;</code>?</strong></p>
+                <p>A: <code>&lt;?&gt;</code> is an unbounded wildcard accepting any type. <code>&lt;? extends T&gt;</code> is an upper bound accepting T or its subtypes (use for reading). <code>&lt;? super T&gt;</code> is a lower bound accepting T or its supertypes (use for writing). Remember PECS: Producer Extends, Consumer Super.</p>
+
+                <p><strong>Q: Can you create an instance of a type parameter?</strong></p>
+                <p>A: No, you cannot do <code>new T()</code> because of type erasure. The compiler doesn't know what T is at runtime. Workarounds include passing a <code>Class&lt;T&gt;</code> object or using a factory/supplier.</p>
+
+                <p><strong>Q: Why can't you create a generic array like <code>new T[10]</code>?</strong></p>
+                <p>A: Arrays are covariant and retain their type at runtime, while generics are invariant and use erasure. Creating generic arrays would break type safety because the array wouldn't know what type to enforce at runtime.</p>
+
+                <p><strong>Q: What is a raw type and why should you avoid it?</strong></p>
+                <p>A: A raw type is using a generic class without type parameters (e.g., <code>List</code> instead of <code>List&lt;String&gt;</code>). It disables type checking and exists only for backward compatibility. Always use parameterized types for type safety.</p>
+
+                <p><strong>Q: What does <code>&lt;T extends Comparable&lt;? super T&gt;&gt;</code> mean?</strong></p>
+                <p>A: This is a common pattern meaning T must implement Comparable for itself or a supertype. For example, if you have a class <code>Apple extends Fruit</code> and <code>Fruit implements Comparable&lt;Fruit&gt;</code>, Apple would satisfy this bound because it's comparable with its supertype Fruit.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Generics Best Practices</div>
+                <ul>
+                    <li><strong>Always use parameterized types</strong> - Never use raw types like <code>List</code></li>
+                    <li><strong>Use meaningful type parameter names</strong> - T for type, E for element, K/V for key/value</li>
+                    <li><strong>Prefer generic methods over wildcards</strong> when the type appears multiple times</li>
+                    <li><strong>Follow PECS</strong> - Producer Extends, Consumer Super</li>
+                    <li><strong>Use bounded type parameters</strong> when you need to call methods on the type</li>
+                    <li><strong>Favor composition over inheritance</strong> with generic types</li>
+                    <li><strong>Don't use raw types in new code</strong> - They exist only for backward compatibility</li>
+                    <li><strong>Suppress warnings carefully</strong> - Only use @SuppressWarnings when you're certain it's safe</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="collections.html" class="related-link">Collections Framework</a>
+                <a href="lambda-streams.html" class="related-link">Lambda & Streams</a>
+                <a href="optional.html" class="related-link">Optional Class</a>
+                <a href="interfaces-abstract.html" class="related-link">Interfaces vs Abstract Classes</a>
+                <a href="../advanced/reflection.html" class="related-link">Reflection API</a>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>See Also</h2>
+            <ul>
+                <li><a href="collections.html">Collections Framework</a> - Heavily uses generics</li>
+                <li><a href="lambda-streams.html">Lambda & Streams</a> - Functional programming with generics</li>
+                <li><a href="../java-versions/version-history.html">Java Version History</a> - Generics introduced in Java 5</li>
+                <li><a href="../advanced/design-patterns.html">Design Patterns</a> - Generic implementations of patterns</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

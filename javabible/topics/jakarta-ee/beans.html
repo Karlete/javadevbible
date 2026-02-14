@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What is a Bean? - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / What is a Bean?
+            </nav>
+            <h1>What is a Bean?</h1>
+            <p class="topic-subtitle">Understanding Managed Components in Jakarta EE</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is a Bean?</h2>
+            <p><strong>Think of a bean like a plant in a greenhouse:</strong></p>
+            <ul>
+                <li>🌱 The greenhouse (container) takes care of watering, temperature, light</li>
+                <li>🏭 You don't manually water each plant - the system does it</li>
+                <li>📦 Beans are objects that the container manages for you</li>
+                <li>♻️ Container handles their lifecycle, dependencies, and resources</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>A Bean</strong> is simply a Java object that is managed by a container (CDI container, EJB container, etc.). The container creates it, injects dependencies, manages its lifecycle, and destroys it.</p>
+                <p><strong>Key Point:</strong> You don't create beans with 'new' - the container does it for you!</p>
+            </div>
+
+            <h3>Regular Object vs Bean</h3>
+            <pre><code><span class="comment">// Regular Object - You manage everything</span>
+<span class="keyword">public class</span> <span class="class-name">RegularClass</span> {
+    <span class="keyword">private</span> <span class="class-name">Database</span> db = <span class="keyword">new</span> <span class="class-name">Database</span>();  <span class="comment">// Manual creation</span>
+
+    <span class="keyword">public</span> <span class="function">RegularClass</span>() {
+        <span class="comment">// You handle initialization</span>
+    }
+
+    <span class="keyword">public void</span> <span class="function">cleanup</span>() {
+        db.close();  <span class="comment">// You handle cleanup</span>
+    }
+}
+
+<span class="class-name">RegularClass</span> obj = <span class="keyword">new</span> <span class="class-name">RegularClass</span>();  <span class="comment">// You create it</span>
+obj.cleanup();  <span class="comment">// You clean it up</span>
+
+<span class="comment">// CDI Bean - Container manages everything</span>
+<span class="annotation">@ApplicationScoped</span>  <span class="comment">// This makes it a bean!</span>
+<span class="keyword">public class</span> <span class="class-name">ManagedBean</span> {
+    <span class="annotation">@Inject</span>  <span class="comment">// Container injects dependencies</span>
+    <span class="keyword">private</span> <span class="class-name">Database</span> db;
+
+    <span class="annotation">@PostConstruct</span>  <span class="comment">// Container calls after creation</span>
+    <span class="keyword">public void</span> <span class="function">init</span>() {
+        <span class="comment">// Automatic initialization</span>
+    }
+
+    <span class="annotation">@PreDestroy</span>  <span class="comment">// Container calls before destruction</span>
+    <span class="keyword">public void</span> <span class="function">cleanup</span>() {
+        <span class="comment">// Automatic cleanup</span>
+    }
+}
+
+<span class="comment">// You just inject it - container creates/manages it</span>
+<span class="annotation">@Inject</span>
+<span class="keyword">private</span> <span class="class-name">ManagedBean</span> bean;  <span class="comment">// Container provides it</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Types of Beans in Jakarta EE</h2>
+
+            <h3>1. CDI Beans (Managed Beans)</h3>
+            <p><strong>Most common type - any POJO with a scope annotation</strong></p>
+            <pre><code><span class="annotation">@RequestScoped</span>  <span class="comment">// Scope makes it a CDI bean</span>
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">UserRepository</span> repository;
+
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> repository.find(id);
+    }
+}</code></pre>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+                <li>✅ Managed by CDI container</li>
+                <li>✅ Supports @Inject for dependency injection</li>
+                <li>✅ Lifecycle callbacks (@PostConstruct, @PreDestroy)</li>
+                <li>✅ Scopes (@RequestScoped, @SessionScoped, @ApplicationScoped, etc.)</li>
+                <li>✅ Events and interceptors</li>
+            </ul>
+
+            <h3>2. Enterprise JavaBeans (EJB)</h3>
+            <p><strong>Server-side components with extra features</strong></p>
+            <pre><code><span class="annotation">@Stateless</span>  <span class="comment">// EJB annotation</span>
+<span class="keyword">public class</span> <span class="class-name">PaymentService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentGateway</span> gateway;
+
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRED)
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">Order</span> order) {
+        gateway.charge(order.getTotal());
+    }
+}</code></pre>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+                <li>✅ Everything CDI beans have</li>
+                <li>✅ <strong>Plus:</strong> Transaction management (@TransactionAttribute)</li>
+                <li>✅ <strong>Plus:</strong> Security (@RolesAllowed)</li>
+                <li>✅ <strong>Plus:</strong> Asynchronous methods (@Asynchronous)</li>
+                <li>✅ <strong>Plus:</strong> Scheduled tasks (@Schedule)</li>
+                <li>✅ <strong>Plus:</strong> Remote access (can be called from other JVMs)</li>
+            </ul>
+
+            <h3>3. JPA Entities</h3>
+            <p><strong>Represent database tables</strong></p>
+            <pre><code><span class="annotation">@Entity</span>  <span class="comment">// JPA annotation</span>
+<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> username;
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+
+    <span class="comment">// Getters/setters</span>
+}</code></pre>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+                <li>✅ Managed by JPA (persistence provider like Hibernate)</li>
+                <li>✅ Maps to database tables</li>
+                <li>✅ Automatic CRUD operations</li>
+                <li>✅ Relationships (@OneToMany, @ManyToOne, etc.)</li>
+                <li>❌ NOT CDI beans (unless you add a scope annotation)</li>
+            </ul>
+
+            <h3>4. JSF Managed Beans</h3>
+            <p><strong>Backing beans for JSF views (older style)</strong></p>
+            <pre><code><span class="annotation">@Named</span>  <span class="comment">// Makes it accessible from JSF views</span>
+<span class="annotation">@ViewScoped</span>
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> username;
+    <span class="keyword">private</span> <span class="class-name">String</span> password;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">AuthService</span> authService;
+
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">login</span>() {
+        <span class="keyword">if</span> (authService.authenticate(username, password)) {
+            <span class="keyword">return</span> <span class="string">"dashboard?faces-redirect=true"</span>;
+        }
+        <span class="keyword">return</span> <span class="keyword">null</span>;
+    }
+
+    <span class="comment">// Getters/setters for view binding</span>
+}</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Bean Type</th>
+                        <th>Annotation</th>
+                        <th>Container</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>CDI Bean</strong></td>
+                        <td>@RequestScoped, @ApplicationScoped</td>
+                        <td>CDI</td>
+                        <td>General business logic</td>
+                    </tr>
+                    <tr>
+                        <td><strong>EJB</strong></td>
+                        <td>@Stateless, @Stateful</td>
+                        <td>EJB + CDI</td>
+                        <td>Transactions, security, timers</td>
+                    </tr>
+                    <tr>
+                        <td><strong>JPA Entity</strong></td>
+                        <td>@Entity</td>
+                        <td>JPA</td>
+                        <td>Database mapping</td>
+                    </tr>
+                    <tr>
+                        <td><strong>JSF Bean</strong></td>
+                        <td>@Named + scope</td>
+                        <td>CDI</td>
+                        <td>JSF view backing beans</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Bean Lifecycle</h2>
+
+            <h3>CDI Bean Lifecycle</h3>
+            <pre><code>1. Container scans for beans (at startup)
+   ↓
+2. User requests bean (via @Inject or direct access)
+   ↓
+3. Container creates instance (calls constructor)
+   ↓
+4. Container injects dependencies (@Inject fields/setters)
+   ↓
+5. Container calls @PostConstruct method
+   ↓
+6. Bean is ready to use
+   ↓
+   ... bean is used by application ...
+   ↓
+7. Scope ends (request ends, session expires, app shuts down)
+   ↓
+8. Container calls @PreDestroy method
+   ↓
+9. Bean is destroyed and garbage collected</code></pre>
+
+            <h3>Complete Lifecycle Example</h3>
+            <pre><code><span class="annotation">@RequestScoped</span>
+<span class="keyword">public class</span> <span class="class-name">LifecycleDemo</span> {
+
+    <span class="comment">// 1. Constructor called</span>
+    <span class="keyword">public</span> <span class="function">LifecycleDemo</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"1. Constructor called"</span>);
+    }
+
+    <span class="comment">// 2. Dependency injected after construction</span>
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">Database</span> database;
+
+    <span class="comment">// 3. Called after injection is complete</span>
+    <span class="annotation">@PostConstruct</span>
+    <span class="keyword">public void</span> <span class="function">init</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"2. @PostConstruct - database is now available"</span>);
+        <span class="comment">// Safe to use injected dependencies here</span>
+        database.connect();
+    }
+
+    <span class="comment">// 4. Business methods can now be called</span>
+    <span class="keyword">public void</span> <span class="function">doWork</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"3. Doing work with database"</span>);
+        database.query(<span class="string">"SELECT * FROM users"</span>);
+    }
+
+    <span class="comment">// 5. Called before bean is destroyed</span>
+    <span class="annotation">@PreDestroy</span>
+    <span class="keyword">public void</span> <span class="function">cleanup</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"4. @PreDestroy - cleaning up"</span>);
+        database.disconnect();
+    }
+}</code></pre>
+
+            <p><strong>Output during a request:</strong></p>
+            <pre><code>1. Constructor called
+2. @PostConstruct - database is now available
+3. Doing work with database
+4. @PreDestroy - cleaning up</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>How to Make a Class a Bean</h2>
+
+            <h3>Option 1: Add a Scope Annotation (Most Common)</h3>
+            <pre><code><span class="annotation">@RequestScoped</span>  <span class="comment">// Now it's a CDI bean!</span>
+<span class="keyword">public class</span> <span class="class-name">MyService</span> {
+    <span class="comment">// Bean code</span>
+}</code></pre>
+
+            <h3>Option 2: Add @Named (For JSF Access)</h3>
+            <pre><code><span class="annotation">@Named</span>  <span class="comment">// Accessible from JSF with #{myController}</span>
+<span class="annotation">@RequestScoped</span>
+<span class="keyword">public class</span> <span class="class-name">MyController</span> {
+    <span class="comment">// Bean code</span>
+}</code></pre>
+
+            <h3>Option 3: Just Use It (Implicit Bean)</h3>
+            <pre><code><span class="comment">// No annotations needed if it has @Inject</span>
+<span class="keyword">public class</span> <span class="class-name">SimpleService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">Database</span> db;  <span class="comment">// Makes it a @Dependent bean</span>
+
+    <span class="keyword">public void</span> <span class="function">doSomething</span>() { }
+}</code></pre>
+
+            <h3>What Makes a Class NOT a Bean?</h3>
+            <pre><code><span class="comment">// ❌ Regular POJO - not a bean</span>
+<span class="keyword">public class</span> <span class="class-name">RegularClass</span> {
+    <span class="comment">// No scope, no @Inject, no EJB annotation</span>
+    <span class="keyword">public void</span> <span class="function">doSomething</span>() { }
+}
+
+<span class="comment">// Created manually</span>
+<span class="class-name">RegularClass</span> obj = <span class="keyword">new</span> <span class="class-name">RegularClass</span>();  <span class="comment">// Not managed</span>
+
+<span class="comment">// ❌ Entity alone - not a CDI bean</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+    <span class="comment">// JPA entity, but not a CDI bean unless you add a scope</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Bean Discovery Modes</h2>
+            <p><strong>Configuration in beans.xml:</strong></p>
+
+            <h3>1. bean-discovery-mode="all" (Default in older versions)</h3>
+            <pre><code><span class="tag">&lt;beans</span> <span class="attribute">xmlns</span>=<span class="string">"https://jakarta.ee/xml/ns/jakartaee"</span>
+       <span class="attribute">version</span>=<span class="string">"4.0"</span>
+       <span class="attribute">bean-discovery-mode</span>=<span class="string">"all"</span><span class="tag">&gt;</span>
+    <span class="comment">&lt;!-- All classes become beans --&gt;</span>
+<span class="tag">&lt;/beans&gt;</span></code></pre>
+            <p>All classes in the archive are CDI beans (even without annotations)</p>
+
+            <h3>2. bean-discovery-mode="annotated" (Recommended)</h3>
+            <pre><code><span class="tag">&lt;beans</span> <span class="attribute">xmlns</span>=<span class="string">"https://jakarta.ee/xml/ns/jakartaee"</span>
+       <span class="attribute">version</span>=<span class="string">"4.0"</span>
+       <span class="attribute">bean-discovery-mode</span>=<span class="string">"annotated"</span><span class="tag">&gt;</span>
+    <span class="comment">&lt;!-- Only annotated classes become beans --&gt;</span>
+<span class="tag">&lt;/beans&gt;</span></code></pre>
+            <p>Only classes with bean-defining annotations become beans (more performant)</p>
+
+            <h3>3. bean-discovery-mode="none"</h3>
+            <pre><code><span class="tag">&lt;beans</span> <span class="attribute">xmlns</span>=<span class="string">"https://jakarta.ee/xml/ns/jakartaee"</span>
+       <span class="attribute">version</span>=<span class="string">"4.0"</span>
+       <span class="attribute">bean-discovery-mode</span>=<span class="string">"none"</span><span class="tag">&gt;</span>
+    <span class="comment">&lt;!-- No automatic bean discovery --&gt;</span>
+<span class="tag">&lt;/beans&gt;</span></code></pre>
+            <p>CDI disabled for this archive (unless explicitly configured)</p>
+        </section>
+
+        <section class="content-section">
+            <h2>Proxies - How CDI Works Behind the Scenes</h2>
+            <p><strong>CDI doesn't inject actual objects - it injects proxies!</strong></p>
+
+            <pre><code><span class="annotation">@RequestScoped</span>
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getUser</span>() {
+        <span class="keyword">return</span> <span class="keyword">new</span> <span class="class-name">User</span>(<span class="string">"Alice"</span>);
+    }
+}
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">MyBean</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">UserService</span> userService;  <span class="comment">// This is a PROXY, not the real object!</span>
+}</code></pre>
+
+            <p><strong>Why proxies?</strong></p>
+            <ul>
+                <li>✅ @ApplicationScoped bean lives long, but @RequestScoped bean changes per request</li>
+                <li>✅ Proxy forwards calls to the correct instance based on current context</li>
+                <li>✅ Enables scope mismatches to work correctly</li>
+                <li>✅ Allows interception and AOP</li>
+            </ul>
+
+            <h3>Proxy Requirements</h3>
+            <ul>
+                <li>✅ Class must not be final</li>
+                <li>✅ Methods must not be final</li>
+                <li>✅ Must have a no-arg constructor (can be private)</li>
+                <li>❌ Abstract classes can't be proxied</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>✅ DO:</h3>
+                <ul>
+                    <li><strong>Use CDI beans for business logic</strong> - Default choice</li>
+                    <li><strong>Use EJBs only when needed</strong> - For transactions, security, timers</li>
+                    <li><strong>Keep entities simple</strong> - No business logic in JPA entities</li>
+                    <li><strong>Choose the right scope</strong> - @RequestScoped for most cases</li>
+                    <li><strong>Use @PostConstruct for initialization</strong> - Dependencies are ready</li>
+                    <li><strong>Make beans serializable if needed</strong> - Required for @SessionScoped</li>
+                    <li><strong>Use bean-discovery-mode="annotated"</strong> - Better performance</li>
+                </ul>
+
+                <h3>❌ DON'T:</h3>
+                <ul>
+                    <li><strong>Don't create beans with 'new'</strong> - Let the container manage them</li>
+                    <li><strong>Don't make beans final</strong> - CDI needs to create proxies</li>
+                    <li><strong>Don't put business logic in entities</strong> - Separate concerns</li>
+                    <li><strong>Don't initialize in constructor</strong> - Injected fields aren't ready yet</li>
+                    <li><strong>Don't store heavy objects in @SessionScoped</strong> - Memory issues</li>
+                    <li><strong>Don't inject narrow scopes into wide scopes</strong> - Use Provider instead</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Bean</strong> = Java object managed by a container</li>
+                    <li><strong>CDI Beans:</strong> General-purpose, @Inject support, lifecycle management</li>
+                    <li><strong>EJBs:</strong> CDI beans + transactions, security, async, timers</li>
+                    <li><strong>JPA Entities:</strong> Database mapping (not CDI beans unless scoped)</li>
+                    <li><strong>JSF Beans:</strong> View backing beans with @Named</li>
+                    <li><strong>Lifecycle:</strong> Constructor → Injection → @PostConstruct → Use → @PreDestroy → Destroy</li>
+                    <li><strong>Scopes control:</strong> How long beans live and how many instances exist</li>
+                    <li><strong>Proxies:</strong> CDI uses proxies to enable context awareness</li>
+                    <li><strong>No 'new' keyword:</strong> Container creates and manages beans</li>
+                    <li><strong>Benefits:</strong> Automatic lifecycle, dependency injection, loose coupling</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="cdi.html" class="related-link">CDI (Dependency Injection)</a>
+                <a href="ejb.html" class="related-link">EJB (Enterprise JavaBeans)</a>
+                <a href="jpa.html" class="related-link">JPA (Persistence)</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

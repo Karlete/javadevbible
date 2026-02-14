@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design Patterns - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / Design Patterns
+            </nav>
+            <h1>Design Patterns</h1>
+            <p class="topic-subtitle">Proven Solutions to Common Programming Problems</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+
+            <section class="content-section">
+                <h2>What Are Design Patterns?</h2>
+                <p><strong>Think of design patterns like IKEA furniture instructions:</strong></p>
+                <ul>
+                    <li>🪑 You don't reinvent how to build a chair - you follow a proven design</li>
+                    <li>📘 Patterns are reusable solutions that experienced developers have refined</li>
+                    <li>🗣️ They provide a common language: "Use a Singleton" instantly communicates the approach</li>
+                </ul>
+
+                <div class="info-box">
+                    <p><strong>What Is a Design Pattern?</strong></p>
+                    <p>A design pattern is a <strong>general reusable solution</strong> to a commonly occurring problem in software design. It's not finished code you can copy-paste, but a <strong>template</strong> for how to solve a problem.</p>
+                    <p><strong>Origin:</strong> The "Gang of Four" (GoF) published 23 classic patterns in 1994 that are still widely used today.</p>
+                </div>
+
+                <h3>Three Categories of Patterns</h3>
+                <ol>
+                    <li><strong>Creational Patterns:</strong> How to create objects (Singleton, Factory, Builder)</li>
+                    <li><strong>Structural Patterns:</strong> How to compose objects (Adapter, Decorator, Facade)</li>
+                    <li><strong>Behavioral Patterns:</strong> How objects interact (Observer, Strategy, Command)</li>
+                </ol>
+            </section>
+
+            <section class="content-section">
+                <h2>Creational Patterns</h2>
+
+                <h3>1. Singleton Pattern - "Only One Instance"</h3>
+                <p><strong>Analogy:</strong> A country has only ONE president at a time. No matter how many times you ask "Who's the president?", you get the same person.</p>
+
+                <p><strong>Problem:</strong> You need exactly one instance of a class (e.g., database connection, configuration manager).</p>
+
+                <div class="code-block">
+                    <pre><code>// Thread-safe Singleton
+public class Database {
+    // 1. Private static instance
+    private static Database instance;
+
+    // 2. Private constructor (can't create with 'new')
+    private Database() {
+        System.out.println("Database connection created!");
+    }
+
+    // 3. Public static method to get instance
+    public static synchronized Database getInstance() {
+        if (instance == null) {
+            instance = new Database();
+        }
+        return instance;
+    }
+
+    public void query(String sql) {
+        System.out.println("Executing: " + sql);
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        Database db1 = Database.getInstance();  // Creates instance
+        Database db2 = Database.getInstance();  // Returns same instance
+
+        System.out.println(db1 == db2);  // true - Same object!
+
+        db1.query("SELECT * FROM users");
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Output:</strong></p>
+                <div class="code-block">
+                    <pre><code>Database connection created!
+true
+Executing: SELECT * FROM users</code></pre>
+                </div>
+
+                <p><strong>Better approach (modern Java):</strong></p>
+                <div class="code-block">
+                    <pre><code>// Enum Singleton - Best practice!
+public enum Database {
+    INSTANCE;  // Only one instance, thread-safe automatically
+
+    public void query(String sql) {
+        System.out.println("Executing: " + sql);
+    }
+}
+
+// Usage
+Database.INSTANCE.query("SELECT * FROM users");</code></pre>
+                </div>
+
+                <h3>2. Factory Pattern - "Let a Factory Create Objects"</h3>
+                <p><strong>Analogy:</strong> You go to a car dealership and say "I want an SUV." The dealer handles which specific model to give you.</p>
+
+                <p><strong>Problem:</strong> You need to create objects but don't know the exact class until runtime.</p>
+
+                <div class="code-block">
+                    <pre><code>// Product interface
+interface Animal {
+    void speak();
+}
+
+// Concrete products
+class Dog implements Animal {
+    @Override
+    public void speak() {
+        System.out.println("Woof!");
+    }
+}
+
+class Cat implements Animal {
+    @Override
+    public void speak() {
+        System.out.println("Meow!");
+    }
+}
+
+class Bird implements Animal {
+    @Override
+    public void speak() {
+        System.out.println("Chirp!");
+    }
+}
+
+// Factory class
+class AnimalFactory {
+    public static Animal createAnimal(String type) {
+        switch (type.toLowerCase()) {
+            case "dog":
+                return new Dog();
+            case "cat":
+                return new Cat();
+            case "bird":
+                return new Bird();
+            default:
+                throw new IllegalArgumentException("Unknown animal: " + type);
+        }
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        Animal pet1 = AnimalFactory.createAnimal("dog");
+        Animal pet2 = AnimalFactory.createAnimal("cat");
+
+        pet1.speak();  // Woof!
+        pet2.speak();  // Meow!
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Why use it?</strong> Client code doesn't need to know about Dog, Cat, or Bird classes. Just ask the factory!</p>
+
+                <h3>3. Builder Pattern - "Build Complex Objects Step-by-Step"</h3>
+                <p><strong>Analogy:</strong> Ordering a custom pizza: "Large, thin crust, extra cheese, pepperoni, olives, no mushrooms."</p>
+
+                <p><strong>Problem:</strong> Constructors with many parameters are hard to read and maintain.</p>
+
+                <div class="code-block">
+                    <pre><code>// Without Builder (ugly!)
+User user = new User("Alice", "alice@example.com", 25, "123 Main St", "555-1234", true);
+
+// With Builder (clean!)
+User user = new User.Builder()
+    .name("Alice")
+    .email("alice@example.com")
+    .age(25)
+    .address("123 Main St")
+    .phone("555-1234")
+    .premium(true)
+    .build();</code></pre>
+                </div>
+
+                <p><strong>Implementation:</strong></p>
+                <div class="code-block">
+                    <pre><code>public class User {
+    // Final fields (immutable)
+    private final String name;
+    private final String email;
+    private final int age;
+    private final String address;
+    private final String phone;
+    private final boolean premium;
+
+    // Private constructor
+    private User(Builder builder) {
+        this.name = builder.name;
+        this.email = builder.email;
+        this.age = builder.age;
+        this.address = builder.address;
+        this.phone = builder.phone;
+        this.premium = builder.premium;
+    }
+
+    // Static nested Builder class
+    public static class Builder {
+        // Required parameters
+        private final String name;
+        private final String email;
+
+        // Optional parameters with defaults
+        private int age = 0;
+        private String address = "";
+        private String phone = "";
+        private boolean premium = false;
+
+        public Builder(String name, String email) {
+            this.name = name;
+            this.email = email;
+        }
+
+        public Builder age(int age) {
+            this.age = age;
+            return this;  // Return this for chaining
+        }
+
+        public Builder address(String address) {
+            this.address = address;
+            return this;
+        }
+
+        public Builder phone(String phone) {
+            this.phone = phone;
+            return this;
+        }
+
+        public Builder premium(boolean premium) {
+            this.premium = premium;
+            return this;
+        }
+
+        public User build() {
+            return new User(this);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "User{name='" + name + "', email='" + email + "', age=" + age +
+               ", premium=" + premium + "}";
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        // Only required fields
+        User user1 = new User.Builder("Bob", "bob@example.com")
+            .build();
+
+        // All fields
+        User user2 = new User.Builder("Alice", "alice@example.com")
+            .age(25)
+            .address("123 Main St")
+            .phone("555-1234")
+            .premium(true)
+            .build();
+
+        System.out.println(user1);
+        System.out.println(user2);
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Output:</strong></p>
+                <div class="code-block">
+                    <pre><code>User{name='Bob', email='bob@example.com', age=0, premium=false}
+User{name='Alice', email='alice@example.com', age=25, premium=true}</code></pre>
+                </div>
+
+                <p><strong>Benefits:</strong> Readable, flexible, immutable objects, optional parameters</p>
+            </section>
+
+            <section class="content-section">
+                <h2>Structural Patterns</h2>
+
+                <h3>4. Adapter Pattern - "Make Incompatible Interfaces Work Together"</h3>
+                <p><strong>Analogy:</strong> A power adapter lets you plug a US device into a European outlet. The adapter translates between them.</p>
+
+                <p><strong>Problem:</strong> You have an existing class with an interface that doesn't match what you need.</p>
+
+                <div class="code-block">
+                    <pre><code>// Old system (incompatible interface)
+class OldPrinter {
+    public void printOldFormat(String text) {
+        System.out.println("[OLD FORMAT] " + text);
+    }
+}
+
+// New system expects this interface
+interface ModernPrinter {
+    void print(String text);
+}
+
+// Adapter makes OldPrinter work as ModernPrinter
+class PrinterAdapter implements ModernPrinter {
+    private OldPrinter oldPrinter;
+
+    public PrinterAdapter(OldPrinter oldPrinter) {
+        this.oldPrinter = oldPrinter;
+    }
+
+    @Override
+    public void print(String text) {
+        // Translate new interface to old interface
+        oldPrinter.printOldFormat(text);
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        // Old printer with old interface
+        OldPrinter oldPrinter = new OldPrinter();
+
+        // Wrap it in adapter to use as ModernPrinter
+        ModernPrinter printer = new PrinterAdapter(oldPrinter);
+
+        printer.print("Hello World");  // Uses old printer via adapter
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Output:</strong></p>
+                <div class="code-block">
+                    <pre><code>[OLD FORMAT] Hello World</code></pre>
+                </div>
+
+                <h3>5. Decorator Pattern - "Add Features Dynamically"</h3>
+                <p><strong>Analogy:</strong> Basic coffee costs $2. Add milk (+$0.50), then whipped cream (+$0.70), then caramel (+$0.60). Each addition "decorates" the base coffee.</p>
+
+                <p><strong>Problem:</strong> You want to add responsibilities to objects without subclassing.</p>
+
+                <div class="code-block">
+                    <pre><code>// Component interface
+interface Coffee {
+    String getDescription();
+    double getCost();
+}
+
+// Concrete component
+class SimpleCoffee implements Coffee {
+    @Override
+    public String getDescription() {
+        return "Simple Coffee";
+    }
+
+    @Override
+    public double getCost() {
+        return 2.0;
+    }
+}
+
+// Decorator base class
+abstract class CoffeeDecorator implements Coffee {
+    protected Coffee coffee;
+
+    public CoffeeDecorator(Coffee coffee) {
+        this.coffee = coffee;
+    }
+
+    @Override
+    public String getDescription() {
+        return coffee.getDescription();
+    }
+
+    @Override
+    public double getCost() {
+        return coffee.getCost();
+    }
+}
+
+// Concrete decorators
+class MilkDecorator extends CoffeeDecorator {
+    public MilkDecorator(Coffee coffee) {
+        super(coffee);
+    }
+
+    @Override
+    public String getDescription() {
+        return coffee.getDescription() + ", Milk";
+    }
+
+    @Override
+    public double getCost() {
+        return coffee.getCost() + 0.5;
+    }
+}
+
+class WhippedCreamDecorator extends CoffeeDecorator {
+    public WhippedCreamDecorator(Coffee coffee) {
+        super(coffee);
+    }
+
+    @Override
+    public String getDescription() {
+        return coffee.getDescription() + ", Whipped Cream";
+    }
+
+    @Override
+    public double getCost() {
+        return coffee.getCost() + 0.7;
+    }
+}
+
+class CaramelDecorator extends CoffeeDecorator {
+    public CaramelDecorator(Coffee coffee) {
+        super(coffee);
+    }
+
+    @Override
+    public String getDescription() {
+        return coffee.getDescription() + ", Caramel";
+    }
+
+    @Override
+    public double getCost() {
+        return coffee.getCost() + 0.6;
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        // Start with simple coffee
+        Coffee coffee = new SimpleCoffee();
+        System.out.println(coffee.getDescription() + " - $" + coffee.getCost());
+
+        // Add milk
+        coffee = new MilkDecorator(coffee);
+        System.out.println(coffee.getDescription() + " - $" + coffee.getCost());
+
+        // Add whipped cream
+        coffee = new WhippedCreamDecorator(coffee);
+        System.out.println(coffee.getDescription() + " - $" + coffee.getCost());
+
+        // Add caramel
+        coffee = new CaramelDecorator(coffee);
+        System.out.println(coffee.getDescription() + " - $" + coffee.getCost());
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Output:</strong></p>
+                <div class="code-block">
+                    <pre><code>Simple Coffee - $2.0
+Simple Coffee, Milk - $2.5
+Simple Coffee, Milk, Whipped Cream - $3.2
+Simple Coffee, Milk, Whipped Cream, Caramel - $3.8</code></pre>
+                </div>
+
+                <p><strong>Benefits:</strong> Add features dynamically, combine features flexibly, avoid class explosion</p>
+
+                <h3>6. Facade Pattern - "Provide a Simple Interface"</h3>
+                <p><strong>Analogy:</strong> A TV remote control hides the complexity of the TV's internal circuits. One "Power" button does many things behind the scenes.</p>
+
+                <p><strong>Problem:</strong> A complex subsystem is hard to use. Provide a simpler interface.</p>
+
+                <div class="code-block">
+                    <pre><code>// Complex subsystem
+class CPU {
+    public void freeze() { System.out.println("CPU: Freezing..."); }
+    public void jump(long position) { System.out.println("CPU: Jumping to " + position); }
+    public void execute() { System.out.println("CPU: Executing..."); }
+}
+
+class Memory {
+    public void load(long position, byte[] data) {
+        System.out.println("Memory: Loading data at " + position);
+    }
+}
+
+class HardDrive {
+    public byte[] read(long lba, int size) {
+        System.out.println("HardDrive: Reading " + size + " bytes from " + lba);
+        return new byte[size];
+    }
+}
+
+// Facade - Simple interface
+class ComputerFacade {
+    private CPU cpu;
+    private Memory memory;
+    private HardDrive hardDrive;
+
+    public ComputerFacade() {
+        this.cpu = new CPU();
+        this.memory = new Memory();
+        this.hardDrive = new HardDrive();
+    }
+
+    public void start() {
+        System.out.println("Starting computer...");
+        cpu.freeze();
+        memory.load(0, hardDrive.read(0, 1024));
+        cpu.jump(0);
+        cpu.execute();
+        System.out.println("Computer started!");
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        // Without Facade - complex!
+        CPU cpu = new CPU();
+        Memory memory = new Memory();
+        HardDrive hardDrive = new HardDrive();
+        cpu.freeze();
+        memory.load(0, hardDrive.read(0, 1024));
+        cpu.jump(0);
+        cpu.execute();
+
+        System.out.println("---");
+
+        // With Facade - simple!
+        ComputerFacade computer = new ComputerFacade();
+        computer.start();  // One method does everything!
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Output:</strong></p>
+                <div class="code-block">
+                    <pre><code>CPU: Freezing...
+Memory: Loading data at 0
+HardDrive: Reading 1024 bytes from 0
+CPU: Jumping to 0
+CPU: Executing...
+---
+Starting computer...
+CPU: Freezing...
+HardDrive: Reading 1024 bytes from 0
+Memory: Loading data at 0
+CPU: Jumping to 0
+CPU: Executing...
+Computer started!</code></pre>
+                </div>
+            </section>
+
+            <section class="content-section">
+                <h2>Behavioral Patterns</h2>
+
+                <h3>7. Observer Pattern - "Subscribe to Events"</h3>
+                <p><strong>Analogy:</strong> YouTube subscriptions. When a channel posts a video, all subscribers get notified automatically.</p>
+
+                <p><strong>Problem:</strong> When one object changes state, multiple other objects need to be notified.</p>
+
+                <div class="code-block">
+                    <pre><code>import java.util.*;
+
+// Observer interface
+interface Observer {
+    void update(String message);
+}
+
+// Subject (Observable)
+class Channel {
+    private List<Observer> subscribers = new ArrayList<>();
+    private String channelName;
+
+    public Channel(String name) {
+        this.channelName = name;
+    }
+
+    // Subscribe
+    public void subscribe(Observer observer) {
+        subscribers.add(observer);
+        System.out.println("New subscriber!");
+    }
+
+    // Unsubscribe
+    public void unsubscribe(Observer observer) {
+        subscribers.remove(observer);
+        System.out.println("Unsubscribed!");
+    }
+
+    // Notify all observers
+    public void uploadVideo(String videoTitle) {
+        System.out.println(channelName + " uploaded: " + videoTitle);
+        notifyObservers("New video: " + videoTitle);
+    }
+
+    private void notifyObservers(String message) {
+        for (Observer observer : subscribers) {
+            observer.update(message);
+        }
+    }
+}
+
+// Concrete observer
+class Subscriber implements Observer {
+    private String name;
+
+    public Subscriber(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public void update(String message) {
+        System.out.println(name + " received notification: " + message);
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        Channel javaChannel = new Channel("JavaMaster");
+
+        // Create subscribers
+        Subscriber alice = new Subscriber("Alice");
+        Subscriber bob = new Subscriber("Bob");
+        Subscriber charlie = new Subscriber("Charlie");
+
+        // Subscribe
+        javaChannel.subscribe(alice);
+        javaChannel.subscribe(bob);
+        javaChannel.subscribe(charlie);
+
+        System.out.println("---");
+
+        // Upload video - all subscribers notified
+        javaChannel.uploadVideo("Design Patterns Explained");
+
+        System.out.println("---");
+
+        // Bob unsubscribes
+        javaChannel.unsubscribe(bob);
+
+        // Upload another video - only Alice and Charlie notified
+        javaChannel.uploadVideo("Advanced Java Tips");
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Output:</strong></p>
+                <div class="code-block">
+                    <pre><code>New subscriber!
+New subscriber!
+New subscriber!
+---
+JavaMaster uploaded: Design Patterns Explained
+Alice received notification: New video: Design Patterns Explained
+Bob received notification: New video: Design Patterns Explained
+Charlie received notification: New video: Design Patterns Explained
+---
+Unsubscribed!
+JavaMaster uploaded: Advanced Java Tips
+Alice received notification: New video: Advanced Java Tips
+Charlie received notification: New video: Advanced Java Tips</code></pre>
+                </div>
+
+                <h3>8. Strategy Pattern - "Choose Algorithm at Runtime"</h3>
+                <p><strong>Analogy:</strong> Navigation app lets you choose: fastest route, shortest route, or scenic route. Same destination, different strategies.</p>
+
+                <p><strong>Problem:</strong> You have multiple ways to do something and want to switch between them easily.</p>
+
+                <div class="code-block">
+                    <pre><code>// Strategy interface
+interface PaymentStrategy {
+    void pay(double amount);
+}
+
+// Concrete strategies
+class CreditCardPayment implements PaymentStrategy {
+    private String cardNumber;
+
+    public CreditCardPayment(String cardNumber) {
+        this.cardNumber = cardNumber;
+    }
+
+    @Override
+    public void pay(double amount) {
+        System.out.println("Paid $" + amount + " using Credit Card " + cardNumber);
+    }
+}
+
+class PayPalPayment implements PaymentStrategy {
+    private String email;
+
+    public PayPalPayment(String email) {
+        this.email = email;
+    }
+
+    @Override
+    public void pay(double amount) {
+        System.out.println("Paid $" + amount + " using PayPal account " + email);
+    }
+}
+
+class CryptoPayment implements PaymentStrategy {
+    private String walletAddress;
+
+    public CryptoPayment(String walletAddress) {
+        this.walletAddress = walletAddress;
+    }
+
+    @Override
+    public void pay(double amount) {
+        System.out.println("Paid $" + amount + " using Crypto wallet " + walletAddress);
+    }
+}
+
+// Context
+class ShoppingCart {
+    private PaymentStrategy paymentStrategy;
+
+    public void setPaymentStrategy(PaymentStrategy strategy) {
+        this.paymentStrategy = strategy;
+    }
+
+    public void checkout(double amount) {
+        if (paymentStrategy == null) {
+            System.out.println("Please select a payment method!");
+            return;
+        }
+        paymentStrategy.pay(amount);
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        ShoppingCart cart = new ShoppingCart();
+
+        // Pay with credit card
+        cart.setPaymentStrategy(new CreditCardPayment("1234-5678-9012-3456"));
+        cart.checkout(100.50);
+
+        // Switch to PayPal
+        cart.setPaymentStrategy(new PayPalPayment("user@example.com"));
+        cart.checkout(75.25);
+
+        // Switch to Crypto
+        cart.setPaymentStrategy(new CryptoPayment("0x1234abcd"));
+        cart.checkout(200.00);
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Output:</strong></p>
+                <div class="code-block">
+                    <pre><code>Paid $100.5 using Credit Card 1234-5678-9012-3456
+Paid $75.25 using PayPal account user@example.com
+Paid $200.0 using Crypto wallet 0x1234abcd</code></pre>
+                </div>
+
+                <p><strong>Benefits:</strong> Easy to add new strategies, switch at runtime, clean separation of algorithms</p>
+
+                <h3>9. Command Pattern - "Encapsulate Requests as Objects"</h3>
+                <p><strong>Analogy:</strong> Remote control buttons. Each button encapsulates a command: "turn on TV", "change channel", etc. You can also undo commands.</p>
+
+                <p><strong>Problem:</strong> You want to parameterize objects with operations, queue operations, or support undo.</p>
+
+                <div class="code-block">
+                    <pre><code>// Command interface
+interface Command {
+    void execute();
+    void undo();
+}
+
+// Receiver
+class Light {
+    private boolean isOn = false;
+
+    public void turnOn() {
+        isOn = true;
+        System.out.println("Light is ON");
+    }
+
+    public void turnOff() {
+        isOn = false;
+        System.out.println("Light is OFF");
+    }
+}
+
+// Concrete commands
+class TurnOnCommand implements Command {
+    private Light light;
+
+    public TurnOnCommand(Light light) {
+        this.light = light;
+    }
+
+    @Override
+    public void execute() {
+        light.turnOn();
+    }
+
+    @Override
+    public void undo() {
+        light.turnOff();
+    }
+}
+
+class TurnOffCommand implements Command {
+    private Light light;
+
+    public TurnOffCommand(Light light) {
+        this.light = light;
+    }
+
+    @Override
+    public void execute() {
+        light.turnOff();
+    }
+
+    @Override
+    public void undo() {
+        light.turnOn();
+    }
+}
+
+// Invoker
+class RemoteControl {
+    private Command command;
+    private Command lastCommand;
+
+    public void setCommand(Command command) {
+        this.command = command;
+    }
+
+    public void pressButton() {
+        command.execute();
+        lastCommand = command;
+    }
+
+    public void pressUndo() {
+        if (lastCommand != null) {
+            System.out.print("Undo: ");
+            lastCommand.undo();
+        }
+    }
+}
+
+// Usage
+public class Main {
+    public static void main(String[] args) {
+        Light livingRoomLight = new Light();
+
+        Command turnOn = new TurnOnCommand(livingRoomLight);
+        Command turnOff = new TurnOffCommand(livingRoomLight);
+
+        RemoteControl remote = new RemoteControl();
+
+        // Turn on
+        remote.setCommand(turnOn);
+        remote.pressButton();
+
+        // Turn off
+        remote.setCommand(turnOff);
+        remote.pressButton();
+
+        // Undo (turns back on)
+        remote.pressUndo();
+    }
+}</code></pre>
+                </div>
+
+                <p><strong>Output:</strong></p>
+                <div class="code-block">
+                    <pre><code>Light is ON
+Light is OFF
+Undo: Light is ON</code></pre>
+                </div>
+
+                <p><strong>Benefits:</strong> Decouple sender from receiver, support undo/redo, queue commands</p>
+            </section>
+
+            <section class="content-section">
+                <h2>Pattern Comparison</h2>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Pattern</th>
+                            <th>Purpose</th>
+                            <th>When to Use</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Singleton</strong></td>
+                            <td>One instance only</td>
+                            <td>Database connections, config</td>
+                            <td>Database.getInstance()</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Factory</strong></td>
+                            <td>Create objects without specifying exact class</td>
+                            <td>Multiple product types</td>
+                            <td>AnimalFactory.create("dog")</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Builder</strong></td>
+                            <td>Construct complex objects step-by-step</td>
+                            <td>Many optional parameters</td>
+                            <td>new User.Builder().name().email().build()</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Adapter</strong></td>
+                            <td>Make incompatible interfaces work</td>
+                            <td>Integrating old code</td>
+                            <td>new PrinterAdapter(oldPrinter)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Decorator</strong></td>
+                            <td>Add features dynamically</td>
+                            <td>Flexible feature combinations</td>
+                            <td>new MilkDecorator(coffee)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Facade</strong></td>
+                            <td>Simplify complex subsystem</td>
+                            <td>Complex APIs</td>
+                            <td>computer.start()</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Observer</strong></td>
+                            <td>Notify multiple objects of changes</td>
+                            <td>Event systems, subscriptions</td>
+                            <td>channel.subscribe(observer)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Strategy</strong></td>
+                            <td>Choose algorithm at runtime</td>
+                            <td>Multiple ways to do something</td>
+                            <td>cart.setPaymentStrategy(paypal)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Command</strong></td>
+                            <td>Encapsulate requests as objects</td>
+                            <td>Undo/redo, queue operations</td>
+                            <td>remote.setCommand(turnOn)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="content-section">
+                <h2>Anti-Patterns (What NOT to Do)</h2>
+                <p>Anti-patterns are common bad solutions that seem good at first but cause problems:</p>
+
+                <h3>1. God Object</h3>
+                <div class="code-block">
+                    <pre><code>// ❌ BAD: One class does EVERYTHING
+class Application {
+    public void connectDatabase() { }
+    public void validateUser() { }
+    public void sendEmail() { }
+    public void processPayment() { }
+    public void generateReport() { }
+    public void logErrors() { }
+    // ... 50 more methods
+}
+
+// ✅ GOOD: Separate responsibilities
+class DatabaseManager { }
+class UserValidator { }
+class EmailService { }
+class PaymentProcessor { }
+class ReportGenerator { }
+class Logger { }</code></pre>
+                </div>
+
+                <h3>2. Spaghetti Code</h3>
+                <div class="code-block">
+                    <pre><code>// ❌ BAD: Tangled, hard to follow
+if (user != null) {
+    if (user.isActive()) {
+        if (!user.isBlocked()) {
+            if (user.hasPermission("admin")) {
+                // do something
+            } else {
+                // do something else
+            }
+        }
+    }
+}
+
+// ✅ GOOD: Early returns, clear flow
+if (user == null) return;
+if (!user.isActive()) return;
+if (user.isBlocked()) return;
+if (!user.hasPermission("admin")) return;
+// do something</code></pre>
+                </div>
+
+                <h3>3. Copy-Paste Programming</h3>
+                <div class="code-block">
+                    <pre><code>// ❌ BAD: Duplicated code
+public void saveUser(User user) {
+    Connection conn = DriverManager.getConnection(url);
+    PreparedStatement stmt = conn.prepareStatement("INSERT INTO users...");
+    stmt.setString(1, user.getName());
+    stmt.execute();
+    stmt.close();
+    conn.close();
+}
+
+public void saveProduct(Product product) {
+    Connection conn = DriverManager.getConnection(url);  // Duplicate!
+    PreparedStatement stmt = conn.prepareStatement("INSERT INTO products...");
+    stmt.setString(1, product.getName());
+    stmt.execute();
+    stmt.close();
+    conn.close();
+}
+
+// ✅ GOOD: Reusable method
+public <T> void save(T entity, String sql, Consumer<PreparedStatement> setter) {
+    try (Connection conn = DriverManager.getConnection(url);
+         PreparedStatement stmt = conn.prepareStatement(sql)) {
+        setter.accept(stmt);
+        stmt.execute();
+    }
+}</code></pre>
+                </div>
+            </section>
+
+            <section class="content-section">
+                <h2>Real-World Framework Examples</h2>
+
+                <h3>Spring Framework</h3>
+                <ul>
+                    <li><strong>Singleton:</strong> Spring beans are singletons by default</li>
+                    <li><strong>Factory:</strong> BeanFactory creates beans</li>
+                    <li><strong>Proxy:</strong> @Transactional uses proxies</li>
+                    <li><strong>Template Method:</strong> JdbcTemplate, RestTemplate</li>
+                </ul>
+
+                <h3>Java Collections</h3>
+                <ul>
+                    <li><strong>Iterator:</strong> for (Item item : list) { } uses Iterator pattern</li>
+                    <li><strong>Decorator:</strong> Collections.synchronizedList() wraps a list</li>
+                    <li><strong>Adapter:</strong> Arrays.asList() adapts array to List</li>
+                </ul>
+
+                <h3>Java I/O</h3>
+                <div class="code-block">
+                    <pre><code>// Decorator pattern in action!
+BufferedReader reader = new BufferedReader(  // Adds buffering
+    new InputStreamReader(                    // Converts bytes to chars
+        new FileInputStream("file.txt")       // Reads file
+    )
+);</code></pre>
+                </div>
+            </section>
+
+            <section class="content-section">
+                <h2>Best Practices</h2>
+
+                <div class="best-practices">
+                    <h3>✅ DO:</h3>
+                    <ul>
+                        <li><strong>Learn patterns gradually</strong> - Don't memorize all 23 at once</li>
+                        <li><strong>Understand the problem first</strong> - Pattern is the solution</li>
+                        <li><strong>Use patterns when they fit</strong> - Not every problem needs a pattern</li>
+                        <li><strong>Start with common patterns</strong> - Singleton, Factory, Strategy, Observer</li>
+                        <li><strong>Study real frameworks</strong> - See how Spring, JUnit use patterns</li>
+                        <li><strong>Keep it simple</strong> - Simple code > complex pattern</li>
+                        <li><strong>Refactor to patterns</strong> - Add patterns as code grows</li>
+                    </ul>
+
+                    <h3>❌ DON'T:</h3>
+                    <ul>
+                        <li><strong>Don't force patterns</strong> - "I must use a pattern!" is wrong mindset</li>
+                        <li><strong>Don't over-engineer</strong> - Simple problem = simple solution</li>
+                        <li><strong>Don't use patterns you don't understand</strong> - Learn it properly first</li>
+                        <li><strong>Don't mix too many patterns</strong> - Can become confusing</li>
+                        <li><strong>Don't ignore SOLID principles</strong> - Patterns build on these</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="content-section">
+                <h2>When to Use Each Pattern</h2>
+
+                <div class="info-box">
+                    <p><strong>Starting a new project?</strong></p>
+                    <ul>
+                        <li>Use <strong>Factory</strong> for object creation flexibility</li>
+                        <li>Use <strong>Builder</strong> for complex configuration objects</li>
+                        <li>Use <strong>Singleton</strong> for shared resources (carefully!)</li>
+                    </ul>
+                </div>
+
+                <div class="info-box">
+                    <p><strong>Working with legacy code?</strong></p>
+                    <ul>
+                        <li>Use <strong>Adapter</strong> to integrate old systems</li>
+                        <li>Use <strong>Facade</strong> to simplify complex APIs</li>
+                        <li>Use <strong>Decorator</strong> to add features without changing code</li>
+                    </ul>
+                </div>
+
+                <div class="info-box">
+                    <p><strong>Building flexible systems?</strong></p>
+                    <ul>
+                        <li>Use <strong>Strategy</strong> for swappable algorithms</li>
+                        <li>Use <strong>Observer</strong> for event-driven architecture</li>
+                        <li>Use <strong>Command</strong> for undo/redo functionality</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="content-section">
+                <h2>Summary</h2>
+                <div class="info-box">
+                    <ul>
+                        <li><strong>Design patterns</strong> are proven solutions to common problems</li>
+                        <li><strong>Three categories:</strong> Creational, Structural, Behavioral</li>
+                        <li><strong>Creational:</strong> How to create objects (Singleton, Factory, Builder)</li>
+                        <li><strong>Structural:</strong> How to compose objects (Adapter, Decorator, Facade)</li>
+                        <li><strong>Behavioral:</strong> How objects interact (Observer, Strategy, Command)</li>
+                        <li><strong>Benefits:</strong> Code reuse, common vocabulary, proven solutions</li>
+                        <li><strong>Don't overuse:</strong> Simple problem = simple solution</li>
+                        <li><strong>Learn by doing:</strong> Refactor existing code to use patterns</li>
+                        <li><strong>Study frameworks:</strong> See patterns in action (Spring, JUnit)</li>
+                    </ul>
+                </div>
+            </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="../fundamentals/oop-basics.html" class="related-link">OOP Basics</a>
+                <a href="../fundamentals/interfaces-abstract.html" class="related-link">Interfaces & Abstract Classes</a>
+                <a href="annotations.html" class="related-link">Annotations</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

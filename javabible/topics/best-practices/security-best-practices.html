@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Best Practices - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#best-practices">Best Practices</a> / Security Best Practices
+            </nav>
+            <h1>Security Best Practices</h1>
+            <p class="topic-subtitle">Building Secure Java Applications</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Input Validation</h2>
+            <p>Never trust user input. Validate all data at system boundaries.</p>
+
+            <h3>Whitelisting Approach</h3>
+            <pre><code><span class="comment">// GOOD: Whitelist validation - define what IS allowed</span>
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">sanitizeUsername</span>(<span class="class-name">String</span> username) {
+    <span class="keyword">if</span> (username == <span class="keyword">null</span> || username.isBlank()) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Username required"</span>);
+    }
+
+    <span class="comment">// Only allow alphanumeric and underscore</span>
+    <span class="keyword">if</span> (!username.matches(<span class="string">"^[a-zA-Z0-9_]{3,20}$"</span>)) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Invalid username format"</span>);
+    }
+
+    <span class="keyword">return</span> username;
+}
+
+<span class="comment">// Bean Validation annotations</span>
+<span class="keyword">public class</span> <span class="class-name">UserRegistration</span> {
+    <span class="annotation">@NotBlank</span>
+    <span class="annotation">@Size</span>(min = <span class="number">3</span>, max = <span class="number">20</span>)
+    <span class="annotation">@Pattern</span>(regexp = <span class="string">"^[a-zA-Z0-9_]+$"</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> username;
+
+    <span class="annotation">@Email</span>
+    <span class="annotation">@NotBlank</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+
+    <span class="annotation">@Size</span>(min = <span class="number">8</span>, max = <span class="number">100</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> password;
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>SQL Injection Prevention</h2>
+
+            <pre><code><span class="comment">// BAD: SQL Injection vulnerable!</span>
+<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findByUsername</span>(<span class="class-name">String</span> username) {
+    <span class="class-name">String</span> sql = <span class="string">"SELECT * FROM users WHERE username = '"</span> + username + <span class="string">"'"</span>;
+    <span class="comment">// Attacker input: ' OR '1'='1' --</span>
+    <span class="comment">// Results in: SELECT * FROM users WHERE username = '' OR '1'='1' --'</span>
+    <span class="keyword">return</span> jdbcTemplate.queryForObject(sql, userRowMapper);
+}
+
+<span class="comment">// GOOD: Parameterized query</span>
+<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findByUsername</span>(<span class="class-name">String</span> username) {
+    <span class="class-name">String</span> sql = <span class="string">"SELECT * FROM users WHERE username = ?"</span>;
+    <span class="keyword">return</span> jdbcTemplate.queryForObject(sql, userRowMapper, username);
+}
+
+<span class="comment">// GOOD: JPA/Hibernate with named parameters</span>
+<span class="annotation">@Query</span>(<span class="string">"SELECT u FROM User u WHERE u.username = :username"</span>)
+<span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByUsername</span>(<span class="annotation">@Param</span>(<span class="string">"username"</span>) <span class="class-name">String</span> username);
+
+<span class="comment">// GOOD: Criteria API</span>
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByUsername</span>(<span class="class-name">String</span> username) {
+    <span class="class-name">CriteriaBuilder</span> cb = em.getCriteriaBuilder();
+    <span class="class-name">CriteriaQuery</span>&lt;<span class="class-name">User</span>&gt; query = cb.createQuery(<span class="class-name">User</span>.<span class="keyword">class</span>);
+    <span class="class-name">Root</span>&lt;<span class="class-name">User</span>&gt; root = query.from(<span class="class-name">User</span>.<span class="keyword">class</span>);
+    query.where(cb.equal(root.get(<span class="string">"username"</span>), username));
+    <span class="keyword">return</span> em.createQuery(query).getResultList();
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Cross-Site Scripting (XSS) Prevention</h2>
+
+            <pre><code><span class="comment">// BAD: Directly outputting user content</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/profile"</span>)
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">profile</span>(<span class="class-name">Model</span> model) {
+    <span class="class-name">String</span> bio = user.getBio();  <span class="comment">// Could contain: &lt;script&gt;alert('XSS')&lt;/script&gt;</span>
+    model.addAttribute(<span class="string">"bio"</span>, bio);
+    <span class="keyword">return</span> <span class="string">"profile"</span>;  <span class="comment">// Rendered without escaping!</span>
+}
+
+<span class="comment">// GOOD: Thymeleaf auto-escapes by default</span>
+<span class="comment">// In template: &lt;p th:text="${bio}"&gt;&lt;/p&gt;</span>
+<span class="comment">// Output: &amp;lt;script&amp;gt;alert('XSS')&amp;lt;/script&amp;gt;</span>
+
+<span class="comment">// For APIs - encode output</span>
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">sanitizeForHtml</span>(<span class="class-name">String</span> input) {
+    <span class="keyword">return</span> <span class="class-name">HtmlUtils</span>.htmlEscape(input);
+}
+
+<span class="comment">// Content Security Policy header</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">securityFilterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    http.headers(headers -&gt; headers
+        .contentSecurityPolicy(csp -&gt; csp
+            .policyDirectives(<span class="string">"default-src 'self'; script-src 'self'"</span>)
+        )
+    );
+    <span class="keyword">return</span> http.build();
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Password Security</h2>
+
+            <pre><code><span class="comment">// NEVER store plain text passwords!</span>
+
+<span class="comment">// GOOD: Use BCrypt (or Argon2)</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">PasswordEncoder</span> <span class="function">passwordEncoder</span>() {
+    <span class="keyword">return new</span> <span class="class-name">BCryptPasswordEncoder</span>(<span class="number">12</span>);  <span class="comment">// Cost factor</span>
+}
+
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+    <span class="keyword">private final</span> <span class="class-name">PasswordEncoder</span> passwordEncoder;
+
+    <span class="keyword">public void</span> <span class="function">register</span>(<span class="class-name">UserRegistration</span> registration) {
+        <span class="class-name">User</span> user = <span class="keyword">new</span> <span class="class-name">User</span>();
+        user.setUsername(registration.getUsername());
+        <span class="comment">// Hash password before storing</span>
+        user.setPasswordHash(passwordEncoder.encode(registration.getPassword()));
+        userRepository.save(user);
+    }
+
+    <span class="keyword">public boolean</span> <span class="function">authenticate</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> password) {
+        <span class="class-name">User</span> user = userRepository.findByUsername(username)
+            .orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">AuthenticationException</span>(<span class="string">"Invalid credentials"</span>));
+
+        <span class="comment">// Compare with hashed password</span>
+        <span class="keyword">return</span> passwordEncoder.matches(password, user.getPasswordHash());
+    }
+}
+
+<span class="comment">// Password requirements validation</span>
+<span class="keyword">public void</span> <span class="function">validatePassword</span>(<span class="class-name">String</span> password) {
+    <span class="keyword">if</span> (password.length() &lt; <span class="number">8</span>) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Password must be at least 8 characters"</span>);
+    }
+    <span class="keyword">if</span> (!password.matches(<span class="string">".*[A-Z].*"</span>)) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Password must contain uppercase letter"</span>);
+    }
+    <span class="keyword">if</span> (!password.matches(<span class="string">".*[0-9].*"</span>)) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Password must contain a digit"</span>);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Secrets Management</h2>
+
+            <pre><code><span class="comment">// BAD: Hardcoded credentials</span>
+<span class="class-name">String</span> apiKey = <span class="string">"sk_live_abc123xyz789"</span>;  <span class="comment">// Never do this!</span>
+
+<span class="comment">// GOOD: Environment variables</span>
+<span class="class-name">String</span> apiKey = <span class="class-name">System</span>.getenv(<span class="string">"API_KEY"</span>);
+
+<span class="comment">// GOOD: Spring externalized configuration</span>
+<span class="annotation">@Value</span>(<span class="string">"${api.secret-key}"</span>)
+<span class="keyword">private</span> <span class="class-name">String</span> apiSecretKey;
+
+<span class="comment">// GOOD: Spring Cloud Vault integration</span>
+<span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">VaultConfig</span> {
+    <span class="annotation">@Value</span>(<span class="string">"${vault.database.password}"</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> dbPassword;
+}
+
+<span class="comment">// Sensitive data in logs</span>
+<span class="comment">// BAD</span>
+log.info(<span class="string">"User {} logged in with password {}"</span>, username, password);
+
+<span class="comment">// GOOD: Never log sensitive data</span>
+log.info(<span class="string">"User {} logged in"</span>, username);
+
+<span class="comment">// Clear sensitive data from memory when done</span>
+<span class="keyword">char</span>[] password = getPassword();
+<span class="keyword">try</span> {
+    authenticate(password);
+} <span class="keyword">finally</span> {
+    <span class="class-name">Arrays</span>.fill(password, <span class="string">'\0'</span>);  <span class="comment">// Overwrite password</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>CSRF Protection</h2>
+
+            <pre><code><span class="comment">// Spring Security CSRF protection (enabled by default)</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">securityFilterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    http
+        <span class="comment">// CSRF is enabled by default</span>
+        <span class="comment">// For APIs using JWT/tokens, you might disable it:</span>
+        <span class="comment">// .csrf(csrf -> csrf.disable())</span>
+
+        <span class="comment">// Configure for SPA with cookie-based CSRF</span>
+        .csrf(csrf -&gt; csrf
+            .csrfTokenRepository(<span class="class-name">CookieCsrfTokenRepository</span>.withHttpOnlyFalse())
+        );
+
+    <span class="keyword">return</span> http.build();
+}
+
+<span class="comment">// In Thymeleaf forms - token included automatically</span>
+<span class="comment">// &lt;form th:action="@{/submit}" method="post"&gt;</span>
+<span class="comment">//     &lt;!-- Hidden CSRF token field added automatically --&gt;</span>
+<span class="comment">// &lt;/form&gt;</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Secure Random Numbers</h2>
+
+            <pre><code><span class="comment">// BAD: Predictable random - NOT for security</span>
+<span class="class-name">Random</span> random = <span class="keyword">new</span> <span class="class-name">Random</span>();
+<span class="class-name">String</span> token = <span class="class-name">String</span>.valueOf(random.nextLong());  <span class="comment">// Predictable!</span>
+
+<span class="comment">// GOOD: Cryptographically secure random</span>
+<span class="class-name">SecureRandom</span> secureRandom = <span class="keyword">new</span> <span class="class-name">SecureRandom</span>();
+<span class="keyword">byte</span>[] tokenBytes = <span class="keyword">new byte</span>[<span class="number">32</span>];
+secureRandom.nextBytes(tokenBytes);
+<span class="class-name">String</span> token = <span class="class-name">Base64</span>.getUrlEncoder().encodeToString(tokenBytes);
+
+<span class="comment">// For session IDs, tokens, etc.</span>
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateSecureToken</span>() {
+    <span class="keyword">byte</span>[] bytes = <span class="keyword">new byte</span>[<span class="number">32</span>];
+    <span class="keyword">new</span> <span class="class-name">SecureRandom</span>().nextBytes(bytes);
+    <span class="keyword">return</span> <span class="class-name">Base64</span>.getUrlEncoder().withoutPadding().encodeToString(bytes);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Secure File Handling</h2>
+
+            <pre><code><span class="comment">// BAD: Path traversal vulnerability</span>
+<span class="keyword">public</span> <span class="class-name">File</span> <span class="function">getFile</span>(<span class="class-name">String</span> filename) {
+    <span class="comment">// Attacker input: "../../../etc/passwd"</span>
+    <span class="keyword">return new</span> <span class="class-name">File</span>(<span class="string">"/uploads/"</span> + filename);
+}
+
+<span class="comment">// GOOD: Validate and normalize path</span>
+<span class="keyword">public</span> <span class="class-name">Path</span> <span class="function">getFile</span>(<span class="class-name">String</span> filename) {
+    <span class="class-name">Path</span> basePath = <span class="class-name">Paths</span>.get(<span class="string">"/uploads"</span>).toAbsolutePath().normalize();
+    <span class="class-name">Path</span> filePath = basePath.resolve(filename).normalize();
+
+    <span class="comment">// Ensure file is within base directory</span>
+    <span class="keyword">if</span> (!filePath.startsWith(basePath)) {
+        <span class="keyword">throw new</span> <span class="class-name">SecurityException</span>(<span class="string">"Invalid file path"</span>);
+    }
+
+    <span class="keyword">return</span> filePath;
+}
+
+<span class="comment">// Validate file uploads</span>
+<span class="keyword">public void</span> <span class="function">handleUpload</span>(<span class="class-name">MultipartFile</span> file) {
+    <span class="comment">// Check file type by content, not just extension</span>
+    <span class="class-name">String</span> contentType = file.getContentType();
+    <span class="keyword">if</span> (!<span class="class-name">ALLOWED_TYPES</span>.contains(contentType)) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"File type not allowed"</span>);
+    }
+
+    <span class="comment">// Limit file size</span>
+    <span class="keyword">if</span> (file.getSize() &gt; MAX_FILE_SIZE) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"File too large"</span>);
+    }
+
+    <span class="comment">// Generate new filename</span>
+    <span class="class-name">String</span> safeFilename = <span class="class-name">UUID</span>.randomUUID() + getExtension(file);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Security Headers</h2>
+
+            <pre><code><span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">securityFilterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    http.headers(headers -&gt; headers
+        <span class="comment">// Prevent clickjacking</span>
+        .frameOptions(frame -&gt; frame.deny())
+
+        <span class="comment">// XSS protection (mostly for older browsers)</span>
+        .xssProtection(xss -&gt; xss.enable())
+
+        <span class="comment">// Prevent MIME type sniffing</span>
+        .contentTypeOptions(content -&gt; {})
+
+        <span class="comment">// HTTP Strict Transport Security</span>
+        .httpStrictTransportSecurity(hsts -&gt; hsts
+            .maxAgeInSeconds(<span class="number">31536000</span>)
+            .includeSubDomains(<span class="keyword">true</span>)
+        )
+
+        <span class="comment">// Content Security Policy</span>
+        .contentSecurityPolicy(csp -&gt; csp
+            .policyDirectives(<span class="string">"default-src 'self'; script-src 'self'"</span>)
+        )
+    );
+
+    <span class="keyword">return</span> http.build();
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Security Checklist</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">OWASP Top 10 Quick Reference</div>
+                <ul>
+                    <li><strong>Injection</strong> - Use parameterized queries</li>
+                    <li><strong>Broken Authentication</strong> - Strong passwords, MFA, secure sessions</li>
+                    <li><strong>Sensitive Data Exposure</strong> - Encrypt at rest and in transit</li>
+                    <li><strong>XML External Entities</strong> - Disable DTDs, use safe parsers</li>
+                    <li><strong>Broken Access Control</strong> - Check authorization on every request</li>
+                    <li><strong>Security Misconfiguration</strong> - Secure defaults, remove unused features</li>
+                    <li><strong>Cross-Site Scripting</strong> - Escape output, use CSP</li>
+                    <li><strong>Insecure Deserialization</strong> - Avoid Java serialization for untrusted data</li>
+                    <li><strong>Components with Vulnerabilities</strong> - Keep dependencies updated</li>
+                    <li><strong>Insufficient Logging</strong> - Log security events, monitor for attacks</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="../spring/security.html" class="related-link">Spring Security</a>
+                <a href="../jakarta-ee/security.html" class="related-link">Jakarta EE Security</a>
+                <a href="error-handling-patterns.html" class="related-link">Error Handling Patterns</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

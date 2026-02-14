@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clean Code Principles - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#best-practices">Best Practices</a> / Clean Code Principles
+            </nav>
+            <h1>Clean Code Principles</h1>
+            <p class="topic-subtitle">Writing Code That Speaks for Itself</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is Clean Code?</h2>
+            <p>Clean code is code that is easy to understand, easy to change, and easy to test. It reads like well-written prose and clearly communicates its intent.</p>
+
+            <div class="info-box note">
+                <div class="info-box-title">Core Philosophy</div>
+                <p>"Any fool can write code that a computer can understand. Good programmers write code that humans can understand." - Martin Fowler</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Meaningful Names</h2>
+
+            <h3>Use Intention-Revealing Names</h3>
+            <pre><code><span class="comment">// BAD: What does this do?</span>
+<span class="keyword">int</span> d;
+<span class="class-name">List</span>&lt;<span class="keyword">int</span>[]&gt; list1;
+
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="keyword">int</span>[]&gt; <span class="function">getThem</span>() {
+    <span class="class-name">List</span>&lt;<span class="keyword">int</span>[]&gt; list1 = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    <span class="keyword">for</span> (<span class="keyword">int</span>[] x : theList) {
+        <span class="keyword">if</span> (x[<span class="number">0</span>] == <span class="number">4</span>)
+            list1.add(x);
+    }
+    <span class="keyword">return</span> list1;
+}
+
+<span class="comment">// GOOD: Clear intent</span>
+<span class="keyword">int</span> elapsedTimeInDays;
+<span class="class-name">List</span>&lt;<span class="class-name">Cell</span>&gt; flaggedCells;
+
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Cell</span>&gt; <span class="function">getFlaggedCells</span>() {
+    <span class="class-name">List</span>&lt;<span class="class-name">Cell</span>&gt; flaggedCells = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    <span class="keyword">for</span> (<span class="class-name">Cell</span> cell : gameBoard) {
+        <span class="keyword">if</span> (cell.isFlagged()) {
+            flaggedCells.add(cell);
+        }
+    }
+    <span class="keyword">return</span> flaggedCells;
+}</code></pre>
+
+            <h3>Avoid Encodings</h3>
+            <pre><code><span class="comment">// BAD: Hungarian notation and prefixes</span>
+<span class="class-name">String</span> strName;
+<span class="class-name">IUserService</span> m_userService;
+<span class="keyword">int</span> iCount;
+
+<span class="comment">// GOOD: Let the type system do its job</span>
+<span class="class-name">String</span> name;
+<span class="class-name">UserService</span> userService;
+<span class="keyword">int</span> count;</code></pre>
+
+            <h3>Class Names vs Method Names</h3>
+            <pre><code><span class="comment">// Classes: Nouns - what it IS</span>
+<span class="keyword">public class</span> <span class="class-name">Customer</span> { }
+<span class="keyword">public class</span> <span class="class-name">OrderProcessor</span> { }
+<span class="keyword">public class</span> <span class="class-name">AccountValidator</span> { }
+
+<span class="comment">// Methods: Verbs - what it DOES</span>
+<span class="keyword">public void</span> <span class="function">save</span>() { }
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">processOrder</span>() { }
+<span class="keyword">public boolean</span> <span class="function">isValid</span>() { }</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Functions Should Be Small</h2>
+
+            <h3>One Level of Abstraction</h3>
+            <pre><code><span class="comment">// BAD: Mixed levels of abstraction</span>
+<span class="keyword">public void</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order) {
+    <span class="comment">// High level</span>
+    validateOrder(order);
+
+    <span class="comment">// Low level - database details</span>
+    <span class="class-name">Connection</span> conn = <span class="class-name">DriverManager</span>.getConnection(url);
+    <span class="class-name">PreparedStatement</span> stmt = conn.prepareStatement(
+        <span class="string">"INSERT INTO orders (id, total) VALUES (?, ?)"</span>
+    );
+    stmt.setLong(<span class="number">1</span>, order.getId());
+    stmt.setDouble(<span class="number">2</span>, order.getTotal());
+    stmt.executeUpdate();
+
+    <span class="comment">// High level again</span>
+    sendConfirmation(order);
+}
+
+<span class="comment">// GOOD: Consistent abstraction level</span>
+<span class="keyword">public void</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order) {
+    validateOrder(order);
+    saveOrder(order);
+    sendConfirmation(order);
+}
+
+<span class="keyword">private void</span> <span class="function">saveOrder</span>(<span class="class-name">Order</span> order) {
+    orderRepository.save(order);
+}</code></pre>
+
+            <h3>Do One Thing</h3>
+            <pre><code><span class="comment">// BAD: Function does multiple things</span>
+<span class="keyword">public void</span> <span class="function">processUserAndSendEmailAndLogActivity</span>(<span class="class-name">User</span> user) {
+    <span class="comment">// validate</span>
+    <span class="comment">// save</span>
+    <span class="comment">// send email</span>
+    <span class="comment">// log</span>
+}
+
+<span class="comment">// GOOD: Each function does one thing</span>
+<span class="keyword">public void</span> <span class="function">registerUser</span>(<span class="class-name">User</span> user) {
+    validate(user);
+    save(user);
+    notifyUser(user);
+    auditRegistration(user);
+}
+
+<span class="keyword">private void</span> <span class="function">validate</span>(<span class="class-name">User</span> user) { <span class="comment">/* validation only */</span> }
+<span class="keyword">private void</span> <span class="function">save</span>(<span class="class-name">User</span> user) { <span class="comment">/* persistence only */</span> }
+<span class="keyword">private void</span> <span class="function">notifyUser</span>(<span class="class-name">User</span> user) { <span class="comment">/* notification only */</span> }
+<span class="keyword">private void</span> <span class="function">auditRegistration</span>(<span class="class-name">User</span> user) { <span class="comment">/* logging only */</span> }</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Function Arguments</h2>
+
+            <pre><code><span class="comment">// Ideal: zero arguments (niladic)</span>
+<span class="keyword">public void</span> <span class="function">run</span>() { }
+
+<span class="comment">// Good: one argument (monadic)</span>
+<span class="keyword">public void</span> <span class="function">process</span>(<span class="class-name">Order</span> order) { }
+
+<span class="comment">// Acceptable: two arguments (dyadic)</span>
+<span class="keyword">public</span> <span class="class-name">Point</span> <span class="function">createPoint</span>(<span class="keyword">int</span> x, <span class="keyword">int</span> y) { }
+
+<span class="comment">// Avoid: three or more arguments</span>
+<span class="comment">// BAD</span>
+<span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email, <span class="keyword">int</span> age,
+                       <span class="class-name">String</span> address, <span class="class-name">String</span> phone) { }
+
+<span class="comment">// GOOD: Use an object</span>
+<span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">UserRegistration</span> registration) { }
+
+<span class="comment">// Avoid flag arguments</span>
+<span class="comment">// BAD</span>
+<span class="keyword">public void</span> <span class="function">render</span>(<span class="keyword">boolean</span> isSuite) { }
+
+<span class="comment">// GOOD: Two separate methods</span>
+<span class="keyword">public void</span> <span class="function">renderForSuite</span>() { }
+<span class="keyword">public void</span> <span class="function">renderForSingleTest</span>() { }</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Avoid Side Effects</h2>
+
+            <pre><code><span class="comment">// BAD: Hidden side effect</span>
+<span class="keyword">public boolean</span> <span class="function">checkPassword</span>(<span class="class-name">String</span> userName, <span class="class-name">String</span> password) {
+    <span class="class-name">User</span> user = <span class="class-name">UserGateway</span>.findByName(userName);
+    <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
+        <span class="keyword">if</span> (user.getPassword().equals(password)) {
+            <span class="class-name">Session</span>.initialize();  <span class="comment">// Hidden side effect!</span>
+            <span class="keyword">return true</span>;
+        }
+    }
+    <span class="keyword">return false</span>;
+}
+
+<span class="comment">// GOOD: Explicit and predictable</span>
+<span class="keyword">public boolean</span> <span class="function">checkPassword</span>(<span class="class-name">String</span> userName, <span class="class-name">String</span> password) {
+    <span class="class-name">User</span> user = userRepository.findByName(userName);
+    <span class="keyword">return</span> user != <span class="keyword">null</span> && user.getPassword().equals(password);
+}
+
+<span class="keyword">public void</span> <span class="function">login</span>(<span class="class-name">String</span> userName, <span class="class-name">String</span> password) {
+    <span class="keyword">if</span> (checkPassword(userName, password)) {
+        sessionManager.initialize();  <span class="comment">// Explicit!</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Comments: When and When Not</h2>
+
+            <h3>Bad Comments</h3>
+            <pre><code><span class="comment">// BAD: Redundant comment</span>
+<span class="comment">// Increment i</span>
+i++;
+
+<span class="comment">// BAD: Noise comment</span>
+<span class="comment">/**
+ * Default constructor
+ */</span>
+<span class="keyword">public</span> <span class="function">User</span>() { }
+
+<span class="comment">// BAD: Commented-out code</span>
+<span class="comment">// userService.oldMethod();</span>
+<span class="comment">// This was the old way we did things</span>
+
+<span class="comment">// BAD: Misleading comment</span>
+<span class="comment">// Returns user's age in months</span>
+<span class="keyword">public int</span> <span class="function">getAge</span>() {
+    <span class="keyword">return</span> age;  <span class="comment">// Actually returns years!</span>
+}</code></pre>
+
+            <h3>Good Comments</h3>
+            <pre><code><span class="comment">// GOOD: Legal comments</span>
+<span class="comment">// Copyright 2026 Company. All rights reserved.</span>
+
+<span class="comment">// GOOD: Explanation of intent</span>
+<span class="comment">// We use insertion sort here because the list is nearly sorted</span>
+<span class="comment">// and small (< 20 elements), making it faster than quicksort</span>
+
+<span class="comment">// GOOD: Warning of consequences</span>
+<span class="comment">// Warning: This test takes 30 minutes to run</span>
+
+<span class="comment">// GOOD: TODO comments (temporarily)</span>
+<span class="comment">// TODO: Implement caching when performance becomes an issue</span>
+
+<span class="comment">// GOOD: Clarification of obscure code</span>
+<span class="comment">// Format: YYMMDD + 4-digit sequence number</span>
+<span class="class-name">String</span> orderId = dateFormat.format(date) + sequence;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Error Handling</h2>
+
+            <pre><code><span class="comment">// BAD: Returning null</span>
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getUsers</span>() {
+    <span class="keyword">if</span> (noUsersFound) {
+        <span class="keyword">return null</span>;  <span class="comment">// Caller must check for null!</span>
+    }
+    <span class="keyword">return</span> users;
+}
+
+<span class="comment">// GOOD: Return empty collection</span>
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getUsers</span>() {
+    <span class="keyword">if</span> (noUsersFound) {
+        <span class="keyword">return</span> <span class="class-name">Collections</span>.emptyList();
+    }
+    <span class="keyword">return</span> users;
+}
+
+<span class="comment">// GOOD: Use Optional</span>
+<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findById</span>(<span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(userMap.get(id));
+}
+
+<span class="comment">// BAD: Passing null</span>
+<span class="keyword">public double</span> <span class="function">calculate</span>(<span class="class-name">Point</span> p1, <span class="class-name">Point</span> p2) {
+    <span class="comment">// What if p1 or p2 is null?</span>
+}
+
+<span class="comment">// GOOD: Use Objects.requireNonNull</span>
+<span class="keyword">public double</span> <span class="function">calculate</span>(<span class="class-name">Point</span> p1, <span class="class-name">Point</span> p2) {
+    <span class="class-name">Objects</span>.requireNonNull(p1, <span class="string">"p1 must not be null"</span>);
+    <span class="class-name">Objects</span>.requireNonNull(p2, <span class="string">"p2 must not be null"</span>);
+    <span class="comment">// Safe to proceed</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>DRY - Don't Repeat Yourself</h2>
+
+            <pre><code><span class="comment">// BAD: Duplicated logic</span>
+<span class="keyword">public void</span> <span class="function">validateUser</span>(<span class="class-name">User</span> user) {
+    <span class="keyword">if</span> (user.getName() == <span class="keyword">null</span> || user.getName().isEmpty()) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Name required"</span>);
+    }
+    <span class="keyword">if</span> (user.getName().length() &gt; <span class="number">100</span>) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Name too long"</span>);
+    }
+}
+
+<span class="keyword">public void</span> <span class="function">validateProduct</span>(<span class="class-name">Product</span> product) {
+    <span class="keyword">if</span> (product.getName() == <span class="keyword">null</span> || product.getName().isEmpty()) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Name required"</span>);
+    }
+    <span class="keyword">if</span> (product.getName().length() &gt; <span class="number">100</span>) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Name too long"</span>);
+    }
+}
+
+<span class="comment">// GOOD: Extract common logic</span>
+<span class="keyword">private void</span> <span class="function">validateName</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> fieldName) {
+    <span class="keyword">if</span> (name == <span class="keyword">null</span> || name.isEmpty()) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(fieldName + <span class="string">" required"</span>);
+    }
+    <span class="keyword">if</span> (name.length() &gt; <span class="number">100</span>) {
+        <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(fieldName + <span class="string">" too long"</span>);
+    }
+}
+
+<span class="keyword">public void</span> <span class="function">validateUser</span>(<span class="class-name">User</span> user) {
+    validateName(user.getName(), <span class="string">"User name"</span>);
+}
+
+<span class="keyword">public void</span> <span class="function">validateProduct</span>(<span class="class-name">Product</span> product) {
+    validateName(product.getName(), <span class="string">"Product name"</span>);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Code Organization</h2>
+
+            <h3>Newspaper Metaphor</h3>
+            <pre><code><span class="comment">// Organize code like a newspaper article:</span>
+<span class="comment">// - Headline (class name) tells you what it's about</span>
+<span class="comment">// - High-level summary first (public methods)</span>
+<span class="comment">// - Details come later (private methods)</span>
+
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="comment">// PUBLIC: High-level operations (the "headline")</span>
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">createOrder</span>(<span class="class-name">OrderRequest</span> request) {
+        validate(request);
+        <span class="class-name">Order</span> order = buildOrder(request);
+        <span class="keyword">return</span> save(order);
+    }
+
+    <span class="keyword">public void</span> <span class="function">cancelOrder</span>(<span class="class-name">Long</span> orderId) {
+        <span class="class-name">Order</span> order = findOrder(orderId);
+        markAsCancelled(order);
+        notifyCustomer(order);
+    }
+
+    <span class="comment">// PRIVATE: Implementation details (the "body")</span>
+    <span class="keyword">private void</span> <span class="function">validate</span>(<span class="class-name">OrderRequest</span> request) { ... }
+    <span class="keyword">private</span> <span class="class-name">Order</span> <span class="function">buildOrder</span>(<span class="class-name">OrderRequest</span> request) { ... }
+    <span class="keyword">private</span> <span class="class-name">Order</span> <span class="function">save</span>(<span class="class-name">Order</span> order) { ... }
+    <span class="keyword">private</span> <span class="class-name">Order</span> <span class="function">findOrder</span>(<span class="class-name">Long</span> id) { ... }
+    <span class="keyword">private void</span> <span class="function">markAsCancelled</span>(<span class="class-name">Order</span> order) { ... }
+    <span class="keyword">private void</span> <span class="function">notifyCustomer</span>(<span class="class-name">Order</span> order) { ... }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Clean Code Checklist</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Quick Review</div>
+                <ul>
+                    <li>Can you understand the code without comments?</li>
+                    <li>Are functions small and focused?</li>
+                    <li>Do names reveal intent?</li>
+                    <li>Is error handling consistent?</li>
+                    <li>Is there any duplicated code?</li>
+                    <li>Could a new team member understand this?</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="solid-principles.html" class="related-link">SOLID Principles</a>
+                <a href="code-conventions.html" class="related-link">Code Conventions</a>
+                <a href="error-handling-patterns.html" class="related-link">Error Handling Patterns</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

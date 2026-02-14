@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request/Response Cycle - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#web-concepts">Web Concepts</a> / Request/Response Cycle
+            </nav>
+            <h1>Request/Response Cycle</h1>
+            <p class="topic-subtitle">Understanding how web communication flows from client to server and back</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is the Request/Response Cycle?</h2>
+            <p>The <strong>request/response cycle</strong> is the fundamental communication pattern of the web and one of the most important concepts for any web developer to understand deeply. Every single interaction on the web—clicking a link, submitting a form, loading an image, fetching API data—triggers this cycle.</p>
+
+            <p>Understanding this cycle is essential because:</p>
+            <ul>
+                <li><strong>Debugging:</strong> When something goes wrong, you need to identify whether it's a request problem, a server processing issue, or a response handling error.</li>
+                <li><strong>Performance:</strong> Knowing where time is spent helps you optimize your application.</li>
+                <li><strong>Security:</strong> Understanding what data flows where helps you protect sensitive information.</li>
+                <li><strong>Architecture:</strong> Good API design comes from understanding this fundamental pattern.</li>
+            </ul>
+
+            <h3>The Basic Pattern</h3>
+            <p>Every web interaction follows the same basic pattern, regardless of whether it's a simple page load or a complex API call:</p>
+
+            <div class="info-box">
+                <p><strong>The cycle in a nutshell:</strong></p>
+                <ol>
+                    <li><strong>Client sends a Request</strong> — "I want something" (e.g., "Give me user #123's profile")</li>
+                    <li><strong>Network delivers the Request</strong> — The request travels across the internet to the server</li>
+                    <li><strong>Server processes the Request</strong> — Authentication, authorization, business logic, database queries</li>
+                    <li><strong>Server sends a Response</strong> — "Here's what you asked for" (or "Here's why I can't give it to you")</li>
+                    <li><strong>Network delivers the Response</strong> — The response travels back to the client</li>
+                    <li><strong>Client processes the Response</strong> — Parses data, updates UI, handles errors</li>
+                </ol>
+            </div>
+
+            <h3>Real-World Analogy: Ordering at a Restaurant</h3>
+            <p>Think of the request/response cycle like ordering food:</p>
+            <ul>
+                <li><strong>Request:</strong> You tell the waiter what you want, including any special instructions ("Burger, medium-rare, no onions, extra pickles")</li>
+                <li><strong>Processing:</strong> The kitchen receives your order, checks if they have ingredients, prepares the food according to your specifications</li>
+                <li><strong>Response:</strong> The waiter brings your food back (or tells you they're out of burgers)</li>
+                <li><strong>Client Processing:</strong> You eat and enjoy (or send it back if something's wrong)</li>
+            </ul>
+
+            <p>The HTTP request contains all the "instructions" (headers, parameters, body), and the response contains the "result" (status, data, or error).</p>
+
+            <pre><code><span class="comment">// The Complete Cycle Visualized</span>
+
+┌─────────────┐                                    ┌─────────────┐
+│   CLIENT    │                                    │   SERVER    │
+│  (Browser)  │                                    │   (Java)    │
+└──────┬──────┘                                    └──────┬──────┘
+       │                                                  │
+       │  1. HTTP REQUEST                                 │
+       │  ─────────────────────────────────────────────>  │
+       │  GET /api/users/123                              │
+       │  Host: api.example.com                           │
+       │  Authorization: Bearer token123                  │
+       │                                                  │
+       │                              2. PROCESS REQUEST  │
+       │                              ┌─────────────────┐ │
+       │                              │ - Authenticate  │ │
+       │                              │ - Query DB      │ │
+       │                              │ - Build response│ │
+       │                              └─────────────────┘ │
+       │                                                  │
+       │  3. HTTP RESPONSE                                │
+       │  <─────────────────────────────────────────────  │
+       │  HTTP/1.1 200 OK                                 │
+       │  Content-Type: application/json                  │
+       │  {"id": 123, "name": "John"}                     │
+       │                                                  │
+       │  4. PROCESS RESPONSE                             │
+       │  ┌─────────────────┐                             │
+       │  │ - Parse JSON    │                             │
+       │  │ - Update UI     │                             │
+       │  │ - Store data    │                             │
+       │  └─────────────────┘                             │
+       ▼                                                  ▼</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Anatomy of an HTTP Request</h2>
+
+            <pre><code><span class="comment">// Complete HTTP Request Structure</span>
+
+<span class="comment">// REQUEST LINE (Method + Path + Protocol)</span>
+POST /api/users HTTP/1.1
+
+<span class="comment">// HEADERS (Metadata about the request)</span>
+Host: api.example.com
+Content-Type: application/json
+Content-Length: 56
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+Accept: application/json
+User-Agent: Mozilla/5.0
+Cache-Control: no-cache
+
+<span class="comment">// BLANK LINE (separates headers from body)</span>
+
+<span class="comment">// BODY (Optional - data being sent)</span>
+{
+    "name": "John Doe",
+    "email": "john@example.com"
+}</code></pre>
+
+            <h3>Request Components Explained</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Example</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Method</strong></td>
+                        <td><code>POST</code></td>
+                        <td>What action to perform</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Path</strong></td>
+                        <td><code>/api/users</code></td>
+                        <td>Which resource to act on</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Protocol</strong></td>
+                        <td><code>HTTP/1.1</code></td>
+                        <td>HTTP version</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Host</strong></td>
+                        <td><code>api.example.com</code></td>
+                        <td>Target server</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Content-Type</strong></td>
+                        <td><code>application/json</code></td>
+                        <td>Format of body data</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Authorization</strong></td>
+                        <td><code>Bearer token</code></td>
+                        <td>Authentication credentials</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Body</strong></td>
+                        <td>JSON data</td>
+                        <td>Payload being sent</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Anatomy of an HTTP Response</h2>
+
+            <pre><code><span class="comment">// Complete HTTP Response Structure</span>
+
+<span class="comment">// STATUS LINE (Protocol + Status Code + Status Text)</span>
+HTTP/1.1 201 Created
+
+<span class="comment">// HEADERS (Metadata about the response)</span>
+Content-Type: application/json
+Content-Length: 89
+Location: /api/users/124
+Date: Thu, 23 Jan 2026 10:30:00 GMT
+Cache-Control: no-cache
+X-Request-Id: abc123
+
+<span class="comment">// BLANK LINE (separates headers from body)</span>
+
+<span class="comment">// BODY (The actual response data)</span>
+{
+    "id": 124,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "createdAt": "2026-01-23T10:30:00Z"
+}</code></pre>
+
+            <h3>Common Response Headers</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Header</th>
+                        <th>Example</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Content-Type</code></td>
+                        <td><code>application/json</code></td>
+                        <td>Format of response body</td>
+                    </tr>
+                    <tr>
+                        <td><code>Content-Length</code></td>
+                        <td><code>256</code></td>
+                        <td>Size of response body in bytes</td>
+                    </tr>
+                    <tr>
+                        <td><code>Location</code></td>
+                        <td><code>/api/users/124</code></td>
+                        <td>URL of created/redirected resource</td>
+                    </tr>
+                    <tr>
+                        <td><code>Cache-Control</code></td>
+                        <td><code>max-age=3600</code></td>
+                        <td>Caching instructions</td>
+                    </tr>
+                    <tr>
+                        <td><code>Set-Cookie</code></td>
+                        <td><code>session=abc123</code></td>
+                        <td>Set cookies on client</td>
+                    </tr>
+                    <tr>
+                        <td><code>ETag</code></td>
+                        <td><code>"v5"</code></td>
+                        <td>Version identifier for caching</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>The Cycle in Java (Server Side)</h2>
+
+            <h3>Using HttpServletRequest and HttpServletResponse</h3>
+            <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/api/users/*"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserServlet</span> <span class="keyword">extends</span> HttpServlet {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> doGet(HttpServletRequest request,
+                          HttpServletResponse response)
+            <span class="keyword">throws</span> ServletException, IOException {
+
+        <span class="comment">// ═══════════════════════════════════════════════</span>
+        <span class="comment">// READING THE REQUEST</span>
+        <span class="comment">// ═══════════════════════════════════════════════</span>
+
+        <span class="comment">// Request Line Info</span>
+        String method = request.getMethod();           <span class="comment">// "GET"</span>
+        String uri = request.getRequestURI();          <span class="comment">// "/api/users/123"</span>
+        String queryString = request.getQueryString(); <span class="comment">// "include=orders"</span>
+
+        <span class="comment">// Headers</span>
+        String contentType = request.getContentType();
+        String authHeader = request.getHeader(<span class="string">"Authorization"</span>);
+        String userAgent = request.getHeader(<span class="string">"User-Agent"</span>);
+
+        <span class="comment">// Query Parameters</span>
+        String include = request.getParameter(<span class="string">"include"</span>);
+
+        <span class="comment">// Path Parameters (manual extraction)</span>
+        String pathInfo = request.getPathInfo();       <span class="comment">// "/123"</span>
+        Long userId = Long.parseLong(pathInfo.substring(<span class="number">1</span>));
+
+        <span class="comment">// ═══════════════════════════════════════════════</span>
+        <span class="comment">// PROCESSING</span>
+        <span class="comment">// ═══════════════════════════════════════════════</span>
+
+        User user = userService.findById(userId);
+
+        <span class="comment">// ═══════════════════════════════════════════════</span>
+        <span class="comment">// BUILDING THE RESPONSE</span>
+        <span class="comment">// ═══════════════════════════════════════════════</span>
+
+        <span class="keyword">if</span> (user == <span class="keyword">null</span>) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND); <span class="comment">// 404</span>
+            response.setContentType(<span class="string">"application/json"</span>);
+            response.getWriter().write(<span class="string">"{\"error\": \"User not found\"}"</span>);
+            <span class="keyword">return</span>;
+        }
+
+        <span class="comment">// Set response headers</span>
+        response.setStatus(HttpServletResponse.SC_OK);  <span class="comment">// 200</span>
+        response.setContentType(<span class="string">"application/json"</span>);
+        response.setCharacterEncoding(<span class="string">"UTF-8"</span>);
+        response.setHeader(<span class="string">"Cache-Control"</span>, <span class="string">"max-age=60"</span>);
+
+        <span class="comment">// Write response body</span>
+        String json = objectMapper.writeValueAsString(user);
+        response.getWriter().write(json);
+    }
+}</code></pre>
+
+            <h3>Using Spring MVC (Much Cleaner)</h3>
+            <pre><code><span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+
+    <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;User&gt; getUser(
+            <span class="annotation">@PathVariable</span> Long id,                    <span class="comment">// From URL path</span>
+            <span class="annotation">@RequestParam</span>(required = <span class="keyword">false</span>) String include, <span class="comment">// From query string</span>
+            <span class="annotation">@RequestHeader</span>(<span class="string">"Authorization"</span>) String auth) {  <span class="comment">// From headers</span>
+
+        <span class="comment">// Spring automatically:</span>
+        <span class="comment">// - Parses the request</span>
+        <span class="comment">// - Extracts parameters</span>
+        <span class="comment">// - Validates input</span>
+
+        User user = userService.findById(id);
+
+        <span class="keyword">if</span> (user == <span class="keyword">null</span>) {
+            <span class="keyword">return</span> ResponseEntity.notFound().build();
+        }
+
+        <span class="comment">// Spring automatically:</span>
+        <span class="comment">// - Serializes to JSON</span>
+        <span class="comment">// - Sets Content-Type</span>
+        <span class="comment">// - Sets status code</span>
+        <span class="keyword">return</span> ResponseEntity.ok()
+            .cacheControl(CacheControl.maxAge(<span class="number">60</span>, TimeUnit.SECONDS))
+            .body(user);
+    }
+
+    <span class="annotation">@PostMapping</span>
+    <span class="keyword">public</span> ResponseEntity&lt;User&gt; createUser(
+            <span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> CreateUserDTO dto) {  <span class="comment">// From request body</span>
+
+        <span class="comment">// Spring automatically:</span>
+        <span class="comment">// - Deserializes JSON body</span>
+        <span class="comment">// - Validates the DTO</span>
+
+        User created = userService.create(dto);
+
+        URI location = URI.create(<span class="string">"/api/users/"</span> + created.getId());
+
+        <span class="keyword">return</span> ResponseEntity
+            .created(location)  <span class="comment">// 201 + Location header</span>
+            .body(created);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>The Cycle in JavaScript (Client Side)</h2>
+
+            <h3>Using Fetch API</h3>
+            <pre><code><span class="comment">// GET Request</span>
+<span class="keyword">async function</span> getUser(userId) {
+    <span class="comment">// 1. BUILD THE REQUEST</span>
+    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(`/api/users/${userId}`, {
+        method: <span class="string">'GET'</span>,
+        headers: {
+            <span class="string">'Accept'</span>: <span class="string">'application/json'</span>,
+            <span class="string">'Authorization'</span>: `Bearer ${token}`
+        }
+    });
+
+    <span class="comment">// 2. CHECK RESPONSE STATUS</span>
+    <span class="keyword">if</span> (!response.ok) {
+        <span class="keyword">if</span> (response.status === <span class="number">404</span>) {
+            <span class="keyword">throw new</span> Error(<span class="string">'User not found'</span>);
+        }
+        <span class="keyword">throw new</span> Error(`HTTP error: ${response.status}`);
+    }
+
+    <span class="comment">// 3. PARSE RESPONSE BODY</span>
+    <span class="keyword">const</span> user = <span class="keyword">await</span> response.json();
+
+    <span class="comment">// 4. USE THE DATA</span>
+    <span class="keyword">return</span> user;
+}
+
+<span class="comment">// POST Request</span>
+<span class="keyword">async function</span> createUser(userData) {
+    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(<span class="string">'/api/users'</span>, {
+        method: <span class="string">'POST'</span>,
+        headers: {
+            <span class="string">'Content-Type'</span>: <span class="string">'application/json'</span>,
+            <span class="string">'Authorization'</span>: `Bearer ${token}`
+        },
+        body: JSON.stringify(userData)  <span class="comment">// Convert to JSON string</span>
+    });
+
+    <span class="keyword">if</span> (response.status === <span class="number">201</span>) {
+        <span class="comment">// Get the Location header for the new resource</span>
+        <span class="keyword">const</span> location = response.headers.get(<span class="string">'Location'</span>);
+        console.log(<span class="string">'Created at:'</span>, location);
+    }
+
+    <span class="keyword">return</span> response.json();
+}</code></pre>
+
+            <h3>Reading Response Details</h3>
+            <pre><code><span class="keyword">async function</span> inspectResponse() {
+    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(<span class="string">'/api/users'</span>);
+
+    <span class="comment">// Response metadata</span>
+    console.log(<span class="string">'Status:'</span>, response.status);        <span class="comment">// 200</span>
+    console.log(<span class="string">'Status Text:'</span>, response.statusText); <span class="comment">// "OK"</span>
+    console.log(<span class="string">'OK?'</span>, response.ok);                  <span class="comment">// true (2xx status)</span>
+    console.log(<span class="string">'URL:'</span>, response.url);                <span class="comment">// Final URL (after redirects)</span>
+
+    <span class="comment">// Headers</span>
+    console.log(<span class="string">'Content-Type:'</span>,
+        response.headers.get(<span class="string">'Content-Type'</span>));       <span class="comment">// "application/json"</span>
+    console.log(<span class="string">'Cache-Control:'</span>,
+        response.headers.get(<span class="string">'Cache-Control'</span>));      <span class="comment">// "max-age=3600"</span>
+
+    <span class="comment">// Body (can only be read once!)</span>
+    <span class="keyword">const</span> data = <span class="keyword">await</span> response.json();  <span class="comment">// or .text(), .blob(), .arrayBuffer()</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Request Processing Pipeline (Server)</h2>
+
+            <pre><code><span class="comment">// What happens on the server when a request arrives</span>
+
+           Request Arrives
+                 │
+                 ▼
+    ┌────────────────────────┐
+    │    1. FILTER CHAIN     │  <span class="comment">Security, logging, CORS</span>
+    │    - Security Filter   │
+    │    - Logging Filter    │
+    │    - CORS Filter       │
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │  2. DISPATCHER SERVLET │  <span class="comment">Routes to correct handler</span>
+    │    (Front Controller)  │
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │   3. HANDLER MAPPING   │  <span class="comment">Finds matching @RequestMapping</span>
+    │    Which controller?   │
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │   4. INTERCEPTORS      │  <span class="comment">Pre-processing (auth checks, etc)</span>
+    │    (preHandle)         │
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │   5. CONTROLLER        │  <span class="comment">Your @RestController method</span>
+    │    Business Logic      │
+    │    - Validate input    │
+    │    - Call services     │
+    │    - Build response    │
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │   6. INTERCEPTORS      │  <span class="comment">Post-processing</span>
+    │    (postHandle)        │
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │  7. VIEW RESOLUTION    │  <span class="comment">JSON serialization for REST</span>
+    │    (Message Converter) │
+    └───────────┬────────────┘
+                │
+                ▼
+    ┌────────────────────────┐
+    │   8. FILTER CHAIN      │  <span class="comment">Post-processing filters</span>
+    │    (Response phase)    │
+    └───────────┬────────────┘
+                │
+                ▼
+          Response Sent</code></pre>
+
+            <h3>Example: Full Request Journey</h3>
+            <pre><code><span class="comment">// 1. SECURITY FILTER - Validates JWT token</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">JwtFilter</span> <span class="keyword">extends</span> OncePerRequestFilter {
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> doFilterInternal(HttpServletRequest request,
+                                      HttpServletResponse response,
+                                      FilterChain chain) {
+
+        String token = request.getHeader(<span class="string">"Authorization"</span>);
+
+        <span class="keyword">if</span> (isValidToken(token)) {
+            <span class="comment">// Set authentication in security context</span>
+            SecurityContextHolder.getContext().setAuthentication(auth);
+        }
+
+        chain.doFilter(request, response);  <span class="comment">// Continue chain</span>
+    }
+}
+
+<span class="comment">// 2. LOGGING INTERCEPTOR - Logs request details</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">LoggingInterceptor</span> <span class="keyword">implements</span> HandlerInterceptor {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public boolean</span> preHandle(HttpServletRequest request,
+                              HttpServletResponse response,
+                              Object handler) {
+        <span class="keyword">long</span> startTime = System.currentTimeMillis();
+        request.setAttribute(<span class="string">"startTime"</span>, startTime);
+        log.info(<span class="string">"Request: {} {}"</span>, request.getMethod(), request.getRequestURI());
+        <span class="keyword">return true</span>;  <span class="comment">// Continue processing</span>
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> afterCompletion(HttpServletRequest request,
+                                 HttpServletResponse response,
+                                 Object handler, Exception ex) {
+        <span class="keyword">long</span> startTime = (<span class="keyword">long</span>) request.getAttribute(<span class="string">"startTime"</span>);
+        <span class="keyword">long</span> duration = System.currentTimeMillis() - startTime;
+        log.info(<span class="string">"Response: {} {} - {}ms"</span>,
+            response.getStatus(), request.getRequestURI(), duration);
+    }
+}
+
+<span class="comment">// 3. CONTROLLER - Handles the actual request</span>
+<span class="annotation">@RestController</span>
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+    <span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{id}"</span>)
+    <span class="keyword">public</span> User getUser(<span class="annotation">@PathVariable</span> Long id) {
+        <span class="keyword">return</span> userService.findById(id);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Content Negotiation</h2>
+            <p>Clients can request specific response formats using the <code>Accept</code> header.</p>
+
+            <pre><code><span class="comment">// Client requests JSON</span>
+GET /api/users/123
+Accept: application/json
+
+<span class="comment">// Client requests XML</span>
+GET /api/users/123
+Accept: application/xml
+
+<span class="comment">// Client accepts either (preference order)</span>
+GET /api/users/123
+Accept: application/json, application/xml;q=0.9
+
+<span class="comment">// Spring Controller supporting multiple formats</span>
+<span class="annotation">@GetMapping</span>(value = <span class="string">"/{id}"</span>,
+            produces = {MediaType.APPLICATION_JSON_VALUE,
+                        MediaType.APPLICATION_XML_VALUE})
+<span class="keyword">public</span> User getUser(<span class="annotation">@PathVariable</span> Long id) {
+    <span class="keyword">return</span> userService.findById(id);
+    <span class="comment">// Spring automatically serializes based on Accept header</span>
+}</code></pre>
+
+            <div class="info-box note">
+                <div class="info-box-title">Quality Factor (q)</div>
+                <p><code>application/xml;q=0.9</code> means XML has 90% preference compared to formats without q (which default to 1.0). Server picks the highest quality format it supports.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Error Handling in the Cycle</h2>
+
+            <pre><code><span class="comment">// Proper error handling throughout the cycle</span>
+
+<span class="annotation">@RestController</span>
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+
+    <span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{id}"</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;User&gt; getUser(<span class="annotation">@PathVariable</span> Long id) {
+        <span class="keyword">return</span> userService.findById(id)
+            .map(ResponseEntity::ok)
+            .orElseThrow(() -> <span class="keyword">new</span> UserNotFoundException(id));
+    }
+}
+
+<span class="comment">// Global exception handler converts exceptions to proper responses</span>
+<span class="annotation">@RestControllerAdvice</span>
+<span class="keyword">public class</span> <span class="class-name">GlobalExceptionHandler</span> {
+
+    <span class="annotation">@ExceptionHandler</span>(UserNotFoundException.<span class="keyword">class</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;ErrorResponse&gt; handleNotFound(UserNotFoundException ex) {
+        ErrorResponse error = <span class="keyword">new</span> ErrorResponse(
+            HttpStatus.NOT_FOUND.value(),
+            ex.getMessage(),
+            LocalDateTime.now()
+        );
+        <span class="keyword">return</span> ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    <span class="annotation">@ExceptionHandler</span>(MethodArgumentNotValidException.<span class="keyword">class</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;ErrorResponse&gt; handleValidation(
+            MethodArgumentNotValidException ex) {
+
+        List&lt;String&gt; errors = ex.getBindingResult()
+            .getFieldErrors().stream()
+            .map(e -> e.getField() + <span class="string">": "</span> + e.getDefaultMessage())
+            .toList();
+
+        ErrorResponse error = <span class="keyword">new</span> ErrorResponse(
+            HttpStatus.BAD_REQUEST.value(),
+            <span class="string">"Validation failed"</span>,
+            errors
+        );
+        <span class="keyword">return</span> ResponseEntity.badRequest().body(error);
+    }
+}
+
+<span class="comment">// Error response format</span>
+{
+    <span class="string">"status"</span>: <span class="number">404</span>,
+    <span class="string">"message"</span>: <span class="string">"User not found with id: 123"</span>,
+    <span class="string">"timestamp"</span>: <span class="string">"2026-01-23T10:30:00"</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Asynchronous Request Handling</h2>
+
+            <pre><code><span class="comment">// Synchronous (Traditional) - Thread blocked during processing</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/reports/{id}"</span>)
+<span class="keyword">public</span> Report getReport(<span class="annotation">@PathVariable</span> Long id) {
+    <span class="comment">// Thread waits here while report generates</span>
+    <span class="keyword">return</span> reportService.generateReport(id);  <span class="comment">// May take 30 seconds!</span>
+}
+
+<span class="comment">// Asynchronous - Thread released while processing</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/reports/{id}"</span>)
+<span class="keyword">public</span> CompletableFuture&lt;Report&gt; getReportAsync(<span class="annotation">@PathVariable</span> Long id) {
+    <span class="comment">// Thread immediately released</span>
+    <span class="keyword">return</span> CompletableFuture.supplyAsync(() ->
+        reportService.generateReport(id)
+    );
+}
+
+<span class="comment">// Using DeferredResult for more control</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/reports/{id}"</span>)
+<span class="keyword">public</span> DeferredResult&lt;Report&gt; getReportDeferred(<span class="annotation">@PathVariable</span> Long id) {
+    DeferredResult&lt;Report&gt; result = <span class="keyword">new</span> DeferredResult&lt;&gt;(<span class="number">30000L</span>); <span class="comment">// 30s timeout</span>
+
+    <span class="comment">// Process in background</span>
+    reportService.generateReportAsync(id, report -> {
+        result.setResult(report);  <span class="comment">// Complete when ready</span>
+    });
+
+    result.onTimeout(() -> {
+        result.setErrorResult(<span class="keyword">new</span> TimeoutException(<span class="string">"Report generation timed out"</span>));
+    });
+
+    <span class="keyword">return</span> result;  <span class="comment">// Returns immediately, response sent later</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Debugging the Cycle</h2>
+
+            <pre><code><span class="comment">// Useful techniques for debugging request/response</span>
+
+<span class="comment">// 1. CURL - See raw request/response</span>
+curl -v -X POST http://localhost:8080/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "John"}'
+
+<span class="comment">// 2. Spring Boot logging - Add to application.properties</span>
+logging.level.org.springframework.web=DEBUG
+logging.level.org.springframework.web.servlet.mvc.method.annotation=TRACE
+
+<span class="comment">// 3. Request logging filter</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">RequestLoggingFilter</span> <span class="keyword">extends</span> CommonsRequestLoggingFilter {
+    <span class="keyword">public</span> RequestLoggingFilter() {
+        setIncludeQueryString(<span class="keyword">true</span>);
+        setIncludePayload(<span class="keyword">true</span>);
+        setIncludeHeaders(<span class="keyword">true</span>);
+        setMaxPayloadLength(<span class="number">10000</span>);
+    }
+}
+
+<span class="comment">// 4. Browser DevTools - Network tab shows all details</span>
+<span class="comment">// 5. Postman/Insomnia - GUI tools for API testing</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Request:</strong> Method + URL + Headers + Body sent from client</li>
+                    <li><strong>Response:</strong> Status + Headers + Body sent from server</li>
+                    <li><strong>Cycle:</strong> Client sends request → Server processes → Server sends response</li>
+                    <li><strong>Headers:</strong> Metadata about the request/response (Content-Type, Authorization, etc.)</li>
+                    <li><strong>Body:</strong> The actual data being transferred (JSON, XML, HTML, etc.)</li>
+                    <li><strong>Status Codes:</strong> Tell client what happened (200 OK, 404 Not Found, etc.)</li>
+                    <li><strong>Pipeline:</strong> Filters → Dispatcher → Interceptors → Controller → Response</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="http.html" class="related-link">HTTP Protocol</a>
+                <a href="rest-principles.html" class="related-link">REST Principles</a>
+                <a href="sessions-cookies.html" class="related-link">Sessions & Cookies</a>
+                <a href="../jakarta-ee/servlets-jsp.html" class="related-link">Servlets & JSP</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

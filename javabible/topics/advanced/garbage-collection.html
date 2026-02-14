@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garbage Collection - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / Garbage Collection
+            </nav>
+            <h1>Garbage Collection</h1>
+            <p class="topic-subtitle">Automatic Memory Management in Java</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is Garbage Collection?</h2>
+            <p>Imagine you're at a restaurant eating. After you finish, you don't wash your own dishes - the staff cleans up for you! <strong>Garbage Collection (GC)</strong> is like that restaurant staff for your program's memory - it automatically cleans up objects you're no longer using.</p>
+
+            <h3>Real-World Analogy: Office Cleaning Service</h3>
+            <ul>
+                <li><strong>You (programmer):</strong> Create objects, use them, then forget about them</li>
+                <li><strong>Garbage Collector:</strong> Comes by after hours, identifies trash (unused objects), throws it away</li>
+                <li><strong>Result:</strong> Clean office (memory) ready for tomorrow!</li>
+            </ul>
+
+            <h3>Manual Memory Management (C/C++) vs Automatic (Java)</h3>
+            <pre><code><span class="comment">// C/C++ - Manual (you must remember to free memory!)</span>
+<span class="keyword">int</span>* ptr = (<span class="keyword">int</span>*)malloc(<span class="keyword">sizeof</span>(<span class="keyword">int</span>));
+*ptr = <span class="number">42</span>;
+<span class="comment">// ... use ptr ...</span>
+free(ptr);  <span class="comment">// Must manually free! If you forget = memory leak!</span>
+
+<span class="comment">// Java - Automatic (GC handles it!)</span>
+<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Alice"</span>);
+<span class="comment">// ... use p ...</span>
+p = <span class="keyword">null</span>;  <span class="comment">// Object becomes eligible for GC</span>
+<span class="comment">// GC automatically cleans it up - you don't worry about it!</span></code></pre>
+
+            <h3>Why Garbage Collection Matters</h3>
+            <ul>
+                <li><strong>Prevents Memory Leaks:</strong> Automatically frees unused memory</li>
+                <li><strong>Prevents Dangling Pointers:</strong> Can't access freed memory accidentally</li>
+                <li><strong>Developer Productivity:</strong> Focus on logic, not memory management</li>
+                <li><strong>Safety:</strong> Reduces crashes from memory errors</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>How Does GC Know What to Clean?</h2>
+
+            <h3>Reachability - The Key Concept</h3>
+            <p>An object is <strong>reachable</strong> if you can access it through references. If unreachable, it's garbage!</p>
+
+            <pre><code><span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+    <span class="class-name">Person</span> p1 = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Alice"</span>);  <span class="comment">// Reachable via p1</span>
+    <span class="class-name">Person</span> p2 = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Bob"</span>);    <span class="comment">// Reachable via p2</span>
+
+    p1 = <span class="keyword">null</span>;  <span class="comment">// Alice object is now UNREACHABLE → Garbage!</span>
+
+    p2 = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Charlie"</span>);  <span class="comment">// Bob becomes UNREACHABLE → Garbage!</span>
+}
+
+<span class="comment">Visualization:</span>
+<span class="comment">┌─────────┐     ┌──────────────┐</span>
+<span class="comment">│   p1    │────→│ Person:Alice │  Reachable ✓</span>
+<span class="comment">└─────────┘     └──────────────┘</span>
+
+<span class="comment">After p1 = null:</span>
+<span class="comment">┌─────────┐     ┌──────────────┐</span>
+<span class="comment">│   p1    │ null │ Person:Alice │  Unreachable ✗ → GARBAGE</span>
+<span class="comment">└─────────┘     └──────────────┘</span></code></pre>
+
+            <h3>GC Roots - Starting Points</h3>
+            <p>GC starts from "roots" and traces all reachable objects. Roots include:</p>
+            <ul>
+                <li>Local variables in stack</li>
+                <li>Static variables</li>
+                <li>Active threads</li>
+                <li>JNI references</li>
+            </ul>
+
+            <pre><code><span class="comment">GC Root Tracing:</span>
+<span class="comment">Start → Stack (local vars) → Objects they point to → Objects those point to...</span>
+<span class="comment">Everything not traced = Garbage!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Generational Garbage Collection</h2>
+            <p>Java's GC uses a clever insight: <strong>Most objects die young!</strong></p>
+
+            <h3>The Weak Generational Hypothesis</h3>
+            <pre><code><span class="comment">Observation:</span>
+<span class="comment">• 90% of objects die within seconds/minutes of creation</span>
+<span class="comment">• 10% survive long-term</span>
+
+<span class="comment">Solution:</span>
+<span class="comment">Split heap into generations, clean young objects frequently!</span></code></pre>
+
+            <h3>Heap Generations</h3>
+            <pre><code><span class="comment">┌────────────────────────────────────────────────┐</span>
+<span class="comment">│              JAVA HEAP                         │</span>
+<span class="comment">├────────────────────────────────────────────────┤</span>
+<span class="comment">│  YOUNG GENERATION (33%)                        │</span>
+<span class="comment">│  ┌──────────┬──────────────┬──────────────┐   │</span>
+<span class="comment">│  │  Eden    │ Survivor S0  │ Survivor S1  │   │</span>
+<span class="comment">│  │  (90%)   │    (5%)      │    (5%)      │   │</span>
+<span class="comment">│  │          │              │              │   │</span>
+<span class="comment">│  │ New objs │ Survived 1+  │ Survived 2+  │   │</span>
+<span class="comment">│  │ born here│  GC cycles   │  GC cycles   │   │</span>
+<span class="comment">│  └──────────┴──────────────┴──────────────┘   │</span>
+<span class="comment">├────────────────────────────────────────────────┤</span>
+<span class="comment">│  OLD GENERATION (Tenured) (67%)                │</span>
+<span class="comment">│  Long-lived objects that survived many GCs     │</span>
+<span class="comment">│  Cleaned less frequently                       │</span>
+<span class="comment">└────────────────────────────────────────────────┘</span></code></pre>
+
+            <h3>Object Lifecycle</h3>
+            <pre><code><span class="comment">Step 1: Object is born</span>
+<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
+<span class="comment">→ Created in Eden space</span>
+
+<span class="comment">Step 2: Minor GC happens (Eden fills up)</span>
+<span class="comment">→ Dead objects: Cleaned up</span>
+<span class="comment">→ Surviving objects: Moved to Survivor S0, age = 1</span>
+
+<span class="comment">Step 3: Next Minor GC</span>
+<span class="comment">→ Eden + S0 objects examined</span>
+<span class="comment">→ Survivors moved to S1, age incremented (age = 2)</span>
+
+<span class="comment">Step 4: Objects keep bouncing between S0 ↔ S1</span>
+<span class="comment">→ Age increments each time</span>
+
+<span class="comment">Step 5: Object reaches age threshold (default: 15)</span>
+<span class="comment">→ Promoted to Old Generation (Tenured)</span>
+
+<span class="comment">Step 6: Lives in Old Gen until Major GC</span>
+<span class="comment">→ Eventually cleaned if unreachable</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Types of Garbage Collection</h2>
+
+            <h3>1. Minor GC (Young Generation)</h3>
+            <ul>
+                <li><strong>Frequency:</strong> Very frequent (milliseconds/seconds)</li>
+                <li><strong>Speed:</strong> Fast (few milliseconds)</li>
+                <li><strong>Scope:</strong> Only Young Generation</li>
+                <li><strong>Trigger:</strong> Eden space fills up</li>
+                <li><strong>Impact:</strong> Minimal pause time</li>
+            </ul>
+
+            <h3>2. Major GC / Full GC (Whole Heap)</h3>
+            <ul>
+                <li><strong>Frequency:</strong> Infrequent (minutes/hours)</li>
+                <li><strong>Speed:</strong> Slow (hundreds of milliseconds - seconds)</li>
+                <li><strong>Scope:</strong> Entire heap (Young + Old)</li>
+                <li><strong>Trigger:</strong> Old Gen fills up, System.gc(), etc.</li>
+                <li><strong>Impact:</strong> Noticeable pause (Stop-The-World)</li>
+            </ul>
+
+            <h3>Stop-The-World Events</h3>
+            <p>During GC, application threads must pause (Stop-The-World). Modern GCs minimize this!</p>
+
+            <pre><code><span class="comment">Application Timeline:</span>
+<span class="comment">App running... → [GC Pause 5ms] → App running... → [GC Pause 3ms] → ...</span>
+
+<span class="comment">During GC pause:</span>
+<span class="comment">✗ Application threads stopped</span>
+<span class="comment">✓ GC threads working</span>
+<span class="comment">Goal: Minimize pause time!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Garbage Collection Algorithms</h2>
+
+            <h3>1. Serial GC (Default for small apps)</h3>
+            <pre><code><span class="comment">// Enable with:</span>
+java -XX:+UseSerialGC MyApp
+
+<span class="comment">How it works:</span>
+<span class="comment">• Single-threaded GC</span>
+<span class="comment">• Stops all app threads</span>
+<span class="comment">• Simple, low overhead</span>
+<span class="comment">• Good for: Small apps, single-core machines</span></code></pre>
+
+            <h3>2. Parallel GC (Throughput Collector)</h3>
+            <pre><code><span class="comment">// Enable with:</span>
+java -XX:+UseParallelGC MyApp
+
+<span class="comment">How it works:</span>
+<span class="comment">• Multi-threaded GC</span>
+<span class="comment">• Uses multiple cores for GC</span>
+<span class="comment">• Faster cleanup</span>
+<span class="comment">• Good for: Batch processing, high throughput apps</span></code></pre>
+
+            <h3>3. G1 GC (Garbage First - Default Java 9+)</h3>
+            <pre><code><span class="comment">// Enable with (or default in Java 9+):</span>
+java -XX:+UseG1GC MyApp
+
+<span class="comment">How it works:</span>
+<span class="comment">• Divides heap into regions</span>
+<span class="comment">• Collects regions with most garbage first</span>
+<span class="comment">• Predictable pause times</span>
+<span class="comment">• Good for: Large heaps, low-latency apps</span></code></pre>
+
+            <h3>4. ZGC (Scalable Low-Latency GC - Java 11+)</h3>
+            <pre><code><span class="comment">// Enable with:</span>
+java -XX:+UseZGC MyApp
+
+<span class="comment">How it works:</span>
+<span class="comment">• Ultra-low pause times (<10ms)</span>
+<span class="comment">• Concurrent GC (runs alongside app)</span>
+<span class="comment">• Handles huge heaps (terabytes)</span>
+<span class="comment">• Good for: Ultra-low-latency requirements</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Memory Leaks in Java - Yes, They Can Happen!</h2>
+            <p>Even with GC, you can leak memory if you hold references to objects you no longer need.</p>
+
+            <h3>Common Memory Leak Scenarios</h3>
+
+            <h4>1. Static Collections</h4>
+            <div class="info-box warning">
+                <div class="info-box-title">❌ Memory Leak Example</div>
+                <pre><code><span class="keyword">public class</span> <span class="class-name">Cache</span> {
+    <span class="keyword">private static</span> <span class="class-name">List</span>&lt;<span class="class-name">Object</span>&gt; cache = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="keyword">public static void</span> <span class="function">add</span>(<span class="class-name">Object</span> obj) {
+        cache.add(obj);  <span class="comment">// Objects NEVER removed!</span>
+    }
+}
+
+<span class="comment">// Every object added stays in memory forever!</span>
+<span class="comment">// Static collection is always reachable → Objects never GC'd</span></code></pre>
+            </div>
+
+            <h4>2. Unclosed Resources</h4>
+            <div class="info-box warning">
+                <div class="info-box-title">❌ Resource Leak</div>
+                <pre><code><span class="class-name">FileInputStream</span> fis = <span class="keyword">new</span> <span class="class-name">FileInputStream</span>(<span class="string">"file.txt"</span>);
+<span class="comment">// ... use fis ...</span>
+<span class="comment">// Never closed! File handle leaked!</span></code></pre>
+            </div>
+
+            <div class="info-box tip">
+                <div class="info-box-title">✅ Solution: Try-With-Resources</div>
+                <pre><code><span class="keyword">try</span> (<span class="class-name">FileInputStream</span> fis = <span class="keyword">new</span> <span class="class-name">FileInputStream</span>(<span class="string">"file.txt"</span>)) {
+    <span class="comment">// use fis...</span>
+}  <span class="comment">// Automatically closed!</span></code></pre>
+            </div>
+
+            <h4>3. Event Listeners Not Removed</h4>
+            <pre><code><span class="comment">// BAD: Add listener but never remove</span>
+button.addActionListener(myListener);
+<span class="comment">// If button outlives listener, listener stays in memory!</span>
+
+<span class="comment">// GOOD: Remove when done</span>
+button.removeActionListener(myListener);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Monitoring and Tuning GC</h2>
+
+            <h3>GC Logging</h3>
+            <pre><code><span class="comment">// Enable GC logging</span>
+java -Xlog:gc* -Xlog:gc:gc.log MyApp
+
+<span class="comment">// Output example:</span>
+[<span class="number">0.123</span>s][info][gc] GC(<span class="number">0</span>) Pause Young (Normal) <span class="number">12</span>M-><span class="number">2</span>M(<span class="number">50</span>M) <span class="number">4.567</span>ms
+<span class="comment">//               │                       │      │     │</span>
+<span class="comment">//               Type                    Before After Time</span></code></pre>
+
+            <h3>Heap Size Tuning</h3>
+            <pre><code><span class="comment">// Set initial heap size (Xms) and max heap size (Xmx)</span>
+java -Xms512m -Xmx2g MyApp
+
+<span class="comment">// -Xms512m: Start with 512MB heap</span>
+<span class="comment">// -Xmx2g: Allow heap to grow up to 2GB</span>
+
+<span class="comment">Best Practice: Set Xms = Xmx (avoid resizing overhead)</span>
+java -Xms2g -Xmx2g MyApp</code></pre>
+
+            <h3>Monitoring Tools</h3>
+            <ul>
+                <li><strong>jstat:</strong> Command-line GC statistics</li>
+                <li><strong>jconsole:</strong> Visual monitoring tool</li>
+                <li><strong>VisualVM:</strong> Advanced profiling</li>
+                <li><strong>Java Mission Control:</strong> Production monitoring</li>
+            </ul>
+
+            <pre><code><span class="comment">// View GC stats in real-time</span>
+jstat -gc <span class="number">12345</span> <span class="number">1000</span>
+<span class="comment">//        │     │</span>
+<span class="comment">//        PID   Every 1000ms</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">GC Best Practices</div>
+                <ul>
+                    <li>✅ <strong>Avoid creating unnecessary objects:</strong> Reuse when possible</li>
+                    <li>✅ <strong>Use object pools for expensive objects:</strong> Database connections, threads</li>
+                    <li>✅ <strong>Clear large collections when done:</strong> list.clear()</li>
+                    <li>✅ <strong>Use weak references for caches:</strong> WeakHashMap, SoftReference</li>
+                    <li>✅ <strong>Close resources:</strong> Try-with-resources or finally blocks</li>
+                    <li>✅ <strong>Avoid finalizers:</strong> They delay GC and are unpredictable</li>
+                    <li>✅ <strong>Profile before tuning:</strong> Measure, don't guess</li>
+                    <li>❌ <strong>Don't call System.gc():</strong> Let JVM decide</li>
+                    <li>❌ <strong>Don't over-tune:</strong> Default settings work for most apps</li>
+                </ul>
+            </div>
+
+            <h3>Writing GC-Friendly Code</h3>
+            <pre><code><span class="comment">// BAD: Creates many temporary objects</span>
+<span class="class-name">String</span> result = <span class="string">""</span>;
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) {
+    result += i;  <span class="comment">// Creates 1000 String objects!</span>
+}
+
+<span class="comment">// GOOD: Reuses single StringBuilder</span>
+<span class="class-name">StringBuilder</span> result = <span class="keyword">new</span> <span class="class-name">StringBuilder</span>();
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) {
+    result.append(i);  <span class="comment">// Single object!</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Why It Matters</h2>
+            <ul>
+                <li><strong>Performance:</strong> Efficient GC = faster applications</li>
+                <li><strong>Scalability:</strong> Handle more users with same hardware</li>
+                <li><strong>Stability:</strong> Prevent OutOfMemoryErrors</li>
+                <li><strong>Cost:</strong> Better GC tuning = lower infrastructure costs</li>
+                <li><strong>User Experience:</strong> Low pause times = smooth applications</li>
+            </ul>
+
+            <div class="info-box note">
+                <div class="info-box-title">Remember</div>
+                <p>Garbage Collection is like a self-cleaning oven - it handles the dirty work so you can focus on cooking (coding)! Trust it, but understand how it works for when you need to tune performance.</p>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jvm-internals.html" class="related-link">JVM Internals</a>
+                <a href="multithreading.html" class="related-link">Multithreading</a>
+                <a href="../best-practices/performance.html" class="related-link">Performance Optimization</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

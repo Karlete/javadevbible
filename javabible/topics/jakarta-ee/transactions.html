@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jakarta Transactions - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / Transactions
+            </nav>
+            <h1>Jakarta Transactions (JTA)</h1>
+            <p class="topic-subtitle">Managing transactions in enterprise applications</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What are Transactions?</h2>
+            <p><strong>Think of a transaction like a bank transfer:</strong></p>
+            <ul>
+                <li>Withdraw $100 from Account A</li>
+                <li>Deposit $100 to Account B</li>
+                <li>Either BOTH happen, or NEITHER happens</li>
+                <li>You can't have money disappear or duplicate!</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Jakarta Transactions (JTA)</strong> provides a standard API for managing transactions across multiple resources (databases, message queues, etc.) in enterprise applications.</p>
+            </div>
+
+            <h3>ACID Properties</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Property</th>
+                        <th>Meaning</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Atomicity</strong></td>
+                        <td>All or nothing</td>
+                        <td>Both withdraw and deposit succeed, or both fail</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Consistency</strong></td>
+                        <td>Valid state transitions</td>
+                        <td>Total money in system stays the same</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Isolation</strong></td>
+                        <td>Concurrent transactions don't interfere</td>
+                        <td>Two transfers at same time don't corrupt data</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Durability</strong></td>
+                        <td>Committed changes persist</td>
+                        <td>After commit, data survives server crash</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Transaction Management Approaches</h2>
+
+            <h3>1. Container-Managed Transactions (CMT) - Recommended</h3>
+            <pre><code><span class="keyword">import</span> jakarta.ejb.*;
+<span class="keyword">import</span> jakarta.transaction.*;
+
+<span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">BankService</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">AccountRepository</span> accountRepo;
+
+    <span class="comment">// Container manages the transaction automatically!</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRED)
+    <span class="keyword">public void</span> <span class="function">transfer</span>(<span class="class-name">Long</span> fromId, <span class="class-name">Long</span> toId, <span class="class-name">BigDecimal</span> amount) {
+        <span class="class-name">Account</span> from = accountRepo.findById(fromId);
+        <span class="class-name">Account</span> to = accountRepo.findById(toId);
+
+        from.withdraw(amount);  <span class="comment">// If this fails...</span>
+        to.deposit(amount);     <span class="comment">// ...this won't happen either!</span>
+
+        accountRepo.save(from);
+        accountRepo.save(to);
+
+        <span class="comment">// Transaction commits automatically when method returns</span>
+        <span class="comment">// Transaction rolls back if exception is thrown</span>
+    }
+}</code></pre>
+
+            <h3>2. Bean-Managed Transactions (BMT)</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="annotation">@TransactionManagement</span>(TransactionManagementType.BEAN)
+<span class="keyword">public class</span> <span class="class-name">ManualTransactionService</span> {
+
+    <span class="annotation">@Resource</span>
+    <span class="keyword">private</span> <span class="class-name">UserTransaction</span> userTransaction;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">AccountRepository</span> accountRepo;
+
+    <span class="keyword">public void</span> <span class="function">transfer</span>(<span class="class-name">Long</span> fromId, <span class="class-name">Long</span> toId, <span class="class-name">BigDecimal</span> amount) {
+        <span class="keyword">try</span> {
+            <span class="comment">// Start transaction manually</span>
+            userTransaction.begin();
+
+            <span class="class-name">Account</span> from = accountRepo.findById(fromId);
+            <span class="class-name">Account</span> to = accountRepo.findById(toId);
+
+            from.withdraw(amount);
+            to.deposit(amount);
+
+            accountRepo.save(from);
+            accountRepo.save(to);
+
+            <span class="comment">// Commit manually</span>
+            userTransaction.commit();
+
+        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+            <span class="keyword">try</span> {
+                <span class="comment">// Rollback on error</span>
+                userTransaction.rollback();
+            } <span class="keyword">catch</span> (<span class="class-name">Exception</span> ex) {
+                <span class="comment">// Handle rollback error</span>
+            }
+            <span class="keyword">throw new</span> <span class="class-name">RuntimeException</span>(<span class="string">"Transfer failed"</span>, e);
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Transaction Attributes (CMT)</h2>
+
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">TransactionDemo</span> {
+
+    <span class="comment">// REQUIRED (default): Join existing or create new</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRED)
+    <span class="keyword">public void</span> <span class="function">required</span>() {
+        <span class="comment">// If caller has transaction: join it</span>
+        <span class="comment">// If no transaction: create new one</span>
+    }
+
+    <span class="comment">// REQUIRES_NEW: Always create new transaction</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRES_NEW)
+    <span class="keyword">public void</span> <span class="function">requiresNew</span>() {
+        <span class="comment">// Suspend caller's transaction (if any)</span>
+        <span class="comment">// Create new independent transaction</span>
+        <span class="comment">// Good for: audit logs that must persist even if main tx fails</span>
+    }
+
+    <span class="comment">// MANDATORY: Must have existing transaction</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.MANDATORY)
+    <span class="keyword">public void</span> <span class="function">mandatory</span>() {
+        <span class="comment">// If caller has transaction: join it</span>
+        <span class="comment">// If no transaction: throw exception!</span>
+    }
+
+    <span class="comment">// SUPPORTS: Optional transaction</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.SUPPORTS)
+    <span class="keyword">public void</span> <span class="function">supports</span>() {
+        <span class="comment">// If caller has transaction: join it</span>
+        <span class="comment">// If no transaction: run without transaction</span>
+    }
+
+    <span class="comment">// NOT_SUPPORTED: Never use transaction</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.NOT_SUPPORTED)
+    <span class="keyword">public void</span> <span class="function">notSupported</span>() {
+        <span class="comment">// Suspend caller's transaction (if any)</span>
+        <span class="comment">// Run without transaction</span>
+        <span class="comment">// Good for: read-only operations, external calls</span>
+    }
+
+    <span class="comment">// NEVER: Must NOT have transaction</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.NEVER)
+    <span class="keyword">public void</span> <span class="function">never</span>() {
+        <span class="comment">// If caller has transaction: throw exception!</span>
+        <span class="comment">// If no transaction: run without transaction</span>
+    }
+}</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Attribute</th>
+                        <th>No Tx Exists</th>
+                        <th>Tx Exists</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>REQUIRED</strong></td>
+                        <td>Create new</td>
+                        <td>Join</td>
+                        <td>Default, most methods</td>
+                    </tr>
+                    <tr>
+                        <td><strong>REQUIRES_NEW</strong></td>
+                        <td>Create new</td>
+                        <td>Create new (suspend)</td>
+                        <td>Audit logs, independent ops</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MANDATORY</strong></td>
+                        <td>Error</td>
+                        <td>Join</td>
+                        <td>Force caller to have tx</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SUPPORTS</strong></td>
+                        <td>No tx</td>
+                        <td>Join</td>
+                        <td>Optional tx support</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NOT_SUPPORTED</strong></td>
+                        <td>No tx</td>
+                        <td>No tx (suspend)</td>
+                        <td>Read-only, external calls</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NEVER</strong></td>
+                        <td>No tx</td>
+                        <td>Error</td>
+                        <td>Must not have tx</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>CDI with @Transactional</h2>
+
+            <pre><code><span class="keyword">import</span> jakarta.transaction.Transactional;
+<span class="keyword">import</span> jakarta.transaction.Transactional.TxType;
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">OrderRepository</span> orderRepo;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentService</span> paymentService;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">InventoryService</span> inventoryService;
+
+    <span class="comment">// Equivalent to TransactionAttributeType.REQUIRED</span>
+    <span class="annotation">@Transactional</span>(TxType.REQUIRED)
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">createOrder</span>(<span class="class-name">OrderRequest</span> request) {
+        <span class="comment">// All these operations are in the same transaction</span>
+        <span class="class-name">Order</span> order = <span class="keyword">new</span> <span class="class-name">Order</span>(request);
+        orderRepo.save(order);
+
+        paymentService.processPayment(order);
+        inventoryService.reserveItems(order);
+
+        <span class="keyword">return</span> order;
+        <span class="comment">// Commit on success, rollback on exception</span>
+    }
+
+    <span class="annotation">@Transactional</span>(TxType.REQUIRES_NEW)
+    <span class="keyword">public void</span> <span class="function">logOrderAttempt</span>(<span class="class-name">OrderRequest</span> request) {
+        <span class="comment">// Logs in separate transaction</span>
+        <span class="comment">// Persists even if main order fails</span>
+    }
+
+    <span class="comment">// Specify which exceptions cause rollback</span>
+    <span class="annotation">@Transactional</span>(
+        rollbackOn = {<span class="class-name">PaymentException</span>.<span class="keyword">class</span>},
+        dontRollbackOn = {<span class="class-name">ValidationWarning</span>.<span class="keyword">class</span>}
+    )
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">Order</span> order) {
+        <span class="comment">// PaymentException: rolls back</span>
+        <span class="comment">// ValidationWarning: commits anyway</span>
+    }
+}</code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Important!</div>
+                <p><strong>@Transactional only works on CDI beans</strong> when called from outside the bean. Calling a transactional method from within the same class won't start a new transaction!</p>
+            </div>
+
+            <pre><code><span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">BrokenExample</span> {
+
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public void</span> <span class="function">methodA</span>() {
+        <span class="comment">// Transaction started</span>
+        methodB();  <span class="comment">// NO new transaction! Same class call bypasses proxy</span>
+    }
+
+    <span class="annotation">@Transactional</span>(TxType.REQUIRES_NEW)
+    <span class="keyword">public void</span> <span class="function">methodB</span>() {
+        <span class="comment">// Expected new transaction, but didn't get one!</span>
+    }
+}
+
+<span class="comment">// Solution: Use self-injection</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">FixedExample</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">FixedExample</span> self;  <span class="comment">// Self-inject the proxy</span>
+
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public void</span> <span class="function">methodA</span>() {
+        self.methodB();  <span class="comment">// Now goes through proxy, new tx created!</span>
+    }
+
+    <span class="annotation">@Transactional</span>(TxType.REQUIRES_NEW)
+    <span class="keyword">public void</span> <span class="function">methodB</span>() {
+        <span class="comment">// Correctly runs in new transaction</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Rollback Handling</h2>
+
+            <h3>Automatic Rollback (Runtime Exceptions)</h3>
+            <pre><code><span class="annotation">@Transactional</span>
+<span class="keyword">public void</span> <span class="function">transferMoney</span>(<span class="class-name">Long</span> fromId, <span class="class-name">Long</span> toId, <span class="class-name">BigDecimal</span> amount) {
+    <span class="class-name">Account</span> from = accountRepo.findById(fromId);
+    <span class="class-name">Account</span> to = accountRepo.findById(toId);
+
+    from.withdraw(amount);
+
+    <span class="keyword">if</span> (amount.compareTo(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"10000"</span>)) > <span class="number">0</span>) {
+        <span class="comment">// RuntimeException = automatic rollback</span>
+        <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Amount too large"</span>);
+    }
+
+    to.deposit(amount);
+    <span class="comment">// If we get here, transaction commits</span>
+}</code></pre>
+
+            <h3>Manual Rollback</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="annotation">@Resource</span>
+    <span class="keyword">private</span> <span class="class-name">SessionContext</span> ctx;  <span class="comment">// EJB context</span>
+
+    <span class="keyword">public void</span> <span class="function">createOrder</span>(<span class="class-name">OrderRequest</span> request) {
+        <span class="keyword">try</span> {
+            <span class="comment">// ... order logic</span>
+
+            <span class="keyword">if</span> (!validateOrder(request)) {
+                <span class="comment">// Mark transaction for rollback</span>
+                ctx.setRollbackOnly();
+                <span class="keyword">return</span>;  <span class="comment">// Transaction will rollback when method ends</span>
+            }
+
+        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+            ctx.setRollbackOnly();
+            <span class="keyword">throw</span> e;
+        }
+    }
+}</code></pre>
+
+            <h3>Programmatic Rollback Check</h3>
+            <pre><code><span class="annotation">@Inject</span>
+<span class="keyword">private</span> <span class="class-name">TransactionManager</span> tm;
+
+<span class="keyword">public void</span> <span class="function">someMethod</span>() {
+    <span class="keyword">try</span> {
+        <span class="comment">// Check if current transaction is marked for rollback</span>
+        <span class="keyword">if</span> (tm.getStatus() == <span class="class-name">Status</span>.STATUS_MARKED_ROLLBACK) {
+            <span class="comment">// Don't do expensive operations, tx will rollback anyway</span>
+            <span class="keyword">return</span>;
+        }
+
+        <span class="comment">// Continue with operations...</span>
+
+    } <span class="keyword">catch</span> (<span class="class-name">SystemException</span> e) {
+        <span class="comment">// Handle error</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Distributed Transactions (XA)</h2>
+
+            <pre><code><span class="comment">// XA transactions span multiple resources (databases, JMS, etc.)</span>
+
+<span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">DistributedService</span> {
+
+    <span class="annotation">@PersistenceContext</span>(unitName = <span class="string">"ordersDB"</span>)
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> ordersEm;
+
+    <span class="annotation">@PersistenceContext</span>(unitName = <span class="string">"inventoryDB"</span>)
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> inventoryEm;
+
+    <span class="annotation">@Inject</span>
+    <span class="annotation">@JMSConnectionFactory</span>(<span class="string">"java:/JmsXA"</span>)
+    <span class="keyword">private</span> <span class="class-name">JMSContext</span> jmsContext;
+
+    <span class="comment">// Single transaction across 2 databases and JMS!</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRED)
+    <span class="keyword">public void</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order) {
+        <span class="comment">// Write to orders database</span>
+        ordersEm.persist(order);
+
+        <span class="comment">// Write to inventory database</span>
+        <span class="class-name">InventoryItem</span> item = inventoryEm.find(<span class="class-name">InventoryItem</span>.<span class="keyword">class</span>, order.getItemId());
+        item.decreaseStock(order.getQuantity());
+
+        <span class="comment">// Send JMS message</span>
+        jmsContext.createProducer().send(queue, <span class="string">"Order created: "</span> + order.getId());
+
+        <span class="comment">// All 3 operations commit or rollback together!</span>
+    }
+}</code></pre>
+
+            <div class="info-box note">
+                <div class="info-box-title">Two-Phase Commit (2PC)</div>
+                <p>XA transactions use 2PC protocol:</p>
+                <ol>
+                    <li><strong>Prepare Phase:</strong> All resources confirm they can commit</li>
+                    <li><strong>Commit Phase:</strong> If all say yes, all commit; if any says no, all rollback</li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Transaction Timeout</h2>
+
+            <pre><code><span class="comment">// Set timeout for long-running transactions</span>
+
+<span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">BatchService</span> {
+
+    <span class="annotation">@Resource</span>
+    <span class="keyword">private</span> <span class="class-name">UserTransaction</span> utx;
+
+    <span class="keyword">public void</span> <span class="function">processBatch</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="comment">// Set timeout to 5 minutes (300 seconds)</span>
+        utx.setTransactionTimeout(<span class="number">300</span>);
+        utx.begin();
+
+        <span class="keyword">try</span> {
+            <span class="comment">// Long-running batch operation</span>
+            processManyRecords();
+            utx.commit();
+        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+            utx.rollback();
+            <span class="keyword">throw</span> e;
+        }
+    }
+}
+
+<span class="comment">// Or use annotation (container-specific)</span>
+<span class="annotation">@Stateless</span>
+<span class="annotation">@TransactionTimeout</span>(value = <span class="number">5</span>, unit = <span class="class-name">TimeUnit</span>.MINUTES)
+<span class="keyword">public class</span> <span class="class-name">SlowService</span> {
+    <span class="comment">// All methods have 5-minute timeout</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>JPA with Transactions</h2>
+
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">ProductService</span> {
+
+    <span class="annotation">@PersistenceContext</span>
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
+
+    <span class="comment">// CMT: transaction managed by container</span>
+    <span class="keyword">public void</span> <span class="function">createProduct</span>(<span class="class-name">Product</span> product) {
+        em.persist(product);
+        <span class="comment">// Changes flushed and committed when method returns</span>
+    }
+
+    <span class="keyword">public void</span> <span class="function">updateProduct</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> newName) {
+        <span class="class-name">Product</span> p = em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, id);
+        p.setName(newName);
+        <span class="comment">// No em.merge() needed! Entity is managed, changes auto-tracked</span>
+    }
+
+    <span class="comment">// Force immediate write to database</span>
+    <span class="keyword">public void</span> <span class="function">createAndFlush</span>(<span class="class-name">Product</span> product) {
+        em.persist(product);
+        em.flush();  <span class="comment">// Write to DB now (still in transaction)</span>
+
+        <span class="comment">// product.getId() now available</span>
+        <span class="class-name">System</span>.out.println(<span class="string">"Created with ID: "</span> + product.getId());
+    }
+
+    <span class="comment">// Read-only optimization</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.NOT_SUPPORTED)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">findAll</span>() {
+        <span class="keyword">return</span> em.createQuery(<span class="string">"SELECT p FROM Product p"</span>, <span class="class-name">Product</span>.<span class="keyword">class</span>)
+                 .getResultList();
+    }
+}</code></pre>
+
+            <h3>Optimistic Locking</h3>
+            <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Product</span> {
+    <span class="annotation">@Id</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+
+    <span class="annotation">@Version</span>  <span class="comment">// Optimistic locking</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> version;
+}
+
+<span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">ProductService</span> {
+
+    <span class="annotation">@PersistenceContext</span>
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
+
+    <span class="keyword">public void</span> <span class="function">updateProduct</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> newName) {
+        <span class="class-name">Product</span> p = em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, id);
+        p.setName(newName);
+        <span class="comment">// If another transaction modified this product,</span>
+        <span class="comment">// OptimisticLockException is thrown on commit!</span>
+    }
+
+    <span class="keyword">public void</span> <span class="function">safeUpdate</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> newName) {
+        <span class="keyword">try</span> {
+            <span class="class-name">Product</span> p = em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, id);
+            p.setName(newName);
+            em.flush();
+        } <span class="keyword">catch</span> (<span class="class-name">OptimisticLockException</span> e) {
+            <span class="comment">// Handle concurrent modification</span>
+            <span class="keyword">throw new</span> <span class="class-name">ConcurrentModificationException</span>(<span class="string">"Product was modified"</span>);
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Patterns</h2>
+
+            <h3>Saga Pattern (for Microservices)</h3>
+            <pre><code><span class="comment">// When XA transactions aren't possible (microservices)</span>
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">OrderSaga</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">OrderService</span> orderService;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentService</span> paymentService;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">InventoryService</span> inventoryService;
+
+    <span class="keyword">public void</span> <span class="function">createOrder</span>(<span class="class-name">OrderRequest</span> request) {
+        <span class="class-name">String</span> orderId = <span class="keyword">null</span>;
+        <span class="class-name">String</span> paymentId = <span class="keyword">null</span>;
+
+        <span class="keyword">try</span> {
+            <span class="comment">// Step 1: Create order</span>
+            orderId = orderService.create(request);
+
+            <span class="comment">// Step 2: Process payment</span>
+            paymentId = paymentService.charge(request.getPaymentInfo());
+
+            <span class="comment">// Step 3: Reserve inventory</span>
+            inventoryService.reserve(request.getItems());
+
+            <span class="comment">// Step 4: Complete order</span>
+            orderService.complete(orderId);
+
+        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+            <span class="comment">// Compensating transactions (rollback)</span>
+            <span class="keyword">if</span> (paymentId != <span class="keyword">null</span>) {
+                paymentService.refund(paymentId);
+            }
+            <span class="keyword">if</span> (orderId != <span class="keyword">null</span>) {
+                orderService.cancel(orderId);
+            }
+            <span class="keyword">throw new</span> <span class="class-name">OrderFailedException</span>(<span class="string">"Order creation failed"</span>, e);
+        }
+    }
+}</code></pre>
+
+            <h3>Audit Logging (Separate Transaction)</h3>
+            <pre><code><span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">AuditService</span> {
+
+    <span class="annotation">@PersistenceContext</span>
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
+
+    <span class="comment">// Always log, even if main transaction fails</span>
+    <span class="annotation">@Transactional</span>(TxType.REQUIRES_NEW)
+    <span class="keyword">public void</span> <span class="function">logAction</span>(<span class="class-name">String</span> user, <span class="class-name">String</span> action, <span class="class-name">String</span> details) {
+        <span class="class-name">AuditLog</span> log = <span class="keyword">new</span> <span class="class-name">AuditLog</span>();
+        log.setUser(user);
+        log.setAction(action);
+        log.setDetails(details);
+        log.setTimestamp(<span class="class-name">Instant</span>.now());
+        em.persist(log);
+        <span class="comment">// Commits in separate transaction</span>
+    }
+}
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">AccountService</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">AuditService</span> auditService;
+
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public void</span> <span class="function">transferMoney</span>(<span class="class-name">String</span> user, <span class="class-name">Long</span> fromId, <span class="class-name">Long</span> toId, <span class="class-name">BigDecimal</span> amount) {
+        <span class="comment">// Log attempt (persists even if transfer fails)</span>
+        auditService.logAction(user, <span class="string">"TRANSFER_ATTEMPT"</span>,
+            <span class="string">"From: "</span> + fromId + <span class="string">", To: "</span> + toId + <span class="string">", Amount: "</span> + amount);
+
+        <span class="keyword">try</span> {
+            <span class="comment">// Do transfer...</span>
+            doTransfer(fromId, toId, amount);
+
+            auditService.logAction(user, <span class="string">"TRANSFER_SUCCESS"</span>, <span class="string">"Completed"</span>);
+        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+            auditService.logAction(user, <span class="string">"TRANSFER_FAILED"</span>, e.getMessage());
+            <span class="keyword">throw</span> e;
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>DO:</h3>
+                <ul>
+                    <li><strong>Use CMT by default</strong> - Let the container manage transactions</li>
+                    <li><strong>Keep transactions short</strong> - Long transactions cause locking issues</li>
+                    <li><strong>Use REQUIRES_NEW for audit logs</strong> - Must persist even on failure</li>
+                    <li><strong>Use optimistic locking (@Version)</strong> - Better scalability</li>
+                    <li><strong>Handle OptimisticLockException</strong> - Retry or notify user</li>
+                    <li><strong>Set appropriate timeouts</strong> - Prevent hung transactions</li>
+                    <li><strong>Use NOT_SUPPORTED for read-only</strong> - Better performance</li>
+                </ul>
+
+                <h3>DON'T:</h3>
+                <ul>
+                    <li><strong>Don't catch and ignore exceptions</strong> - Transaction won't rollback</li>
+                    <li><strong>Don't do external calls in transactions</strong> - HTTP, file I/O, etc.</li>
+                    <li><strong>Don't hold transactions during user input</strong> - Causes blocking</li>
+                    <li><strong>Don't forget about lazy loading</strong> - May fail after tx closes</li>
+                    <li><strong>Don't mix CMT and BMT</strong> - Confusing and error-prone</li>
+                    <li><strong>Don't use SERIALIZABLE isolation</strong> unless necessary - Performance impact</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>JTA:</strong> Standard API for transaction management</li>
+                    <li><strong>CMT:</strong> Container-Managed Transactions (recommended)</li>
+                    <li><strong>BMT:</strong> Bean-Managed Transactions (manual control)</li>
+                    <li><strong>@Transactional:</strong> CDI annotation for transaction demarcation</li>
+                    <li><strong>REQUIRED:</strong> Join or create transaction (default)</li>
+                    <li><strong>REQUIRES_NEW:</strong> Always new transaction (audit logs)</li>
+                    <li><strong>NOT_SUPPORTED:</strong> No transaction (read-only)</li>
+                    <li><strong>XA Transactions:</strong> Distributed transactions across resources</li>
+                    <li><strong>@Version:</strong> Optimistic locking in JPA</li>
+                    <li><strong>Saga Pattern:</strong> Compensating transactions for microservices</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jpa.html" class="related-link">JPA (Persistence)</a>
+                <a href="ejb.html" class="related-link">EJB</a>
+                <a href="cdi.html" class="related-link">CDI</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

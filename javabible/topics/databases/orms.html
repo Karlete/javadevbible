@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ORMs (Object-Relational Mapping) - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#databases">Databases & Persistence</a> / ORMs
+            </nav>
+            <h1>ORMs (Object-Relational Mapping)</h1>
+            <p class="topic-subtitle">Bridging the gap between objects and databases</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is ORM?</h2>
+            <p><strong>Object-Relational Mapping (ORM)</strong> is a programming technique that converts data between incompatible type systems: object-oriented programming languages and relational databases. ORMs allow developers to work with database data using their language's native objects instead of writing SQL.</p>
+
+            <h3>The Impedance Mismatch Problem</h3>
+            <pre><code><span class="comment">// Object-Oriented World vs Relational World</span>
+
+┌────────────────────────────────────────────────────────────────────┐
+│         OBJECTS (Java)              │        TABLES (SQL)          │
+├────────────────────────────────────────────────────────────────────┤
+│                                     │                              │
+│  class Employee {                   │  CREATE TABLE employees (    │
+│      Long id;                       │      id BIGINT PRIMARY KEY,  │
+│      String name;                   │      name VARCHAR(100),      │
+│      Department dept;  ← Object     │      dept_id BIGINT  ← FK    │
+│      List&lt;Project&gt; projects; ←Many │  );                          │
+│  }                                  │                              │
+│                                     │  CREATE TABLE emp_projects ( │
+│  Inheritance:                       │      emp_id BIGINT,          │
+│  class Manager extends Employee     │      proj_id BIGINT          │
+│                                     │  ); ← Join table             │
+│                                     │                              │
+│  Encapsulation:                     │  No encapsulation -          │
+│  private fields, methods            │  just columns                │
+│                                     │                              │
+│  Identity:                          │  Identity:                   │
+│  emp1 == emp2 (reference)           │  id = id (value)             │
+│                                     │                              │
+└────────────────────────────────────────────────────────────────────┘
+
+<span class="comment">// Key mismatches ORMs solve:</span>
+<span class="comment">// 1. Granularity - Objects can have complex structure, tables are flat</span>
+<span class="comment">// 2. Inheritance - Objects have it, tables don't</span>
+<span class="comment">// 3. Identity - Object identity vs primary key</span>
+<span class="comment">// 4. Associations - References vs foreign keys</span>
+<span class="comment">// 5. Navigation - Objects traverse, SQL joins</span></code></pre>
+
+            <h3>What ORM Does</h3>
+            <pre><code><span class="comment">// WITHOUT ORM (Manual mapping)</span>
+<span class="keyword">public</span> Employee <span class="function">findById</span>(<span class="keyword">long</span> id) {
+    String sql = <span class="string">"SELECT * FROM employees WHERE id = ?"</span>;
+
+    <span class="keyword">try</span> (Connection conn = getConnection();
+         PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+        stmt.setLong(1, id);
+        ResultSet rs = stmt.executeQuery();
+
+        <span class="keyword">if</span> (rs.next()) {
+            Employee emp = <span class="keyword">new</span> Employee();
+            emp.setId(rs.getLong(<span class="string">"id"</span>));
+            emp.setName(rs.getString(<span class="string">"name"</span>));
+            emp.setEmail(rs.getString(<span class="string">"email"</span>));
+            emp.setSalary(rs.getBigDecimal(<span class="string">"salary"</span>));
+            <span class="comment">// Load department? More queries...</span>
+            <span class="comment">// Load projects? Even more queries...</span>
+            <span class="keyword">return</span> emp;
+        }
+    }
+    <span class="keyword">return null</span>;
+}
+
+<span class="comment">// WITH ORM (Automatic mapping)</span>
+<span class="keyword">public</span> Employee <span class="function">findById</span>(<span class="keyword">long</span> id) {
+    <span class="keyword">return</span> entityManager.find(Employee.<span class="keyword">class</span>, id);  <span class="comment">// That's it!</span>
+}</code></pre>
+
+            <div class="info-box">
+                <p><strong>ORM Benefits:</strong></p>
+                <ul>
+                    <li><strong>Productivity:</strong> Write less boilerplate code</li>
+                    <li><strong>Maintainability:</strong> Schema changes in one place</li>
+                    <li><strong>Type Safety:</strong> Compile-time checking</li>
+                    <li><strong>Database Independence:</strong> Switch databases easier</li>
+                    <li><strong>Caching:</strong> Built-in caching mechanisms</li>
+                    <li><strong>Lazy Loading:</strong> Load data on demand</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>ORM Frameworks in Java</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Hibernate</strong></td>
+                        <td>Full ORM</td>
+                        <td>Most popular, JPA provider, feature-rich</td>
+                        <td>Most enterprise applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>EclipseLink</strong></td>
+                        <td>Full ORM</td>
+                        <td>Reference JPA implementation</td>
+                        <td>JPA-strict applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MyBatis</strong></td>
+                        <td>SQL Mapper</td>
+                        <td>SQL-centric, more control</td>
+                        <td>Complex SQL, DBA teams</td>
+                    </tr>
+                    <tr>
+                        <td><strong>jOOQ</strong></td>
+                        <td>SQL Builder</td>
+                        <td>Type-safe SQL, code generation</td>
+                        <td>SQL-heavy applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Spring Data JPA</strong></td>
+                        <td>Repository</td>
+                        <td>Abstraction over JPA</td>
+                        <td>Spring Boot applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>JDBI</strong></td>
+                        <td>SQL Abstraction</td>
+                        <td>Lightweight, SQL-focused</td>
+                        <td>Simple JDBC wrapper</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Framework Categories</h3>
+            <pre><code><span class="comment">// 1. FULL ORM (Hibernate, EclipseLink)</span>
+<span class="comment">// - Complete object-relational mapping</span>
+<span class="comment">// - Automatic SQL generation</span>
+<span class="comment">// - Caching, lazy loading, dirty checking</span>
+<span class="comment">// - You work with objects, framework handles SQL</span>
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+    <span class="annotation">@Id</span> <span class="keyword">private</span> Long id;
+    <span class="keyword">private</span> String name;
+    <span class="annotation">@ManyToOne</span> <span class="keyword">private</span> Department dept;
+}
+
+Employee emp = em.find(Employee.<span class="keyword">class</span>, 1L);  <span class="comment">// No SQL written!</span>
+
+<span class="comment">// 2. SQL MAPPER (MyBatis)</span>
+<span class="comment">// - You write SQL, framework maps results</span>
+<span class="comment">// - More control over queries</span>
+<span class="comment">// - No automatic relationship handling</span>
+
+<span class="comment">// mapper.xml</span>
+<span class="keyword">&lt;select</span> id="findById" resultType="Employee"<span class="keyword">&gt;</span>
+    SELECT * FROM employees WHERE id = #{id}
+<span class="keyword">&lt;/select&gt;</span>
+
+Employee emp = mapper.findById(1L);  <span class="comment">// Your SQL, mapped result</span>
+
+<span class="comment">// 3. SQL BUILDER (jOOQ)</span>
+<span class="comment">// - Type-safe SQL construction</span>
+<span class="comment">// - Compile-time SQL validation</span>
+<span class="comment">// - Generated code from schema</span>
+
+Result&lt;Record&gt; result = create
+    .select(EMPLOYEE.NAME, DEPARTMENT.NAME)
+    .from(EMPLOYEE)
+    .join(DEPARTMENT).on(EMPLOYEE.DEPT_ID.eq(DEPARTMENT.ID))
+    .where(EMPLOYEE.SALARY.gt(50000))
+    .fetch();</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Hibernate: The Most Popular ORM</h2>
+
+            <h3>Key Features</h3>
+            <pre><code><span class="comment">// Hibernate provides:</span>
+
+<span class="comment">// 1. TRANSPARENT PERSISTENCE</span>
+<span class="comment">// - Persist objects without implementing interfaces</span>
+<span class="comment">// - POJOs with annotations</span>
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Product</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+    <span class="keyword">private</span> BigDecimal price;
+}
+
+<span class="comment">// 2. AUTOMATIC DIRTY CHECKING</span>
+<span class="comment">// - Hibernate tracks changes to managed entities</span>
+<span class="comment">// - Updates generated automatically at flush time</span>
+
+Product product = em.find(Product.<span class="keyword">class</span>, 1L);
+product.setPrice(<span class="keyword">new</span> BigDecimal(<span class="string">"99.99"</span>));  <span class="comment">// Changed!</span>
+<span class="comment">// No explicit save needed - Hibernate sees the change</span>
+tx.commit();  <span class="comment">// UPDATE product SET price = 99.99 WHERE id = 1</span>
+
+<span class="comment">// 3. LAZY LOADING</span>
+<span class="comment">// - Load relationships on demand</span>
+
+<span class="annotation">@OneToMany</span>(fetch = FetchType.LAZY)
+<span class="keyword">private</span> List&lt;OrderItem&gt; items;
+
+Order order = em.find(Order.<span class="keyword">class</span>, 1L);  <span class="comment">// Items NOT loaded</span>
+order.getItems().size();  <span class="comment">// NOW items are loaded</span>
+
+<span class="comment">// 4. CACHING</span>
+<span class="comment">// - First level cache (session-scoped)</span>
+<span class="comment">// - Second level cache (shared)</span>
+
+Product p1 = em.find(Product.<span class="keyword">class</span>, 1L);  <span class="comment">// DB query</span>
+Product p2 = em.find(Product.<span class="keyword">class</span>, 1L);  <span class="comment">// From L1 cache!</span>
+System.out.println(p1 == p2);  <span class="comment">// true - same instance</span>
+
+<span class="comment">// 5. HQL (Hibernate Query Language)</span>
+<span class="comment">// - Object-oriented SQL</span>
+
+List&lt;Product&gt; products = em.createQuery(
+    <span class="string">"SELECT p FROM Product p WHERE p.price > :minPrice"</span>,
+    Product.<span class="keyword">class</span>
+)
+.setParameter(<span class="string">"minPrice"</span>, <span class="keyword">new</span> BigDecimal(<span class="string">"50"</span>))
+.getResultList();</code></pre>
+
+            <h3>Hibernate Architecture</h3>
+            <pre><code><span class="comment">// Hibernate Core Components</span>
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                        APPLICATION                                   │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   SessionFactory / EntityManagerFactory              │
+│   - One per database (expensive to create)                          │
+│   - Thread-safe                                                      │
+│   - Creates Sessions                                                 │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ creates
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   Session / EntityManager                            │
+│   - One per request/transaction                                      │
+│   - NOT thread-safe                                                  │
+│   - Contains persistence context (L1 cache)                         │
+│   - Manages entity lifecycle                                         │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ uses
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       JDBC / Connection Pool                         │
+└─────────────────────────────────────────────────────────────────────┘</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>MyBatis: SQL-Centric Approach</h2>
+
+            <h3>When to Choose MyBatis</h3>
+            <pre><code><span class="comment">// MyBatis is better when:</span>
+<span class="comment">// - You have complex, hand-tuned SQL</span>
+<span class="comment">// - DBAs want control over SQL</span>
+<span class="comment">// - Working with stored procedures</span>
+<span class="comment">// - Legacy database with unusual schema</span>
+<span class="comment">// - Need database-specific features</span></code></pre>
+
+            <h3>MyBatis Configuration</h3>
+            <pre><code><span class="comment">&lt;!-- Mapper XML --&gt;</span>
+<span class="keyword">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="keyword">&lt;!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd"&gt;</span>
+
+<span class="keyword">&lt;mapper</span> namespace="com.example.mapper.EmployeeMapper"<span class="keyword">&gt;</span>
+
+    <span class="comment">&lt;!-- Result mapping --&gt;</span>
+    <span class="keyword">&lt;resultMap</span> id="employeeResultMap" type="Employee"<span class="keyword">&gt;</span>
+        <span class="keyword">&lt;id</span> property="id" column="emp_id"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;result</span> property="name" column="emp_name"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;result</span> property="email" column="emp_email"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;association</span> property="department" javaType="Department"<span class="keyword">&gt;</span>
+            <span class="keyword">&lt;id</span> property="id" column="dept_id"<span class="keyword">/&gt;</span>
+            <span class="keyword">&lt;result</span> property="name" column="dept_name"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;/association&gt;</span>
+    <span class="keyword">&lt;/resultMap&gt;</span>
+
+    <span class="comment">&lt;!-- Queries --&gt;</span>
+    <span class="keyword">&lt;select</span> id="findById" resultMap="employeeResultMap"<span class="keyword">&gt;</span>
+        SELECT
+            e.id as emp_id,
+            e.name as emp_name,
+            e.email as emp_email,
+            d.id as dept_id,
+            d.name as dept_name
+        FROM employees e
+        LEFT JOIN departments d ON e.dept_id = d.id
+        WHERE e.id = #{id}
+    <span class="keyword">&lt;/select&gt;</span>
+
+    <span class="keyword">&lt;select</span> id="findByDepartment" resultMap="employeeResultMap"<span class="keyword">&gt;</span>
+        SELECT * FROM employees WHERE dept_id = #{deptId}
+    <span class="keyword">&lt;/select&gt;</span>
+
+    <span class="comment">&lt;!-- Dynamic SQL --&gt;</span>
+    <span class="keyword">&lt;select</span> id="search" resultMap="employeeResultMap"<span class="keyword">&gt;</span>
+        SELECT * FROM employees
+        <span class="keyword">&lt;where&gt;</span>
+            <span class="keyword">&lt;if</span> test="name != null"<span class="keyword">&gt;</span>
+                AND name LIKE #{name}
+            <span class="keyword">&lt;/if&gt;</span>
+            <span class="keyword">&lt;if</span> test="email != null"<span class="keyword">&gt;</span>
+                AND email = #{email}
+            <span class="keyword">&lt;/if&gt;</span>
+            <span class="keyword">&lt;if</span> test="minSalary != null"<span class="keyword">&gt;</span>
+                AND salary >= #{minSalary}
+            <span class="keyword">&lt;/if&gt;</span>
+        <span class="keyword">&lt;/where&gt;</span>
+    <span class="keyword">&lt;/select&gt;</span>
+
+    <span class="keyword">&lt;insert</span> id="insert" useGeneratedKeys="true" keyProperty="id"<span class="keyword">&gt;</span>
+        INSERT INTO employees (name, email, dept_id)
+        VALUES (#{name}, #{email}, #{department.id})
+    <span class="keyword">&lt;/insert&gt;</span>
+
+<span class="keyword">&lt;/mapper&gt;</span></code></pre>
+
+            <h3>MyBatis Mapper Interface</h3>
+            <pre><code><span class="keyword">public interface</span> <span class="class-name">EmployeeMapper</span> {
+
+    Employee <span class="function">findById</span>(<span class="keyword">long</span> id);
+
+    List&lt;Employee&gt; <span class="function">findByDepartment</span>(<span class="keyword">long</span> deptId);
+
+    List&lt;Employee&gt; <span class="function">search</span>(EmployeeSearchCriteria criteria);
+
+    <span class="keyword">void</span> <span class="function">insert</span>(Employee employee);
+
+    <span class="keyword">void</span> <span class="function">update</span>(Employee employee);
+
+    <span class="keyword">void</span> <span class="function">delete</span>(<span class="keyword">long</span> id);
+
+    <span class="comment">// With annotations (alternative to XML)</span>
+    <span class="annotation">@Select</span>(<span class="string">"SELECT * FROM employees WHERE id = #{id}"</span>)
+    Employee <span class="function">findByIdSimple</span>(<span class="keyword">long</span> id);
+
+    <span class="annotation">@Insert</span>(<span class="string">"INSERT INTO employees (name, email) VALUES (#{name}, #{email})"</span>)
+    <span class="annotation">@Options</span>(useGeneratedKeys = <span class="keyword">true</span>, keyProperty = <span class="string">"id"</span>)
+    <span class="keyword">void</span> <span class="function">insertSimple</span>(Employee employee);
+}
+
+<span class="comment">// Usage</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">EmployeeService</span> {
+
+    <span class="keyword">private final</span> EmployeeMapper mapper;
+
+    <span class="keyword">public</span> Employee <span class="function">getEmployee</span>(<span class="keyword">long</span> id) {
+        <span class="keyword">return</span> mapper.findById(id);  <span class="comment">// Your SQL, automatic mapping</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>jOOQ: Type-Safe SQL</h2>
+
+            <h3>Why jOOQ?</h3>
+            <pre><code><span class="comment">// jOOQ generates Java code from your database schema</span>
+<span class="comment">// Provides compile-time type safety for SQL</span>
+
+<span class="comment">// Traditional JPQL - errors at runtime</span>
+em.createQuery(<span class="string">"SELECT e FROM Employe e"</span>);  <span class="comment">// Typo! Runtime error</span>
+
+<span class="comment">// jOOQ - errors at compile time</span>
+create.selectFrom(EMPLOYE);  <span class="comment">// Won't compile if EMPLOYE doesn't exist</span></code></pre>
+
+            <h3>jOOQ Examples</h3>
+            <pre><code><span class="keyword">import static</span> org.jooq.impl.DSL.*;
+<span class="keyword">import static</span> com.example.generated.Tables.*;  <span class="comment">// Generated from DB</span>
+
+<span class="keyword">public class</span> <span class="class-name">EmployeeRepository</span> {
+
+    <span class="keyword">private final</span> DSLContext create;
+
+    <span class="comment">// Simple query</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findAll</span>() {
+        <span class="keyword">return</span> create
+            .selectFrom(EMPLOYEES)
+            .fetchInto(Employee.<span class="keyword">class</span>);
+    }
+
+    <span class="comment">// Query with conditions</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findBySalaryRange</span>(BigDecimal min, BigDecimal max) {
+        <span class="keyword">return</span> create
+            .selectFrom(EMPLOYEES)
+            .where(EMPLOYEES.SALARY.between(min, max))
+            .orderBy(EMPLOYEES.SALARY.desc())
+            .fetchInto(Employee.<span class="keyword">class</span>);
+    }
+
+    <span class="comment">// Join query</span>
+    <span class="keyword">public</span> List&lt;EmployeeWithDept&gt; <span class="function">findWithDepartment</span>() {
+        <span class="keyword">return</span> create
+            .select(EMPLOYEES.NAME, DEPARTMENTS.NAME.as(<span class="string">"dept_name"</span>))
+            .from(EMPLOYEES)
+            .join(DEPARTMENTS).on(EMPLOYEES.DEPT_ID.eq(DEPARTMENTS.ID))
+            .fetchInto(EmployeeWithDept.<span class="keyword">class</span>);
+    }
+
+    <span class="comment">// Aggregate query</span>
+    <span class="keyword">public</span> Map&lt;String, BigDecimal&gt; <span class="function">avgSalaryByDepartment</span>() {
+        <span class="keyword">return</span> create
+            .select(DEPARTMENTS.NAME, avg(EMPLOYEES.SALARY))
+            .from(EMPLOYEES)
+            .join(DEPARTMENTS).on(EMPLOYEES.DEPT_ID.eq(DEPARTMENTS.ID))
+            .groupBy(DEPARTMENTS.NAME)
+            .fetchMap(DEPARTMENTS.NAME, avg(EMPLOYEES.SALARY));
+    }
+
+    <span class="comment">// Insert</span>
+    <span class="keyword">public void</span> <span class="function">insert</span>(Employee emp) {
+        create
+            .insertInto(EMPLOYEES, EMPLOYEES.NAME, EMPLOYEES.EMAIL, EMPLOYEES.SALARY)
+            .values(emp.getName(), emp.getEmail(), emp.getSalary())
+            .execute();
+    }
+
+    <span class="comment">// Update</span>
+    <span class="keyword">public void</span> <span class="function">giveRaise</span>(Long deptId, BigDecimal percentage) {
+        create
+            .update(EMPLOYEES)
+            .set(EMPLOYEES.SALARY, EMPLOYEES.SALARY.multiply(BigDecimal.ONE.add(percentage)))
+            .where(EMPLOYEES.DEPT_ID.eq(deptId))
+            .execute();
+    }
+
+    <span class="comment">// Complex dynamic query</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">search</span>(SearchCriteria criteria) {
+        SelectConditionStep&lt;Record&gt; query = create
+            .selectFrom(EMPLOYEES)
+            .where(trueCondition());  <span class="comment">// Start with always-true</span>
+
+        <span class="keyword">if</span> (criteria.getName() != <span class="keyword">null</span>) {
+            query = query.and(EMPLOYEES.NAME.containsIgnoreCase(criteria.getName()));
+        }
+        <span class="keyword">if</span> (criteria.getMinSalary() != <span class="keyword">null</span>) {
+            query = query.and(EMPLOYEES.SALARY.ge(criteria.getMinSalary()));
+        }
+        <span class="keyword">if</span> (criteria.getDeptId() != <span class="keyword">null</span>) {
+            query = query.and(EMPLOYEES.DEPT_ID.eq(criteria.getDeptId()));
+        }
+
+        <span class="keyword">return</span> query.fetchInto(Employee.<span class="keyword">class</span>);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Choosing the Right Approach</h2>
+
+            <h3>Decision Matrix</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Scenario</th>
+                        <th>Recommended</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>New enterprise app</td>
+                        <td>JPA (Hibernate)</td>
+                        <td>Productivity, ecosystem, Spring integration</td>
+                    </tr>
+                    <tr>
+                        <td>Complex queries, DBA team</td>
+                        <td>MyBatis</td>
+                        <td>Full SQL control, query optimization</td>
+                    </tr>
+                    <tr>
+                        <td>Type-safe SQL, refactoring</td>
+                        <td>jOOQ</td>
+                        <td>Compile-time validation, IDE support</td>
+                    </tr>
+                    <tr>
+                        <td>Simple CRUD, Spring Boot</td>
+                        <td>Spring Data JPA</td>
+                        <td>Minimal code, rapid development</td>
+                    </tr>
+                    <tr>
+                        <td>Stored procedures heavy</td>
+                        <td>MyBatis or jOOQ</td>
+                        <td>Better stored procedure support</td>
+                    </tr>
+                    <tr>
+                        <td>Database-first design</td>
+                        <td>jOOQ</td>
+                        <td>Code generation from schema</td>
+                    </tr>
+                    <tr>
+                        <td>Domain-first design</td>
+                        <td>JPA (Hibernate)</td>
+                        <td>Code generates schema</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Hybrid Approaches</h3>
+            <pre><code><span class="comment">// You can combine approaches!</span>
+
+<span class="comment">// Spring Data JPA for simple CRUD</span>
+<span class="keyword">public interface</span> <span class="class-name">EmployeeRepository</span> <span class="keyword">extends</span> JpaRepository&lt;Employee, Long&gt; {
+    List&lt;Employee&gt; <span class="function">findByDepartmentId</span>(Long deptId);
+}
+
+<span class="comment">// Native query for complex cases</span>
+<span class="annotation">@Query</span>(value = <span class="string">"""
+    SELECT e.*, d.name as dept_name
+    FROM employees e
+    JOIN departments d ON e.dept_id = d.id
+    WHERE e.salary > (SELECT AVG(salary) FROM employees)
+    """</span>, nativeQuery = <span class="keyword">true</span>)
+List&lt;EmployeeProjection&gt; <span class="function">findHighEarners</span>();
+
+<span class="comment">// Or use jOOQ for complex reporting while JPA handles CRUD</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">ReportService</span> {
+
+    <span class="keyword">private final</span> DSLContext dsl;  <span class="comment">// jOOQ</span>
+
+    <span class="keyword">public</span> List&lt;SalaryReport&gt; <span class="function">generateSalaryReport</span>() {
+        <span class="keyword">return</span> dsl
+            .select(
+                DEPARTMENTS.NAME,
+                count(EMPLOYEES.ID).as(<span class="string">"emp_count"</span>),
+                sum(EMPLOYEES.SALARY).as(<span class="string">"total_salary"</span>),
+                avg(EMPLOYEES.SALARY).as(<span class="string">"avg_salary"</span>)
+            )
+            .from(EMPLOYEES)
+            .join(DEPARTMENTS).on(EMPLOYEES.DEPT_ID.eq(DEPARTMENTS.ID))
+            .groupBy(DEPARTMENTS.NAME)
+            .having(count(EMPLOYEES.ID).gt(5))
+            .orderBy(avg(EMPLOYEES.SALARY).desc())
+            .fetchInto(SalaryReport.<span class="keyword">class</span>);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>ORM Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>General Guidelines</h3>
+                <ul>
+                    <li><strong>Know your ORM:</strong> Understand how it generates SQL</li>
+                    <li><strong>Monitor SQL:</strong> Always enable SQL logging in development</li>
+                    <li><strong>Watch for N+1:</strong> Use JOIN FETCH or batch loading</li>
+                    <li><strong>Use DTOs:</strong> For read-only data, project into DTOs</li>
+                    <li><strong>Transaction boundaries:</strong> Keep transactions short</li>
+                    <li><strong>Don't fight the ORM:</strong> If ORM makes it hard, maybe use native SQL</li>
+                </ul>
+
+                <h3>Hibernate-Specific</h3>
+                <ul>
+                    <li><strong>Prefer LAZY:</strong> Make all relationships lazy by default</li>
+                    <li><strong>Avoid open-session-in-view:</strong> Fetch data in service layer</li>
+                    <li><strong>Use natural IDs:</strong> For business-meaningful lookups</li>
+                    <li><strong>Consider stateless session:</strong> For batch operations</li>
+                </ul>
+
+                <h3>MyBatis-Specific</h3>
+                <ul>
+                    <li><strong>Use result maps:</strong> For complex mappings</li>
+                    <li><strong>Leverage dynamic SQL:</strong> &lt;if&gt;, &lt;choose&gt;, &lt;foreach&gt;</li>
+                    <li><strong>Enable caching:</strong> For read-heavy queries</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>ORM:</strong> Bridges object-oriented and relational worlds</li>
+                    <li><strong>Hibernate:</strong> Full-featured ORM, JPA provider, most popular</li>
+                    <li><strong>MyBatis:</strong> SQL mapper, you control the SQL</li>
+                    <li><strong>jOOQ:</strong> Type-safe SQL builder, compile-time validation</li>
+                    <li><strong>Spring Data JPA:</strong> Repository abstraction over JPA</li>
+                    <li><strong>Trade-offs:</strong> Productivity vs Control vs Type Safety</li>
+                    <li><strong>Hybrid:</strong> Mix approaches for different use cases</li>
+                    <li><strong>Key:</strong> Understand generated SQL, monitor performance</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jpa-hibernate.html" class="related-link">JPA & Hibernate</a>
+                <a href="jdbc.html" class="related-link">JDBC</a>
+                <a href="relationships.html" class="related-link">Entity Relationships</a>
+                <a href="../spring/data-jpa.html" class="related-link">Spring Data JPA</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

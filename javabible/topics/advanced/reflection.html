@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reflection API - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / Reflection API
+            </nav>
+            <h1>Reflection API</h1>
+            <p class="topic-subtitle">Inspecting and Modifying Code at Runtime</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is Reflection?</h2>
+            <p>Imagine having X-ray vision to see inside a sealed box, and magic hands that can reach through and rearrange things inside. <strong>Reflection</strong> gives Java programs this superpower - the ability to inspect and modify classes, methods, and fields at runtime!</p>
+
+            <h3>Real-World Analogy: Building Inspector</h3>
+            <p>A building inspector can:</p>
+            <ul>
+                <li>See the building's blueprint without opening walls (class structure)</li>
+                <li>Count rooms and identify their purpose (methods, fields)</li>
+                <li>Check room dimensions and features (method parameters, return types)</li>
+                <li>Even access locked rooms with a master key (private members!)</li>
+            </ul>
+
+            <p>Reflection lets Java code be its own inspector!</p>
+
+            <h3>Simple Example - The Magic</h3>
+            <pre><code><span class="keyword">class</span> <span class="class-name">Person</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> name = <span class="string">"Alice"</span>;
+    <span class="keyword">private</span> <span class="keyword">int</span> age = <span class="number">25</span>;
+}
+
+<span class="comment">// Normal Java - Can't access private fields!</span>
+<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
+<span class="comment">// System.out.println(p.name); // ❌ ERROR! name is private</span>
+
+<span class="comment">// With Reflection - Break the rules!</span>
+<span class="class-name">Class</span>&lt;?&gt; clazz = p.getClass();
+<span class="class-name">Field</span> nameField = clazz.getDeclaredField(<span class="string">"name"</span>);
+nameField.setAccessible(<span class="keyword">true</span>);  <span class="comment">// Bypass private!</span>
+<span class="class-name">String</span> name = (<span class="class-name">String</span>) nameField.get(p);
+<span class="class-name">System</span>.out.println(name);  <span class="comment">// ✅ "Alice" - accessed private field!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Getting Class Information</h2>
+
+            <h3>Three Ways to Get Class Object</h3>
+            <pre><code><span class="comment">// Way 1: From an object instance</span>
+<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
+<span class="class-name">Class</span>&lt;?&gt; clazz1 = p.getClass();
+
+<span class="comment">// Way 2: From class literal</span>
+<span class="class-name">Class</span>&lt;?&gt; clazz2 = <span class="class-name">Person</span>.<span class="keyword">class</span>;
+
+<span class="comment">// Way 3: From class name string (useful for dynamic loading)</span>
+<span class="class-name">Class</span>&lt;?&gt; clazz3 = <span class="class-name">Class</span>.forName(<span class="string">"com.example.Person"</span>);</code></pre>
+
+            <h3>Inspecting Class Details</h3>
+            <pre><code><span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
+
+<span class="comment">// Get names</span>
+<span class="class-name">System</span>.out.println(clazz.getName());         <span class="comment">// "com.example.Person"</span>
+<span class="class-name">System</span>.out.println(clazz.getSimpleName());  <span class="comment">// "Person"</span>
+
+<span class="comment">// Get package</span>
+<span class="class-name">System</span>.out.println(clazz.getPackage().getName());
+
+<span class="comment">// Get parent class</span>
+<span class="class-name">Class</span>&lt;?&gt; parent = clazz.getSuperclass();
+
+<span class="comment">// Get interfaces</span>
+<span class="class-name">Class</span>&lt;?&gt;[] interfaces = clazz.getInterfaces();
+
+<span class="comment">// Check modifiers</span>
+<span class="keyword">int</span> mods = clazz.getModifiers();
+<span class="class-name">System</span>.out.println(<span class="class-name">Modifier</span>.isPublic(mods));     <span class="comment">// true/false</span>
+<span class="class-name">System</span>.out.println(<span class="class-name">Modifier</span>.isAbstract(mods));   <span class="comment">// true/false</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Working with Fields</h2>
+
+            <pre><code><span class="keyword">class</span> <span class="class-name">Person</span> {
+    <span class="keyword">public</span> <span class="class-name">String</span> name = <span class="string">"Alice"</span>;
+    <span class="keyword">private</span> <span class="keyword">int</span> age = <span class="number">25</span>;
+    <span class="keyword">protected</span> <span class="class-name">String</span> address = <span class="string">"NYC"</span>;
+}
+
+<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
+<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
+
+<span class="comment">// Get ALL declared fields (public, private, protected)</span>
+<span class="class-name">Field</span>[] allFields = clazz.getDeclaredFields();
+<span class="keyword">for</span> (<span class="class-name">Field</span> f : allFields) {
+    <span class="class-name">System</span>.out.println(f.getName() + <span class="string">": "</span> + f.getType());
+}
+
+<span class="comment">// Get only PUBLIC fields (including inherited)</span>
+<span class="class-name">Field</span>[] publicFields = clazz.getFields();
+
+<span class="comment">// Get specific field</span>
+<span class="class-name">Field</span> ageField = clazz.getDeclaredField(<span class="string">"age"</span>);
+
+<span class="comment">// Read private field</span>
+ageField.setAccessible(<span class="keyword">true</span>);  <span class="comment">// REQUIRED for private!</span>
+<span class="keyword">int</span> ageValue = (<span class="keyword">int</span>) ageField.get(p);
+<span class="class-name">System</span>.out.println(<span class="string">"Age: "</span> + ageValue);  <span class="comment">// 25</span>
+
+<span class="comment">// Modify private field</span>
+ageField.set(p, <span class="number">30</span>);
+<span class="class-name">System</span>.out.println(<span class="string">"New age: "</span> + ageField.get(p));  <span class="comment">// 30</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Working with Methods</h2>
+
+            <pre><code><span class="keyword">class</span> <span class="class-name">Calculator</span> {
+    <span class="keyword">public</span> <span class="keyword">int</span> <span class="function">add</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {
+        <span class="keyword">return</span> a + b;
+    }
+
+    <span class="keyword">private</span> <span class="keyword">int</span> <span class="function">multiply</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {
+        <span class="keyword">return</span> a * b;
+    }
+
+    <span class="keyword">public</span> <span class="keyword">void</span> <span class="function">display</span>(<span class="class-name">String</span> msg) {
+        <span class="class-name">System</span>.out.println(msg);
+    }
+}
+
+<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Calculator</span>.<span class="keyword">class</span>;
+<span class="class-name">Calculator</span> calc = <span class="keyword">new</span> <span class="class-name">Calculator</span>();
+
+<span class="comment">// Get all methods</span>
+<span class="class-name">Method</span>[] methods = clazz.getDeclaredMethods();
+<span class="keyword">for</span> (<span class="class-name">Method</span> m : methods) {
+    <span class="class-name">System</span>.out.println(m.getName());
+}
+
+<span class="comment">// Get specific public method (specify parameter types!)</span>
+<span class="class-name">Method</span> addMethod = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+
+<span class="comment">// Invoke method</span>
+<span class="class-name">Object</span> result = addMethod.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
+<span class="class-name">System</span>.out.println(<span class="string">"5 + 3 = "</span> + result);  <span class="comment">// 8</span>
+
+<span class="comment">// Invoke private method</span>
+<span class="class-name">Method</span> multiplyMethod = clazz.getDeclaredMethod(<span class="string">"multiply"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+multiplyMethod.setAccessible(<span class="keyword">true</span>);  <span class="comment">// Bypass private</span>
+result = multiplyMethod.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
+<span class="class-name">System</span>.out.println(<span class="string">"5 * 3 = "</span> + result);  <span class="comment">// 15</span>
+
+<span class="comment">// Method with no return (void)</span>
+<span class="class-name">Method</span> displayMethod = clazz.getMethod(<span class="string">"display"</span>, <span class="class-name">String</span>.<span class="keyword">class</span>);
+displayMethod.invoke(calc, <span class="string">"Hello!"</span>);  <span class="comment">// Prints "Hello!"</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Creating Objects Dynamically</h2>
+
+            <pre><code><span class="keyword">class</span> <span class="class-name">Person</span> {
+    <span class="keyword">public</span> <span class="function">Person</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"No-arg constructor"</span>);
+    }
+
+    <span class="keyword">public</span> <span class="function">Person</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> age) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Name: "</span> + name + <span class="string">", Age: "</span> + age);
+    }
+}
+
+<span class="comment">// Normal way</span>
+<span class="class-name">Person</span> p1 = <span class="keyword">new</span> <span class="class-name">Person</span>();
+
+<span class="comment">// Reflection way - no-arg constructor</span>
+<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
+<span class="class-name">Object</span> p2 = clazz.getDeclaredConstructor().newInstance();
+
+<span class="comment">// With constructor parameters</span>
+<span class="class-name">Constructor</span>&lt;?&gt; constructor = clazz.getConstructor(<span class="class-name">String</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+<span class="class-name">Object</span> p3 = constructor.newInstance(<span class="string">"Alice"</span>, <span class="number">25</span>);
+
+<span class="comment">// Load class by name (dynamic!)</span>
+<span class="class-name">String</span> className = <span class="string">"com.example.Person"</span>;
+<span class="class-name">Class</span>&lt;?&gt; dynamicClass = <span class="class-name">Class</span>.forName(className);
+<span class="class-name">Object</span> p4 = dynamicClass.getDeclaredConstructor().newInstance();</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Real-World Use Cases</h2>
+
+            <h3>1. Dependency Injection (Spring Framework)</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">UserController</span> {
+    <span class="annotation">@Autowired</span>  <span class="comment">// Spring uses reflection!</span>
+    <span class="keyword">private</span> <span class="class-name">UserService</span> userService;
+}
+
+<span class="comment">// Spring internally does:</span>
+<span class="comment">// 1. Finds @Autowired fields via reflection</span>
+<span class="comment">// 2. Creates UserService instance</span>
+<span class="comment">// 3. Sets field value using reflection (setAccessible!)</span></code></pre>
+
+            <h3>2. JSON Serialization (Jackson, Gson)</h3>
+            <pre><code><span class="comment">// Convert Java object to JSON</span>
+<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Alice"</span>, <span class="number">25</span>);
+<span class="class-name">String</span> json = objectMapper.writeValueAsString(p);
+
+<span class="comment">// Jackson internally:</span>
+<span class="comment">// 1. Uses reflection to find all fields</span>
+<span class="comment">// 2. Reads field values via reflection</span>
+<span class="comment">// 3. Converts to JSON format</span>
+
+<span class="comment">// Convert JSON back to object</span>
+<span class="class-name">Person</span> p2 = objectMapper.readValue(json, <span class="class-name">Person</span>.<span class="keyword">class</span>);
+
+<span class="comment">// Jackson:</span>
+<span class="comment">// 1. Creates empty Person object via reflection</span>
+<span class="comment">// 2. Sets field values from JSON using reflection</span></code></pre>
+
+            <h3>3. Testing Frameworks (JUnit, Mockito)</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">MyTest</span> {
+    <span class="annotation">@Test</span>  <span class="comment">// JUnit finds this via reflection</span>
+    <span class="keyword">public void</span> <span class="function">testSomething</span>() {
+        <span class="comment">// test code...</span>
+    }
+
+    <span class="annotation">@BeforeEach</span>  <span class="comment">// Reflection identifies setup methods</span>
+    <span class="keyword">public void</span> <span class="function">setup</span>() {
+        <span class="comment">// setup code...</span>
+    }
+}
+
+<span class="comment">// JUnit uses reflection to:</span>
+<span class="comment">// 1. Find all @Test methods</span>
+<span class="comment">// 2. Create test class instance</span>
+<span class="comment">// 3. Invoke @BeforeEach methods</span>
+<span class="comment">// 4. Invoke @Test methods</span>
+<span class="comment">// 5. Invoke @AfterEach methods</span></code></pre>
+
+            <h3>4. ORM Frameworks (Hibernate, JPA)</h3>
+            <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+    <span class="annotation">@Id</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@Column</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+}
+
+<span class="comment">// Hibernate uses reflection to:</span>
+<span class="comment">// 1. Find @Entity classes</span>
+<span class="comment">// 2. Map fields to database columns</span>
+<span class="comment">// 3. Create objects from database rows</span>
+<span class="comment">// 4. Read/write field values</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Performance Considerations</h2>
+
+            <pre><code><span class="comment">// Direct call - FAST</span>
+<span class="keyword">long</span> start = <span class="class-name">System</span>.nanoTime();
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000000</span>; i++) {
+    calc.add(<span class="number">5</span>, <span class="number">3</span>);
+}
+<span class="keyword">long</span> end = <span class="class-name">System</span>.nanoTime();
+<span class="class-name">System</span>.out.println(<span class="string">"Direct: "</span> + (end - start) + <span class="string">"ns"</span>);
+
+<span class="comment">// Reflection call - SLOW (10-50x slower)</span>
+<span class="class-name">Method</span> method = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+start = <span class="class-name">System</span>.nanoTime();
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000000</span>; i++) {
+    method.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
+}
+end = <span class="class-name">System</span>.nanoTime();
+<span class="class-name">System</span>.out.println(<span class="string">"Reflection: "</span> + (end - start) + <span class="string">"ns"</span>);</code></pre>
+
+            <h3>Optimization Tip: Cache Reflection Objects</h3>
+            <pre><code><span class="comment">// BAD: Look up method every time (SLOW!)</span>
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) {
+    <span class="class-name">Method</span> m = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+    m.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
+}
+
+<span class="comment">// GOOD: Cache method lookup (FASTER!)</span>
+<span class="class-name">Method</span> m = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) {
+    m.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices & Warnings</h2>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Reflection Drawbacks</div>
+                <ul>
+                    <li>❌ <strong>Performance:</strong> 10-50x slower than direct calls</li>
+                    <li>❌ <strong>Security:</strong> Breaks encapsulation (accesses private members)</li>
+                    <li>❌ <strong>Type Safety:</strong> Errors at runtime, not compile time</li>
+                    <li>❌ <strong>Code Clarity:</strong> Harder to read and understand</li>
+                    <li>❌ <strong>Refactoring:</strong> IDEs can't safely rename reflected members</li>
+                </ul>
+            </div>
+
+            <div class="info-box tip">
+                <div class="info-box-title">When to Use Reflection</div>
+                <p><strong>DO use for:</strong></p>
+                <ul>
+                    <li>✅ Building frameworks and libraries</li>
+                    <li>✅ Dependency injection containers</li>
+                    <li>✅ Object-Relational Mapping (ORM)</li>
+                    <li>✅ Serialization/deserialization</li>
+                    <li>✅ Testing frameworks and mocking</li>
+                    <li>✅ Plugin architectures</li>
+                </ul>
+
+                <p><strong>DON'T use for:</strong></p>
+                <ul>
+                    <li>❌ Regular application business logic</li>
+                    <li>❌ When you can use interfaces/polymorphism instead</li>
+                    <li>❌ Performance-critical code</li>
+                    <li>❌ Simple getter/setter access</li>
+                </ul>
+            </div>
+
+            <h3>Security Considerations</h3>
+            <pre><code><span class="comment">// Reflection can bypass security!</span>
+<span class="keyword">class</span> <span class="class-name">Secrets</span> {
+    <span class="keyword">private static final</span> <span class="class-name">String</span> PASSWORD = <span class="string">"secret123"</span>;
+}
+
+<span class="comment">// Attacker can access it via reflection!</span>
+<span class="class-name">Field</span> f = <span class="class-name">Secrets</span>.<span class="keyword">class</span>.getDeclaredField(<span class="string">"PASSWORD"</span>);
+f.setAccessible(<span class="keyword">true</span>);
+<span class="class-name">String</span> stolen = (<span class="class-name">String</span>) f.get(<span class="keyword">null</span>);
+
+<span class="comment">// Use SecurityManager to prevent this in production!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Why It Matters</h2>
+            <ul>
+                <li><strong>Frameworks:</strong> Powers Spring, Hibernate, and most Java frameworks</li>
+                <li><strong>Flexibility:</strong> Build generic, reusable code</li>
+                <li><strong>Dynamic Behavior:</strong> Load classes at runtime, plugin systems</li>
+                <li><strong>Tools:</strong> IDE code completion, debuggers use reflection</li>
+                <li><strong>Understanding:</strong> Helps you understand how frameworks work</li>
+            </ul>
+
+            <div class="info-box note">
+                <div class="info-box-title">Remember</div>
+                <p>Reflection is like a skeleton key - powerful but should be used responsibly! Use it when you need the flexibility, but prefer normal Java code when possible.</p>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="annotations.html" class="related-link">Annotations</a>
+                <a href="jvm-internals.html" class="related-link">JVM Internals</a>
+                <a href="../fundamentals/generics.html" class="related-link">Generics</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

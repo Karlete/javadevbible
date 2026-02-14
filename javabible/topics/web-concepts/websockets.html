@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSockets - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#web-concepts">Web Concepts</a> / WebSockets
+            </nav>
+            <h1>WebSockets</h1>
+            <p class="topic-subtitle">Real-time, bidirectional communication between client and server</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What are WebSockets?</h2>
+            <p><strong>WebSocket</strong> is a communication protocol that provides full-duplex (two-way) communication channels over a single, long-lived TCP connection. It represents a fundamental shift from HTTP's request-response model to enable true real-time communication on the web.</p>
+
+            <p>WebSockets were standardized in 2011 (RFC 6455) to solve a problem that HTTP couldn't address well: <strong>server-initiated communication</strong>. With HTTP, the server can only respond to client requests—it can never proactively send data to the client. This limitation made building real-time applications like chat, gaming, and live dashboards difficult and inefficient.</p>
+
+            <h3>The Problem WebSockets Solve</h3>
+            <p>Before WebSockets, developers used workarounds to simulate real-time communication:</p>
+            <ul>
+                <li><strong>Polling:</strong> Client asks "Any updates?" every few seconds. Wasteful—most requests return nothing new.</li>
+                <li><strong>Long Polling:</strong> Client asks, server holds the connection open until there's data. Better, but still creates overhead of repeatedly establishing connections.</li>
+                <li><strong>Server-Sent Events (SSE):</strong> Server can push data, but only server-to-client. Client still uses HTTP for sending.</li>
+            </ul>
+
+            <p>WebSockets provide a clean solution: <strong>a single persistent connection where both sides can send messages at any time</strong>.</p>
+
+            <h3>Real-World Examples</h3>
+            <p>You encounter WebSockets frequently, even if you don't realize it:</p>
+            <ul>
+                <li><strong>Chat applications:</strong> Slack, Discord, WhatsApp Web—messages appear instantly without refreshing</li>
+                <li><strong>Collaborative editing:</strong> Google Docs, Figma—multiple users see each other's changes in real-time</li>
+                <li><strong>Live sports/stock tickers:</strong> Scores and prices update continuously</li>
+                <li><strong>Online gaming:</strong> Player movements and actions synchronized instantly</li>
+                <li><strong>Notifications:</strong> Real-time alerts that appear without polling</li>
+                <li><strong>Live dashboards:</strong> Metrics that update as data changes</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Key Difference from HTTP:</strong></p>
+                <ul>
+                    <li><strong>HTTP:</strong> Client asks, server responds. The server can NEVER initiate communication. Each request requires a new connection setup (in HTTP/1.1 without keep-alive).</li>
+                    <li><strong>WebSocket:</strong> Both parties can send messages anytime over a persistent connection. The server can push data to clients without being asked. Low overhead per message.</li>
+                </ul>
+            </div>
+
+            <pre><code><span class="comment">// HTTP: Request-Response (Half-duplex)</span>
+Client ──Request──> Server
+Client <──Response── Server
+Client ──Request──> Server
+Client <──Response── Server
+<span class="comment">// Client must always initiate!</span>
+
+<span class="comment">// WebSocket: Full-duplex</span>
+Client <────────────> Server
+       ↑            ↑
+       │            └── Server can push anytime
+       └─────────────── Client can send anytime
+
+<span class="comment">// Perfect for: Chat, gaming, live updates, notifications</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>WebSocket vs HTTP</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>HTTP</th>
+                        <th>WebSocket</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Communication</strong></td>
+                        <td>Request-Response</td>
+                        <td>Bidirectional</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Connection</strong></td>
+                        <td>New connection per request</td>
+                        <td>Persistent connection</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Initiation</strong></td>
+                        <td>Client only</td>
+                        <td>Either side</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Overhead</strong></td>
+                        <td>Headers on every request</td>
+                        <td>Minimal frame overhead</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Latency</strong></td>
+                        <td>Higher (connection setup)</td>
+                        <td>Lower (persistent)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Use Case</strong></td>
+                        <td>CRUD operations, static content</td>
+                        <td>Real-time updates, streaming</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>How WebSockets Work</h2>
+
+            <pre><code><span class="comment">// WebSocket Lifecycle</span>
+
+┌──────────────────────────────────────────────────────────────────┐
+│                      1. HANDSHAKE (HTTP Upgrade)                  │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Client Request:                                                  │
+│  GET /chat HTTP/1.1                                              │
+│  Host: server.example.com                                        │
+│  Upgrade: websocket            <span class="comment">← Request protocol upgrade</span>         │
+│  Connection: Upgrade                                             │
+│  Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==                    │
+│  Sec-WebSocket-Version: 13                                       │
+│                                                                   │
+│  Server Response:                                                 │
+│  HTTP/1.1 101 Switching Protocols                                │
+│  Upgrade: websocket                                              │
+│  Connection: Upgrade                                             │
+│  Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=             │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                   2. CONNECTION ESTABLISHED                       │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────┐           WebSocket           ┌─────────┐           │
+│  │ Client  │ <═══════════════════════════> │ Server  │           │
+│  └─────────┘      Bidirectional            └─────────┘           │
+│                                                                   │
+│  - Both can send messages anytime                                │
+│  - Low overhead per message (2-14 bytes)                         │
+│  - Connection stays open                                         │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                      3. DATA EXCHANGE                             │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Client: {"type": "message", "text": "Hello!"}                   │
+│  Server: {"type": "message", "from": "john", "text": "Hello!"}   │
+│  Server: {"type": "notification", "count": 5}                    │
+│  Client: {"type": "typing", "user": "jane"}                      │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                      4. CONNECTION CLOSE                          │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  Either side sends close frame                                   │
+│  Other side acknowledges                                         │
+│  TCP connection terminates                                       │
+│                                                                   │
+└──────────────────────────────────────────────────────────────────┘</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>WebSocket in JavaScript (Client)</h2>
+
+            <pre><code><span class="comment">// Basic WebSocket connection</span>
+<span class="keyword">const</span> socket = <span class="keyword">new</span> WebSocket(<span class="string">'wss://api.example.com/ws'</span>);
+
+<span class="comment">// Connection opened</span>
+socket.onopen = <span class="keyword">function</span>(event) {
+    console.log(<span class="string">'Connected to WebSocket!'</span>);
+
+    <span class="comment">// Send a message</span>
+    socket.send(JSON.stringify({
+        type: <span class="string">'join'</span>,
+        room: <span class="string">'general'</span>
+    }));
+};
+
+<span class="comment">// Listen for messages</span>
+socket.onmessage = <span class="keyword">function</span>(event) {
+    <span class="keyword">const</span> data = JSON.parse(event.data);
+    console.log(<span class="string">'Received:'</span>, data);
+
+    <span class="keyword">if</span> (data.type === <span class="string">'message'</span>) {
+        displayMessage(data);
+    } <span class="keyword">else if</span> (data.type === <span class="string">'notification'</span>) {
+        showNotification(data);
+    }
+};
+
+<span class="comment">// Connection closed</span>
+socket.onclose = <span class="keyword">function</span>(event) {
+    <span class="keyword">if</span> (event.wasClean) {
+        console.log(<span class="string">'Connection closed cleanly'</span>);
+    } <span class="keyword">else</span> {
+        console.log(<span class="string">'Connection died'</span>);
+    }
+    console.log(<span class="string">'Code:'</span>, event.code, <span class="string">'Reason:'</span>, event.reason);
+};
+
+<span class="comment">// Connection error</span>
+socket.onerror = <span class="keyword">function</span>(error) {
+    console.error(<span class="string">'WebSocket error:'</span>, error);
+};
+
+<span class="comment">// Send message function</span>
+<span class="keyword">function</span> sendMessage(text) {
+    <span class="keyword">if</span> (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+            type: <span class="string">'message'</span>,
+            text: text,
+            timestamp: Date.now()
+        }));
+    }
+}
+
+<span class="comment">// Close connection</span>
+<span class="keyword">function</span> disconnect() {
+    socket.close(<span class="number">1000</span>, <span class="string">'User logged out'</span>);
+}</code></pre>
+
+            <h3>WebSocket with Reconnection</h3>
+            <pre><code><span class="keyword">class</span> <span class="class-name">ReconnectingWebSocket</span> {
+    <span class="keyword">constructor</span>(url) {
+        <span class="keyword">this</span>.url = url;
+        <span class="keyword">this</span>.reconnectAttempts = <span class="number">0</span>;
+        <span class="keyword">this</span>.maxReconnectAttempts = <span class="number">5</span>;
+        <span class="keyword">this</span>.reconnectDelay = <span class="number">1000</span>;
+        <span class="keyword">this</span>.connect();
+    }
+
+    connect() {
+        <span class="keyword">this</span>.socket = <span class="keyword">new</span> WebSocket(<span class="keyword">this</span>.url);
+
+        <span class="keyword">this</span>.socket.onopen = () => {
+            console.log(<span class="string">'Connected'</span>);
+            <span class="keyword">this</span>.reconnectAttempts = <span class="number">0</span>;  <span class="comment">// Reset on successful connection</span>
+        };
+
+        <span class="keyword">this</span>.socket.onclose = (event) => {
+            <span class="keyword">if</span> (!event.wasClean) {
+                <span class="keyword">this</span>.reconnect();
+            }
+        };
+
+        <span class="keyword">this</span>.socket.onerror = (error) => {
+            console.error(<span class="string">'WebSocket error'</span>, error);
+        };
+
+        <span class="keyword">this</span>.socket.onmessage = (event) => {
+            <span class="keyword">this</span>.onMessage(JSON.parse(event.data));
+        };
+    }
+
+    reconnect() {
+        <span class="keyword">if</span> (<span class="keyword">this</span>.reconnectAttempts < <span class="keyword">this</span>.maxReconnectAttempts) {
+            <span class="keyword">this</span>.reconnectAttempts++;
+            <span class="keyword">const</span> delay = <span class="keyword">this</span>.reconnectDelay * <span class="keyword">this</span>.reconnectAttempts;
+
+            console.log(`Reconnecting in ${delay}ms... (attempt ${<span class="keyword">this</span>.reconnectAttempts})`);
+
+            setTimeout(() => <span class="keyword">this</span>.connect(), delay);
+        } <span class="keyword">else</span> {
+            console.error(<span class="string">'Max reconnection attempts reached'</span>);
+        }
+    }
+
+    send(data) {
+        <span class="keyword">if</span> (<span class="keyword">this</span>.socket.readyState === WebSocket.OPEN) {
+            <span class="keyword">this</span>.socket.send(JSON.stringify(data));
+        }
+    }
+
+    onMessage(data) {
+        <span class="comment">// Override this in subclass or set externally</span>
+        console.log(<span class="string">'Received:'</span>, data);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>WebSocket in Spring Boot (Server)</h2>
+
+            <h3>Dependencies</h3>
+            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-websocket&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+
+            <h3>Basic WebSocket Handler</h3>
+            <pre><code><span class="comment">// 1. WebSocket Configuration</span>
+<span class="annotation">@Configuration</span>
+<span class="annotation">@EnableWebSocket</span>
+<span class="keyword">public class</span> <span class="class-name">WebSocketConfig</span> <span class="keyword">implements</span> WebSocketConfigurer {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> ChatWebSocketHandler chatHandler;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(chatHandler, <span class="string">"/ws/chat"</span>)
+            .setAllowedOrigins(<span class="string">"https://myapp.com"</span>);  <span class="comment">// CORS for WebSocket</span>
+    }
+}
+
+<span class="comment">// 2. WebSocket Handler</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">ChatWebSocketHandler</span> <span class="keyword">extends</span> TextWebSocketHandler {
+
+    <span class="keyword">private final</span> Set&lt;WebSocketSession&gt; sessions =
+        ConcurrentHashMap.newKeySet();
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> afterConnectionEstablished(WebSocketSession session) {
+        sessions.add(session);
+        System.out.println(<span class="string">"New connection: "</span> + session.getId());
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> handleTextMessage(WebSocketSession session,
+                                       TextMessage message) <span class="keyword">throws</span> Exception {
+        String payload = message.getPayload();
+        System.out.println(<span class="string">"Received: "</span> + payload);
+
+        <span class="comment">// Parse the message</span>
+        ObjectMapper mapper = <span class="keyword">new</span> ObjectMapper();
+        ChatMessage chatMessage = mapper.readValue(payload, ChatMessage.<span class="keyword">class</span>);
+
+        <span class="comment">// Broadcast to all connected clients</span>
+        <span class="keyword">for</span> (WebSocketSession s : sessions) {
+            <span class="keyword">if</span> (s.isOpen()) {
+                s.sendMessage(<span class="keyword">new</span> TextMessage(payload));
+            }
+        }
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> afterConnectionClosed(WebSocketSession session,
+                                       CloseStatus status) {
+        sessions.remove(session);
+        System.out.println(<span class="string">"Connection closed: "</span> + session.getId());
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> handleTransportError(WebSocketSession session,
+                                      Throwable exception) {
+        System.err.println(<span class="string">"Error: "</span> + exception.getMessage());
+        sessions.remove(session);
+    }
+
+    <span class="comment">// Send message to specific session</span>
+    <span class="keyword">public void</span> sendToSession(String sessionId, String message) {
+        sessions.stream()
+            .filter(s -> s.getId().equals(sessionId))
+            .findFirst()
+            .ifPresent(s -> {
+                <span class="keyword">try</span> {
+                    s.sendMessage(<span class="keyword">new</span> TextMessage(message));
+                } <span class="keyword">catch</span> (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>STOMP over WebSocket (Recommended)</h2>
+            <p><strong>STOMP</strong> (Simple Text Oriented Messaging Protocol) is a messaging protocol that runs over WebSocket, providing features like message routing, subscriptions, and better organization.</p>
+
+            <h3>Server Configuration</h3>
+            <pre><code><span class="annotation">@Configuration</span>
+<span class="annotation">@EnableWebSocketMessageBroker</span>
+<span class="keyword">public class</span> <span class="class-name">WebSocketConfig</span> <span class="keyword">implements</span> WebSocketMessageBrokerConfigurer {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> configureMessageBroker(MessageBrokerRegistry config) {
+        <span class="comment">// Enable simple in-memory message broker</span>
+        <span class="comment">// Client subscribes to /topic/* or /queue/*</span>
+        config.enableSimpleBroker(<span class="string">"/topic"</span>, <span class="string">"/queue"</span>);
+
+        <span class="comment">// Prefix for messages FROM client TO server</span>
+        config.setApplicationDestinationPrefixes(<span class="string">"/app"</span>);
+
+        <span class="comment">// Prefix for user-specific messages</span>
+        config.setUserDestinationPrefix(<span class="string">"/user"</span>);
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> registerStompEndpoints(StompEndpointRegistry registry) {
+        <span class="comment">// WebSocket endpoint - clients connect here</span>
+        registry.addEndpoint(<span class="string">"/ws"</span>)
+            .setAllowedOrigins(<span class="string">"https://myapp.com"</span>)
+            .withSockJS();  <span class="comment">// Fallback for old browsers</span>
+    }
+}</code></pre>
+
+            <h3>Controller for Handling Messages</h3>
+            <pre><code><span class="annotation">@Controller</span>
+<span class="keyword">public class</span> <span class="class-name">ChatController</span> {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> SimpMessagingTemplate messagingTemplate;
+
+    <span class="comment">// Handle messages sent to /app/chat</span>
+    <span class="annotation">@MessageMapping</span>(<span class="string">"/chat"</span>)
+    <span class="annotation">@SendTo</span>(<span class="string">"/topic/messages"</span>)  <span class="comment">// Broadcast to all subscribers</span>
+    <span class="keyword">public</span> ChatMessage handleMessage(ChatMessage message,
+                                       Principal principal) {
+        message.setSender(principal.getName());
+        message.setTimestamp(LocalDateTime.now());
+        <span class="keyword">return</span> message;  <span class="comment">// Automatically sent to /topic/messages</span>
+    }
+
+    <span class="comment">// Send to specific user</span>
+    <span class="annotation">@MessageMapping</span>(<span class="string">"/private"</span>)
+    <span class="keyword">public void</span> handlePrivateMessage(PrivateMessage message,
+                                       Principal principal) {
+        message.setSender(principal.getName());
+
+        <span class="comment">// Send to specific user's queue</span>
+        messagingTemplate.convertAndSendToUser(
+            message.getRecipient(),
+            <span class="string">"/queue/private"</span>,
+            message
+        );
+    }
+
+    <span class="comment">// Send from anywhere in the application</span>
+    <span class="keyword">public void</span> sendNotification(String userId, Notification notification) {
+        messagingTemplate.convertAndSendToUser(
+            userId,
+            <span class="string">"/queue/notifications"</span>,
+            notification
+        );
+    }
+
+    <span class="comment">// Broadcast to all</span>
+    <span class="keyword">public void</span> broadcastAnnouncement(Announcement announcement) {
+        messagingTemplate.convertAndSend(<span class="string">"/topic/announcements"</span>, announcement);
+    }
+}</code></pre>
+
+            <h3>JavaScript Client with STOMP</h3>
+            <pre><code><span class="comment">// Using stompjs library</span>
+<span class="comment">// npm install @stomp/stompjs sockjs-client</span>
+
+<span class="keyword">import</span> { Client } <span class="keyword">from</span> <span class="string">'@stomp/stompjs'</span>;
+<span class="keyword">import</span> SockJS <span class="keyword">from</span> <span class="string">'sockjs-client'</span>;
+
+<span class="keyword">const</span> client = <span class="keyword">new</span> Client({
+    <span class="comment">// Use SockJS for fallback support</span>
+    webSocketFactory: () => <span class="keyword">new</span> SockJS(<span class="string">'https://api.myapp.com/ws'</span>),
+
+    <span class="comment">// Or native WebSocket</span>
+    <span class="comment">// brokerURL: 'wss://api.myapp.com/ws',</span>
+
+    reconnectDelay: <span class="number">5000</span>,
+
+    onConnect: (frame) => {
+        console.log(<span class="string">'Connected!'</span>);
+
+        <span class="comment">// Subscribe to public topic</span>
+        client.subscribe(<span class="string">'/topic/messages'</span>, (message) => {
+            <span class="keyword">const</span> chatMessage = JSON.parse(message.body);
+            displayMessage(chatMessage);
+        });
+
+        <span class="comment">// Subscribe to user-specific queue</span>
+        client.subscribe(<span class="string">'/user/queue/private'</span>, (message) => {
+            <span class="keyword">const</span> privateMessage = JSON.parse(message.body);
+            displayPrivateMessage(privateMessage);
+        });
+
+        <span class="comment">// Subscribe to notifications</span>
+        client.subscribe(<span class="string">'/user/queue/notifications'</span>, (message) => {
+            <span class="keyword">const</span> notification = JSON.parse(message.body);
+            showNotification(notification);
+        });
+    },
+
+    onDisconnect: () => {
+        console.log(<span class="string">'Disconnected'</span>);
+    },
+
+    onStompError: (frame) => {
+        console.error(<span class="string">'STOMP error:'</span>, frame.headers[<span class="string">'message'</span>]);
+    }
+});
+
+<span class="comment">// Activate connection</span>
+client.activate();
+
+<span class="comment">// Send message to /app/chat</span>
+<span class="keyword">function</span> sendMessage(text) {
+    client.publish({
+        destination: <span class="string">'/app/chat'</span>,
+        body: JSON.stringify({
+            type: <span class="string">'message'</span>,
+            text: text
+        })
+    });
+}
+
+<span class="comment">// Send private message</span>
+<span class="keyword">function</span> sendPrivateMessage(recipient, text) {
+    client.publish({
+        destination: <span class="string">'/app/private'</span>,
+        body: JSON.stringify({
+            recipient: recipient,
+            text: text
+        })
+    });
+}
+
+<span class="comment">// Disconnect</span>
+<span class="keyword">function</span> disconnect() {
+    client.deactivate();
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>WebSocket Authentication</h2>
+
+            <pre><code><span class="comment">// 1. Handshake Interceptor - Authenticate during connection</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">AuthHandshakeInterceptor</span> <span class="keyword">implements</span> HandshakeInterceptor {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> JwtTokenProvider tokenProvider;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public boolean</span> beforeHandshake(ServerHttpRequest request,
+                                     ServerHttpResponse response,
+                                     WebSocketHandler handler,
+                                     Map&lt;String, Object&gt; attributes) {
+
+        <span class="comment">// Get token from query parameter or header</span>
+        String token = extractToken(request);
+
+        <span class="keyword">if</span> (token != <span class="keyword">null</span> && tokenProvider.validateToken(token)) {
+            String userId = tokenProvider.getUserId(token);
+            attributes.put(<span class="string">"userId"</span>, userId);
+            <span class="keyword">return true</span>;  <span class="comment">// Allow connection</span>
+        }
+
+        <span class="keyword">return false</span>;  <span class="comment">// Reject connection</span>
+    }
+
+    <span class="keyword">private</span> String extractToken(ServerHttpRequest request) {
+        <span class="comment">// From query parameter: /ws?token=xxx</span>
+        String query = request.getURI().getQuery();
+        <span class="keyword">if</span> (query != <span class="keyword">null</span> && query.contains(<span class="string">"token="</span>)) {
+            <span class="keyword">return</span> query.split(<span class="string">"token="</span>)[<span class="number">1</span>].split(<span class="string">"&"</span>)[<span class="number">0</span>];
+        }
+        <span class="keyword">return null</span>;
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> afterHandshake(ServerHttpRequest request,
+                                ServerHttpResponse response,
+                                WebSocketHandler handler,
+                                Exception ex) { }
+}
+
+<span class="comment">// 2. Register the interceptor</span>
+<span class="annotation">@Configuration</span>
+<span class="annotation">@EnableWebSocketMessageBroker</span>
+<span class="keyword">public class</span> <span class="class-name">WebSocketConfig</span> <span class="keyword">implements</span> WebSocketMessageBrokerConfigurer {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> AuthHandshakeInterceptor authInterceptor;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint(<span class="string">"/ws"</span>)
+            .addInterceptors(authInterceptor)
+            .setAllowedOrigins(<span class="string">"*"</span>)
+            .withSockJS();
+    }
+}
+
+<span class="comment">// 3. Channel Interceptor - Authenticate STOMP messages</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">AuthChannelInterceptor</span> <span class="keyword">implements</span> ChannelInterceptor {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> Message&lt;?&gt; preSend(Message&lt;?&gt; message, MessageChannel channel) {
+        StompHeaderAccessor accessor =
+            StompHeaderAccessor.wrap(message);
+
+        <span class="keyword">if</span> (StompCommand.CONNECT.equals(accessor.getCommand())) {
+            String token = accessor.getFirstNativeHeader(<span class="string">"Authorization"</span>);
+            <span class="comment">// Validate token and set principal</span>
+        }
+
+        <span class="keyword">return</span> message;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Real-World Example: Live Chat</h2>
+
+            <pre><code><span class="comment">// Message DTOs</span>
+<span class="keyword">public record</span> <span class="class-name">ChatMessage</span>(
+    String id,
+    String sender,
+    String content,
+    String room,
+    LocalDateTime timestamp
+) {}
+
+<span class="keyword">public record</span> <span class="class-name">JoinMessage</span>(
+    String username,
+    String room
+) {}
+
+<span class="comment">// Chat Controller</span>
+<span class="annotation">@Controller</span>
+<span class="keyword">public class</span> <span class="class-name">ChatController</span> {
+
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> SimpMessagingTemplate messagingTemplate;
+
+    <span class="keyword">private final</span> Map&lt;String, Set&lt;String&gt;&gt; roomUsers = <span class="keyword">new</span> ConcurrentHashMap&lt;&gt;();
+
+    <span class="annotation">@MessageMapping</span>(<span class="string">"/chat.join"</span>)
+    <span class="keyword">public void</span> joinRoom(JoinMessage joinMessage, SimpMessageHeaderAccessor headerAccessor) {
+        String sessionId = headerAccessor.getSessionId();
+        String room = joinMessage.room();
+        String username = joinMessage.username();
+
+        <span class="comment">// Store user in room</span>
+        roomUsers.computeIfAbsent(room, k -> ConcurrentHashMap.newKeySet()).add(username);
+
+        <span class="comment">// Store in session attributes</span>
+        headerAccessor.getSessionAttributes().put(<span class="string">"username"</span>, username);
+        headerAccessor.getSessionAttributes().put(<span class="string">"room"</span>, room);
+
+        <span class="comment">// Notify room that user joined</span>
+        messagingTemplate.convertAndSend(
+            <span class="string">"/topic/chat/"</span> + room,
+            <span class="keyword">new</span> ChatMessage(
+                UUID.randomUUID().toString(),
+                <span class="string">"SYSTEM"</span>,
+                username + <span class="string">" joined the chat"</span>,
+                room,
+                LocalDateTime.now()
+            )
+        );
+
+        <span class="comment">// Send updated user list</span>
+        messagingTemplate.convertAndSend(
+            <span class="string">"/topic/chat/"</span> + room + <span class="string">"/users"</span>,
+            roomUsers.get(room)
+        );
+    }
+
+    <span class="annotation">@MessageMapping</span>(<span class="string">"/chat.send"</span>)
+    <span class="keyword">public void</span> sendMessage(ChatMessage message) {
+        ChatMessage enrichedMessage = <span class="keyword">new</span> ChatMessage(
+            UUID.randomUUID().toString(),
+            message.sender(),
+            message.content(),
+            message.room(),
+            LocalDateTime.now()
+        );
+
+        messagingTemplate.convertAndSend(
+            <span class="string">"/topic/chat/"</span> + message.room(),
+            enrichedMessage
+        );
+    }
+
+    <span class="comment">// Handle disconnection</span>
+    <span class="annotation">@EventListener</span>
+    <span class="keyword">public void</span> handleSessionDisconnect(SessionDisconnectEvent event) {
+        SimpMessageHeaderAccessor headerAccessor =
+            SimpMessageHeaderAccessor.wrap(event.getMessage());
+
+        String username = (String) headerAccessor.getSessionAttributes().get(<span class="string">"username"</span>);
+        String room = (String) headerAccessor.getSessionAttributes().get(<span class="string">"room"</span>);
+
+        <span class="keyword">if</span> (username != <span class="keyword">null</span> && room != <span class="keyword">null</span>) {
+            roomUsers.getOrDefault(room, Set.of()).remove(username);
+
+            messagingTemplate.convertAndSend(
+                <span class="string">"/topic/chat/"</span> + room,
+                <span class="keyword">new</span> ChatMessage(
+                    UUID.randomUUID().toString(),
+                    <span class="string">"SYSTEM"</span>,
+                    username + <span class="string">" left the chat"</span>,
+                    room,
+                    LocalDateTime.now()
+                )
+            );
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>WebSocket vs Alternatives</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Technology</th>
+                        <th>Direction</th>
+                        <th>Connection</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>WebSocket</strong></td>
+                        <td>Bidirectional</td>
+                        <td>Persistent</td>
+                        <td>Chat, gaming, collaboration</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Server-Sent Events</strong></td>
+                        <td>Server → Client</td>
+                        <td>Persistent</td>
+                        <td>News feeds, notifications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Long Polling</strong></td>
+                        <td>Simulated push</td>
+                        <td>Repeated requests</td>
+                        <td>Legacy support</td>
+                    </tr>
+                    <tr>
+                        <td><strong>HTTP/2 Push</strong></td>
+                        <td>Server → Client</td>
+                        <td>Request-based</td>
+                        <td>Resource preloading</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box note">
+                <div class="info-box-title">When to Use WebSocket</div>
+                <ul>
+                    <li>Real-time bidirectional communication needed</li>
+                    <li>Low latency is critical</li>
+                    <li>Frequent small messages</li>
+                    <li>Gaming, chat, live collaboration</li>
+                </ul>
+                <p><strong>When NOT to use:</strong> Simple one-way notifications (use SSE), infrequent updates (use polling), RESTful CRUD operations (use HTTP)</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>DO:</h3>
+                <ul>
+                    <li><strong>Use WSS (WebSocket Secure)</strong> - Always encrypt in production</li>
+                    <li><strong>Implement heartbeat/ping-pong</strong> - Detect dead connections</li>
+                    <li><strong>Handle reconnection</strong> - Network can be unreliable</li>
+                    <li><strong>Use STOMP for complex apps</strong> - Better message routing</li>
+                    <li><strong>Authenticate connections</strong> - Validate tokens during handshake</li>
+                    <li><strong>Limit message size</strong> - Prevent DoS attacks</li>
+                    <li><strong>Use message queues for scale</strong> - RabbitMQ, Redis Pub/Sub</li>
+                </ul>
+
+                <h3>DON'T:</h3>
+                <ul>
+                    <li><strong>Don't use WebSocket for everything</strong> - REST is fine for CRUD</li>
+                    <li><strong>Don't trust client messages</strong> - Always validate on server</li>
+                    <li><strong>Don't forget error handling</strong> - Connections can fail</li>
+                    <li><strong>Don't ignore backpressure</strong> - Handle slow consumers</li>
+                    <li><strong>Don't store sensitive data in messages</strong> - Use references</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>WebSocket:</strong> Full-duplex communication protocol over TCP</li>
+                    <li><strong>Handshake:</strong> HTTP upgrade to WebSocket protocol</li>
+                    <li><strong>Persistent:</strong> Connection stays open for continuous communication</li>
+                    <li><strong>STOMP:</strong> Messaging protocol that runs over WebSocket</li>
+                    <li><strong>Topics:</strong> Pub/sub for broadcasting to multiple clients</li>
+                    <li><strong>Queues:</strong> Point-to-point for user-specific messages</li>
+                    <li><strong>Use cases:</strong> Chat, gaming, notifications, live updates</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="http.html" class="related-link">HTTP Protocol</a>
+                <a href="client-server.html" class="related-link">Client-Server Architecture</a>
+                <a href="sessions-cookies.html" class="related-link">Sessions & Cookies</a>
+                <a href="../jakarta-ee/websocket.html" class="related-link">Jakarta WebSocket</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

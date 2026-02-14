@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profiles & Environments - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#spring">Spring Framework</a> / Profiles
+            </nav>
+            <h1>Profiles & Environments</h1>
+            <p class="topic-subtitle">Managing different configurations for different environments</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What are Profiles?</h2>
+            <p>Profiles allow you to have different configurations for different environments (dev, test, prod).</p>
+
+            <h3>Profile-Specific Files</h3>
+            <pre><code>src/main/resources/
+├── application.properties          <span class="comment"># Default/shared config</span>
+├── application-dev.properties      <span class="comment"># Development</span>
+├── application-test.properties     <span class="comment"># Testing</span>
+└── application-prod.properties     <span class="comment"># Production</span></code></pre>
+
+            <h3>Example Configurations</h3>
+            <pre><code><span class="comment"># application.properties (shared)</span>
+app.name=My Application
+spring.jpa.show-sql=false
+
+<span class="comment"># application-dev.properties</span>
+spring.datasource.url=jdbc:h2:mem:devdb
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
+logging.level.com.example=DEBUG
+
+<span class="comment"># application-prod.properties</span>
+spring.datasource.url=jdbc:postgresql://prod-db:5432/myapp
+spring.jpa.hibernate.ddl-auto=validate
+logging.level.root=WARN</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Activating Profiles</h2>
+
+            <pre><code><span class="comment"># In application.properties</span>
+spring.profiles.active=dev
+
+<span class="comment"># Command line</span>
+java -jar app.jar --spring.profiles.active=prod
+
+<span class="comment"># Environment variable</span>
+export SPRING_PROFILES_ACTIVE=prod
+java -jar app.jar
+
+<span class="comment"># Multiple profiles</span>
+java -jar app.jar --spring.profiles.active=prod,metrics</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Profile-Specific Beans</h2>
+
+            <pre><code><span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">DataSourceConfig</span> {
+
+    <span class="annotation">@Bean</span>
+    <span class="annotation">@Profile</span>(<span class="string">"dev"</span>)
+    <span class="keyword">public</span> <span class="class-name">DataSource</span> <span class="function">devDataSource</span>() {
+        <span class="comment">// H2 in-memory database for development</span>
+        <span class="keyword">return new</span> <span class="class-name">EmbeddedDatabaseBuilder</span>()
+            .setType(<span class="class-name">EmbeddedDatabaseType</span>.H2)
+            .build();
+    }
+
+    <span class="annotation">@Bean</span>
+    <span class="annotation">@Profile</span>(<span class="string">"prod"</span>)
+    <span class="keyword">public</span> <span class="class-name">DataSource</span> <span class="function">prodDataSource</span>() {
+        <span class="comment">// Real database for production</span>
+        <span class="class-name">HikariDataSource</span> ds = <span class="keyword">new</span> <span class="class-name">HikariDataSource</span>();
+        ds.setJdbcUrl(<span class="string">"jdbc:postgresql://prod:5432/db"</span>);
+        <span class="keyword">return</span> ds;
+    }
+
+    <span class="annotation">@Bean</span>
+    <span class="annotation">@Profile</span>(<span class="string">"!prod"</span>)  <span class="comment">// Any profile except prod</span>
+    <span class="keyword">public</span> <span class="class-name">DataInitializer</span> <span class="function">dataInitializer</span>() {
+        <span class="keyword">return new</span> <span class="class-name">DataInitializer</span>();
+    }
+}
+
+<span class="comment">// Profile on entire class</span>
+<span class="annotation">@Service</span>
+<span class="annotation">@Profile</span>(<span class="string">"dev"</span>)
+<span class="keyword">public class</span> <span class="class-name">MockEmailService</span> <span class="keyword">implements</span> <span class="class-name">EmailService</span> {
+    <span class="comment">// Mock implementation for dev</span>
+}
+
+<span class="annotation">@Service</span>
+<span class="annotation">@Profile</span>(<span class="string">"prod"</span>)
+<span class="keyword">public class</span> <span class="class-name">SmtpEmailService</span> <span class="keyword">implements</span> <span class="class-name">EmailService</span> {
+    <span class="comment">// Real implementation for prod</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>YAML Multi-Document</h2>
+
+            <pre><code><span class="comment"># application.yml - all profiles in one file</span>
+
+<span class="comment"># Default config</span>
+<span class="keyword">app</span>:
+  <span class="keyword">name</span>: My Application
+
+---
+<span class="keyword">spring</span>:
+  <span class="keyword">config</span>:
+    <span class="keyword">activate</span>:
+      <span class="keyword">on-profile</span>: dev
+
+<span class="keyword">spring</span>:
+  <span class="keyword">datasource</span>:
+    <span class="keyword">url</span>: jdbc:h2:mem:devdb
+
+---
+<span class="keyword">spring</span>:
+  <span class="keyword">config</span>:
+    <span class="keyword">activate</span>:
+      <span class="keyword">on-profile</span>: prod
+
+<span class="keyword">spring</span>:
+  <span class="keyword">datasource</span>:
+    <span class="keyword">url</span>: jdbc:postgresql://prod:5432/db</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Profiles:</strong> Environment-specific configuration</li>
+                    <li><strong>application-{profile}.properties:</strong> Profile-specific files</li>
+                    <li><strong>spring.profiles.active:</strong> Activate profiles</li>
+                    <li><strong>@Profile:</strong> Profile-specific beans</li>
+                    <li><strong>@Profile("!prod"):</strong> All except prod</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="boot.html" class="related-link">Spring Boot</a>
+                <a href="properties.html" class="related-link">Application Properties</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

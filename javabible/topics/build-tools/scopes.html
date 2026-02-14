@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dependency Scopes - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#build-tools">Build Tools</a> / Dependency Scopes
+            </nav>
+            <h1>Dependency Scopes</h1>
+            <p class="topic-subtitle">Understanding when and where dependencies are available</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What are Dependency Scopes?</h2>
+            <p><strong>Think of scopes like access passes at an event:</strong></p>
+            <ul>
+                <li><strong>VIP Pass (compile):</strong> Access everywhere - backstage, main event, after party</li>
+                <li><strong>Staff Pass (provided):</strong> Access during work, but you don't take it home</li>
+                <li><strong>Event Pass (runtime):</strong> Access to the main event only</li>
+                <li><strong>Rehearsal Pass (test):</strong> Access only during practice, not the real event</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Scope determines:</strong></p>
+                <ul>
+                    <li>When the dependency is available (compile, test, runtime)</li>
+                    <li>Whether it's included in the final package (JAR/WAR)</li>
+                    <li>How it affects transitive dependencies</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Scope Overview</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Scope</th>
+                        <th>Compile</th>
+                        <th>Test</th>
+                        <th>Runtime</th>
+                        <th>Packaged</th>
+                        <th>Transitive</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>compile</strong></td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>provided</strong></td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>No</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>runtime</strong></td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>test</strong></td>
+                        <td>No</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>No</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>system</strong></td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                        <td>No</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>import</strong></td>
+                        <td colspan="5">Special: Only for BOM imports in dependencyManagement</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>compile (Default)</h2>
+            <p>The default scope. Available everywhere: compile, test, runtime, and packaged in final artifact.</p>
+
+            <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-core&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;6.1.0&lt;/<span class="keyword">version</span>&gt;
+    <span class="comment">&lt;!-- scope defaults to compile if not specified --&gt;</span>
+&lt;/<span class="keyword">dependency</span>&gt;
+
+<span class="comment">&lt;!-- Same as: --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-core&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;6.1.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;compile&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+            <div class="info-box">
+                <p><strong>Use for:</strong> Most dependencies - libraries your code directly uses and needs at runtime.</p>
+                <p><strong>Examples:</strong> Spring Framework, Jackson, Apache Commons, Guava</p>
+            </div>
+
+            <pre><code><span class="comment">// Your code uses it directly at compile time</span>
+<span class="keyword">import</span> org.springframework.stereotype.Component;
+
+<span class="annotation">@Component</span>  <span class="comment">// Needs spring-core at compile AND runtime</span>
+<span class="keyword">public class</span> <span class="class-name">MyService</span> {
+    <span class="comment">// ...</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>provided</h2>
+            <p>Available at compile time, but NOT packaged. The runtime environment provides it.</p>
+
+            <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;jakarta.servlet&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;jakarta.servlet-api&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;6.0.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;provided&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.projectlombok&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;lombok&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;1.18.30&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;provided&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+            <div class="info-box">
+                <p><strong>Use for:</strong> APIs that the server/container provides, or compile-time-only tools.</p>
+                <p><strong>Examples:</strong></p>
+                <ul>
+                    <li><strong>Servlet API</strong> - Tomcat/Jetty provides this</li>
+                    <li><strong>Lombok</strong> - Only needed at compile time for code generation</li>
+                    <li><strong>Jakarta EE APIs</strong> - Application server provides implementations</li>
+                </ul>
+            </div>
+
+            <pre><code><span class="comment">// Servlet API - you code against it, but Tomcat provides the implementation</span>
+<span class="keyword">import</span> jakarta.servlet.http.HttpServlet;
+
+<span class="keyword">public class</span> <span class="class-name">MyServlet</span> <span class="keyword">extends</span> HttpServlet {
+    <span class="comment">// Code compiles fine</span>
+    <span class="comment">// At runtime, Tomcat provides the actual servlet-api JAR</span>
+    <span class="comment">// If you packaged it, you'd have conflicts!</span>
+}</code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Why Not compile?</div>
+                <p>If you include servlet-api in your WAR, it might conflict with Tomcat's version. <code>provided</code> prevents this by not packaging the dependency.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>runtime</h2>
+            <p>NOT available at compile time, but available at runtime and packaged.</p>
+
+            <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.postgresql&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;postgresql&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;42.7.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;ch.qos.logback&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;logback-classic&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;1.4.14&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+            <div class="info-box">
+                <p><strong>Use for:</strong> Implementation libraries loaded dynamically at runtime.</p>
+                <p><strong>Examples:</strong></p>
+                <ul>
+                    <li><strong>JDBC Drivers</strong> - PostgreSQL, MySQL, Oracle drivers</li>
+                    <li><strong>SLF4J Implementations</strong> - Logback, Log4j2</li>
+                    <li><strong>JPA Implementations</strong> - Hibernate (when coding to JPA API)</li>
+                </ul>
+            </div>
+
+            <pre><code><span class="comment">// You code against JDBC (standard API)</span>
+<span class="keyword">import</span> java.sql.Connection;
+<span class="keyword">import</span> java.sql.DriverManager;
+
+Connection conn = DriverManager.getConnection(
+    <span class="string">"jdbc:postgresql://localhost/mydb"</span>, <span class="string">"user"</span>, <span class="string">"pass"</span>
+);
+<span class="comment">// At runtime, PostgreSQL driver is loaded via ServiceLoader</span>
+<span class="comment">// You never import org.postgresql.* directly in your code</span></code></pre>
+
+            <h3>Why Use runtime Instead of compile?</h3>
+            <pre><code><span class="comment">// BAD: Direct dependency on implementation</span>
+<span class="keyword">import</span> org.postgresql.Driver;  <span class="comment">// Tight coupling!</span>
+
+<span class="comment">// GOOD: Code to interface, runtime provides implementation</span>
+<span class="keyword">import</span> java.sql.Driver;  <span class="comment">// Standard API</span>
+<span class="comment">// PostgreSQL driver discovered at runtime</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>test</h2>
+            <p>Available ONLY during test compilation and execution. Not packaged.</p>
+
+            <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.junit.jupiter&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;junit-jupiter&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;5.10.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.mockito&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;mockito-core&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;5.8.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-test&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.h2database&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;h2&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;  <span class="comment">&lt;!-- In-memory DB for testing --&gt;</span>
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+            <div class="info-box">
+                <p><strong>Use for:</strong> Testing frameworks, mocking libraries, test utilities.</p>
+                <p><strong>Examples:</strong> JUnit, Mockito, AssertJ, Hamcrest, H2 (test DB), Testcontainers</p>
+            </div>
+
+            <pre><code><span class="comment">// Only available in src/test/java</span>
+<span class="keyword">import</span> org.junit.jupiter.api.Test;
+<span class="keyword">import static</span> org.mockito.Mockito.*;
+
+<span class="keyword">class</span> <span class="class-name">MyServiceTest</span> {
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> testSomething() {
+        <span class="comment">// Test code here</span>
+    }
+}
+
+<span class="comment">// If you tried to use JUnit in src/main/java, it won't compile!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>system (Avoid!)</h2>
+            <p>Like <code>provided</code>, but you specify the JAR path manually. <strong>Avoid using this.</strong></p>
+
+            <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.example&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;proprietary-lib&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;1.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;system&lt;/<span class="keyword">scope</span>&gt;
+    &lt;<span class="keyword">systemPath</span>&gt;${project.basedir}/lib/proprietary-lib.jar&lt;/<span class="keyword">systemPath</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Why Avoid system Scope?</div>
+                <ul>
+                    <li>Breaks build portability (absolute paths)</li>
+                    <li>JAR not in repository, hard to share</li>
+                    <li>Not packaged in final artifact</li>
+                    <li>Better alternatives exist</li>
+                </ul>
+            </div>
+
+            <h3>Better Alternatives</h3>
+            <pre><code><span class="comment"># Option 1: Install to local repo</span>
+mvn install:install-file \
+    -Dfile=lib/proprietary-lib.jar \
+    -DgroupId=com.example \
+    -DartifactId=proprietary-lib \
+    -Dversion=1.0 \
+    -Dpackaging=jar
+
+<span class="comment"># Option 2: Use a private Maven repository (Nexus, Artifactory)</span>
+<span class="comment"># Option 3: Use a file-based repository in your project</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>import</h2>
+            <p>Special scope for importing BOMs (Bill of Materials) in <code>dependencyManagement</code>.</p>
+
+            <pre><code>&lt;<span class="keyword">dependencyManagement</span>&gt;
+    &lt;<span class="keyword">dependencies</span>&gt;
+        <span class="comment">&lt;!-- Import Spring Boot BOM --&gt;</span>
+        &lt;<span class="keyword">dependency</span>&gt;
+            &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+            &lt;<span class="keyword">artifactId</span>&gt;spring-boot-dependencies&lt;/<span class="keyword">artifactId</span>&gt;
+            &lt;<span class="keyword">version</span>&gt;3.2.0&lt;/<span class="keyword">version</span>&gt;
+            &lt;<span class="keyword">type</span>&gt;pom&lt;/<span class="keyword">type</span>&gt;
+            &lt;<span class="keyword">scope</span>&gt;import&lt;/<span class="keyword">scope</span>&gt;
+        &lt;/<span class="keyword">dependency</span>&gt;
+
+        <span class="comment">&lt;!-- Import JUnit BOM --&gt;</span>
+        &lt;<span class="keyword">dependency</span>&gt;
+            &lt;<span class="keyword">groupId</span>&gt;org.junit&lt;/<span class="keyword">groupId</span>&gt;
+            &lt;<span class="keyword">artifactId</span>&gt;junit-bom&lt;/<span class="keyword">artifactId</span>&gt;
+            &lt;<span class="keyword">version</span>&gt;5.10.0&lt;/<span class="keyword">version</span>&gt;
+            &lt;<span class="keyword">type</span>&gt;pom&lt;/<span class="keyword">type</span>&gt;
+            &lt;<span class="keyword">scope</span>&gt;import&lt;/<span class="keyword">scope</span>&gt;
+        &lt;/<span class="keyword">dependency</span>&gt;
+    &lt;/<span class="keyword">dependencies</span>&gt;
+&lt;/<span class="keyword">dependencyManagement</span>&gt;
+
+<span class="comment">&lt;!-- Now use dependencies without specifying versions --&gt;</span>
+&lt;<span class="keyword">dependencies</span>&gt;
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-web&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;org.junit.jupiter&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;junit-jupiter&lt;/<span class="keyword">artifactId</span>&gt;
+        &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+&lt;/<span class="keyword">dependencies</span>&gt;</code></pre>
+
+            <div class="info-box note">
+                <div class="info-box-title">Note</div>
+                <p><code>import</code> scope ONLY works in <code>dependencyManagement</code> and ONLY with <code>type=pom</code>.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Transitive Scope Resolution</h2>
+            <p>When your dependency has its own dependencies, scopes interact:</p>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th colspan="5">Transitive Dependency Scope</th>
+                    </tr>
+                    <tr>
+                        <th>Direct Scope</th>
+                        <th>compile</th>
+                        <th>provided</th>
+                        <th>runtime</th>
+                        <th>test</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>compile</strong></td>
+                        <td>compile</td>
+                        <td>-</td>
+                        <td>runtime</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>provided</strong></td>
+                        <td>provided</td>
+                        <td>-</td>
+                        <td>provided</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>runtime</strong></td>
+                        <td>runtime</td>
+                        <td>-</td>
+                        <td>runtime</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td><strong>test</strong></td>
+                        <td>test</td>
+                        <td>-</td>
+                        <td>test</td>
+                        <td>-</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <pre><code><span class="comment">&lt;!-- Example: spring-boot-starter-web (compile scope) --&gt;</span>
+<span class="comment">&lt;!-- Has transitive dependency: spring-core (compile scope) --&gt;</span>
+<span class="comment">&lt;!-- Result: spring-core is compile scope in your project --&gt;</span>
+
+<span class="comment">&lt;!-- Example: spring-boot-starter-test (test scope) --&gt;</span>
+<span class="comment">&lt;!-- Has transitive dependency: mockito-core (compile scope) --&gt;</span>
+<span class="comment">&lt;!-- Result: mockito-core is test scope in your project --&gt;</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Gradle Equivalent Scopes</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Maven Scope</th>
+                        <th>Gradle Configuration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>compile</td>
+                        <td><code>implementation</code> or <code>api</code></td>
+                    </tr>
+                    <tr>
+                        <td>provided</td>
+                        <td><code>compileOnly</code></td>
+                    </tr>
+                    <tr>
+                        <td>runtime</td>
+                        <td><code>runtimeOnly</code></td>
+                    </tr>
+                    <tr>
+                        <td>test</td>
+                        <td><code>testImplementation</code></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <pre><code><span class="comment">// build.gradle.kts</span>
+dependencies {
+    <span class="comment">// compile scope equivalent</span>
+    implementation(<span class="string">"org.springframework:spring-core:6.1.0"</span>)
+
+    <span class="comment">// provided scope equivalent</span>
+    compileOnly(<span class="string">"jakarta.servlet:jakarta.servlet-api:6.0.0"</span>)
+
+    <span class="comment">// runtime scope equivalent</span>
+    runtimeOnly(<span class="string">"org.postgresql:postgresql:42.7.0"</span>)
+
+    <span class="comment">// test scope equivalent</span>
+    testImplementation(<span class="string">"org.junit.jupiter:junit-jupiter:5.10.0"</span>)
+
+    <span class="comment">// Gradle-specific: api exposes to consumers (like compile but transitive)</span>
+    api(<span class="string">"com.google.guava:guava:32.1.3-jre"</span>)
+}</code></pre>
+
+            <div class="info-box note">
+                <div class="info-box-title">implementation vs api</div>
+                <ul>
+                    <li><code>implementation</code>: Dependency is internal, not exposed to consumers</li>
+                    <li><code>api</code>: Dependency is part of your public API, exposed to consumers</li>
+                    <li>Prefer <code>implementation</code> for better encapsulation and faster builds</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Patterns</h2>
+
+            <pre><code><span class="comment">&lt;!-- Typical Spring Boot Web Application --&gt;</span>
+&lt;<span class="keyword">dependencies</span>&gt;
+    <span class="comment">&lt;!-- Main dependencies (compile) --&gt;</span>
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-web&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-jpa&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+
+    <span class="comment">&lt;!-- Compile-time only (provided) --&gt;</span>
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;org.projectlombok&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;lombok&lt;/<span class="keyword">artifactId</span>&gt;
+        &lt;<span class="keyword">scope</span>&gt;provided&lt;/<span class="keyword">scope</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+
+    <span class="comment">&lt;!-- Runtime only --&gt;</span>
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;org.postgresql&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;postgresql&lt;/<span class="keyword">artifactId</span>&gt;
+        &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+
+    <span class="comment">&lt;!-- Testing --&gt;</span>
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-test&lt;/<span class="keyword">artifactId</span>&gt;
+        &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;com.h2database&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;h2&lt;/<span class="keyword">artifactId</span>&gt;
+        &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+&lt;/<span class="keyword">dependencies</span>&gt;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Quick Reference</h2>
+
+            <div class="best-practices">
+                <h3>When to Use Each Scope:</h3>
+                <ul>
+                    <li><strong>compile (default):</strong> Your code imports and uses it directly</li>
+                    <li><strong>provided:</strong> Container/server provides it (Servlet API, Jakarta EE)</li>
+                    <li><strong>runtime:</strong> Needed at runtime but you code to an interface (JDBC drivers)</li>
+                    <li><strong>test:</strong> Only for testing (JUnit, Mockito, test DBs)</li>
+                    <li><strong>import:</strong> BOM imports in dependencyManagement</li>
+                    <li><strong>system:</strong> Avoid - use local repo install instead</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>compile:</strong> Default, everywhere, packaged</li>
+                    <li><strong>provided:</strong> Compile time only, server provides at runtime</li>
+                    <li><strong>runtime:</strong> Runtime only, for dynamic implementations</li>
+                    <li><strong>test:</strong> Test only, not packaged</li>
+                    <li><strong>import:</strong> BOM imports for version management</li>
+                    <li><strong>Choosing correctly:</strong> Reduces artifact size, prevents conflicts</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="maven.html" class="related-link">What is Maven?</a>
+                <a href="dependencies.html" class="related-link">Dependencies Management</a>
+                <a href="versions.html" class="related-link">Version Management</a>
+                <a href="pom.html" class="related-link">POM.xml Structure</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

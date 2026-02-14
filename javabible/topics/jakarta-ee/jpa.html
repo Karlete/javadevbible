@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JPA (Java Persistence API) - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / JPA
+            </nav>
+            <h1>JPA (Java Persistence API)</h1>
+            <p class="topic-subtitle">Object-Relational Mapping for Database Access</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is JPA?</h2>
+            <p><strong>Think of JPA like a translator between Java and databases:</strong></p>
+            <ul>
+                <li>🗣️ You speak Java (objects, methods)</li>
+                <li>🗄️ Database speaks SQL (tables, rows)</li>
+                <li>🔄 JPA translates between them automatically</li>
+                <li>✨ You work with objects, JPA handles SQL</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>JPA (Java Persistence API)</strong> is a specification for mapping Java objects to database tables. It's an ORM (Object-Relational Mapping) framework that eliminates most SQL code.</p>
+                <p><strong>Popular implementations:</strong> Hibernate, EclipseLink, OpenJPA</p>
+            </div>
+
+            <h3>Without JPA (Manual SQL)</h3>
+            <pre><code><span class="comment">// Lots of boilerplate code!</span>
+<span class="class-name">Connection</span> conn = DriverManager.getConnection(url);
+<span class="class-name">PreparedStatement</span> stmt = conn.prepareStatement(<span class="string">"SELECT * FROM users WHERE id = ?"</span>);
+stmt.setLong(<span class="number">1</span>, userId);
+<span class="class-name">ResultSet</span> rs = stmt.executeQuery();
+
+<span class="class-name">User</span> user = <span class="keyword">null</span>;
+<span class="keyword">if</span> (rs.next()) {
+    user = <span class="keyword">new</span> <span class="class-name">User</span>();
+    user.setId(rs.getLong(<span class="string">"id"</span>));
+    user.setName(rs.getString(<span class="string">"name"</span>));
+    user.setEmail(rs.getString(<span class="string">"email"</span>));
+}
+rs.close();
+stmt.close();
+conn.close();</code></pre>
+
+            <h3>With JPA (Simple!)</h3>
+            <pre><code><span class="comment">// One line!</span>
+<span class="class-name">User</span> user = entityManager.find(User.<span class="keyword">class</span>, userId);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Creating an Entity</h2>
+
+            <h3>Simple Entity</h3>
+            <pre><code><span class="keyword">import</span> jakarta.persistence.*;
+
+<span class="annotation">@Entity</span>  <span class="comment">// Maps to database table</span>
+<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)  <span class="comment">// Optional: specify table name</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+
+    <span class="annotation">@Id</span>  <span class="comment">// Primary key</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)  <span class="comment">// Auto-increment</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@Column</span>(name = <span class="string">"user_name"</span>, length = <span class="number">50</span>, nullable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> username;
+
+    <span class="annotation">@Column</span>(unique = <span class="keyword">true</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+
+    <span class="keyword">private int</span> age;  <span class="comment">// Maps to "age" column automatically</span>
+
+    <span class="annotation">@Temporal</span>(TemporalType.TIMESTAMP)
+    <span class="keyword">private</span> <span class="class-name">Date</span> createdAt;
+
+    <span class="comment">// Constructors</span>
+    <span class="keyword">public</span> <span class="function">User</span>() { }
+
+    <span class="keyword">public</span> <span class="function">User</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) {
+        <span class="keyword">this</span>.username = username;
+        <span class="keyword">this</span>.email = email;
+        <span class="keyword">this</span>.createdAt = <span class="keyword">new</span> <span class="class-name">Date</span>();
+    }
+
+    <span class="comment">// Getters and setters</span>
+    <span class="keyword">public</span> <span class="class-name">Long</span> <span class="function">getId</span>() { <span class="keyword">return</span> id; }
+    <span class="keyword">public void</span> <span class="function">setId</span>(<span class="class-name">Long</span> id) { <span class="keyword">this</span>.id = id; }
+
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getUsername</span>() { <span class="keyword">return</span> username; }
+    <span class="keyword">public void</span> <span class="function">setUsername</span>(<span class="class-name">String</span> username) { <span class="keyword">this</span>.username = username; }
+
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getEmail</span>() { <span class="keyword">return</span> email; }
+    <span class="keyword">public void</span> <span class="function">setEmail</span>(<span class="class-name">String</span> email) { <span class="keyword">this</span>.email = email; }
+}</code></pre>
+
+            <p><strong>JPA creates this table automatically:</strong></p>
+            <pre><code><span class="keyword">CREATE TABLE</span> users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_name VARCHAR(<span class="number">50</span>) NOT NULL,
+    email VARCHAR(<span class="number">255</span>) UNIQUE,
+    age INT,
+    created_at TIMESTAMP
+);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>EntityManager - Your Database Interface</h2>
+
+            <h3>Injecting EntityManager</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">UserRepository</span> {
+
+    <span class="annotation">@PersistenceContext</span>  <span class="comment">// Inject EntityManager</span>
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
+
+    <span class="comment">// CRUD operations below...</span>
+}</code></pre>
+
+            <h3>Create (Insert)</h3>
+            <pre><code><span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">User</span> user) {
+    em.persist(user);  <span class="comment">// INSERT INTO users ...</span>
+    <span class="comment">// ID is automatically generated and set</span>
+}</code></pre>
+
+            <h3>Read (Select)</h3>
+            <pre><code><span class="comment">// Find by primary key</span>
+<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> em.find(User.<span class="keyword">class</span>, id);  <span class="comment">// SELECT * FROM users WHERE id = ?</span>
+}
+
+<span class="comment">// Find with query</span>
+<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findByEmail</span>(<span class="class-name">String</span> email) {
+    <span class="keyword">return</span> em.createQuery(<span class="string">"SELECT u FROM User u WHERE u.email = :email"</span>, User.<span class="keyword">class</span>)
+             .setParameter(<span class="string">"email"</span>, email)
+             .getSingleResult();
+}
+
+<span class="comment">// Find all</span>
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findAll</span>() {
+    <span class="keyword">return</span> em.createQuery(<span class="string">"SELECT u FROM User u"</span>, User.<span class="keyword">class</span>)
+             .getResultList();
+}</code></pre>
+
+            <h3>Update</h3>
+            <pre><code><span class="keyword">public void</span> <span class="function">updateUser</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> newEmail) {
+    <span class="class-name">User</span> user = em.find(User.<span class="keyword">class</span>, id);
+    <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
+        user.setEmail(newEmail);  <span class="comment">// Just change the object!</span>
+        <span class="comment">// JPA automatically updates database (no em.update() needed!)</span>
+    }
+}</code></pre>
+
+            <h3>Delete</h3>
+            <pre><code><span class="keyword">public void</span> <span class="function">deleteUser</span>(<span class="class-name">Long</span> id) {
+    <span class="class-name">User</span> user = em.find(User.<span class="keyword">class</span>, id);
+    <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
+        em.remove(user);  <span class="comment">// DELETE FROM users WHERE id = ?</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Relationships</h2>
+
+            <h3>@OneToMany - One User Has Many Orders</h3>
+            <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"user"</span>, cascade = CascadeType.ALL)
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="comment">// Getters/setters</span>
+}
+
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"orders"</span>)
+<span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> productName;
+    <span class="keyword">private</span> <span class="keyword">double</span> total;
+
+    <span class="annotation">@ManyToOne</span>
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"user_id"</span>)  <span class="comment">// Foreign key column</span>
+    <span class="keyword">private</span> <span class="class-name">User</span> user;
+
+    <span class="comment">// Getters/setters</span>
+}</code></pre>
+
+            <p><strong>Usage:</strong></p>
+            <pre><code><span class="class-name">User</span> user = <span class="keyword">new</span> <span class="class-name">User</span>(<span class="string">"Alice"</span>);
+
+<span class="class-name">Order</span> order1 = <span class="keyword">new</span> <span class="class-name">Order</span>(<span class="string">"Laptop"</span>, <span class="number">999.99</span>);
+order1.setUser(user);
+
+<span class="class-name">Order</span> order2 = <span class="keyword">new</span> <span class="class-name">Order</span>(<span class="string">"Mouse"</span>, <span class="number">29.99</span>);
+order2.setUser(user);
+
+user.getOrders().add(order1);
+user.getOrders().add(order2);
+
+em.persist(user);  <span class="comment">// Saves user + both orders (cascade!)</span></code></pre>
+
+            <h3>@ManyToMany - Students and Courses</h3>
+            <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Student</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+
+    <span class="annotation">@ManyToMany</span>
+    <span class="annotation">@JoinTable</span>(
+        name = <span class="string">"student_course"</span>,  <span class="comment">// Join table name</span>
+        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"student_id"</span>),
+        inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"course_id"</span>)
+    )
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Course</span>&gt; courses = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Course</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> title;
+
+    <span class="annotation">@ManyToMany</span>(mappedBy = <span class="string">"courses"</span>)
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Student</span>&gt; students = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>JPQL (JPA Query Language)</h2>
+            <p><strong>Like SQL but for objects!</strong></p>
+
+            <h3>Basic Queries</h3>
+            <pre><code><span class="comment">// Select all</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = em.createQuery(<span class="string">"SELECT u FROM User u"</span>, User.<span class="keyword">class</span>)
+                          .getResultList();
+
+<span class="comment">// Where clause</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; adults = em.createQuery(
+    <span class="string">"SELECT u FROM User u WHERE u.age >= :age"</span>, User.<span class="keyword">class</span>)
+    .setParameter(<span class="string">"age"</span>, <span class="number">18</span>)
+    .getResultList();
+
+<span class="comment">// Order by</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; sorted = em.createQuery(
+    <span class="string">"SELECT u FROM User u ORDER BY u.username ASC"</span>, User.<span class="keyword">class</span>)
+    .getResultList();
+
+<span class="comment">// Pagination</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; page = em.createQuery(<span class="string">"SELECT u FROM User u"</span>, User.<span class="keyword">class</span>)
+                          .setFirstResult(<span class="number">0</span>)     <span class="comment">// Start at 0</span>
+                          .setMaxResults(<span class="number">10</span>)    <span class="comment">// Get 10 records</span>
+                          .getResultList();</code></pre>
+
+            <h3>Joins</h3>
+            <pre><code><span class="comment">// Inner join</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = em.createQuery(
+    <span class="string">"SELECT o FROM Order o JOIN o.user u WHERE u.username = :username"</span>,
+    Order.<span class="keyword">class</span>)
+    .setParameter(<span class="string">"username"</span>, <span class="string">"Alice"</span>)
+    .getResultList();
+
+<span class="comment">// Fetch join (avoids N+1 problem)</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; usersWithOrders = em.createQuery(
+    <span class="string">"SELECT u FROM User u LEFT JOIN FETCH u.orders"</span>,
+    User.<span class="keyword">class</span>)
+    .getResultList();</code></pre>
+
+            <h3>Aggregates</h3>
+            <pre><code><span class="comment">// Count</span>
+<span class="class-name">Long</span> count = em.createQuery(<span class="string">"SELECT COUNT(u) FROM User u"</span>, Long.<span class="keyword">class</span>)
+                  .getSingleResult();
+
+<span class="comment">// Average</span>
+<span class="class-name">Double</span> avgAge = em.createQuery(<span class="string">"SELECT AVG(u.age) FROM User u"</span>, Double.<span class="keyword">class</span>)
+                    .getSingleResult();
+
+<span class="comment">// Sum</span>
+<span class="class-name">Double</span> total = em.createQuery(
+    <span class="string">"SELECT SUM(o.total) FROM Order o WHERE o.user.id = :userId"</span>,
+    Double.<span class="keyword">class</span>)
+    .setParameter(<span class="string">"userId"</span>, <span class="number">1L</span>)
+    .getSingleResult();</code></pre>
+
+            <h3>Native SQL (When JPQL Isn't Enough)</h3>
+            <pre><code><span class="comment">// Execute native SQL</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = em.createNativeQuery(
+    <span class="string">"SELECT * FROM users WHERE email LIKE ?1"</span>, User.<span class="keyword">class</span>)
+    .setParameter(<span class="number">1</span>, <span class="string">"%@gmail.com"</span>)
+    .getResultList();</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Named Queries</h2>
+            <p><strong>Define queries once, reuse everywhere</strong></p>
+
+            <pre><code><span class="annotation">@Entity</span>
+<span class="annotation">@NamedQueries</span>({
+    <span class="annotation">@NamedQuery</span>(
+        name = <span class="string">"User.findAll"</span>,
+        query = <span class="string">"SELECT u FROM User u"</span>
+    ),
+    <span class="annotation">@NamedQuery</span>(
+        name = <span class="string">"User.findByEmail"</span>,
+        query = <span class="string">"SELECT u FROM User u WHERE u.email = :email"</span>
+    ),
+    <span class="annotation">@NamedQuery</span>(
+        name = <span class="string">"User.findAdults"</span>,
+        query = <span class="string">"SELECT u FROM User u WHERE u.age >= 18"</span>
+    )
+})
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+    <span class="comment">// Entity fields...</span>
+}
+
+<span class="comment">// Usage</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = em.createNamedQuery(<span class="string">"User.findAll"</span>, User.<span class="keyword">class</span>)
+                          .getResultList();
+
+<span class="class-name">User</span> user = em.createNamedQuery(<span class="string">"User.findByEmail"</span>, User.<span class="keyword">class</span>)
+                 .setParameter(<span class="string">"email"</span>, <span class="string">"alice@example.com"</span>)
+                 .getSingleResult();</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Entity Lifecycle</h2>
+
+            <pre><code>NEW (Transient)
+    ↓ em.persist()
+MANAGED (Persistent) ← Changes tracked, auto-saved
+    ↓ em.detach() or transaction ends
+DETACHED (No longer tracked)
+    ↓ em.merge()
+MANAGED again
+    ↓ em.remove()
+REMOVED (Marked for deletion)
+    ↓ transaction commits
+Deleted from database</code></pre>
+
+            <h3>Lifecycle Callbacks</h3>
+            <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Product</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> createdAt;
+    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> updatedAt;
+
+    <span class="annotation">@PrePersist</span>  <span class="comment">// Before INSERT</span>
+    <span class="keyword">public void</span> <span class="function">onCreate</span>() {
+        createdAt = <span class="class-name">LocalDateTime</span>.now();
+        <span class="class-name">System</span>.out.println(<span class="string">"About to create: "</span> + name);
+    }
+
+    <span class="annotation">@PreUpdate</span>  <span class="comment">// Before UPDATE</span>
+    <span class="keyword">public void</span> <span class="function">onUpdate</span>() {
+        updatedAt = <span class="class-name">LocalDateTime</span>.now();
+        <span class="class-name">System</span>.out.println(<span class="string">"Updating: "</span> + name);
+    }
+
+    <span class="annotation">@PostPersist</span>  <span class="comment">// After INSERT</span>
+    <span class="keyword">public void</span> <span class="function">afterCreate</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Created with ID: "</span> + id);
+    }
+
+    <span class="annotation">@PostLoad</span>  <span class="comment">// After entity loaded from database</span>
+    <span class="keyword">public void</span> <span class="function">afterLoad</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Loaded: "</span> + name);
+    }
+
+    <span class="annotation">@PreRemove</span>  <span class="comment">// Before DELETE</span>
+    <span class="keyword">public void</span> <span class="function">onDelete</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"About to delete: "</span> + name);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>✅ DO:</h3>
+                <ul>
+                    <li><strong>Use JPQL for most queries</strong> - Database-independent</li>
+                    <li><strong>Use fetch joins to avoid N+1</strong> - Load related data efficiently</li>
+                    <li><strong>Use pagination for large result sets</strong> - setMaxResults()</li>
+                    <li><strong>Let transactions handle persistence</strong> - Changes auto-saved</li>
+                    <li><strong>Use @NamedQueries for common queries</strong> - Validated at startup</li>
+                    <li><strong>Keep entities simple</strong> - No business logic</li>
+                    <li><strong>Use cascade wisely</strong> - Understand propagation</li>
+                </ul>
+
+                <h3>❌ DON'T:</h3>
+                <ul>
+                    <li><strong>Don't forget @Id</strong> - Every entity needs primary key</li>
+                    <li><strong>Don't expose entities to view layer</strong> - Use DTOs</li>
+                    <li><strong>Don't use SELECT *</strong> - Fetch only needed columns</li>
+                    <li><strong>Don't load entire tables</strong> - Use pagination</li>
+                    <li><strong>Don't put business logic in entities</strong> - Keep them data-focused</li>
+                    <li><strong>Don't forget lazy vs eager loading</strong> - Default is lazy for collections</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>JPA</strong> maps Java objects to database tables automatically</li>
+                    <li><strong>@Entity:</strong> Marks a class as a database table</li>
+                    <li><strong>@Id:</strong> Primary key field</li>
+                    <li><strong>EntityManager:</strong> Your interface to the database (persist, find, remove)</li>
+                    <li><strong>JPQL:</strong> Object-oriented query language (like SQL for objects)</li>
+                    <li><strong>Relationships:</strong> @OneToMany, @ManyToOne, @ManyToMany</li>
+                    <li><strong>Cascade:</strong> Propagate operations to related entities</li>
+                    <li><strong>Lifecycle:</strong> New → Managed → Detached → Removed</li>
+                    <li><strong>Implementations:</strong> Hibernate (most popular), EclipseLink, OpenJPA</li>
+                    <li><strong>Benefits:</strong> No SQL code, database portability, automatic mapping</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="transactions.html" class="related-link">Transactions</a>
+                <a href="bean-validation.html" class="related-link">Bean Validation</a>
+                <a href="ejb.html" class="related-link">EJB (Enterprise JavaBeans)</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

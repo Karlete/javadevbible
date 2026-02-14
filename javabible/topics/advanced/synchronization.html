@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synchronization Mechanisms - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / Synchronization Mechanisms
+            </nav>
+            <h1>Synchronization Mechanisms</h1>
+            <p class="topic-subtitle">Thread Safety and Preventing Race Conditions</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is Synchronization?</h2>
+            <p>Imagine a shared bathroom in a house with multiple people. If two people try to use it at the same time, chaos! The solution? A lock on the door. Only one person can use it at a time. <strong>Synchronization</strong> works the same way in Java - it controls access to shared resources so only one thread can use them at a time.</p>
+
+            <h3>Real-World Analogy: ATM Machine</h3>
+            <p>You're at an ATM checking your balance ($1000). While you're deciding how much to withdraw, your spouse at another ATM also sees $1000 and starts withdrawing. You both withdraw $600...</p>
+
+            <p><strong>Without synchronization:</strong> Both see $1000, both withdraw $600 → account becomes -$200 (overdraft!)</p>
+            <p><strong>With synchronization:</strong> One person completes their transaction first (balance → $400), then the other sees $400 and gets "Insufficient funds"</p>
+
+            <h3>The Problem: Race Condition</h3>
+            <p>A <strong>race condition</strong> occurs when multiple threads try to modify shared data simultaneously, leading to unpredictable results.</p>
+
+            <div class="info-box warning">
+                <div class="info-box-title">❌ Problem - Race Condition Example</div>
+                <pre><code><span class="keyword">class</span> <span class="class-name">Counter</span> {
+    <span class="keyword">private int</span> count = <span class="number">0</span>;
+
+    <span class="keyword">public void</span> <span class="function">increment</span>() {
+        count++;  <span class="comment">// Looks simple, but NOT atomic!</span>
+    }
+}
+
+<span class="comment">// What count++ actually does (3 steps):</span>
+<span class="comment">1. Read current value of count</span>
+<span class="comment">2. Add 1 to it</span>
+<span class="comment">3. Write new value back to count</span>
+
+<span class="comment">// Race condition scenario:</span>
+<span class="class-name">Counter</span> counter = <span class="keyword">new</span> <span class="class-name">Counter</span>();
+
+<span class="class-name">Thread</span> t1 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) counter.increment();
+});
+
+<span class="class-name">Thread</span> t2 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) counter.increment();
+});
+
+t1.start();
+t2.start();
+t1.join();
+t2.join();
+
+<span class="class-name">System</span>.out.println(counter.count);
+<span class="comment">// Expected: 2000</span>
+<span class="comment">// Actual: 1847, 1923, 1956... (varies every run!)</span>
+
+<span class="comment">// WHY? Threads interfere with each other:</span>
+<span class="comment">// T1 reads: 100 | T2 reads: 100</span>
+<span class="comment">// T1 adds 1: 101 | T2 adds 1: 101</span>
+<span class="comment">// T1 writes: 101 | T2 writes: 101</span>
+<span class="comment">// Result: 101 instead of 102! One increment lost!</span></code></pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Solution 1: Synchronized Methods</h2>
+            <p>The <code>synchronized</code> keyword ensures only ONE thread can execute the method at a time.</p>
+
+            <div class="info-box tip">
+                <div class="info-box-title">✅ Solution - Thread-Safe with Synchronized</div>
+                <pre><code><span class="keyword">class</span> <span class="class-name">SafeCounter</span> {
+    <span class="keyword">private int</span> count = <span class="number">0</span>;
+
+    <span class="keyword">public synchronized void</span> <span class="function">increment</span>() {
+        count++;  <span class="comment">// Now thread-safe!</span>
+    }
+
+    <span class="keyword">public synchronized int</span> <span class="function">getCount</span>() {
+        <span class="keyword">return</span> count;
+    }
+}
+
+<span class="comment">// Now it always returns 2000!</span></code></pre>
+            </div>
+
+            <h3>How Synchronized Works</h3>
+            <pre><code><span class="comment">Every object in Java has an invisible LOCK (monitor)</span>
+
+<span class="comment">┌─────────────────┐</span>
+<span class="comment">│  Counter Object │  ← Has a lock</span>
+<span class="comment">│  count = 0      │</span>
+<span class="comment">│  🔒 LOCK        │</span>
+<span class="comment">└─────────────────┘</span>
+
+<span class="comment">Step-by-step execution:</span>
+<span class="comment">1. Thread A calls increment() → Tries to acquire lock</span>
+<span class="comment">2. Lock is available → Thread A gets it 🔒✅</span>
+<span class="comment">3. Thread A executes count++ safely</span>
+<span class="comment">4. Thread B calls increment() → Tries to acquire lock</span>
+<span class="comment">5. Lock is HELD by A → Thread B waits ⏳</span>
+<span class="comment">6. Thread A finishes → Releases lock 🔓</span>
+<span class="comment">7. Thread B acquires lock 🔒✅ → Executes count++</span></code></pre>
+
+            <h3>Complete Bank Account Example</h3>
+            <pre><code><span class="keyword">class</span> <span class="class-name">BankAccount</span> {
+    <span class="keyword">private int</span> balance = <span class="number">1000</span>;
+
+    <span class="keyword">public synchronized void</span> <span class="function">withdraw</span>(<span class="keyword">int</span> amount) {
+        <span class="class-name">String</span> thread = <span class="class-name">Thread</span>.currentThread().getName();
+        <span class="class-name">System</span>.out.println(thread + <span class="string">": Checking balance..."</span>);
+
+        <span class="keyword">if</span> (balance >= amount) {
+            <span class="class-name">System</span>.out.println(thread + <span class="string">": Sufficient funds"</span>);
+            <span class="keyword">try</span> { <span class="class-name">Thread</span>.sleep(<span class="number">100</span>); } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {}
+            balance -= amount;
+            <span class="class-name">System</span>.out.println(thread + <span class="string">": Withdrew $"</span> + amount);
+            <span class="class-name">System</span>.out.println(thread + <span class="string">": New balance: $"</span> + balance);
+        } <span class="keyword">else</span> {
+            <span class="class-name">System</span>.out.println(thread + <span class="string">": Insufficient funds!"</span>);
+        }
+    }
+
+    <span class="keyword">public synchronized void</span> <span class="function">deposit</span>(<span class="keyword">int</span> amount) {
+        balance += amount;
+        <span class="class-name">System</span>.out.println(<span class="string">"Deposited $"</span> + amount + <span class="string">", Balance: $"</span> + balance);
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">BankTest</span> {
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) <span class="keyword">throws</span> <span class="class-name">InterruptedException</span> {
+        <span class="class-name">BankAccount</span> account = <span class="keyword">new</span> <span class="class-name">BankAccount</span>();
+
+        <span class="class-name">Thread</span> person1 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> account.withdraw(<span class="number">600</span>), <span class="string">"Person1"</span>);
+        <span class="class-name">Thread</span> person2 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> account.withdraw(<span class="number">600</span>), <span class="string">"Person2"</span>);
+
+        person1.start();
+        person2.start();
+        person1.join();
+        person2.join();
+    }
+}</code></pre>
+
+            <p><strong>Output (synchronized - safe):</strong></p>
+            <pre><code>Person1: Checking balance...
+Person1: Sufficient funds
+Person1: Withdrew $600
+Person1: New balance: $400
+Person2: Checking balance...
+Person2: Insufficient funds!</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Solution 2: Synchronized Blocks</h2>
+            <p>Sometimes you only need to synchronize part of a method, not the whole thing. Use synchronized blocks for better performance.</p>
+
+            <h3>Syntax</h3>
+            <pre><code><span class="keyword">public void</span> <span class="function">myMethod</span>() {
+    <span class="comment">// This code can run concurrently</span>
+    doSomeWork();
+
+    <span class="keyword">synchronized</span>(<span class="keyword">this</span>) {
+        <span class="comment">// Only THIS part is synchronized</span>
+        criticalSection();
+    }
+
+    <span class="comment">// This code can run concurrently</span>
+    doMoreWork();
+}</code></pre>
+
+            <h3>Example: Synchronized Block</h3>
+            <pre><code><span class="keyword">class</span> <span class="class-name">Logger</span> {
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; logs = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="keyword">public void</span> <span class="function">log</span>(<span class="class-name">String</span> message) {
+        <span class="comment">// Formatting doesn't need synchronization</span>
+        <span class="class-name">String</span> formatted = <span class="class-name">LocalDateTime</span>.now() + <span class="string">": "</span> + message;
+
+        <span class="comment">// Only synchronize the critical part</span>
+        <span class="keyword">synchronized</span>(<span class="keyword">this</span>) {
+            logs.add(formatted);  <span class="comment">// Shared resource - needs lock</span>
+        }
+    }
+}</code></pre>
+
+            <h3>Synchronizing on Different Objects</h3>
+            <pre><code><span class="keyword">class</span> <span class="class-name">BankAccount</span> {
+    <span class="keyword">private int</span> balance = <span class="number">1000</span>;
+    <span class="keyword">private final</span> <span class="class-name">Object</span> balanceLock = <span class="keyword">new</span> <span class="class-name">Object</span>();
+
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; transactions = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    <span class="keyword">private final</span> <span class="class-name">Object</span> transactionLock = <span class="keyword">new</span> <span class="class-name">Object</span>();
+
+    <span class="keyword">public void</span> <span class="function">withdraw</span>(<span class="keyword">int</span> amount) {
+        <span class="keyword">synchronized</span>(balanceLock) {
+            balance -= amount;
+        }
+    }
+
+    <span class="keyword">public void</span> <span class="function">addTransaction</span>(<span class="class-name">String</span> transaction) {
+        <span class="keyword">synchronized</span>(transactionLock) {
+            transactions.add(transaction);
+        }
+    }
+}
+
+<span class="comment">// Benefits: withdraw() and addTransaction() can run concurrently!</span>
+<span class="comment">// They use different locks</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Solution 3: Volatile Keyword</h2>
+            <p>Use <code>volatile</code> for simple flags that are read/written by multiple threads.</p>
+
+            <h3>The Problem: Caching</h3>
+            <pre><code><span class="keyword">class</span> <span class="class-name">TaskRunner</span> {
+    <span class="keyword">private boolean</span> running = <span class="keyword">true</span>;  <span class="comment">// Problem: might be cached!</span>
+
+    <span class="keyword">public void</span> <span class="function">run</span>() {
+        <span class="keyword">while</span> (running) {  <span class="comment">// Thread might cache this value</span>
+            doWork();
+        }
+    }
+
+    <span class="keyword">public void</span> <span class="function">stop</span>() {
+        running = <span class="keyword">false</span>;  <span class="comment">// Other thread might not see this change!</span>
+    }
+}</code></pre>
+
+            <h3>The Solution: Volatile</h3>
+            <pre><code><span class="keyword">class</span> <span class="class-name">TaskRunner</span> {
+    <span class="keyword">private volatile boolean</span> running = <span class="keyword">true</span>;  <span class="comment">// Always read from main memory</span>
+
+    <span class="keyword">public void</span> <span class="function">run</span>() {
+        <span class="keyword">while</span> (running) {  <span class="comment">// Always sees latest value</span>
+            doWork();
+        }
+    }
+
+    <span class="keyword">public void</span> <span class="function">stop</span>() {
+        running = <span class="keyword">false</span>;  <span class="comment">// Immediately visible to all threads</span>
+    }
+}
+
+<span class="comment">// volatile ensures:</span>
+<span class="comment">✅ Changes are immediately visible to all threads</span>
+<span class="comment">✅ No caching in thread-local memory</span>
+<span class="comment">❌ Does NOT provide atomicity (use synchronized for that)</span></code></pre>
+
+            <h3>When to Use Volatile</h3>
+            <ul>
+                <li>✅ Simple flags (boolean running, boolean done)</li>
+                <li>✅ Single variable read/write</li>
+                <li>✅ Status indicators</li>
+                <li>❌ NOT for compound operations (count++)</li>
+                <li>❌ NOT when multiple variables need consistency</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Solution 4: Atomic Classes</h2>
+            <p>Java provides atomic classes for lock-free thread-safe operations.</p>
+
+            <h3>AtomicInteger Example</h3>
+            <pre><code><span class="keyword">import</span> java.util.concurrent.atomic.*;
+
+<span class="keyword">class</span> <span class="class-name">AtomicCounter</span> {
+    <span class="keyword">private</span> <span class="class-name">AtomicInteger</span> count = <span class="keyword">new</span> <span class="class-name">AtomicInteger</span>(<span class="number">0</span>);
+
+    <span class="keyword">public void</span> <span class="function">increment</span>() {
+        count.incrementAndGet();  <span class="comment">// Atomic operation - thread-safe!</span>
+    }
+
+    <span class="keyword">public int</span> <span class="function">getCount</span>() {
+        <span class="keyword">return</span> count.get();
+    }
+}
+
+<span class="comment">// No need for synchronized - AtomicInteger handles it!</span></code></pre>
+
+            <h3>Common Atomic Classes</h3>
+            <pre><code><span class="class-name">AtomicInteger</span> atomicInt = <span class="keyword">new</span> <span class="class-name">AtomicInteger</span>(<span class="number">0</span>);
+atomicInt.incrementAndGet();  <span class="comment">// ++count</span>
+atomicInt.decrementAndGet();  <span class="comment">// --count</span>
+atomicInt.addAndGet(<span class="number">5</span>);     <span class="comment">// count += 5</span>
+atomicInt.compareAndSet(<span class="number">10</span>, <span class="number">20</span>);  <span class="comment">// if(count==10) count=20</span>
+
+<span class="class-name">AtomicLong</span> atomicLong = <span class="keyword">new</span> <span class="class-name">AtomicLong</span>(<span class="number">0L</span>);
+<span class="class-name">AtomicBoolean</span> atomicBool = <span class="keyword">new</span> <span class="class-name">AtomicBoolean</span>(<span class="keyword">false</span>);
+<span class="class-name">AtomicReference</span>&lt;<span class="class-name">String</span>&gt; atomicRef = <span class="keyword">new</span> <span class="class-name">AtomicReference</span>&lt;&gt;(<span class="string">"initial"</span>);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Solution 5: ReentrantLock - Advanced Locking</h2>
+            <p>More flexible than synchronized, with tryLock(), timed locks, and interruptible locks.</p>
+
+            <pre><code><span class="keyword">import</span> java.util.concurrent.locks.*;
+
+<span class="keyword">class</span> <span class="class-name">BankAccountWithLock</span> {
+    <span class="keyword">private int</span> balance = <span class="number">1000</span>;
+    <span class="keyword">private final</span> <span class="class-name">Lock</span> lock = <span class="keyword">new</span> <span class="class-name">ReentrantLock</span>();
+
+    <span class="keyword">public void</span> <span class="function">withdraw</span>(<span class="keyword">int</span> amount) {
+        lock.lock();  <span class="comment">// Acquire lock</span>
+        <span class="keyword">try</span> {
+            <span class="keyword">if</span> (balance >= amount) {
+                balance -= amount;
+                <span class="class-name">System</span>.out.println(<span class="string">"Withdrew $"</span> + amount);
+            }
+        } <span class="keyword">finally</span> {
+            lock.unlock();  <span class="comment">// ALWAYS unlock in finally!</span>
+        }
+    }
+
+    <span class="keyword">public boolean</span> <span class="function">tryWithdraw</span>(<span class="keyword">int</span> amount) {
+        <span class="keyword">if</span> (lock.tryLock()) {  <span class="comment">// Try to get lock, don't wait</span>
+            <span class="keyword">try</span> {
+                <span class="keyword">if</span> (balance >= amount) {
+                    balance -= amount;
+                    <span class="keyword">return</span> <span class="keyword">true</span>;
+                }
+            } <span class="keyword">finally</span> {
+                lock.unlock();
+            }
+        }
+        <span class="keyword">return</span> <span class="keyword">false</span>;  <span class="comment">// Couldn't get lock</span>
+    }
+}</code></pre>
+
+            <h3>ReentrantLock Features</h3>
+            <ul>
+                <li><code>tryLock()</code> - Try to acquire lock, return immediately</li>
+                <li><code>tryLock(timeout, unit)</code> - Wait for specified time</li>
+                <li><code>lockInterruptibly()</code> - Can be interrupted while waiting</li>
+                <li><code>isLocked()</code> - Check if lock is held</li>
+                <li><code>getHoldCount()</code> - How many times current thread holds lock</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Comparison: Synchronized vs Lock vs Atomic</h2>
+
+            <table>
+                <tr>
+                    <th>Feature</th>
+                    <th>synchronized</th>
+                    <th>ReentrantLock</th>
+                    <th>Atomic Classes</th>
+                </tr>
+                <tr>
+                    <td><strong>Ease of Use</strong></td>
+                    <td>Very easy</td>
+                    <td>More complex</td>
+                    <td>Very easy</td>
+                </tr>
+                <tr>
+                    <td><strong>Performance</strong></td>
+                    <td>Good</td>
+                    <td>Good</td>
+                    <td>Best (lock-free)</td>
+                </tr>
+                <tr>
+                    <td><strong>Try Lock</strong></td>
+                    <td>❌ No</td>
+                    <td>✅ Yes</td>
+                    <td>N/A</td>
+                </tr>
+                <tr>
+                    <td><strong>Timeout</strong></td>
+                    <td>❌ No</td>
+                    <td>✅ Yes</td>
+                    <td>N/A</td>
+                </tr>
+                <tr>
+                    <td><strong>Fairness</strong></td>
+                    <td>No guarantee</td>
+                    <td>✅ Optional</td>
+                    <td>N/A</td>
+                </tr>
+                <tr>
+                    <td><strong>Use Case</strong></td>
+                    <td>General purpose</td>
+                    <td>Advanced control</td>
+                    <td>Single variables</td>
+                </tr>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Pitfalls & Best Practices</h2>
+
+            <h3>❌ Deadlock Example</h3>
+            <pre><code><span class="class-name">Object</span> lock1 = <span class="keyword">new</span> <span class="class-name">Object</span>();
+<span class="class-name">Object</span> lock2 = <span class="keyword">new</span> <span class="class-name">Object</span>();
+
+<span class="comment">// Thread 1</span>
+<span class="keyword">synchronized</span>(lock1) {
+    <span class="class-name">Thread</span>.sleep(<span class="number">100</span>);
+    <span class="keyword">synchronized</span>(lock2) {  <span class="comment">// Waits for lock2</span>
+        doWork();
+    }
+}
+
+<span class="comment">// Thread 2</span>
+<span class="keyword">synchronized</span>(lock2) {
+    <span class="class-name">Thread</span>.sleep(<span class="number">100</span>);
+    <span class="keyword">synchronized</span>(lock1) {  <span class="comment">// Waits for lock1</span>
+        doWork();
+    }
+}
+
+<span class="comment">// DEADLOCK! Both threads wait forever</span></code></pre>
+
+            <h3>✅ Avoiding Deadlock</h3>
+            <pre><code><span class="comment">// Always acquire locks in same order!</span>
+<span class="keyword">synchronized</span>(lock1) {
+    <span class="keyword">synchronized</span>(lock2) {
+        doWork();
+    }
+}</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Best Practices</div>
+                <ul>
+                    <li>✅ Keep synchronized blocks small - minimize lock time</li>
+                    <li>✅ Use specific locks for specific resources</li>
+                    <li>✅ Always acquire locks in same order (prevent deadlock)</li>
+                    <li>✅ Use concurrent collections (ConcurrentHashMap, CopyOnWriteArrayList)</li>
+                    <li>✅ Prefer atomic classes for simple counters/flags</li>
+                    <li>✅ Use volatile for simple shared flags</li>
+                    <li>✅ Document synchronization strategy in comments</li>
+                    <li>❌ Don't synchronize on public objects (use private locks)</li>
+                    <li>❌ Don't synchronize on String literals (they're interned!)</li>
+                    <li>❌ Don't call unknown methods inside synchronized blocks</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Why It Matters</h2>
+            <ul>
+                <li><strong>Correctness:</strong> Prevents data corruption from race conditions</li>
+                <li><strong>Reliability:</strong> Programs produce consistent, predictable results</li>
+                <li><strong>Safety:</strong> Critical for financial, medical, and mission-critical systems</li>
+                <li><strong>Professional Skill:</strong> Essential for multi-threaded applications</li>
+            </ul>
+
+            <div class="info-box note">
+                <div class="info-box-title">Remember</div>
+                <p>Synchronization is like traffic lights - it prevents collisions but adds overhead. Use it when needed, but don't over-synchronize!</p>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="multithreading.html" class="related-link">Multithreading & Concurrency</a>
+                <a href="thread-pools.html" class="related-link">Thread Pools & ExecutorService</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

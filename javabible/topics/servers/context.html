@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context & Deployment - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#servers">Application Servers</a> / Context & Deployment
+            </nav>
+            <h1>Context & Deployment</h1>
+            <p class="topic-subtitle">Getting your Java application running</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is a Web Application Context?</h2>
+            <p>A <strong>context</strong> represents a single web application running within a servlet container. Understanding contexts is essential because it determines how your application is accessed (its URL path), how it's isolated from other applications, and how it can be configured and deployed.</p>
+
+            <p>Each context:</p>
+            <ul>
+                <li>Has its own URL namespace (context path)</li>
+                <li>Has its own classloader and classpath</li>
+                <li>Has its own ServletContext object</li>
+                <li>Is isolated from other applications</li>
+                <li>Can be started, stopped, and reloaded independently</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Apartment Building Analogy:</strong></p>
+                <p>Think of a servlet container (like Tomcat) as an <strong>apartment building</strong>:</p>
+                <ul>
+                    <li>The entire building = Tomcat server</li>
+                    <li>Individual apartments = Web application contexts</li>
+                    <li>Apartment number (101, 102...) = Context path (/app1, /app2)</li>
+                    <li>Each apartment has its own furniture = Each context has its own classes</li>
+                    <li>Apartments share building utilities = Contexts share container services</li>
+                </ul>
+            </div>
+
+            <h3>Context Path Explained</h3>
+            <p>The <strong>context path</strong> is the URL prefix that identifies your application:</p>
+            <pre><code>http://localhost:8080/myapp/products/list
+└──────────────────┘└─────┘└────────────┘
+     Host:Port      Context   Servlet
+                     Path     Path
+
+<span class="comment"># If your WAR is named "myapp.war":</span>
+<span class="comment"># Context path = /myapp</span>
+
+<span class="comment"># URL breakdown:</span>
+<span class="comment"># http://localhost:8080  → Tomcat server</span>
+<span class="comment"># /myapp                 → Your application (context)</span>
+<span class="comment"># /products/list         → Servlet/resource within your app</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>The ServletContext Object</h2>
+            <p>Every web application has a <code>ServletContext</code> object—the programmatic representation of the context:</p>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">MyServlet</span> <span class="keyword">extends</span> HttpServlet {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> init() <span class="keyword">throws</span> ServletException {
+        ServletContext ctx = getServletContext();
+
+        <span class="comment">// 1. Access initialization parameters (from web.xml)</span>
+        String dbUrl = ctx.getInitParameter(<span class="string">"database.url"</span>);
+        String adminEmail = ctx.getInitParameter(<span class="string">"admin.email"</span>);
+
+        <span class="comment">// 2. Store application-wide data (shared across all servlets)</span>
+        DataSource ds = createDataSource(dbUrl);
+        ctx.setAttribute(<span class="string">"dataSource"</span>, ds);
+
+        <span class="comment">// 3. Get real file paths</span>
+        String uploadDir = ctx.getRealPath(<span class="string">"/uploads"</span>);
+        <span class="comment">// Returns: C:\tomcat\webapps\myapp\uploads</span>
+
+        <span class="comment">// 4. Get resource as stream</span>
+        InputStream config = ctx.getResourceAsStream(<span class="string">"/WEB-INF/config.properties"</span>);
+
+        <span class="comment">// 5. Get context information</span>
+        String serverInfo = ctx.getServerInfo();  <span class="comment">// "Apache Tomcat/10.1.x"</span>
+        String contextPath = ctx.getContextPath(); <span class="comment">// "/myapp"</span>
+
+        <span class="comment">// 6. Log messages</span>
+        ctx.log(<span class="string">"Application initialized successfully"</span>);
+    }
+}</code></pre>
+
+            <h3>Attribute Scopes</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Scope</th>
+                        <th>Object</th>
+                        <th>Lifetime</th>
+                        <th>Use For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Application</strong></td>
+                        <td>ServletContext</td>
+                        <td>Entire app lifetime</td>
+                        <td>Config, shared resources, caches</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Session</strong></td>
+                        <td>HttpSession</td>
+                        <td>User session</td>
+                        <td>Login state, shopping cart</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Request</strong></td>
+                        <td>HttpServletRequest</td>
+                        <td>Single request</td>
+                        <td>Form data, request params</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Deployment Methods</h2>
+
+            <h3>Method 1: WAR File Deployment (Most Common)</h3>
+            <pre><code><span class="comment"># For Tomcat, copy WAR to webapps directory:</span>
+cp myapp.war $CATALINA_HOME/webapps/
+
+<span class="comment"># Tomcat automatically:</span>
+<span class="comment"># 1. Detects the new WAR file</span>
+<span class="comment"># 2. Extracts it to webapps/myapp/</span>
+<span class="comment"># 3. Deploys and starts the application</span>
+<span class="comment"># 4. Application available at /myapp</span>
+
+<span class="comment"># To undeploy:</span>
+rm $CATALINA_HOME/webapps/myapp.war
+<span class="comment"># Tomcat removes the extracted directory</span></code></pre>
+
+            <div class="info-box">
+                <p><strong>Context Path from WAR Name:</strong></p>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>WAR File Name</th>
+                            <th>Context Path</th>
+                            <th>Access URL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>myapp.war</td>
+                            <td>/myapp</td>
+                            <td>http://localhost:8080/myapp/</td>
+                        </tr>
+                        <tr>
+                            <td>ROOT.war</td>
+                            <td>/ (root)</td>
+                            <td>http://localhost:8080/</td>
+                        </tr>
+                        <tr>
+                            <td>app#v1.war</td>
+                            <td>/app/v1</td>
+                            <td>http://localhost:8080/app/v1/</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h3>Method 2: Exploded Directory</h3>
+            <pre><code><span class="comment"># Instead of myapp.war, create a directory:</span>
+webapps/
+└── myapp/
+    ├── WEB-INF/
+    │   ├── web.xml
+    │   ├── classes/
+    │   └── lib/
+    ├── index.html
+    └── css/
+
+<span class="comment"># Benefits:</span>
+<span class="comment"># - Edit files without rebuilding WAR</span>
+<span class="comment"># - Faster deployment cycle during development</span>
+<span class="comment"># - Can modify JSPs and see changes immediately</span></code></pre>
+
+            <h3>Method 3: Context XML Files</h3>
+            <pre><code><span class="comment">&lt;!-- $CATALINA_HOME/conf/Catalina/localhost/myapp.xml --&gt;</span>
+&lt;<span class="keyword">Context</span> docBase="/path/to/myapp.war" reloadable="false"&gt;
+
+    <span class="comment">&lt;!-- Database connection pool --&gt;</span>
+    &lt;<span class="keyword">Resource</span> name="jdbc/MyDB"
+              auth="Container"
+              type="javax.sql.DataSource"
+              maxTotal="100"
+              maxIdle="30"
+              username="dbuser"
+              password="dbpass"
+              driverClassName="com.mysql.cj.jdbc.Driver"
+              url="jdbc:mysql://localhost:3306/mydb"/&gt;
+
+    <span class="comment">&lt;!-- Environment entries --&gt;</span>
+    &lt;<span class="keyword">Environment</span> name="maxUploadSize"
+                 value="10485760"
+                 type="java.lang.Integer"/&gt;
+
+&lt;/Context&gt;</code></pre>
+
+            <h3>Method 4: Tomcat Manager</h3>
+            <pre><code><span class="comment"># 1. Configure manager user in tomcat-users.xml:</span>
+&lt;user username="admin"
+      password="secret"
+      roles="manager-gui,manager-script"/&gt;
+
+<span class="comment"># 2. Access Manager at:</span>
+http://localhost:8080/manager/html
+
+<span class="comment"># 3. Or use the text interface (for scripting):</span>
+curl -u admin:secret \
+     -T myapp.war \
+     "http://localhost:8080/manager/text/deploy?path=/myapp"</code></pre>
+
+            <h3>Method 5: Maven Plugin</h3>
+            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.tomcat.maven&lt;/groupId&gt;
+    &lt;artifactId&gt;tomcat7-maven-plugin&lt;/artifactId&gt;
+    &lt;configuration&gt;
+        &lt;url&gt;http://localhost:8080/manager/text&lt;/url&gt;
+        &lt;server&gt;TomcatServer&lt;/server&gt;
+        &lt;path&gt;/myapp&lt;/path&gt;
+    &lt;/configuration&gt;
+&lt;/plugin&gt;
+
+<span class="comment"># Deploy commands:</span>
+mvn tomcat7:deploy      <span class="comment"># First deployment</span>
+mvn tomcat7:redeploy    <span class="comment"># Update existing</span>
+mvn tomcat7:undeploy    <span class="comment"># Remove</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>JNDI Resources</h2>
+            <p>JNDI (Java Naming and Directory Interface) allows you to look up resources configured in the container:</p>
+
+            <pre><code><span class="comment">// Looking up a DataSource configured in context.xml:</span>
+<span class="keyword">public class</span> <span class="class-name">DatabaseServlet</span> <span class="keyword">extends</span> HttpServlet {
+
+    <span class="keyword">private</span> DataSource dataSource;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> init() <span class="keyword">throws</span> ServletException {
+        <span class="keyword">try</span> {
+            <span class="comment">// Look up the JNDI resource</span>
+            Context initCtx = <span class="keyword">new</span> InitialContext();
+            Context envCtx = (Context) initCtx.lookup(<span class="string">"java:comp/env"</span>);
+            dataSource = (DataSource) envCtx.lookup(<span class="string">"jdbc/MyDB"</span>);
+        } <span class="keyword">catch</span> (NamingException e) {
+            <span class="keyword">throw new</span> ServletException(<span class="string">"Cannot find DataSource"</span>, e);
+        }
+    }
+
+    <span class="keyword">protected void</span> doGet(HttpServletRequest req, HttpServletResponse resp) {
+        <span class="keyword">try</span> (Connection conn = dataSource.getConnection()) {
+            <span class="comment">// Use the connection...</span>
+        } <span class="keyword">catch</span> (SQLException e) {
+            resp.sendError(500, <span class="string">"Database error"</span>);
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Hot Deployment</h2>
+            <p>Hot deployment means updating an application without restarting the entire server.</p>
+
+            <pre><code><span class="comment">&lt;!-- In context.xml or server.xml --&gt;</span>
+&lt;<span class="keyword">Context</span> reloadable="true"&gt;
+    <span class="comment">&lt;!-- Monitor WEB-INF/classes and WEB-INF/lib for changes --&gt;</span>
+&lt;/Context&gt;
+
+<span class="comment">&lt;!-- In server.xml Host element --&gt;</span>
+&lt;<span class="keyword">Host</span> name="localhost" appBase="webapps"
+      unpackWARs="true"       <span class="comment">&lt;!-- Extract WAR files --&gt;</span>
+      autoDeploy="true"&gt;      <span class="comment">&lt;!-- Watch for new WARs --&gt;</span>
+&lt;/Host&gt;</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Setting</th>
+                        <th>What it Does</th>
+                        <th>Use In</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>reloadable="true"</code></td>
+                        <td>Reload when classes change</td>
+                        <td>Development only!</td>
+                    </tr>
+                    <tr>
+                        <td><code>autoDeploy="true"</code></td>
+                        <td>Deploy new WARs automatically</td>
+                        <td>Development, staging</td>
+                    </tr>
+                    <tr>
+                        <td><code>unpackWARs="true"</code></td>
+                        <td>Extract WAR to directory</td>
+                        <td>Usually always</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Production Warning</div>
+                <p><strong>Never use <code>reloadable="true"</code> in production!</strong></p>
+                <ul>
+                    <li>Causes memory leaks (old classloaders not garbage collected)</li>
+                    <li>CPU overhead from watching files</li>
+                    <li>Unpredictable reload timing</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Production Deployment Strategies</h2>
+
+            <h3>Strategy 1: Stop-Deploy-Start</h3>
+            <pre><code><span class="comment"># Simple approach with brief downtime</span>
+curl "http://localhost:8080/manager/text/stop?path=/myapp"
+curl -T myapp.war "http://localhost:8080/manager/text/deploy?path=/myapp&update=true"
+curl "http://localhost:8080/manager/text/start?path=/myapp"</code></pre>
+
+            <h3>Strategy 2: Parallel Deployment (Zero Downtime)</h3>
+            <pre><code><span class="comment"># Tomcat 7+ supports multiple versions running simultaneously</span>
+<span class="comment"># Version naming: appname##version.war</span>
+
+myapp##001.war    <span class="comment"># Version 001</span>
+myapp##002.war    <span class="comment"># Version 002</span>
+
+<span class="comment"># How it works:</span>
+<span class="comment"># - Existing sessions continue on old version</span>
+<span class="comment"># - New sessions go to newest version</span>
+<span class="comment"># - Old version undeploys when all sessions end</span></code></pre>
+
+            <h3>Strategy 3: Blue-Green Deployment</h3>
+            <pre><code><span class="comment"># Run two identical environments:</span>
+<span class="comment"># BLUE (v1.0) - Currently active</span>
+<span class="comment"># GREEN (v1.1) - Standby</span>
+
+<span class="comment"># Deployment steps:</span>
+<span class="comment"># 1. Deploy v1.1 to GREEN</span>
+<span class="comment"># 2. Test GREEN thoroughly</span>
+<span class="comment"># 3. Switch load balancer to GREEN</span>
+<span class="comment"># 4. If problems, instantly switch back to BLUE</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Classloading and Isolation</h2>
+            <p>Each context has its own classloader, providing isolation between applications:</p>
+
+            <pre><code><span class="comment">// Classloader hierarchy:</span>
+Bootstrap ClassLoader
+    └── System ClassLoader (Tomcat startup)
+        └── Common ClassLoader ($CATALINA_HOME/lib)
+            ├── WebApp1 ClassLoader (WEB-INF/classes, lib)
+            ├── WebApp2 ClassLoader (WEB-INF/classes, lib)
+            └── WebApp3 ClassLoader (WEB-INF/classes, lib)
+
+<span class="comment">// Each app has its own classloader:</span>
+<span class="comment">// - Classes in WEB-INF/classes take precedence</span>
+<span class="comment">// - Apps can use different library versions</span>
+<span class="comment">// - Apps are isolated from each other</span></code></pre>
+
+            <h3>Preventing Memory Leaks</h3>
+            <pre><code><span class="comment">// Use a ServletContextListener to cleanup:</span>
+<span class="annotation">@WebListener</span>
+<span class="keyword">public class</span> <span class="class-name">CleanupListener</span> <span class="keyword">implements</span> ServletContextListener {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> contextDestroyed(ServletContextEvent sce) {
+        <span class="comment">// CRITICAL: Clean up to prevent memory leaks</span>
+
+        <span class="comment">// 1. Stop any threads you started</span>
+        executorService.shutdown();
+
+        <span class="comment">// 2. Deregister JDBC drivers</span>
+        Enumeration&lt;Driver&gt; drivers = DriverManager.getDrivers();
+        <span class="keyword">while</span> (drivers.hasMoreElements()) {
+            Driver driver = drivers.nextElement();
+            <span class="keyword">try</span> {
+                DriverManager.deregisterDriver(driver);
+            } <span class="keyword">catch</span> (SQLException e) {
+                log.warn(<span class="string">"Error deregistering driver"</span>, e);
+            }
+        }
+
+        <span class="comment">// 3. Close cached connections/resources</span>
+        connectionPool.close();
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Spring Boot Context Configuration</h2>
+            <p>Spring Boot simplifies context configuration in <code>application.properties</code>:</p>
+
+            <pre><code><span class="comment"># application.properties</span>
+
+<span class="comment"># Context path (default is /)</span>
+server.servlet.context-path=/myapp
+
+<span class="comment"># Server port</span>
+server.port=8080
+
+<span class="comment"># Session configuration</span>
+server.servlet.session.timeout=30m
+server.servlet.session.cookie.http-only=true
+server.servlet.session.cookie.secure=true
+
+<span class="comment"># Embedded Tomcat settings</span>
+server.tomcat.max-threads=200
+server.tomcat.min-spare-threads=10</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Context:</strong> A single web application instance within a container</li>
+                    <li><strong>Context Path:</strong> The URL prefix that identifies your application</li>
+                    <li><strong>ServletContext:</strong> Programmatic access to context information and resources</li>
+                    <li><strong>Deployment Methods:</strong> WAR drop, Manager app, Maven plugins, context XML</li>
+                    <li><strong>JNDI Resources:</strong> Container-managed database pools and other resources</li>
+                    <li><strong>Hot Deployment:</strong> Development convenience, never for production</li>
+                    <li><strong>Production Strategies:</strong> Blue-green, rolling, parallel deployment</li>
+                    <li><strong>Classloader Isolation:</strong> Each context has its own classloader</li>
+                    <li><strong>Memory Leaks:</strong> Clean up resources in contextDestroyed()</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="web-xml.html" class="related-link">Deployment Descriptors</a>
+                <a href="war-jar.html" class="related-link">WAR vs JAR Files</a>
+                <a href="tomcat.html" class="related-link">Apache Tomcat</a>
+                <a href="servlet-container.html" class="related-link">Servlet Containers</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

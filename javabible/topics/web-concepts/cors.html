@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS (Cross-Origin Resource Sharing) - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#web-concepts">Web Concepts</a> / CORS
+            </nav>
+            <h1>CORS (Cross-Origin Resource Sharing)</h1>
+            <p class="topic-subtitle">Understanding and configuring cross-origin requests in web applications</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is CORS?</h2>
+            <p><strong>CORS (Cross-Origin Resource Sharing)</strong> is one of the most commonly encountered—and often frustrating—concepts for web developers. It's a browser security mechanism that controls how web pages can request resources from a different domain (origin) than the one that served the page.</p>
+
+            <p>If you've ever seen the dreaded error message <code>"has been blocked by CORS policy"</code>, you've experienced this security mechanism in action. Understanding CORS is essential because it affects virtually every modern web application that separates frontend and backend.</p>
+
+            <h3>Why Does CORS Exist? The Security Problem</h3>
+            <p>To understand CORS, you first need to understand the threat it protects against. Imagine this scenario:</p>
+
+            <ol>
+                <li>You're logged into your bank at <code>https://mybank.com</code></li>
+                <li>In another tab, you visit a malicious site <code>https://evil-site.com</code></li>
+                <li>Without security restrictions, JavaScript on evil-site.com could:
+                    <ul>
+                        <li>Make requests to <code>https://mybank.com/api/transfer</code></li>
+                        <li>Read your account information</li>
+                        <li>Transfer money to the attacker's account</li>
+                        <li>All using YOUR authenticated session (because cookies are sent automatically)</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <p>This is why browsers implement the <strong>Same-Origin Policy</strong>—JavaScript can only make requests to the same origin that served the page, unless the target server explicitly allows it via CORS.</p>
+
+            <div class="info-box">
+                <p><strong>The Same-Origin Policy:</strong> By default, browsers block JavaScript from making requests to different origins. This is a critical security measure that prevents malicious websites from accessing your data on other sites.</p>
+                <p><strong>CORS (Cross-Origin Resource Sharing):</strong> The mechanism by which servers can explicitly say "I allow requests from these origins." It's not about making your app work—it's about security. CORS is the server giving permission to the browser.</p>
+            </div>
+
+            <h3>Key Concept: The Browser Enforces CORS, Not the Server</h3>
+            <p>This is a crucial point that confuses many developers: <strong>CORS is enforced by the browser, not the server</strong>. The server just sends headers saying what it allows—the browser decides whether to block or allow based on those headers.</p>
+            <ul>
+                <li>If you use <code>curl</code> or Postman, CORS doesn't apply—these tools don't enforce same-origin policy</li>
+                <li>CORS only affects requests made by JavaScript in browsers</li>
+                <li>The request often actually reaches the server; the browser just blocks JavaScript from reading the response</li>
+            </ul>
+
+            <h3>What is an "Origin"?</h3>
+            <pre><code><span class="comment">// An origin consists of: Protocol + Host + Port</span>
+
+https://example.com:443/path/page
+└─┬─┘   └────┬────┘ └┬┘
+  │         │       └── Port (443 is default for HTTPS)
+  │         └────────── Host (domain)
+  └──────────────────── Protocol (scheme)
+
+<span class="comment">// Same origin examples:</span>
+https://example.com/page1
+https://example.com/page2     <span class="comment">✓ Same origin (different path)</span>
+
+<span class="comment">// Different origin examples:</span>
+https://example.com
+http://example.com            <span class="comment">✗ Different protocol</span>
+https://api.example.com       <span class="comment">✗ Different subdomain</span>
+https://example.com:8080      <span class="comment">✗ Different port</span>
+https://other.com             <span class="comment">✗ Different domain</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>The CORS Problem</h2>
+
+            <pre><code><span class="comment">// Scenario: Frontend at https://myapp.com, API at https://api.myapp.com</span>
+
+<span class="comment">// Frontend JavaScript tries to fetch data:</span>
+fetch(<span class="string">'https://api.myapp.com/users'</span>)
+    .then(response => response.json())
+    .then(data => console.log(data));
+
+<span class="comment">// Browser blocks it!</span>
+<span class="comment">// Error: "Access to fetch at 'https://api.myapp.com/users' from origin</span>
+<span class="comment">//        'https://myapp.com' has been blocked by CORS policy"</span>
+
+<span class="comment">// Why? Different subdomains = different origins!</span>
+
+┌─────────────────────────────────────────────────────────────────┐
+│                         BROWSER                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Page loaded from: https://myapp.com                     │   │
+│  │                                                          │   │
+│  │  JavaScript tries: fetch('https://api.myapp.com/users')  │   │
+│  │                           │                              │   │
+│  │                           ▼                              │   │
+│  │              ┌───────────────────────┐                   │   │
+│  │              │   CORS CHECK          │                   │   │
+│  │              │   Origin: myapp.com   │                   │   │
+│  │              │   Target: api.myapp   │                   │   │
+│  │              │   ────────────────    │                   │   │
+│  │              │   DIFFERENT! BLOCK!   │                   │   │
+│  │              └───────────────────────┘                   │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>How CORS Works</h2>
+
+            <h3>Simple Requests</h3>
+            <p>For "simple" requests (GET, POST with simple content types), the browser sends the request but blocks the response if CORS headers are missing.</p>
+
+            <pre><code><span class="comment">// 1. Browser sends request with Origin header</span>
+GET /api/users HTTP/1.1
+Host: api.myapp.com
+Origin: https://myapp.com      <span class="comment">← Browser adds this automatically</span>
+
+<span class="comment">// 2. Server responds with CORS headers</span>
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: https://myapp.com  <span class="comment">← Server allows this origin</span>
+Content-Type: application/json
+
+[{"id": 1, "name": "John"}]
+
+<span class="comment">// 3. Browser checks: Does Allow-Origin match our origin?</span>
+<span class="comment">//    Yes! Response is allowed through to JavaScript</span></code></pre>
+
+            <h3>Preflight Requests</h3>
+            <p>For "non-simple" requests (PUT, DELETE, custom headers, JSON content-type), the browser first sends an OPTIONS request to check if the actual request is allowed.</p>
+
+            <pre><code><span class="comment">// Triggering a preflight:</span>
+fetch(<span class="string">'https://api.myapp.com/users'</span>, {
+    method: <span class="string">'POST'</span>,
+    headers: {
+        <span class="string">'Content-Type'</span>: <span class="string">'application/json'</span>,  <span class="comment">← Triggers preflight!</span>
+        <span class="string">'Authorization'</span>: <span class="string">'Bearer token'</span>       <span class="comment">← Custom header triggers preflight!</span>
+    },
+    body: JSON.stringify({ name: <span class="string">'John'</span> })
+});
+
+<span class="comment">// STEP 1: Browser sends preflight OPTIONS request</span>
+OPTIONS /api/users HTTP/1.1
+Host: api.myapp.com
+Origin: https://myapp.com
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: Content-Type, Authorization
+
+<span class="comment">// STEP 2: Server responds to preflight</span>
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: https://myapp.com
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+Access-Control-Allow-Headers: Content-Type, Authorization
+Access-Control-Max-Age: 86400  <span class="comment">← Cache preflight for 24 hours</span>
+
+<span class="comment">// STEP 3: If preflight passes, browser sends actual request</span>
+POST /api/users HTTP/1.1
+Host: api.myapp.com
+Origin: https://myapp.com
+Content-Type: application/json
+Authorization: Bearer token
+
+{"name": "John"}
+
+<span class="comment">// STEP 4: Server responds with data + CORS headers</span>
+HTTP/1.1 201 Created
+Access-Control-Allow-Origin: https://myapp.com
+Content-Type: application/json
+
+{"id": 1, "name": "John"}</code></pre>
+
+            <div class="info-box note">
+                <div class="info-box-title">What Triggers a Preflight?</div>
+                <ul>
+                    <li>Methods other than GET, HEAD, POST</li>
+                    <li>Content-Type other than: application/x-www-form-urlencoded, multipart/form-data, text/plain</li>
+                    <li>Custom headers (Authorization, X-Custom-Header, etc.)</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>CORS Headers Explained</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Header</th>
+                        <th>Example</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Access-Control-Allow-Origin</code></td>
+                        <td><code>https://myapp.com</code> or <code>*</code></td>
+                        <td>Which origins can access the resource</td>
+                    </tr>
+                    <tr>
+                        <td><code>Access-Control-Allow-Methods</code></td>
+                        <td><code>GET, POST, PUT, DELETE</code></td>
+                        <td>Which HTTP methods are allowed</td>
+                    </tr>
+                    <tr>
+                        <td><code>Access-Control-Allow-Headers</code></td>
+                        <td><code>Content-Type, Authorization</code></td>
+                        <td>Which request headers are allowed</td>
+                    </tr>
+                    <tr>
+                        <td><code>Access-Control-Allow-Credentials</code></td>
+                        <td><code>true</code></td>
+                        <td>Allow cookies/auth with requests</td>
+                    </tr>
+                    <tr>
+                        <td><code>Access-Control-Expose-Headers</code></td>
+                        <td><code>X-Custom-Header</code></td>
+                        <td>Headers JavaScript can read</td>
+                    </tr>
+                    <tr>
+                        <td><code>Access-Control-Max-Age</code></td>
+                        <td><code>86400</code></td>
+                        <td>How long to cache preflight (seconds)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Configuring CORS in Spring Boot</h2>
+
+            <h3>Method 1: @CrossOrigin Annotation</h3>
+            <pre><code><span class="comment">// Allow CORS for specific controller</span>
+<span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/users"</span>)
+<span class="annotation">@CrossOrigin</span>(origins = <span class="string">"https://myapp.com"</span>)  <span class="comment">← Entire controller</span>
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+
+    <span class="annotation">@GetMapping</span>
+    <span class="keyword">public</span> List&lt;User&gt; getUsers() {
+        <span class="keyword">return</span> userService.findAll();
+    }
+
+    <span class="comment">// Or per method with different settings</span>
+    <span class="annotation">@CrossOrigin</span>(
+        origins = {<span class="string">"https://myapp.com"</span>, <span class="string">"https://admin.myapp.com"</span>},
+        methods = {RequestMethod.GET, RequestMethod.POST},
+        allowedHeaders = {<span class="string">"Content-Type"</span>, <span class="string">"Authorization"</span>},
+        maxAge = <span class="number">3600</span>
+    )
+    <span class="annotation">@PostMapping</span>
+    <span class="keyword">public</span> User createUser(<span class="annotation">@RequestBody</span> User user) {
+        <span class="keyword">return</span> userService.save(user);
+    }
+}</code></pre>
+
+            <h3>Method 2: Global CORS Configuration</h3>
+            <pre><code><span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">CorsConfig</span> <span class="keyword">implements</span> WebMvcConfigurer {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> addCorsMappings(CorsRegistry registry) {
+        registry.addMapping(<span class="string">"/api/**"</span>)  <span class="comment">// Apply to all /api/ endpoints</span>
+            .allowedOrigins(
+                <span class="string">"https://myapp.com"</span>,
+                <span class="string">"https://admin.myapp.com"</span>
+            )
+            .allowedMethods(<span class="string">"GET"</span>, <span class="string">"POST"</span>, <span class="string">"PUT"</span>, <span class="string">"DELETE"</span>, <span class="string">"OPTIONS"</span>)
+            .allowedHeaders(<span class="string">"*"</span>)
+            .allowCredentials(<span class="keyword">true</span>)
+            .maxAge(<span class="number">3600</span>);
+
+        <span class="comment">// Different config for public endpoints</span>
+        registry.addMapping(<span class="string">"/public/**"</span>)
+            .allowedOrigins(<span class="string">"*"</span>)  <span class="comment">// Allow all origins</span>
+            .allowedMethods(<span class="string">"GET"</span>);
+    }
+}</code></pre>
+
+            <h3>Method 3: CORS Filter (Most Control)</h3>
+            <pre><code><span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">CorsConfig</span> {
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> CorsFilter corsFilter() {
+        CorsConfiguration config = <span class="keyword">new</span> CorsConfiguration();
+
+        <span class="comment">// Allowed origins</span>
+        config.setAllowedOrigins(Arrays.asList(
+            <span class="string">"https://myapp.com"</span>,
+            <span class="string">"https://admin.myapp.com"</span>
+        ));
+
+        <span class="comment">// Or use patterns for dynamic origins</span>
+        config.setAllowedOriginPatterns(Arrays.asList(
+            <span class="string">"https://*.myapp.com"</span>  <span class="comment">// Any subdomain</span>
+        ));
+
+        <span class="comment">// Allowed methods</span>
+        config.setAllowedMethods(Arrays.asList(
+            <span class="string">"GET"</span>, <span class="string">"POST"</span>, <span class="string">"PUT"</span>, <span class="string">"DELETE"</span>, <span class="string">"OPTIONS"</span>
+        ));
+
+        <span class="comment">// Allowed headers</span>
+        config.setAllowedHeaders(Arrays.asList(
+            <span class="string">"Content-Type"</span>,
+            <span class="string">"Authorization"</span>,
+            <span class="string">"X-Requested-With"</span>
+        ));
+
+        <span class="comment">// Exposed headers (readable by JavaScript)</span>
+        config.setExposedHeaders(Arrays.asList(
+            <span class="string">"X-Total-Count"</span>,
+            <span class="string">"X-Page-Number"</span>
+        ));
+
+        <span class="comment">// Allow credentials (cookies, auth headers)</span>
+        config.setAllowCredentials(<span class="keyword">true</span>);
+
+        <span class="comment">// Preflight cache duration</span>
+        config.setMaxAge(<span class="number">3600L</span>);
+
+        UrlBasedCorsConfigurationSource source = <span class="keyword">new</span> UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration(<span class="string">"/api/**"</span>, config);
+
+        <span class="keyword">return new</span> CorsFilter(source);
+    }
+}</code></pre>
+
+            <h3>Method 4: With Spring Security</h3>
+            <pre><code><span class="annotation">@Configuration</span>
+<span class="annotation">@EnableWebSecurity</span>
+<span class="keyword">public class</span> <span class="class-name">SecurityConfig</span> {
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> SecurityFilterChain filterChain(HttpSecurity http) <span class="keyword">throws</span> Exception {
+        http
+            <span class="comment">// Enable CORS with default configuration</span>
+            .cors(Customizer.withDefaults())
+
+            <span class="comment">// Or with custom configuration</span>
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+            .authorizeHttpRequests(auth -> auth
+                .anyRequest().authenticated()
+            );
+
+        <span class="keyword">return</span> http.build();
+    }
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = <span class="keyword">new</span> CorsConfiguration();
+        config.setAllowedOrigins(List.of(<span class="string">"https://myapp.com"</span>));
+        config.setAllowedMethods(List.of(<span class="string">"GET"</span>, <span class="string">"POST"</span>, <span class="string">"PUT"</span>, <span class="string">"DELETE"</span>));
+        config.setAllowedHeaders(List.of(<span class="string">"*"</span>));
+        config.setAllowCredentials(<span class="keyword">true</span>);
+
+        UrlBasedCorsConfigurationSource source = <span class="keyword">new</span> UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration(<span class="string">"/api/**"</span>, config);
+        <span class="keyword">return</span> source;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>CORS with Credentials</h2>
+            <p>When you need to send cookies or authentication headers with cross-origin requests, special configuration is required.</p>
+
+            <pre><code><span class="comment">// Frontend: Must include credentials option</span>
+fetch(<span class="string">'https://api.myapp.com/users'</span>, {
+    method: <span class="string">'GET'</span>,
+    credentials: <span class="string">'include'</span>  <span class="comment">← Include cookies!</span>
+});
+
+<span class="comment">// Or with axios</span>
+axios.get(<span class="string">'https://api.myapp.com/users'</span>, {
+    withCredentials: <span class="keyword">true</span>
+});
+
+<span class="comment">// Backend: Must allow credentials AND cannot use wildcard origin!</span>
+
+<span class="comment">// WRONG - Won't work with credentials!</span>
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Credentials: true
+
+<span class="comment">// CORRECT - Specific origin required</span>
+Access-Control-Allow-Origin: https://myapp.com
+Access-Control-Allow-Credentials: true</code></pre>
+
+            <div class="info-box note">
+                <div class="info-box-title">Credentials Rule</div>
+                <p>When <code>Access-Control-Allow-Credentials: true</code>, you <strong>cannot</strong> use <code>*</code> for Allow-Origin. You must specify the exact origin(s).</p>
+            </div>
+
+            <h3>Dynamic Origin with Credentials</h3>
+            <pre><code><span class="comment">// Allow multiple origins while supporting credentials</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">DynamicCorsFilter</span> <span class="keyword">extends</span> OncePerRequestFilter {
+
+    <span class="keyword">private static final</span> Set&lt;String&gt; ALLOWED_ORIGINS = Set.of(
+        <span class="string">"https://myapp.com"</span>,
+        <span class="string">"https://admin.myapp.com"</span>,
+        <span class="string">"https://mobile.myapp.com"</span>
+    );
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> doFilterInternal(HttpServletRequest request,
+                                      HttpServletResponse response,
+                                      FilterChain chain) <span class="keyword">throws</span> Exception {
+
+        String origin = request.getHeader(<span class="string">"Origin"</span>);
+
+        <span class="keyword">if</span> (origin != <span class="keyword">null</span> && ALLOWED_ORIGINS.contains(origin)) {
+            <span class="comment">// Echo back the specific requesting origin</span>
+            response.setHeader(<span class="string">"Access-Control-Allow-Origin"</span>, origin);
+            response.setHeader(<span class="string">"Access-Control-Allow-Credentials"</span>, <span class="string">"true"</span>);
+            response.setHeader(<span class="string">"Access-Control-Allow-Methods"</span>,
+                <span class="string">"GET, POST, PUT, DELETE, OPTIONS"</span>);
+            response.setHeader(<span class="string">"Access-Control-Allow-Headers"</span>,
+                <span class="string">"Content-Type, Authorization"</span>);
+            response.setHeader(<span class="string">"Access-Control-Max-Age"</span>, <span class="string">"3600"</span>);
+        }
+
+        <span class="comment">// Handle preflight</span>
+        <span class="keyword">if</span> (<span class="string">"OPTIONS"</span>.equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            <span class="keyword">return</span>;
+        }
+
+        chain.doFilter(request, response);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common CORS Errors and Solutions</h2>
+
+            <h3>Error 1: No 'Access-Control-Allow-Origin' header</h3>
+            <pre><code><span class="comment">// Error message:</span>
+<span class="comment">// "No 'Access-Control-Allow-Origin' header is present on the requested resource"</span>
+
+<span class="comment">// Cause: Server not sending CORS headers</span>
+<span class="comment">// Solution: Add CORS configuration to your backend</span>
+
+<span class="annotation">@CrossOrigin</span>(origins = <span class="string">"https://myapp.com"</span>)
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/data"</span>)
+<span class="keyword">public</span> Data getData() { ... }</code></pre>
+
+            <h3>Error 2: Preflight request doesn't pass</h3>
+            <pre><code><span class="comment">// Error message:</span>
+<span class="comment">// "Response to preflight request doesn't pass access control check"</span>
+
+<span class="comment">// Cause: OPTIONS request failing or not handled</span>
+<span class="comment">// Solution: Ensure OPTIONS method is allowed</span>
+
+config.setAllowedMethods(Arrays.asList(
+    <span class="string">"GET"</span>, <span class="string">"POST"</span>, <span class="string">"PUT"</span>, <span class="string">"DELETE"</span>,
+    <span class="string">"OPTIONS"</span>  <span class="comment">← Don't forget this!</span>
+));</code></pre>
+
+            <h3>Error 3: Credentials not supported with wildcard</h3>
+            <pre><code><span class="comment">// Error message:</span>
+<span class="comment">// "The value of 'Access-Control-Allow-Origin' header must not be '*'</span>
+<span class="comment">//  when credentials mode is 'include'"</span>
+
+<span class="comment">// Cause: Using * with credentials: 'include'</span>
+<span class="comment">// Solution: Specify exact origin</span>
+
+<span class="comment">// WRONG</span>
+config.setAllowedOrigins(List.of(<span class="string">"*"</span>));
+config.setAllowCredentials(<span class="keyword">true</span>);
+
+<span class="comment">// CORRECT</span>
+config.setAllowedOrigins(List.of(<span class="string">"https://myapp.com"</span>));
+config.setAllowCredentials(<span class="keyword">true</span>);</code></pre>
+
+            <h3>Error 4: Header not allowed</h3>
+            <pre><code><span class="comment">// Error message:</span>
+<span class="comment">// "Request header field X-Custom-Header is not allowed"</span>
+
+<span class="comment">// Cause: Custom header not in Allow-Headers</span>
+<span class="comment">// Solution: Add the header to allowed headers</span>
+
+config.setAllowedHeaders(Arrays.asList(
+    <span class="string">"Content-Type"</span>,
+    <span class="string">"Authorization"</span>,
+    <span class="string">"X-Custom-Header"</span>  <span class="comment">← Add your custom header</span>
+));
+
+<span class="comment">// Or allow all headers</span>
+config.setAllowedHeaders(List.of(<span class="string">"*"</span>));</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Environment-Specific CORS</h2>
+
+            <pre><code><span class="comment">// Different CORS settings per environment</span>
+
+<span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">CorsConfig</span> {
+
+    <span class="annotation">@Value</span>(<span class="string">"${cors.allowed-origins}"</span>)
+    <span class="keyword">private</span> String[] allowedOrigins;
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> CorsFilter corsFilter() {
+        CorsConfiguration config = <span class="keyword">new</span> CorsConfiguration();
+        config.setAllowedOrigins(Arrays.asList(allowedOrigins));
+        config.setAllowedMethods(List.of(<span class="string">"GET"</span>, <span class="string">"POST"</span>, <span class="string">"PUT"</span>, <span class="string">"DELETE"</span>));
+        config.setAllowCredentials(<span class="keyword">true</span>);
+
+        UrlBasedCorsConfigurationSource source = <span class="keyword">new</span> UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration(<span class="string">"/**"</span>, config);
+        <span class="keyword">return new</span> CorsFilter(source);
+    }
+}
+
+<span class="comment">// application-dev.properties</span>
+cors.allowed-origins=http://localhost:3000,http://localhost:5173
+
+<span class="comment">// application-prod.properties</span>
+cors.allowed-origins=https://myapp.com,https://admin.myapp.com</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>CORS vs CSRF</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>CORS</th>
+                        <th>CSRF</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Purpose</strong></td>
+                        <td>Control cross-origin requests</td>
+                        <td>Prevent forged requests</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Enforced By</strong></td>
+                        <td>Browser</td>
+                        <td>Server</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Protection</strong></td>
+                        <td>Prevents reading cross-origin responses</td>
+                        <td>Prevents unauthorized actions</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Mechanism</strong></td>
+                        <td>HTTP headers</td>
+                        <td>Tokens, SameSite cookies</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box note">
+                <div class="info-box-title">Important!</div>
+                <p>CORS does NOT prevent requests from being sent - it only prevents the browser from reading the response. A malicious site can still send requests (which might trigger side effects). Use CSRF protection for state-changing operations!</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Testing CORS</h2>
+
+            <pre><code><span class="comment">// Using curl to test CORS headers</span>
+
+<span class="comment"># Simple request</span>
+curl -v -H "Origin: https://myapp.com" \
+     https://api.myapp.com/api/users
+
+<span class="comment"># Preflight request</span>
+curl -v -X OPTIONS \
+     -H "Origin: https://myapp.com" \
+     -H "Access-Control-Request-Method: POST" \
+     -H "Access-Control-Request-Headers: Content-Type, Authorization" \
+     https://api.myapp.com/api/users
+
+<span class="comment"># Check response headers:</span>
+<span class="comment"># < Access-Control-Allow-Origin: https://myapp.com</span>
+<span class="comment"># < Access-Control-Allow-Methods: GET, POST, PUT, DELETE</span>
+<span class="comment"># < Access-Control-Allow-Headers: Content-Type, Authorization</span>
+<span class="comment"># < Access-Control-Allow-Credentials: true</span></code></pre>
+
+            <h3>Browser DevTools</h3>
+            <pre><code><span class="comment">// In browser console, check for CORS errors:</span>
+
+<span class="comment">// 1. Open DevTools (F12)</span>
+<span class="comment">// 2. Go to Network tab</span>
+<span class="comment">// 3. Make your request</span>
+<span class="comment">// 4. Click on the request</span>
+<span class="comment">// 5. Check "Headers" tab for:</span>
+<span class="comment">//    - Request Headers: Origin</span>
+<span class="comment">//    - Response Headers: Access-Control-*</span>
+<span class="comment">// 6. Check Console tab for CORS error messages</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>DO:</h3>
+                <ul>
+                    <li><strong>Be specific with origins</strong> - List exact allowed origins</li>
+                    <li><strong>Use HTTPS</strong> - Both for origin and API</li>
+                    <li><strong>Set Max-Age</strong> - Cache preflight responses</li>
+                    <li><strong>Limit allowed methods</strong> - Only what you need</li>
+                    <li><strong>Configure differently per environment</strong> - Stricter in production</li>
+                    <li><strong>Use allowedOriginPatterns for subdomains</strong> - <code>https://*.myapp.com</code></li>
+                </ul>
+
+                <h3>DON'T:</h3>
+                <ul>
+                    <li><strong>Don't use * in production</strong> - Too permissive</li>
+                    <li><strong>Don't use * with credentials</strong> - Doesn't work anyway</li>
+                    <li><strong>Don't forget OPTIONS method</strong> - Needed for preflight</li>
+                    <li><strong>Don't rely on CORS alone for security</strong> - Add authentication!</li>
+                    <li><strong>Don't expose sensitive headers unnecessarily</strong></li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>CORS:</strong> Browser security mechanism for cross-origin requests</li>
+                    <li><strong>Origin:</strong> Protocol + Host + Port must all match</li>
+                    <li><strong>Preflight:</strong> OPTIONS request for "non-simple" requests</li>
+                    <li><strong>Allow-Origin:</strong> Which origins can access the resource</li>
+                    <li><strong>Credentials:</strong> Cannot use <code>*</code> with credentials</li>
+                    <li><strong>Configuration:</strong> @CrossOrigin, WebMvcConfigurer, or Filter</li>
+                    <li><strong>Security:</strong> CORS prevents reading responses, not sending requests</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="http.html" class="related-link">HTTP Protocol</a>
+                <a href="rest-principles.html" class="related-link">REST Principles</a>
+                <a href="sessions-cookies.html" class="related-link">Sessions & Cookies</a>
+                <a href="../spring/security.html" class="related-link">Spring Security</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

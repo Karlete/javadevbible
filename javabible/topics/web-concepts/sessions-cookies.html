@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sessions & Cookies - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#web-concepts">Web Concepts</a> / Sessions & Cookies
+            </nav>
+            <h1>Sessions & Cookies</h1>
+            <p class="topic-subtitle">Managing state in stateless HTTP communication</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>The Fundamental Problem: HTTP is Stateless</h2>
+            <p>To understand why sessions and cookies exist, you need to understand a fundamental characteristic of HTTP: <strong>it is inherently stateless</strong>. This means that HTTP treats every request as completely independent—the server has no built-in memory of previous requests from the same client.</p>
+
+            <p>This statelessness was actually a deliberate design decision that makes HTTP simple and scalable. But it creates a significant challenge: <strong>how do we create experiences that feel connected?</strong></p>
+
+            <h3>Why Statelessness is a Problem</h3>
+            <p>Think about the things you do every day that require "memory":</p>
+            <ul>
+                <li><strong>Staying logged in:</strong> You don't want to enter your password for every single page you visit</li>
+                <li><strong>Shopping carts:</strong> Adding items, browsing other pages, then checking out—the cart needs to persist</li>
+                <li><strong>Personalization:</strong> Showing your name, remembering your preferences, recent history</li>
+                <li><strong>Multi-step forms:</strong> Filling out a wizard where data from step 1 is needed in step 3</li>
+                <li><strong>Security:</strong> Knowing that the person making request #2 is the same person who authenticated in request #1</li>
+            </ul>
+
+            <p>Without some mechanism to maintain state, every request would be like meeting someone with complete amnesia—no matter how many times you've talked before, you'd have to introduce yourself again.</p>
+
+            <div class="info-box">
+                <p><strong>Without state management, every request starts from zero:</strong></p>
+                <ul>
+                    <li>User logs in → Server forgets immediately after responding</li>
+                    <li>User adds item to cart → Server doesn't remember what's in the cart</li>
+                    <li>User fills out step 1 of a form → Step 2 doesn't know what happened in step 1</li>
+                    <li>Every request would need full re-authentication</li>
+                </ul>
+                <p><strong>Cookies and Sessions solve this problem!</strong> They provide mechanisms to maintain state across multiple requests.</p>
+            </div>
+
+            <h3>Two Solutions to One Problem</h3>
+            <p>There are two main approaches to maintaining state:</p>
+            <ul>
+                <li><strong>Cookies:</strong> Store small pieces of data in the browser itself. The browser automatically sends this data with every request.</li>
+                <li><strong>Sessions:</strong> Store data on the server, and give the client a "ticket" (usually via a cookie) that identifies their session.</li>
+            </ul>
+
+            <p>In practice, sessions and cookies often work together: a session ID is stored in a cookie, which the server uses to look up the full session data.</p>
+
+            <pre><code><span class="comment">// Without sessions - server has no memory</span>
+
+Request 1: POST /login {username: "john", password: "***"}
+Response:  200 OK "Login successful!"
+
+Request 2: GET /my-profile
+Response:  401 Unauthorized "Who are you?"  <span class="comment">← Server forgot!</span>
+
+<span class="comment">// With sessions - server remembers</span>
+
+Request 1: POST /login {username: "john", password: "***"}
+Response:  200 OK, Set-Cookie: JSESSIONID=abc123  <span class="comment">← Server creates session</span>
+
+Request 2: GET /my-profile
+           Cookie: JSESSIONID=abc123  <span class="comment">← Browser sends cookie</span>
+Response:  200 OK {"name": "John Doe"}  <span class="comment">← Server recognizes user!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Cookies Explained</h2>
+            <p><strong>Cookies</strong> are small pieces of data stored by the browser and sent with every request to the same domain.</p>
+
+            <h3>How Cookies Work</h3>
+            <pre><code><span class="comment">// 1. Server sends Set-Cookie header in response</span>
+HTTP/1.1 200 OK
+Set-Cookie: username=john; Path=/; Max-Age=86400
+Set-Cookie: theme=dark; Path=/; HttpOnly
+
+<span class="comment">// 2. Browser stores the cookies</span>
+
+<span class="comment">// 3. Browser sends cookies with EVERY subsequent request to that domain</span>
+GET /api/profile HTTP/1.1
+Host: example.com
+Cookie: username=john; theme=dark  <span class="comment">← Automatically included!</span></code></pre>
+
+            <h3>Cookie Attributes</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Attribute</th>
+                        <th>Example</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Name=Value</code></td>
+                        <td><code>session=abc123</code></td>
+                        <td>The actual data</td>
+                    </tr>
+                    <tr>
+                        <td><code>Domain</code></td>
+                        <td><code>Domain=example.com</code></td>
+                        <td>Which domain can receive the cookie</td>
+                    </tr>
+                    <tr>
+                        <td><code>Path</code></td>
+                        <td><code>Path=/api</code></td>
+                        <td>URL path scope</td>
+                    </tr>
+                    <tr>
+                        <td><code>Expires</code></td>
+                        <td><code>Expires=Thu, 01 Jan 2027</code></td>
+                        <td>When to delete (absolute date)</td>
+                    </tr>
+                    <tr>
+                        <td><code>Max-Age</code></td>
+                        <td><code>Max-Age=86400</code></td>
+                        <td>When to delete (seconds from now)</td>
+                    </tr>
+                    <tr>
+                        <td><code>Secure</code></td>
+                        <td><code>Secure</code></td>
+                        <td>Only send over HTTPS</td>
+                    </tr>
+                    <tr>
+                        <td><code>HttpOnly</code></td>
+                        <td><code>HttpOnly</code></td>
+                        <td>JavaScript cannot access</td>
+                    </tr>
+                    <tr>
+                        <td><code>SameSite</code></td>
+                        <td><code>SameSite=Strict</code></td>
+                        <td>CSRF protection</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Setting Cookies in Java</h3>
+            <pre><code><span class="comment">// Using Servlet API</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/login"</span>)
+<span class="keyword">public void</span> login(HttpServletResponse response) {
+    Cookie cookie = <span class="keyword">new</span> Cookie(<span class="string">"username"</span>, <span class="string">"john"</span>);
+
+    cookie.setMaxAge(<span class="number">60</span> * <span class="number">60</span> * <span class="number">24</span>);  <span class="comment">// 24 hours in seconds</span>
+    cookie.setPath(<span class="string">"/"</span>);              <span class="comment">// Available to entire site</span>
+    cookie.setHttpOnly(<span class="keyword">true</span>);         <span class="comment">// No JavaScript access</span>
+    cookie.setSecure(<span class="keyword">true</span>);           <span class="comment">// HTTPS only</span>
+
+    response.addCookie(cookie);
+}
+
+<span class="comment">// Using Spring ResponseCookie (more options)</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/login"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;String&gt; login() {
+    ResponseCookie cookie = ResponseCookie.from(<span class="string">"session"</span>, <span class="string">"abc123"</span>)
+        .httpOnly(<span class="keyword">true</span>)
+        .secure(<span class="keyword">true</span>)
+        .path(<span class="string">"/"</span>)
+        .maxAge(Duration.ofHours(<span class="number">24</span>))
+        .sameSite(<span class="string">"Strict"</span>)  <span class="comment">// Strict, Lax, or None</span>
+        .build();
+
+    <span class="keyword">return</span> ResponseEntity.ok()
+        .header(HttpHeaders.SET_COOKIE, cookie.toString())
+        .body(<span class="string">"Logged in!"</span>);
+}</code></pre>
+
+            <h3>Reading Cookies in Java</h3>
+            <pre><code><span class="comment">// Using Servlet API</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/profile"</span>)
+<span class="keyword">public</span> String getProfile(HttpServletRequest request) {
+    Cookie[] cookies = request.getCookies();
+
+    <span class="keyword">if</span> (cookies != <span class="keyword">null</span>) {
+        <span class="keyword">for</span> (Cookie cookie : cookies) {
+            <span class="keyword">if</span> (<span class="string">"username"</span>.equals(cookie.getName())) {
+                <span class="keyword">return</span> <span class="string">"Hello, "</span> + cookie.getValue();
+            }
+        }
+    }
+    <span class="keyword">return</span> <span class="string">"Not logged in"</span>;
+}
+
+<span class="comment">// Using Spring @CookieValue annotation</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/profile"</span>)
+<span class="keyword">public</span> String getProfile(
+        <span class="annotation">@CookieValue</span>(name = <span class="string">"username"</span>, required = <span class="keyword">false</span>) String username) {
+
+    <span class="keyword">if</span> (username != <span class="keyword">null</span>) {
+        <span class="keyword">return</span> <span class="string">"Hello, "</span> + username;
+    }
+    <span class="keyword">return</span> <span class="string">"Not logged in"</span>;
+}</code></pre>
+
+            <h3>Deleting Cookies</h3>
+            <pre><code><span class="comment">// To delete a cookie, set Max-Age to 0</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/logout"</span>)
+<span class="keyword">public void</span> logout(HttpServletResponse response) {
+    Cookie cookie = <span class="keyword">new</span> Cookie(<span class="string">"session"</span>, <span class="keyword">null</span>);
+    cookie.setMaxAge(<span class="number">0</span>);  <span class="comment">// Delete immediately</span>
+    cookie.setPath(<span class="string">"/"</span>);   <span class="comment">// Must match original path!</span>
+    response.addCookie(cookie);
+}
+
+<span class="comment">// Using Spring</span>
+ResponseCookie cookie = ResponseCookie.from(<span class="string">"session"</span>, <span class="string">""</span>)
+    .maxAge(<span class="number">0</span>)
+    .path(<span class="string">"/"</span>)
+    .build();</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Sessions Explained</h2>
+            <p><strong>Sessions</strong> store user data on the server, identified by a unique session ID sent via cookie.</p>
+
+            <pre><code><span class="comment">// How sessions work:</span>
+
+┌─────────────────┐                      ┌─────────────────┐
+│     BROWSER     │                      │     SERVER      │
+└────────┬────────┘                      └────────┬────────┘
+         │                                        │
+         │  1. First Request (no cookie)          │
+         │  ─────────────────────────────────>    │
+         │                                        │
+         │                         2. Create session
+         │                         ┌─────────────────────┐
+         │                         │ Sessions Map:       │
+         │                         │ "abc123" → {        │
+         │                         │   user: null,       │
+         │                         │   cart: []          │
+         │                         │ }                   │
+         │                         └─────────────────────┘
+         │                                        │
+         │  3. Response + Set-Cookie: JSESSIONID=abc123
+         │  <─────────────────────────────────    │
+         │                                        │
+         │  4. User logs in                       │
+         │  POST /login                           │
+         │  Cookie: JSESSIONID=abc123             │
+         │  ─────────────────────────────────>    │
+         │                                        │
+         │                         5. Update session
+         │                         ┌─────────────────────┐
+         │                         │ Sessions Map:       │
+         │                         │ "abc123" → {        │
+         │                         │   user: "john",     │
+         │                         │   cart: []          │
+         │                         │ }                   │
+         │                         └─────────────────────┘
+         │                                        │
+         │  6. Subsequent requests use same session
+         │  Cookie: JSESSIONID=abc123             │
+         │  ─────────────────────────────────>    │
+         │           Server looks up "abc123"     │
+         │           and knows who you are!       │
+         ▼                                        ▼</code></pre>
+
+            <h3>Using HttpSession in Java</h3>
+            <pre><code><span class="comment">// Storing data in session</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
+<span class="keyword">public</span> String login(<span class="annotation">@RequestBody</span> LoginRequest request,
+                    HttpSession session) {
+
+    User user = authService.authenticate(request);
+
+    <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
+        <span class="comment">// Store user in session</span>
+        session.setAttribute(<span class="string">"user"</span>, user);
+        session.setAttribute(<span class="string">"loginTime"</span>, LocalDateTime.now());
+
+        <span class="keyword">return</span> <span class="string">"Login successful"</span>;
+    }
+
+    <span class="keyword">throw new</span> AuthenticationException(<span class="string">"Invalid credentials"</span>);
+}
+
+<span class="comment">// Reading data from session</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/profile"</span>)
+<span class="keyword">public</span> User getProfile(HttpSession session) {
+    User user = (User) session.getAttribute(<span class="string">"user"</span>);
+
+    <span class="keyword">if</span> (user == <span class="keyword">null</span>) {
+        <span class="keyword">throw new</span> UnauthorizedException(<span class="string">"Please log in"</span>);
+    }
+
+    <span class="keyword">return</span> user;
+}
+
+<span class="comment">// Shopping cart example</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/cart/add"</span>)
+<span class="keyword">public</span> Cart addToCart(<span class="annotation">@RequestBody</span> CartItem item,
+                       HttpSession session) {
+
+    @SuppressWarnings(<span class="string">"unchecked"</span>)
+    List&lt;CartItem&gt; cart = (List&lt;CartItem&gt;) session.getAttribute(<span class="string">"cart"</span>);
+
+    <span class="keyword">if</span> (cart == <span class="keyword">null</span>) {
+        cart = <span class="keyword">new</span> ArrayList&lt;&gt;();
+    }
+
+    cart.add(item);
+    session.setAttribute(<span class="string">"cart"</span>, cart);
+
+    <span class="keyword">return new</span> Cart(cart);
+}
+
+<span class="comment">// Logout - invalidate session</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/logout"</span>)
+<span class="keyword">public</span> String logout(HttpSession session) {
+    session.invalidate();  <span class="comment">// Destroys the session</span>
+    <span class="keyword">return</span> <span class="string">"Logged out"</span>;
+}</code></pre>
+
+            <h3>Session Configuration</h3>
+            <pre><code><span class="comment">// application.properties</span>
+server.servlet.session.timeout=30m          <span class="comment"># Session timeout</span>
+server.servlet.session.cookie.name=SESSIONID <span class="comment"># Cookie name</span>
+server.servlet.session.cookie.http-only=true <span class="comment"># HttpOnly flag</span>
+server.servlet.session.cookie.secure=true    <span class="comment"># Secure flag (HTTPS)</span>
+server.servlet.session.cookie.same-site=lax  <span class="comment"># SameSite policy</span>
+
+<span class="comment">// Programmatic configuration</span>
+<span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">SessionConfig</span> {
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> ServletContextInitializer servletContextInitializer() {
+        <span class="keyword">return</span> servletContext -> {
+            servletContext.getSessionCookieConfig().setMaxAge(<span class="number">3600</span>);
+            servletContext.getSessionCookieConfig().setHttpOnly(<span class="keyword">true</span>);
+            servletContext.getSessionCookieConfig().setSecure(<span class="keyword">true</span>);
+        };
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Session vs Cookies Comparison</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Cookies</th>
+                        <th>Sessions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Storage Location</strong></td>
+                        <td>Browser (client-side)</td>
+                        <td>Server (server-side)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Size</strong></td>
+                        <td>~4KB per cookie</td>
+                        <td>Limited by server memory</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Security</strong></td>
+                        <td>Data visible to client</td>
+                        <td>Data hidden on server</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Scalability</strong></td>
+                        <td>No server memory needed</td>
+                        <td>Requires session storage</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Persistence</strong></td>
+                        <td>Can survive browser close</td>
+                        <td>Usually lost on server restart</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Use Case</strong></td>
+                        <td>Preferences, tokens</td>
+                        <td>User data, shopping cart</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box note">
+                <div class="info-box-title">Best Practice</div>
+                <p>Use <strong>sessions</strong> for sensitive data (user info, permissions) and <strong>cookies</strong> for non-sensitive data (preferences, tracking). Never store passwords or sensitive info directly in cookies!</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Session Storage Options</h2>
+
+            <h3>1. In-Memory (Default)</h3>
+            <pre><code><span class="comment">// Default - sessions stored in server memory</span>
+<span class="comment">// Problem: Lost on restart, can't scale horizontally</span>
+
+Server A ─────────────────────────────────
+         │ Session: abc123 → {user: "john"}
+         │ Session: def456 → {user: "jane"}
+
+<span class="comment">// If user's next request goes to Server B...</span>
+Server B ─────────────────────────────────
+         │ No sessions! User appears logged out!</span></code></pre>
+
+            <h3>2. Database-Backed Sessions</h3>
+            <pre><code><span class="comment">// Store sessions in database (JDBC)</span>
+
+<span class="comment">// pom.xml</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.session&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-session-jdbc&lt;/artifactId&gt;
+&lt;/dependency&gt;
+
+<span class="comment">// application.properties</span>
+spring.session.store-type=jdbc
+spring.session.jdbc.initialize-schema=always
+
+<span class="comment">// That's it! Sessions now stored in database</span>
+<span class="comment">// Works across multiple servers</span></code></pre>
+
+            <h3>3. Redis Sessions (Recommended for Scale)</h3>
+            <pre><code><span class="comment">// Store sessions in Redis (fast, distributed)</span>
+
+<span class="comment">// pom.xml</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.session&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-session-data-redis&lt;/artifactId&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;
+&lt;/dependency&gt;
+
+<span class="comment">// application.properties</span>
+spring.session.store-type=redis
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+
+<span class="comment">// Now all servers share the same session store!</span>
+┌──────────┐    ┌──────────┐    ┌──────────┐
+│ Server A │    │ Server B │    │ Server C │
+└────┬─────┘    └────┬─────┘    └────┬─────┘
+     │               │               │
+     └───────────────┼───────────────┘
+                     │
+              ┌──────┴──────┐
+              │    REDIS    │
+              │  (Sessions) │
+              └─────────────┘</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Security Considerations</h2>
+
+            <h3>Cookie Security Flags</h3>
+            <pre><code><span class="comment">// ALWAYS use these flags for session cookies!</span>
+
+ResponseCookie sessionCookie = ResponseCookie.from(<span class="string">"JSESSIONID"</span>, sessionId)
+    <span class="comment">// HttpOnly - Prevents JavaScript access (XSS protection)</span>
+    .httpOnly(<span class="keyword">true</span>)
+
+    <span class="comment">// Secure - Only sent over HTTPS</span>
+    .secure(<span class="keyword">true</span>)
+
+    <span class="comment">// SameSite - CSRF protection</span>
+    <span class="comment">// Strict: Never send with cross-site requests</span>
+    <span class="comment">// Lax: Send with top-level navigations</span>
+    <span class="comment">// None: Always send (requires Secure)</span>
+    .sameSite(<span class="string">"Strict"</span>)
+
+    .path(<span class="string">"/"</span>)
+    .build();</code></pre>
+
+            <h3>Session Fixation Prevention</h3>
+            <pre><code><span class="comment">// Problem: Attacker sets session ID before user logs in</span>
+<span class="comment">// Solution: Generate new session ID after login</span>
+
+<span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
+<span class="keyword">public</span> String login(<span class="annotation">@RequestBody</span> LoginRequest request,
+                    HttpServletRequest httpRequest) {
+
+    User user = authService.authenticate(request);
+
+    <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
+        <span class="comment">// Invalidate old session and create new one</span>
+        HttpSession oldSession = httpRequest.getSession(<span class="keyword">false</span>);
+        <span class="keyword">if</span> (oldSession != <span class="keyword">null</span>) {
+            oldSession.invalidate();
+        }
+
+        <span class="comment">// Create new session with new ID</span>
+        HttpSession newSession = httpRequest.getSession(<span class="keyword">true</span>);
+        newSession.setAttribute(<span class="string">"user"</span>, user);
+
+        <span class="keyword">return</span> <span class="string">"Login successful"</span>;
+    }
+
+    <span class="keyword">throw new</span> AuthenticationException(<span class="string">"Invalid credentials"</span>);
+}
+
+<span class="comment">// Spring Security does this automatically!</span>
+<span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">SecurityConfig</span> {
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> SecurityFilterChain filterChain(HttpSecurity http) <span class="keyword">throws</span> Exception {
+        http.sessionManagement(session -> session
+            .sessionFixation().newSession()  <span class="comment">// or .migrateSession()</span>
+        );
+        <span class="keyword">return</span> http.build();
+    }
+}</code></pre>
+
+            <h3>Session Timeout</h3>
+            <pre><code><span class="comment">// Set appropriate timeout for your application</span>
+
+<span class="comment">// application.properties</span>
+server.servlet.session.timeout=30m  <span class="comment"># 30 minutes</span>
+
+<span class="comment">// Programmatically</span>
+HttpSession session = request.getSession();
+session.setMaxInactiveInterval(<span class="number">30</span> * <span class="number">60</span>);  <span class="comment">// 30 minutes in seconds</span>
+
+<span class="comment">// Check remaining time</span>
+<span class="keyword">long</span> lastAccessed = session.getLastAccessedTime();
+<span class="keyword">int</span> maxInactive = session.getMaxInactiveInterval();
+<span class="keyword">long</span> timeRemaining = (lastAccessed + (maxInactive * <span class="number">1000</span>)) - System.currentTimeMillis();</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Stateless Authentication (JWT Alternative)</h2>
+            <p>For RESTful APIs and microservices, consider stateless authentication using JWT tokens instead of sessions.</p>
+
+            <pre><code><span class="comment">// Session-based (Stateful)</span>
+┌────────────┐                    ┌────────────┐
+│   Client   │                    │   Server   │
+└─────┬──────┘                    └─────┬──────┘
+      │  Cookie: JSESSIONID=abc         │
+      │ ───────────────────────────>    │
+      │                                 │
+      │                   Look up session in memory/DB
+      │                   Retrieve user data
+      │                                 │
+      │  200 OK                         │
+      │ <───────────────────────────    │
+
+
+<span class="comment">// JWT-based (Stateless)</span>
+┌────────────┐                    ┌────────────┐
+│   Client   │                    │   Server   │
+└─────┬──────┘                    └─────┬──────┘
+      │  Authorization: Bearer eyJ...   │
+      │ ───────────────────────────>    │
+      │                                 │
+      │                   Verify JWT signature
+      │                   Extract user from token payload
+      │                   (No database lookup needed!)
+      │                                 │
+      │  200 OK                         │
+      │ <───────────────────────────    │</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Sessions</th>
+                        <th>JWT</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>State</strong></td>
+                        <td>Server stores state</td>
+                        <td>Token contains state</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Scalability</strong></td>
+                        <td>Needs shared storage</td>
+                        <td>Easily scalable</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Revocation</strong></td>
+                        <td>Easy (delete session)</td>
+                        <td>Harder (need blocklist)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Size</strong></td>
+                        <td>Small cookie</td>
+                        <td>Larger token</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Best For</strong></td>
+                        <td>Traditional web apps</td>
+                        <td>APIs, microservices</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Working with Cookies in JavaScript</h2>
+
+            <pre><code><span class="comment">// Reading cookies (non-HttpOnly only)</span>
+<span class="keyword">function</span> getCookie(name) {
+    <span class="keyword">const</span> cookies = document.cookie.split(<span class="string">'; '</span>);
+    <span class="keyword">for</span> (<span class="keyword">const</span> cookie <span class="keyword">of</span> cookies) {
+        <span class="keyword">const</span> [key, value] = cookie.split(<span class="string">'='</span>);
+        <span class="keyword">if</span> (key === name) {
+            <span class="keyword">return</span> decodeURIComponent(value);
+        }
+    }
+    <span class="keyword">return null</span>;
+}
+
+<span class="comment">// Setting cookies</span>
+<span class="keyword">function</span> setCookie(name, value, days) {
+    <span class="keyword">const</span> expires = <span class="keyword">new</span> Date();
+    expires.setTime(expires.getTime() + days * <span class="number">24</span> * <span class="number">60</span> * <span class="number">60</span> * <span class="number">1000</span>);
+
+    document.cookie = `${name}=${encodeURIComponent(value)}; ` +
+                      `expires=${expires.toUTCString()}; ` +
+                      `path=/; ` +
+                      `SameSite=Strict`;
+}
+
+<span class="comment">// Deleting cookies</span>
+<span class="keyword">function</span> deleteCookie(name) {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
+}
+
+<span class="comment">// Note: HttpOnly cookies are NOT accessible via JavaScript!</span>
+<span class="comment">// This is intentional - it prevents XSS attacks from stealing session cookies</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Patterns</h2>
+
+            <h3>"Remember Me" Functionality</h3>
+            <pre><code><span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;?&gt; login(
+        <span class="annotation">@RequestBody</span> LoginRequest request,
+        <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"false"</span>) <span class="keyword">boolean</span> rememberMe,
+        HttpServletResponse response,
+        HttpSession session) {
+
+    User user = authService.authenticate(request);
+    session.setAttribute(<span class="string">"user"</span>, user);
+
+    <span class="keyword">if</span> (rememberMe) {
+        <span class="comment">// Create persistent "remember me" token</span>
+        String token = tokenService.createRememberMeToken(user);
+
+        ResponseCookie cookie = ResponseCookie.from(<span class="string">"remember-me"</span>, token)
+            .httpOnly(<span class="keyword">true</span>)
+            .secure(<span class="keyword">true</span>)
+            .maxAge(Duration.ofDays(<span class="number">30</span>))  <span class="comment">// 30 days</span>
+            .path(<span class="string">"/"</span>)
+            .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+
+    <span class="keyword">return</span> ResponseEntity.ok(<span class="string">"Logged in"</span>);
+}
+
+<span class="comment">// Check remember-me on startup</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">RememberMeFilter</span> <span class="keyword">extends</span> OncePerRequestFilter {
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> doFilterInternal(HttpServletRequest request,
+                                      HttpServletResponse response,
+                                      FilterChain chain) {
+
+        HttpSession session = request.getSession(<span class="keyword">false</span>);
+
+        <span class="keyword">if</span> (session == <span class="keyword">null</span> || session.getAttribute(<span class="string">"user"</span>) == <span class="keyword">null</span>) {
+            <span class="comment">// No active session, check for remember-me cookie</span>
+            String rememberMeToken = getCookieValue(request, <span class="string">"remember-me"</span>);
+
+            <span class="keyword">if</span> (rememberMeToken != <span class="keyword">null</span>) {
+                User user = tokenService.validateRememberMeToken(rememberMeToken);
+                <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
+                    <span class="comment">// Auto-login user</span>
+                    request.getSession(<span class="keyword">true</span>).setAttribute(<span class="string">"user"</span>, user);
+                }
+            }
+        }
+
+        chain.doFilter(request, response);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>DO:</h3>
+                <ul>
+                    <li><strong>Use HttpOnly for session cookies</strong> - Prevents XSS attacks</li>
+                    <li><strong>Use Secure flag</strong> - Only transmit over HTTPS</li>
+                    <li><strong>Set SameSite attribute</strong> - CSRF protection</li>
+                    <li><strong>Regenerate session ID after login</strong> - Prevents session fixation</li>
+                    <li><strong>Set appropriate timeouts</strong> - Balance security and UX</li>
+                    <li><strong>Use external session store for scale</strong> - Redis or database</li>
+                </ul>
+
+                <h3>DON'T:</h3>
+                <ul>
+                    <li><strong>Don't store sensitive data in cookies</strong> - Use sessions instead</li>
+                    <li><strong>Don't trust cookie values</strong> - Always validate server-side</li>
+                    <li><strong>Don't use predictable session IDs</strong> - Use cryptographic randomness</li>
+                    <li><strong>Don't forget to invalidate sessions on logout</strong></li>
+                    <li><strong>Don't store passwords in sessions</strong> - Store user ID, fetch as needed</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Cookies:</strong> Small data stored in browser, sent with every request</li>
+                    <li><strong>Sessions:</strong> Server-side storage identified by session ID cookie</li>
+                    <li><strong>HttpOnly:</strong> Cookie flag that prevents JavaScript access</li>
+                    <li><strong>Secure:</strong> Cookie flag that requires HTTPS</li>
+                    <li><strong>SameSite:</strong> Cookie attribute for CSRF protection</li>
+                    <li><strong>Session Fixation:</strong> Attack prevented by regenerating session ID</li>
+                    <li><strong>Scaling:</strong> Use Redis or database for distributed sessions</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="http.html" class="related-link">HTTP Protocol</a>
+                <a href="request-response.html" class="related-link">Request/Response Cycle</a>
+                <a href="../spring/security.html" class="related-link">Spring Security</a>
+                <a href="../jakarta-ee/security.html" class="related-link">Jakarta EE Security</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

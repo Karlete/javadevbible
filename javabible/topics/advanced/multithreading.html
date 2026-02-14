@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multithreading & Concurrency - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / Multithreading & Concurrency
+            </nav>
+            <h1>Multithreading & Concurrency</h1>
+            <p class="topic-subtitle">Running Multiple Tasks Simultaneously</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is Multithreading?</h2>
+            <p>Imagine you're cooking dinner: you put rice on the stove, while it's cooking you chop vegetables, and while those are simmering you set the table. You're doing multiple tasks at the same time by switching between them efficiently. That's exactly what <strong>multithreading</strong> does in programming!</p>
+
+            <h3>Real-World Analogy: Restaurant Kitchen</h3>
+            <ul>
+                <li><strong>Single-threaded:</strong> One chef does everything - cook pasta, make salad, bake dessert - one after another. Customers wait forever!</li>
+                <li><strong>Multi-threaded:</strong> Multiple chefs work simultaneously - one on pasta, one on salad, one on dessert. Much faster!</li>
+            </ul>
+
+            <h3>What is a Thread?</h3>
+            <p>A <strong>thread</strong> is like a worker that can execute code. Your Java program starts with one thread (the main thread), but you can create more threads to do multiple things at once.</p>
+
+            <pre><code><span class="comment">// Without threads - tasks run one after another (sequential)</span>
+task1();  <span class="comment">// Wait for task1 to finish</span>
+task2();  <span class="comment">// Then do task2</span>
+task3();  <span class="comment">// Then do task3</span>
+<span class="comment">// Total time: time1 + time2 + time3</span>
+
+<span class="comment">// With threads - tasks run simultaneously (concurrent)</span>
+Thread t1 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> task1());
+Thread t2 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> task2());
+Thread t3 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> task3());
+t1.start(); t2.start(); t3.start();
+<span class="comment">// Total time: max(time1, time2, time3) - much faster!</span></code></pre>
+
+            <h3>Why Use Multithreading?</h3>
+            <ul>
+                <li><strong>Performance:</strong> Utilize multiple CPU cores - faster execution</li>
+                <li><strong>Responsiveness:</strong> UI stays responsive while background work happens</li>
+                <li><strong>Resource Utilization:</strong> Don't waste CPU time waiting for I/O (file/network)</li>
+                <li><strong>Better User Experience:</strong> Download file while user continues working</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Creating Threads - Two Ways</h2>
+
+            <h3>Method 1: Extending Thread Class</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">MyThread</span> <span class="keyword">extends</span> <span class="class-name">Thread</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">run</span>() {
+        <span class="comment">// This code runs in a separate thread</span>
+        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i <= <span class="number">5</span>; i++) {
+            <span class="class-name">System</span>.out.println(<span class="string">"Thread: "</span> + i);
+            <span class="keyword">try</span> {
+                <span class="class-name">Thread</span>.sleep(<span class="number">1000</span>);  <span class="comment">// Sleep 1 second</span>
+            } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+<span class="comment">// Usage</span>
+<span class="class-name">MyThread</span> thread = <span class="keyword">new</span> <span class="class-name">MyThread</span>();
+thread.start();  <span class="comment">// Start the thread - calls run() automatically</span></code></pre>
+
+            <h3>Method 2: Implementing Runnable Interface (Preferred)</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">MyRunnable</span> <span class="keyword">implements</span> <span class="class-name">Runnable</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">run</span>() {
+        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i <= <span class="number">5</span>; i++) {
+            <span class="class-name">System</span>.out.println(<span class="string">"Runnable: "</span> + i);
+            <span class="keyword">try</span> {
+                <span class="class-name">Thread</span>.sleep(<span class="number">1000</span>);
+            } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+<span class="comment">// Usage</span>
+<span class="class-name">MyRunnable</span> runnable = <span class="keyword">new</span> <span class="class-name">MyRunnable</span>();
+<span class="class-name">Thread</span> thread = <span class="keyword">new</span> <span class="class-name">Thread</span>(runnable);
+thread.start();</code></pre>
+
+            <h3>Method 3: Using Lambda (Modern, Cleanest)</h3>
+            <pre><code><span class="comment">// Most concise way!</span>
+<span class="class-name">Thread</span> thread = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i <= <span class="number">5</span>; i++) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Lambda: "</span> + i);
+        <span class="keyword">try</span> {
+            <span class="class-name">Thread</span>.sleep(<span class="number">1000</span>);
+        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
+            e.printStackTrace();
+        }
+    }
+});
+thread.start();</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Why Runnable is Preferred</div>
+                <ul>
+                    <li>Java doesn't support multiple inheritance - extending Thread prevents extending other classes</li>
+                    <li>Implementing Runnable separates the task from the thread mechanism</li>
+                    <li>More flexible - can be used with ExecutorService (thread pools)</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Complete Example - Multiple Threads Working Together</h2>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">DownloadExample</span> {
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+        <span class="comment">// Simulate downloading 3 files simultaneously</span>
+        <span class="class-name">Thread</span> download1 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> downloadFile(<span class="string">"File1.pdf"</span>));
+        <span class="class-name">Thread</span> download2 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> downloadFile(<span class="string">"File2.jpg"</span>));
+        <span class="class-name">Thread</span> download3 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> downloadFile(<span class="string">"File3.mp4"</span>));
+
+        <span class="class-name">System</span>.out.println(<span class="string">"Starting downloads..."</span>);
+
+        <span class="comment">// Start all downloads at once!</span>
+        download1.start();
+        download2.start();
+        download3.start();
+
+        <span class="class-name">System</span>.out.println(<span class="string">"All downloads started! Main thread continues..."</span>);
+    }
+
+    <span class="keyword">private static void</span> <span class="function">downloadFile</span>(<span class="class-name">String</span> fileName) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Downloading "</span> + fileName + <span class="string">"..."</span>);
+        <span class="keyword">try</span> {
+            <span class="class-name">Thread</span>.sleep(<span class="number">3000</span>);  <span class="comment">// Simulate 3-second download</span>
+        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
+            e.printStackTrace();
+        }
+        <span class="class-name">System</span>.out.println(fileName + <span class="string">" downloaded!"</span>);
+    }
+}</code></pre>
+
+            <p><strong>Output:</strong></p>
+            <pre><code>Starting downloads...
+All downloads started! Main thread continues...
+Downloading File1.pdf...
+Downloading File2.jpg...
+Downloading File3.mp4...
+<span class="comment">... 3 seconds pass ...</span>
+File1.pdf downloaded!
+File2.jpg downloaded!
+File3.mp4 downloaded!</code></pre>
+
+            <p><strong>Notice:</strong> All three files download simultaneously (concurrently), not one after another!</p>
+        </section>
+
+        <section class="content-section">
+            <h2>Thread Lifecycle - States</h2>
+
+            <pre><code><span class="comment">┌──────────┐</span>
+<span class="comment">│   NEW    │  ← Thread created but not started</span>
+<span class="comment">└──────────┘</span>
+      ↓ start()
+<span class="comment">┌──────────┐</span>
+<span class="comment">│ RUNNABLE │  ← Running or ready to run</span>
+<span class="comment">└──────────┘</span>
+      ↓ sleep(), wait(), I/O
+<span class="comment">┌──────────┐</span>
+<span class="comment">│ BLOCKED/ │  ← Waiting for resource/lock</span>
+<span class="comment">│ WAITING  │</span>
+<span class="comment">└──────────┘</span>
+      ↓ notify(), timeout, I/O completes
+<span class="comment">┌──────────┐</span>
+<span class="comment">│ RUNNABLE │  ← Back to running</span>
+<span class="comment">└──────────┘</span>
+      ↓ run() completes
+<span class="comment">┌──────────┐</span>
+<span class="comment">│TERMINATED│  ← Thread finished</span>
+<span class="comment">└──────────┘</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Important Thread Methods</h2>
+
+            <h3>start() - Begin Thread Execution</h3>
+            <pre><code><span class="class-name">Thread</span> t = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> <span class="class-name">System</span>.out.println(<span class="string">"Hello"</span>));
+t.start();  <span class="comment">// Starts the thread - calls run() in new thread</span>
+<span class="comment">// t.run();  // DON'T do this! Runs in current thread, not a new one</span></code></pre>
+
+            <h3>sleep() - Pause Thread</h3>
+            <pre><code><span class="keyword">try</span> {
+    <span class="class-name">Thread</span>.sleep(<span class="number">2000</span>);  <span class="comment">// Sleep for 2 seconds (2000 milliseconds)</span>
+} <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
+    e.printStackTrace();
+}</code></pre>
+
+            <h3>join() - Wait for Thread to Finish</h3>
+            <pre><code><span class="class-name">Thread</span> worker = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+    <span class="class-name">System</span>.out.println(<span class="string">"Working..."</span>);
+    <span class="keyword">try</span> { <span class="class-name">Thread</span>.sleep(<span class="number">3000</span>); } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {}
+    <span class="class-name">System</span>.out.println(<span class="string">"Work done!"</span>);
+});
+
+worker.start();
+<span class="class-name">System</span>.out.println(<span class="string">"Main thread continues..."</span>);
+
+<span class="keyword">try</span> {
+    worker.join();  <span class="comment">// Wait for worker to finish</span>
+} <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
+    e.printStackTrace();
+}
+
+<span class="class-name">System</span>.out.println(<span class="string">"Worker finished, main thread continues"</span>);</code></pre>
+
+            <h3>isAlive() - Check if Thread is Running</h3>
+            <pre><code><span class="class-name">Thread</span> t = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+    <span class="keyword">try</span> { <span class="class-name">Thread</span>.sleep(<span class="number">2000</span>); } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {}
+});
+
+<span class="class-name">System</span>.out.println(<span class="string">"Before start: "</span> + t.isAlive());  <span class="comment">// false</span>
+t.start();
+<span class="class-name">System</span>.out.println(<span class="string">"After start: "</span> + t.isAlive());   <span class="comment">// true</span>
+t.join();
+<span class="class-name">System</span>.out.println(<span class="string">"After finish: "</span> + t.isAlive());  <span class="comment">// false</span></code></pre>
+
+            <h3>getName() / setName() - Thread Naming</h3>
+            <pre><code><span class="class-name">Thread</span> t = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+    <span class="class-name">System</span>.out.println(<span class="string">"I am "</span> + <span class="class-name">Thread</span>.currentThread().getName());
+});
+
+t.setName(<span class="string">"Worker-1"</span>);
+t.start();  <span class="comment">// Output: "I am Worker-1"</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Problems with Multithreading</h2>
+
+            <h3>Problem 1: Race Condition</h3>
+            <p>When multiple threads access shared data simultaneously and try to change it at the same time.</p>
+
+            <div class="info-box warning">
+                <div class="info-box-title">❌ Unsafe Code - Race Condition</div>
+                <pre><code><span class="keyword">class</span> <span class="class-name">Counter</span> {
+    <span class="keyword">private int</span> count = <span class="number">0</span>;
+
+    <span class="keyword">public void</span> <span class="function">increment</span>() {
+        count++;  <span class="comment">// NOT thread-safe!</span>
+    }
+
+    <span class="keyword">public int</span> <span class="function">getCount</span>() {
+        <span class="keyword">return</span> count;
+    }
+}
+
+<span class="comment">// Two threads incrementing simultaneously</span>
+<span class="class-name">Counter</span> counter = <span class="keyword">new</span> <span class="class-name">Counter</span>();
+
+<span class="class-name">Thread</span> t1 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) counter.increment();
+});
+
+<span class="class-name">Thread</span> t2 = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) counter.increment();
+});
+
+t1.start(); t2.start();
+t1.join(); t2.join();
+
+<span class="class-name">System</span>.out.println(counter.getCount());  <span class="comment">// Expected: 2000, Actual: 1847 (varies!)</span></code></pre>
+            </div>
+
+            <div class="info-box tip">
+                <div class="info-box-title">✅ Safe Code - Synchronized</div>
+                <pre><code><span class="keyword">class</span> <span class="class-name">SafeCounter</span> {
+    <span class="keyword">private int</span> count = <span class="number">0</span>;
+
+    <span class="keyword">public synchronized void</span> <span class="function">increment</span>() {
+        count++;  <span class="comment">// Thread-safe! Only one thread at a time</span>
+    }
+
+    <span class="keyword">public synchronized int</span> <span class="function">getCount</span>() {
+        <span class="keyword">return</span> count;
+    }
+}
+
+<span class="comment">// Now it works correctly!</span>
+<span class="class-name">System</span>.out.println(counter.getCount());  <span class="comment">// Always 2000</span></code></pre>
+            </div>
+
+            <h3>Problem 2: Deadlock</h3>
+            <p>Two threads waiting for each other to release resources - both stuck forever!</p>
+
+            <pre><code><span class="comment">// Thread A holds Lock1, wants Lock2</span>
+<span class="comment">// Thread B holds Lock2, wants Lock1</span>
+<span class="comment">// Both threads wait forever = DEADLOCK!</span>
+
+<span class="comment">Analogy: Two people at a narrow bridge, both refuse to step back.</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Practical Example - Web Server Handling Requests</h2>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">SimpleWebServer</span> {
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+        <span class="comment">// Simulate handling 5 client requests concurrently</span>
+        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i <= <span class="number">5</span>; i++) {
+            <span class="keyword">int</span> clientId = i;
+            <span class="class-name">Thread</span> clientHandler = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+                handleRequest(clientId);
+            });
+            clientHandler.setName(<span class="string">"Client-"</span> + i);
+            clientHandler.start();
+        }
+    }
+
+    <span class="keyword">private static void</span> <span class="function">handleRequest</span>(<span class="keyword">int</span> clientId) {
+        <span class="class-name">System</span>.out.println(<span class="class-name">Thread</span>.currentThread().getName() +
+                           <span class="string">": Processing request from Client "</span> + clientId);
+        <span class="keyword">try</span> {
+            <span class="comment">// Simulate processing time</span>
+            <span class="class-name">Thread</span>.sleep((<span class="keyword">long</span>) (<span class="class-name">Math</span>.random() * <span class="number">3000</span>));
+        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
+            e.printStackTrace();
+        }
+        <span class="class-name">System</span>.out.println(<span class="class-name">Thread</span>.currentThread().getName() +
+                           <span class="string">": Finished request for Client "</span> + clientId);
+    }
+}</code></pre>
+
+            <p><strong>Output:</strong></p>
+            <pre><code>Client-1: Processing request from Client 1
+Client-2: Processing request from Client 2
+Client-3: Processing request from Client 3
+Client-4: Processing request from Client 4
+Client-5: Processing request from Client 5
+Client-3: Finished request for Client 3
+Client-1: Finished request for Client 1
+Client-5: Finished request for Client 5
+Client-2: Finished request for Client 2
+Client-4: Finished request for Client 4</code></pre>
+
+            <p><strong>Notice:</strong> All 5 clients are handled simultaneously! Without threads, each client would wait for the previous one to finish.</p>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Threading Best Practices</div>
+                <ul>
+                    <li>✅ Use thread pools (ExecutorService) instead of creating threads manually</li>
+                    <li>✅ Implement Runnable rather than extending Thread</li>
+                    <li>✅ Always handle InterruptedException properly</li>
+                    <li>✅ Use synchronized or concurrent collections for shared data</li>
+                    <li>✅ Avoid calling Thread.stop() - it's deprecated and dangerous</li>
+                    <li>✅ Name your threads for easier debugging</li>
+                    <li>✅ Keep synchronized blocks as small as possible</li>
+                    <li>❌ Never call run() directly - always use start()</li>
+                    <li>❌ Avoid creating too many threads - use thread pools</li>
+                    <li>❌ Don't share mutable state without synchronization</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>When to Use Multithreading?</h2>
+
+            <h3>Good Use Cases:</h3>
+            <ul>
+                <li><strong>I/O Operations:</strong> Reading files, network calls, database queries</li>
+                <li><strong>UI Applications:</strong> Keep UI responsive while background work happens</li>
+                <li><strong>Parallel Processing:</strong> Process large datasets by splitting work</li>
+                <li><strong>Server Applications:</strong> Handle multiple client requests simultaneously</li>
+                <li><strong>Batch Processing:</strong> Process multiple items concurrently</li>
+            </ul>
+
+            <h3>When NOT to Use:</h3>
+            <ul>
+                <li>Simple, quick operations (overhead not worth it)</li>
+                <li>When operations must happen in strict order</li>
+                <li>When shared state is complex (synchronization overhead)</li>
+                <li>CPU-bound tasks on single-core machines</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Why It Matters</h2>
+            <ul>
+                <li><strong>Modern Computing:</strong> Most devices have multiple cores - multithreading utilizes them</li>
+                <li><strong>User Experience:</strong> Apps stay responsive - no freezing</li>
+                <li><strong>Performance:</strong> Can significantly speed up applications</li>
+                <li><strong>Scalability:</strong> Handle more users/requests simultaneously</li>
+                <li><strong>Professional Skill:</strong> Essential for building real-world applications</li>
+            </ul>
+
+            <div class="info-box note">
+                <div class="info-box-title">Remember</div>
+                <p>Multithreading is powerful but complex. Start simple, understand the basics, then move to advanced topics like thread pools, locks, and concurrent collections.</p>
+                <p><strong>"With great power comes great responsibility - and great complexity!"</strong></p>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="thread-pools.html" class="related-link">Thread Pools & ExecutorService</a>
+                <a href="synchronization.html" class="related-link">Synchronization Mechanisms</a>
+                <a href="../fundamentals/exceptions.html" class="related-link">Exception Handling</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

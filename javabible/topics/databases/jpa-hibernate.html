@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JPA & Hibernate - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#databases">Databases & Persistence</a> / JPA & Hibernate
+            </nav>
+            <h1>JPA & Hibernate</h1>
+            <p class="topic-subtitle">Object-Relational Mapping made simple</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is JPA?</h2>
+            <p><strong>JPA (Jakarta Persistence API)</strong>, formerly Java Persistence API, is a specification that describes how to manage relational data in Java applications. It defines a standard way to map Java objects to database tables (ORM - Object-Relational Mapping) and provides APIs for CRUD operations, queries, and transactions.</p>
+
+            <div class="info-box">
+                <p><strong>JPA is a specification, not an implementation.</strong> You need a JPA provider (implementation) to use JPA. Hibernate is the most popular JPA provider, but others exist (EclipseLink, OpenJPA).</p>
+            </div>
+
+            <h3>JPA vs Hibernate vs JDBC</h3>
+            <pre><code><span class="comment">// Architecture comparison:</span>
+
+┌─────────────────────────────────────────────────────────────┐
+│                    YOUR APPLICATION                          │
+└─────────────────────────────────────────────────────────────┘
+           │                    │                    │
+           ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│   Pure JDBC     │  │      JPA        │  │    Hibernate    │
+│  (Manual SQL)   │  │ (Specification) │  │  (Native API)   │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+           │                    │                    │
+           │                    ▼                    │
+           │         ┌─────────────────┐             │
+           │         │    Hibernate    │◄────────────┘
+           │         │ (JPA Provider)  │
+           │         └─────────────────┘
+           │                    │
+           └────────────────────┼────────────────────┘
+                                ▼
+                    ┌─────────────────┐
+                    │      JDBC       │
+                    └─────────────────┘
+                                │
+                                ▼
+                    ┌─────────────────┐
+                    │    Database     │
+                    └─────────────────┘</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>JDBC</th>
+                        <th>JPA/Hibernate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Abstraction Level</strong></td>
+                        <td>Low - write SQL</td>
+                        <td>High - work with objects</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Boilerplate Code</strong></td>
+                        <td>High</td>
+                        <td>Low</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Learning Curve</strong></td>
+                        <td>Lower</td>
+                        <td>Higher</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Performance Control</strong></td>
+                        <td>Full control</td>
+                        <td>Less direct control</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Caching</strong></td>
+                        <td>Manual</td>
+                        <td>Built-in (L1, L2)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Database Portability</strong></td>
+                        <td>SQL dialect issues</td>
+                        <td>Better portability</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Setting Up JPA with Hibernate</h2>
+
+            <h3>Maven Dependencies</h3>
+            <pre><code><span class="comment">&lt;!-- JPA API --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>jakarta.persistence<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>jakarta.persistence-api<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>3.1.0<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">&lt;!-- Hibernate (JPA Provider) --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>org.hibernate.orm<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>hibernate-core<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>6.4.1.Final<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">&lt;!-- Database Driver --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>com.mysql<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>mysql-connector-j<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>8.3.0<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">&lt;!-- For Spring Boot (all-in-one) --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>org.springframework.boot<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>spring-boot-starter-data-jpa<span class="keyword">&lt;/artifactId&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span></code></pre>
+
+            <h3>Configuration (persistence.xml)</h3>
+            <pre><code><span class="comment">&lt;!-- src/main/resources/META-INF/persistence.xml --&gt;</span>
+<span class="keyword">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="keyword">&lt;persistence</span> xmlns="https://jakarta.ee/xml/ns/persistence"
+             version="3.0"<span class="keyword">&gt;</span>
+
+    <span class="keyword">&lt;persistence-unit</span> name="myPU" transaction-type="RESOURCE_LOCAL"<span class="keyword">&gt;</span>
+        <span class="keyword">&lt;provider&gt;</span>org.hibernate.jpa.HibernatePersistenceProvider<span class="keyword">&lt;/provider&gt;</span>
+
+        <span class="comment">&lt;!-- Entity classes --&gt;</span>
+        <span class="keyword">&lt;class&gt;</span>com.example.entity.Employee<span class="keyword">&lt;/class&gt;</span>
+        <span class="keyword">&lt;class&gt;</span>com.example.entity.Department<span class="keyword">&lt;/class&gt;</span>
+
+        <span class="keyword">&lt;properties&gt;</span>
+            <span class="comment">&lt;!-- Database connection --&gt;</span>
+            <span class="keyword">&lt;property</span> name="jakarta.persistence.jdbc.driver"
+                      value="com.mysql.cj.jdbc.Driver"<span class="keyword">/&gt;</span>
+            <span class="keyword">&lt;property</span> name="jakarta.persistence.jdbc.url"
+                      value="jdbc:mysql://localhost:3306/mydb"<span class="keyword">/&gt;</span>
+            <span class="keyword">&lt;property</span> name="jakarta.persistence.jdbc.user"
+                      value="root"<span class="keyword">/&gt;</span>
+            <span class="keyword">&lt;property</span> name="jakarta.persistence.jdbc.password"
+                      value="password"<span class="keyword">/&gt;</span>
+
+            <span class="comment">&lt;!-- Hibernate settings --&gt;</span>
+            <span class="keyword">&lt;property</span> name="hibernate.dialect"
+                      value="org.hibernate.dialect.MySQLDialect"<span class="keyword">/&gt;</span>
+            <span class="keyword">&lt;property</span> name="hibernate.hbm2ddl.auto"
+                      value="update"<span class="keyword">/&gt;</span>
+            <span class="keyword">&lt;property</span> name="hibernate.show_sql"
+                      value="true"<span class="keyword">/&gt;</span>
+            <span class="keyword">&lt;property</span> name="hibernate.format_sql"
+                      value="true"<span class="keyword">/&gt;</span>
+
+            <span class="comment">&lt;!-- Connection pool (HikariCP) --&gt;</span>
+            <span class="keyword">&lt;property</span> name="hibernate.hikari.minimumIdle"
+                      value="5"<span class="keyword">/&gt;</span>
+            <span class="keyword">&lt;property</span> name="hibernate.hikari.maximumPoolSize"
+                      value="20"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;/properties&gt;</span>
+    <span class="keyword">&lt;/persistence-unit&gt;</span>
+<span class="keyword">&lt;/persistence&gt;</span></code></pre>
+
+            <h3>Spring Boot Configuration (application.yml)</h3>
+            <pre><code><span class="comment"># application.yml - much simpler!</span>
+<span class="keyword">spring:</span>
+  <span class="keyword">datasource:</span>
+    url: <span class="string">jdbc:mysql://localhost:3306/mydb</span>
+    username: <span class="string">root</span>
+    password: <span class="string">password</span>
+    driver-class-name: <span class="string">com.mysql.cj.jdbc.Driver</span>
+
+  <span class="keyword">jpa:</span>
+    hibernate:
+      ddl-auto: <span class="string">update</span>  <span class="comment"># create, create-drop, validate, update, none</span>
+    show-sql: <span class="keyword">true</span>
+    properties:
+      hibernate:
+        format_sql: <span class="keyword">true</span>
+        dialect: <span class="string">org.hibernate.dialect.MySQLDialect</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Entity Mapping Basics</h2>
+
+            <h3>Simple Entity</h3>
+            <pre><code><span class="keyword">import</span> jakarta.persistence.*;
+<span class="keyword">import</span> java.math.BigDecimal;
+<span class="keyword">import</span> java.time.LocalDate;
+
+<span class="annotation">@Entity</span>                                   <span class="comment">// Marks class as JPA entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"employees"</span>)               <span class="comment">// Maps to table name</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+
+    <span class="annotation">@Id</span>                                    <span class="comment">// Primary key</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)  <span class="comment">// Auto-increment</span>
+    <span class="keyword">private</span> Long id;
+
+    <span class="annotation">@Column</span>(name = <span class="string">"first_name"</span>, nullable = <span class="keyword">false</span>, length = 50)
+    <span class="keyword">private</span> String firstName;
+
+    <span class="annotation">@Column</span>(name = <span class="string">"last_name"</span>, nullable = <span class="keyword">false</span>, length = 50)
+    <span class="keyword">private</span> String lastName;
+
+    <span class="annotation">@Column</span>(unique = <span class="keyword">true</span>, nullable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> String email;
+
+    <span class="annotation">@Column</span>(precision = 10, scale = 2)
+    <span class="keyword">private</span> BigDecimal salary;
+
+    <span class="annotation">@Column</span>(name = <span class="string">"hire_date"</span>)
+    <span class="keyword">private</span> LocalDate hireDate;
+
+    <span class="annotation">@Column</span>(nullable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> Boolean active = <span class="keyword">true</span>;
+
+    <span class="annotation">@Enumerated</span>(EnumType.STRING)           <span class="comment">// Store enum as string, not ordinal</span>
+    <span class="keyword">private</span> EmployeeStatus status;
+
+    <span class="annotation">@Lob</span>                                   <span class="comment">// Large object (TEXT/BLOB)</span>
+    <span class="keyword">private</span> String biography;
+
+    <span class="annotation">@Transient</span>                             <span class="comment">// Not persisted to database</span>
+    <span class="keyword">private</span> String fullName;
+
+    <span class="comment">// Default constructor required by JPA</span>
+    <span class="keyword">public</span> <span class="function">Employee</span>() {}
+
+    <span class="comment">// Getters and setters...</span>
+
+    <span class="comment">// Calculated field</span>
+    <span class="keyword">public</span> String <span class="function">getFullName</span>() {
+        <span class="keyword">return</span> firstName + <span class="string">" "</span> + lastName;
+    }
+}
+
+<span class="keyword">public enum</span> <span class="class-name">EmployeeStatus</span> {
+    ACTIVE, INACTIVE, ON_LEAVE, TERMINATED
+}</code></pre>
+
+            <h3>ID Generation Strategies</h3>
+            <pre><code><span class="comment">// AUTO - Let JPA choose the strategy</span>
+<span class="annotation">@GeneratedValue</span>(strategy = GenerationType.AUTO)
+
+<span class="comment">// IDENTITY - Database auto-increment (MySQL, PostgreSQL SERIAL)</span>
+<span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+
+<span class="comment">// SEQUENCE - Database sequence (Oracle, PostgreSQL)</span>
+<span class="annotation">@GeneratedValue</span>(strategy = GenerationType.SEQUENCE, generator = <span class="string">"emp_seq"</span>)
+<span class="annotation">@SequenceGenerator</span>(name = <span class="string">"emp_seq"</span>, sequenceName = <span class="string">"employee_sequence"</span>, allocationSize = 50)
+
+<span class="comment">// TABLE - Simulated sequence using a table</span>
+<span class="annotation">@GeneratedValue</span>(strategy = GenerationType.TABLE, generator = <span class="string">"emp_gen"</span>)
+<span class="annotation">@TableGenerator</span>(name = <span class="string">"emp_gen"</span>, table = <span class="string">"id_generator"</span>, pkColumnValue = <span class="string">"employee"</span>)
+
+<span class="comment">// UUID - For distributed systems</span>
+<span class="annotation">@Id</span>
+<span class="annotation">@GeneratedValue</span>(strategy = GenerationType.UUID)
+<span class="keyword">private</span> UUID id;</code></pre>
+
+            <h3>Embedded Objects</h3>
+            <pre><code><span class="annotation">@Embeddable</span>
+<span class="keyword">public class</span> <span class="class-name">Address</span> {
+    <span class="keyword">private</span> String street;
+    <span class="keyword">private</span> String city;
+    <span class="keyword">private</span> String state;
+    <span class="keyword">private</span> String zipCode;
+    <span class="keyword">private</span> String country;
+
+    <span class="comment">// Constructors, getters, setters...</span>
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@Embedded</span>
+    <span class="keyword">private</span> Address homeAddress;
+
+    <span class="annotation">@Embedded</span>
+    <span class="annotation">@AttributeOverrides</span>({
+        <span class="annotation">@AttributeOverride</span>(name = <span class="string">"street"</span>, column = <span class="annotation">@Column</span>(name = <span class="string">"work_street"</span>)),
+        <span class="annotation">@AttributeOverride</span>(name = <span class="string">"city"</span>, column = <span class="annotation">@Column</span>(name = <span class="string">"work_city"</span>)),
+        <span class="annotation">@AttributeOverride</span>(name = <span class="string">"state"</span>, column = <span class="annotation">@Column</span>(name = <span class="string">"work_state"</span>)),
+        <span class="annotation">@AttributeOverride</span>(name = <span class="string">"zipCode"</span>, column = <span class="annotation">@Column</span>(name = <span class="string">"work_zip"</span>)),
+        <span class="annotation">@AttributeOverride</span>(name = <span class="string">"country"</span>, column = <span class="annotation">@Column</span>(name = <span class="string">"work_country"</span>))
+    })
+    <span class="keyword">private</span> Address workAddress;
+}</code></pre>
+
+            <h3>Auditing Fields</h3>
+            <pre><code><span class="annotation">@MappedSuperclass</span>  <span class="comment">// Not an entity itself, inherited by entities</span>
+<span class="keyword">public abstract class</span> <span class="class-name">BaseEntity</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="annotation">@Column</span>(name = <span class="string">"created_at"</span>, updatable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> LocalDateTime createdAt;
+
+    <span class="annotation">@Column</span>(name = <span class="string">"updated_at"</span>)
+    <span class="keyword">private</span> LocalDateTime updatedAt;
+
+    <span class="annotation">@Column</span>(name = <span class="string">"created_by"</span>, updatable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> String createdBy;
+
+    <span class="annotation">@PrePersist</span>
+    <span class="keyword">protected void</span> <span class="function">onCreate</span>() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    <span class="annotation">@PreUpdate</span>
+    <span class="keyword">protected void</span> <span class="function">onUpdate</span>() {
+        updatedAt = LocalDateTime.now();
+    }
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> <span class="keyword">extends</span> <span class="class-name">BaseEntity</span> {
+    <span class="keyword">private</span> String name;
+    <span class="comment">// id, createdAt, updatedAt inherited</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>EntityManager Operations</h2>
+
+            <h3>Basic CRUD Operations</h3>
+            <pre><code><span class="keyword">import</span> jakarta.persistence.*;
+
+<span class="keyword">public class</span> <span class="class-name">EmployeeService</span> {
+
+    <span class="keyword">private</span> EntityManagerFactory emf = Persistence.createEntityManagerFactory(<span class="string">"myPU"</span>);
+
+    <span class="comment">// CREATE - persist()</span>
+    <span class="keyword">public void</span> <span class="function">save</span>(Employee employee) {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+
+        <span class="keyword">try</span> {
+            tx.begin();
+            em.persist(employee);  <span class="comment">// INSERT</span>
+            tx.commit();
+        } <span class="keyword">catch</span> (Exception e) {
+            <span class="keyword">if</span> (tx.isActive()) tx.rollback();
+            <span class="keyword">throw</span> e;
+        } <span class="keyword">finally</span> {
+            em.close();
+        }
+    }
+
+    <span class="comment">// READ - find()</span>
+    <span class="keyword">public</span> Employee <span class="function">findById</span>(Long id) {
+        EntityManager em = emf.createEntityManager();
+        <span class="keyword">try</span> {
+            <span class="keyword">return</span> em.find(Employee.<span class="keyword">class</span>, id);  <span class="comment">// SELECT by primary key</span>
+        } <span class="keyword">finally</span> {
+            em.close();
+        }
+    }
+
+    <span class="comment">// READ - getReference() - lazy loading proxy</span>
+    <span class="keyword">public</span> Employee <span class="function">getReference</span>(Long id) {
+        EntityManager em = emf.createEntityManager();
+        <span class="keyword">try</span> {
+            <span class="keyword">return</span> em.getReference(Employee.<span class="keyword">class</span>, id);  <span class="comment">// Returns proxy, may throw EntityNotFoundException</span>
+        } <span class="keyword">finally</span> {
+            em.close();
+        }
+    }
+
+    <span class="comment">// UPDATE - merge()</span>
+    <span class="keyword">public</span> Employee <span class="function">update</span>(Employee employee) {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+
+        <span class="keyword">try</span> {
+            tx.begin();
+            Employee merged = em.merge(employee);  <span class="comment">// UPDATE</span>
+            tx.commit();
+            <span class="keyword">return</span> merged;
+        } <span class="keyword">catch</span> (Exception e) {
+            <span class="keyword">if</span> (tx.isActive()) tx.rollback();
+            <span class="keyword">throw</span> e;
+        } <span class="keyword">finally</span> {
+            em.close();
+        }
+    }
+
+    <span class="comment">// DELETE - remove()</span>
+    <span class="keyword">public void</span> <span class="function">delete</span>(Long id) {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+
+        <span class="keyword">try</span> {
+            tx.begin();
+            Employee employee = em.find(Employee.<span class="keyword">class</span>, id);
+            <span class="keyword">if</span> (employee != <span class="keyword">null</span>) {
+                em.remove(employee);  <span class="comment">// DELETE</span>
+            }
+            tx.commit();
+        } <span class="keyword">catch</span> (Exception e) {
+            <span class="keyword">if</span> (tx.isActive()) tx.rollback();
+            <span class="keyword">throw</span> e;
+        } <span class="keyword">finally</span> {
+            em.close();
+        }
+    }
+}</code></pre>
+
+            <h3>Entity States and Lifecycle</h3>
+            <pre><code><span class="comment">// Entity States in JPA:</span>
+
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│  ┌─────────┐                      ┌──────────┐              │
+│  │   NEW   │──────persist()──────▶│ MANAGED  │              │
+│  │(Transient)│                    │          │              │
+│  └─────────┘                      └────┬─────┘              │
+│       ▲                                │                    │
+│       │                          find() │ merge()           │
+│   new Entity()                   ┌─────▼─────┐              │
+│       │                          │ Database  │              │
+│       │                          └───────────┘              │
+│       │                                │                    │
+│       │                         remove()│                   │
+│       │                                ▼                    │
+│       │                          ┌──────────┐              │
+│       │                          │ REMOVED  │              │
+│       │                          └────┬─────┘              │
+│       │                               │                    │
+│       │                         close()│ clear()           │
+│       │                  detach()      │                    │
+│       │      ┌─────────────────────────┴──────────────┐    │
+│       │      ▼                                         │    │
+│  ┌─────────────────┐                                   │    │
+│  │    DETACHED     │──────────────merge()──────────────┘    │
+│  └─────────────────┘                                        │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+
+<span class="comment">// NEW (Transient): Just created, not associated with EntityManager</span>
+Employee emp = <span class="keyword">new</span> Employee();
+emp.setName(<span class="string">"John"</span>);
+
+<span class="comment">// MANAGED: Tracked by EntityManager, changes auto-synced</span>
+em.persist(emp);  <span class="comment">// Now managed</span>
+emp.setName(<span class="string">"Jane"</span>);  <span class="comment">// Change will be saved on commit!</span>
+
+<span class="comment">// DETACHED: Was managed, but EntityManager closed</span>
+em.close();  <span class="comment">// emp is now detached</span>
+emp.setName(<span class="string">"Jack"</span>);  <span class="comment">// Change NOT tracked!</span>
+
+<span class="comment">// REMOVED: Marked for deletion</span>
+em.remove(emp);  <span class="comment">// Will be deleted on commit</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>JPQL and Criteria API</h2>
+
+            <h3>JPQL (Java Persistence Query Language)</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">EmployeeRepository</span> {
+
+    <span class="keyword">private</span> EntityManager em;
+
+    <span class="comment">// Simple query</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findAll</span>() {
+        <span class="keyword">return</span> em.createQuery(
+            <span class="string">"SELECT e FROM Employee e"</span>,
+            Employee.<span class="keyword">class</span>
+        ).getResultList();
+    }
+
+    <span class="comment">// Query with parameter</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findByDepartment</span>(String deptName) {
+        <span class="keyword">return</span> em.createQuery(
+            <span class="string">"SELECT e FROM Employee e WHERE e.department.name = :deptName"</span>,
+            Employee.<span class="keyword">class</span>
+        )
+        .setParameter(<span class="string">"deptName"</span>, deptName)
+        .getResultList();
+    }
+
+    <span class="comment">// Query with multiple parameters</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findBySalaryRange</span>(BigDecimal min, BigDecimal max) {
+        <span class="keyword">return</span> em.createQuery(
+            <span class="string">"SELECT e FROM Employee e WHERE e.salary BETWEEN :min AND :max ORDER BY e.salary DESC"</span>,
+            Employee.<span class="keyword">class</span>
+        )
+        .setParameter(<span class="string">"min"</span>, min)
+        .setParameter(<span class="string">"max"</span>, max)
+        .getResultList();
+    }
+
+    <span class="comment">// Pagination</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findAllPaginated</span>(<span class="keyword">int</span> page, <span class="keyword">int</span> size) {
+        <span class="keyword">return</span> em.createQuery(<span class="string">"SELECT e FROM Employee e ORDER BY e.id"</span>, Employee.<span class="keyword">class</span>)
+            .setFirstResult(page * size)
+            .setMaxResults(size)
+            .getResultList();
+    }
+
+    <span class="comment">// Single result</span>
+    <span class="keyword">public</span> Employee <span class="function">findByEmail</span>(String email) {
+        <span class="keyword">try</span> {
+            <span class="keyword">return</span> em.createQuery(
+                <span class="string">"SELECT e FROM Employee e WHERE e.email = :email"</span>,
+                Employee.<span class="keyword">class</span>
+            )
+            .setParameter(<span class="string">"email"</span>, email)
+            .getSingleResult();
+        } <span class="keyword">catch</span> (NoResultException e) {
+            <span class="keyword">return null</span>;
+        }
+    }
+
+    <span class="comment">// JOIN queries</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findWithDepartment</span>() {
+        <span class="keyword">return</span> em.createQuery(
+            <span class="string">"SELECT e FROM Employee e JOIN FETCH e.department"</span>,
+            Employee.<span class="keyword">class</span>
+        ).getResultList();
+    }
+
+    <span class="comment">// Aggregate functions</span>
+    <span class="keyword">public</span> Double <span class="function">getAverageSalary</span>() {
+        <span class="keyword">return</span> em.createQuery(
+            <span class="string">"SELECT AVG(e.salary) FROM Employee e"</span>,
+            Double.<span class="keyword">class</span>
+        ).getSingleResult();
+    }
+
+    <span class="comment">// Projection (DTO)</span>
+    <span class="keyword">public</span> List&lt;EmployeeDTO&gt; <span class="function">findAllAsDTO</span>() {
+        <span class="keyword">return</span> em.createQuery(
+            <span class="string">"SELECT NEW com.example.dto.EmployeeDTO(e.id, e.firstName, e.lastName, e.email) FROM Employee e"</span>,
+            EmployeeDTO.<span class="keyword">class</span>
+        ).getResultList();
+    }
+
+    <span class="comment">// UPDATE query</span>
+    <span class="keyword">public int</span> <span class="function">giveRaise</span>(Long deptId, BigDecimal percentage) {
+        <span class="keyword">return</span> em.createQuery(
+            <span class="string">"UPDATE Employee e SET e.salary = e.salary * (1 + :pct) WHERE e.department.id = :deptId"</span>
+        )
+        .setParameter(<span class="string">"pct"</span>, percentage.divide(<span class="keyword">new</span> BigDecimal(<span class="string">"100"</span>)))
+        .setParameter(<span class="string">"deptId"</span>, deptId)
+        .executeUpdate();
+    }
+
+    <span class="comment">// DELETE query</span>
+    <span class="keyword">public int</span> <span class="function">deleteInactive</span>() {
+        <span class="keyword">return</span> em.createQuery(
+            <span class="string">"DELETE FROM Employee e WHERE e.active = false"</span>
+        ).executeUpdate();
+    }
+}</code></pre>
+
+            <h3>Named Queries</h3>
+            <pre><code><span class="annotation">@Entity</span>
+<span class="annotation">@NamedQueries</span>({
+    <span class="annotation">@NamedQuery</span>(
+        name = <span class="string">"Employee.findAll"</span>,
+        query = <span class="string">"SELECT e FROM Employee e ORDER BY e.lastName"</span>
+    ),
+    <span class="annotation">@NamedQuery</span>(
+        name = <span class="string">"Employee.findByDepartment"</span>,
+        query = <span class="string">"SELECT e FROM Employee e WHERE e.department.id = :deptId"</span>
+    ),
+    <span class="annotation">@NamedQuery</span>(
+        name = <span class="string">"Employee.findActive"</span>,
+        query = <span class="string">"SELECT e FROM Employee e WHERE e.active = true"</span>
+    )
+})
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+    <span class="comment">// ...</span>
+}
+
+<span class="comment">// Usage</span>
+List&lt;Employee&gt; employees = em.createNamedQuery(<span class="string">"Employee.findAll"</span>, Employee.<span class="keyword">class</span>)
+    .getResultList();
+
+List&lt;Employee&gt; deptEmployees = em.createNamedQuery(<span class="string">"Employee.findByDepartment"</span>, Employee.<span class="keyword">class</span>)
+    .setParameter(<span class="string">"deptId"</span>, departmentId)
+    .getResultList();</code></pre>
+
+            <h3>Criteria API (Type-Safe Queries)</h3>
+            <pre><code><span class="keyword">import</span> jakarta.persistence.criteria.*;
+
+<span class="keyword">public class</span> <span class="class-name">EmployeeRepository</span> {
+
+    <span class="keyword">private</span> EntityManager em;
+
+    <span class="comment">// Simple criteria query</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findAll</span>() {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery&lt;Employee&gt; cq = cb.createQuery(Employee.<span class="keyword">class</span>);
+        Root&lt;Employee&gt; root = cq.from(Employee.<span class="keyword">class</span>);
+
+        cq.select(root);
+
+        <span class="keyword">return</span> em.createQuery(cq).getResultList();
+    }
+
+    <span class="comment">// Criteria with WHERE clause</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findByDepartment</span>(Long deptId) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery&lt;Employee&gt; cq = cb.createQuery(Employee.<span class="keyword">class</span>);
+        Root&lt;Employee&gt; root = cq.from(Employee.<span class="keyword">class</span>);
+
+        cq.select(root)
+          .where(cb.equal(root.get(<span class="string">"department"</span>).get(<span class="string">"id"</span>), deptId));
+
+        <span class="keyword">return</span> em.createQuery(cq).getResultList();
+    }
+
+    <span class="comment">// Dynamic criteria with multiple conditions</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">search</span>(String name, BigDecimal minSalary, Boolean active) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery&lt;Employee&gt; cq = cb.createQuery(Employee.<span class="keyword">class</span>);
+        Root&lt;Employee&gt; root = cq.from(Employee.<span class="keyword">class</span>);
+
+        List&lt;Predicate&gt; predicates = <span class="keyword">new</span> ArrayList&lt;&gt;();
+
+        <span class="keyword">if</span> (name != <span class="keyword">null</span>) {
+            predicates.add(cb.like(
+                cb.lower(root.get(<span class="string">"lastName"</span>)),
+                <span class="string">"%"</span> + name.toLowerCase() + <span class="string">"%"</span>
+            ));
+        }
+
+        <span class="keyword">if</span> (minSalary != <span class="keyword">null</span>) {
+            predicates.add(cb.greaterThanOrEqualTo(root.get(<span class="string">"salary"</span>), minSalary));
+        }
+
+        <span class="keyword">if</span> (active != <span class="keyword">null</span>) {
+            predicates.add(cb.equal(root.get(<span class="string">"active"</span>), active));
+        }
+
+        cq.where(predicates.toArray(<span class="keyword">new</span> Predicate[0]));
+        cq.orderBy(cb.asc(root.get(<span class="string">"lastName"</span>)));
+
+        <span class="keyword">return</span> em.createQuery(cq).getResultList();
+    }
+
+    <span class="comment">// Criteria with JOIN</span>
+    <span class="keyword">public</span> List&lt;Employee&gt; <span class="function">findByDepartmentName</span>(String deptName) {
+        CriteriaBuilder cb = em.getCriteriaBuilder();
+        CriteriaQuery&lt;Employee&gt; cq = cb.createQuery(Employee.<span class="keyword">class</span>);
+        Root&lt;Employee&gt; root = cq.from(Employee.<span class="keyword">class</span>);
+
+        Join&lt;Employee, Department&gt; deptJoin = root.join(<span class="string">"department"</span>);
+
+        cq.select(root)
+          .where(cb.equal(deptJoin.get(<span class="string">"name"</span>), deptName));
+
+        <span class="keyword">return</span> em.createQuery(cq).getResultList();
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Fetching Strategies</h2>
+
+            <h3>Lazy vs Eager Loading</h3>
+            <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)  <span class="comment">// Load department only when accessed</span>
+    <span class="keyword">private</span> Department department;
+
+    <span class="annotation">@OneToMany</span>(fetch = FetchType.LAZY)  <span class="comment">// Default for collections</span>
+    <span class="keyword">private</span> List&lt;Project&gt; projects;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.EAGER) <span class="comment">// Load immediately with employee</span>
+    <span class="keyword">private</span> Manager manager;
+}
+
+<span class="comment">// Defaults:</span>
+<span class="comment">// @OneToMany, @ManyToMany -> LAZY</span>
+<span class="comment">// @OneToOne, @ManyToOne -> EAGER</span>
+
+<span class="comment">// Best practice: Make everything LAZY, use JOIN FETCH when needed</span></code></pre>
+
+            <h3>N+1 Problem and Solutions</h3>
+            <pre><code><span class="comment">// THE N+1 PROBLEM:</span>
+List&lt;Employee&gt; employees = em.createQuery(
+    <span class="string">"SELECT e FROM Employee e"</span>, Employee.<span class="keyword">class</span>
+).getResultList();  <span class="comment">// 1 query</span>
+
+<span class="keyword">for</span> (Employee e : employees) {
+    System.out.println(e.getDepartment().getName());  <span class="comment">// N queries!</span>
+}
+<span class="comment">// Total: 1 + N queries (very slow!)</span>
+
+<span class="comment">// SOLUTION 1: JOIN FETCH</span>
+List&lt;Employee&gt; employees = em.createQuery(
+    <span class="string">"SELECT e FROM Employee e JOIN FETCH e.department"</span>,
+    Employee.<span class="keyword">class</span>
+).getResultList();  <span class="comment">// 1 query with JOIN</span>
+
+<span class="comment">// SOLUTION 2: Entity Graph</span>
+<span class="annotation">@Entity</span>
+<span class="annotation">@NamedEntityGraph</span>(
+    name = <span class="string">"Employee.withDepartment"</span>,
+    attributeNodes = <span class="annotation">@NamedAttributeNode</span>(<span class="string">"department"</span>)
+)
+<span class="keyword">public class</span> <span class="class-name">Employee</span> { ... }
+
+<span class="comment">// Usage</span>
+EntityGraph&lt;?&gt; graph = em.getEntityGraph(<span class="string">"Employee.withDepartment"</span>);
+List&lt;Employee&gt; employees = em.createQuery(<span class="string">"SELECT e FROM Employee e"</span>, Employee.<span class="keyword">class</span>)
+    .setHint(<span class="string">"jakarta.persistence.fetchgraph"</span>, graph)
+    .getResultList();
+
+<span class="comment">// SOLUTION 3: Batch fetching (Hibernate-specific)</span>
+<span class="annotation">@BatchSize</span>(size = 25)  <span class="comment">// Fetch 25 departments at a time</span>
+<span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+<span class="keyword">private</span> Department department;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Caching</h2>
+
+            <h3>First Level Cache (Session Cache)</h3>
+            <pre><code><span class="comment">// L1 Cache: Enabled by default, per EntityManager/Session</span>
+
+EntityManager em = emf.createEntityManager();
+
+<span class="comment">// First call - hits database</span>
+Employee emp1 = em.find(Employee.<span class="keyword">class</span>, 1L);  <span class="comment">// SELECT from DB</span>
+
+<span class="comment">// Second call - from L1 cache (no DB hit!)</span>
+Employee emp2 = em.find(Employee.<span class="keyword">class</span>, 1L);  <span class="comment">// From cache</span>
+
+System.out.println(emp1 == emp2);  <span class="comment">// true - same instance!</span>
+
+<span class="comment">// Clear L1 cache</span>
+em.clear();  <span class="comment">// Detaches all entities</span>
+
+<span class="comment">// Now hits DB again</span>
+Employee emp3 = em.find(Employee.<span class="keyword">class</span>, 1L);  <span class="comment">// SELECT from DB</span></code></pre>
+
+            <h3>Second Level Cache (Shared Cache)</h3>
+            <pre><code><span class="comment">// L2 Cache: Shared across EntityManagers, must be configured</span>
+
+<span class="comment">// persistence.xml configuration</span>
+<span class="keyword">&lt;property</span> name="hibernate.cache.use_second_level_cache" value="true"<span class="keyword">/&gt;</span>
+<span class="keyword">&lt;property</span> name="hibernate.cache.region.factory_class"
+          value="org.hibernate.cache.jcache.JCacheRegionFactory"<span class="keyword">/&gt;</span>
+<span class="keyword">&lt;property</span> name="hibernate.javax.cache.provider"
+          value="org.ehcache.jsr107.EhcacheCachingProvider"<span class="keyword">/&gt;</span>
+
+<span class="comment">// Mark entity as cacheable</span>
+<span class="annotation">@Entity</span>
+<span class="annotation">@Cacheable</span>
+<span class="annotation">@org.hibernate.annotations.Cache</span>(usage = CacheConcurrencyStrategy.READ_WRITE)
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+    <span class="comment">// ...</span>
+}
+
+<span class="comment">// Cache strategies:</span>
+<span class="comment">// READ_ONLY - Never changes, safest</span>
+<span class="comment">// NONSTRICT_READ_WRITE - Rarely changes, eventual consistency OK</span>
+<span class="comment">// READ_WRITE - Changes often, needs locking</span>
+<span class="comment">// TRANSACTIONAL - Full transaction isolation</span></code></pre>
+
+            <h3>Query Cache</h3>
+            <pre><code><span class="comment">// Enable query cache</span>
+<span class="keyword">&lt;property</span> name="hibernate.cache.use_query_cache" value="true"<span class="keyword">/&gt;</span>
+
+<span class="comment">// Mark query as cacheable</span>
+List&lt;Employee&gt; employees = em.createQuery(
+    <span class="string">"SELECT e FROM Employee e WHERE e.active = true"</span>,
+    Employee.<span class="keyword">class</span>
+)
+.setHint(<span class="string">"org.hibernate.cacheable"</span>, <span class="keyword">true</span>)
+.getResultList();
+
+<span class="comment">// Named query with caching</span>
+<span class="annotation">@NamedQuery</span>(
+    name = <span class="string">"Employee.findActive"</span>,
+    query = <span class="string">"SELECT e FROM Employee e WHERE e.active = true"</span>,
+    hints = <span class="annotation">@QueryHint</span>(name = <span class="string">"org.hibernate.cacheable"</span>, value = <span class="string">"true"</span>)
+)</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Spring Data JPA</h2>
+            <p>Spring Data JPA dramatically reduces boilerplate by providing repository interfaces that Spring implements for you.</p>
+
+            <pre><code><span class="keyword">import</span> org.springframework.data.jpa.repository.JpaRepository;
+<span class="keyword">import</span> org.springframework.data.jpa.repository.Query;
+<span class="keyword">import</span> org.springframework.data.repository.query.Param;
+
+<span class="keyword">public interface</span> <span class="class-name">EmployeeRepository</span> <span class="keyword">extends</span> JpaRepository&lt;Employee, Long&gt; {
+
+    <span class="comment">// Derived query methods - Spring generates SQL from method name!</span>
+    List&lt;Employee&gt; <span class="function">findByLastName</span>(String lastName);
+
+    List&lt;Employee&gt; <span class="function">findByFirstNameAndLastName</span>(String firstName, String lastName);
+
+    List&lt;Employee&gt; <span class="function">findByDepartmentName</span>(String deptName);
+
+    List&lt;Employee&gt; <span class="function">findBySalaryGreaterThan</span>(BigDecimal salary);
+
+    List&lt;Employee&gt; <span class="function">findByActiveTrue</span>();
+
+    List&lt;Employee&gt; <span class="function">findByEmailContainingIgnoreCase</span>(String email);
+
+    List&lt;Employee&gt; <span class="function">findByHireDateBetween</span>(LocalDate start, LocalDate end);
+
+    <span class="comment">// Top/First queries</span>
+    List&lt;Employee&gt; <span class="function">findTop5BySalaryOrderBySalaryDesc</span>();
+
+    Employee <span class="function">findFirstByOrderByHireDateAsc</span>();
+
+    <span class="comment">// Count and exists</span>
+    <span class="keyword">long</span> <span class="function">countByDepartmentId</span>(Long deptId);
+
+    <span class="keyword">boolean</span> <span class="function">existsByEmail</span>(String email);
+
+    <span class="comment">// Custom JPQL query</span>
+    <span class="annotation">@Query</span>(<span class="string">"SELECT e FROM Employee e WHERE e.salary > :salary AND e.department.id = :deptId"</span>)
+    List&lt;Employee&gt; <span class="function">findHighEarners</span>(<span class="annotation">@Param</span>(<span class="string">"salary"</span>) BigDecimal salary,
+                                   <span class="annotation">@Param</span>(<span class="string">"deptId"</span>) Long departmentId);
+
+    <span class="comment">// Native SQL query</span>
+    <span class="annotation">@Query</span>(value = <span class="string">"SELECT * FROM employees WHERE email LIKE %:domain"</span>, nativeQuery = <span class="keyword">true</span>)
+    List&lt;Employee&gt; <span class="function">findByEmailDomain</span>(<span class="annotation">@Param</span>(<span class="string">"domain"</span>) String domain);
+
+    <span class="comment">// Modifying queries</span>
+    <span class="annotation">@Modifying</span>
+    <span class="annotation">@Query</span>(<span class="string">"UPDATE Employee e SET e.active = false WHERE e.id = :id"</span>)
+    <span class="keyword">int</span> <span class="function">deactivate</span>(<span class="annotation">@Param</span>(<span class="string">"id"</span>) Long id);
+
+    <span class="annotation">@Modifying</span>
+    <span class="annotation">@Query</span>(<span class="string">"DELETE FROM Employee e WHERE e.active = false"</span>)
+    <span class="keyword">int</span> <span class="function">deleteInactive</span>();
+}
+
+<span class="comment">// Usage in service</span>
+<span class="annotation">@Service</span>
+<span class="annotation">@Transactional</span>
+<span class="keyword">public class</span> <span class="class-name">EmployeeService</span> {
+
+    <span class="keyword">private final</span> EmployeeRepository repository;
+
+    <span class="keyword">public</span> <span class="function">EmployeeService</span>(EmployeeRepository repository) {
+        <span class="keyword">this</span>.repository = repository;
+    }
+
+    <span class="keyword">public</span> Employee <span class="function">findById</span>(Long id) {
+        <span class="keyword">return</span> repository.findById(id)
+            .orElseThrow(() -> <span class="keyword">new</span> EntityNotFoundException(<span class="string">"Employee not found"</span>));
+    }
+
+    <span class="keyword">public</span> Employee <span class="function">save</span>(Employee employee) {
+        <span class="keyword">return</span> repository.save(employee);  <span class="comment">// INSERT or UPDATE</span>
+    }
+
+    <span class="keyword">public void</span> <span class="function">delete</span>(Long id) {
+        repository.deleteById(id);
+    }
+
+    <span class="keyword">public</span> Page&lt;Employee&gt; <span class="function">findAll</span>(Pageable pageable) {
+        <span class="keyword">return</span> repository.findAll(pageable);  <span class="comment">// Pagination built-in!</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>Do's</h3>
+                <ul>
+                    <li><strong>Use LAZY fetching</strong> as default, JOIN FETCH when needed</li>
+                    <li><strong>Always use @Transactional</strong> for write operations</li>
+                    <li><strong>Use DTOs</strong> for read-only queries (projections)</li>
+                    <li><strong>Index foreign keys</strong> in the database</li>
+                    <li><strong>Use batch operations</strong> for bulk inserts/updates</li>
+                    <li><strong>Enable SQL logging</strong> in development to catch N+1</li>
+                </ul>
+
+                <h3>Don'ts</h3>
+                <ul>
+                    <li><strong>Don't use EAGER</strong> fetching without good reason</li>
+                    <li><strong>Don't ignore</strong> the generated SQL - review it</li>
+                    <li><strong>Don't use bidirectional</strong> relationships unless necessary</li>
+                    <li><strong>Don't modify detached entities</strong> without merge()</li>
+                    <li><strong>Don't use flush()</strong> unnecessarily</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>JPA:</strong> Specification for ORM in Java</li>
+                    <li><strong>Hibernate:</strong> Most popular JPA implementation</li>
+                    <li><strong>Entity:</strong> Java class mapped to database table</li>
+                    <li><strong>EntityManager:</strong> API for CRUD and queries</li>
+                    <li><strong>JPQL:</strong> Object-oriented query language</li>
+                    <li><strong>Criteria API:</strong> Type-safe programmatic queries</li>
+                    <li><strong>Lazy Loading:</strong> Load data on demand</li>
+                    <li><strong>Caching:</strong> L1 (session), L2 (shared), Query cache</li>
+                    <li><strong>Spring Data JPA:</strong> Repository abstraction, minimal boilerplate</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jdbc.html" class="related-link">JDBC</a>
+                <a href="relationships.html" class="related-link">Entity Relationships</a>
+                <a href="transactions.html" class="related-link">Transactions (ACID)</a>
+                <a href="orms.html" class="related-link">ORMs</a>
+                <a href="../spring/data-jpa.html" class="related-link">Spring Data JPA</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

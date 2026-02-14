@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Optimization - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#best-practices">Best Practices</a> / Performance Optimization
+            </nav>
+            <h1>Performance Optimization</h1>
+            <p class="topic-subtitle">Making Java Applications Fast and Efficient</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Performance Principles</h2>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Premature Optimization</div>
+                <p>"Premature optimization is the root of all evil." - Donald Knuth</p>
+                <p>Always measure first. Optimize only after profiling identifies actual bottlenecks.</p>
+            </div>
+
+            <h3>Optimization Process</h3>
+            <ol>
+                <li>Write correct, clean code first</li>
+                <li>Measure performance with realistic data</li>
+                <li>Identify bottlenecks using profilers</li>
+                <li>Optimize the critical path</li>
+                <li>Measure again to verify improvement</li>
+            </ol>
+        </section>
+
+        <section class="content-section">
+            <h2>String Operations</h2>
+
+            <h3>StringBuilder for Concatenation</h3>
+            <pre><code><span class="comment">// BAD: String concatenation in loop - O(n²)</span>
+<span class="class-name">String</span> result = <span class="string">""</span>;
+<span class="keyword">for</span> (<span class="class-name">String</span> item : items) {
+    result += item + <span class="string">", "</span>;  <span class="comment">// Creates new String each iteration!</span>
+}
+
+<span class="comment">// GOOD: StringBuilder - O(n)</span>
+<span class="class-name">StringBuilder</span> sb = <span class="keyword">new</span> <span class="class-name">StringBuilder</span>();
+<span class="keyword">for</span> (<span class="class-name">String</span> item : items) {
+    sb.append(item).append(<span class="string">", "</span>);
+}
+<span class="class-name">String</span> result = sb.toString();
+
+<span class="comment">// BETTER: String.join() for simple cases</span>
+<span class="class-name">String</span> result = <span class="class-name">String</span>.join(<span class="string">", "</span>, items);
+
+<span class="comment">// BEST: Streams with Collectors.joining()</span>
+<span class="class-name">String</span> result = items.stream()
+    .collect(<span class="class-name">Collectors</span>.joining(<span class="string">", "</span>));
+
+<span class="comment">// Note: Single concatenation is fine - compiler optimizes it</span>
+<span class="class-name">String</span> msg = <span class="string">"Hello, "</span> + name + <span class="string">"!"</span>;  <span class="comment">// OK</span></code></pre>
+
+            <h3>String Interning</h3>
+            <pre><code><span class="comment">// String literals are automatically interned</span>
+<span class="class-name">String</span> s1 = <span class="string">"hello"</span>;
+<span class="class-name">String</span> s2 = <span class="string">"hello"</span>;
+s1 == s2;  <span class="comment">// true - same object in string pool</span>
+
+<span class="comment">// new String() creates new object</span>
+<span class="class-name">String</span> s3 = <span class="keyword">new</span> <span class="class-name">String</span>(<span class="string">"hello"</span>);
+s1 == s3;  <span class="comment">// false - different objects</span>
+
+<span class="comment">// Manual interning (use sparingly)</span>
+<span class="class-name">String</span> s4 = s3.intern();
+s1 == s4;  <span class="comment">// true - s4 points to pool</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Collection Performance</h2>
+
+            <h3>Choosing the Right Collection</h3>
+            <pre><code><span class="comment">// ArrayList vs LinkedList</span>
+<span class="comment">// ArrayList: Fast random access O(1), slow insert/delete O(n)</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; arrayList = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+<span class="comment">// LinkedList: Slow random access O(n), fast insert/delete O(1)</span>
+<span class="comment">// In practice, ArrayList is almost always faster due to CPU cache</span>
+
+<span class="comment">// HashMap vs TreeMap</span>
+<span class="comment">// HashMap: O(1) average for get/put</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">User</span>&gt; hashMap = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
+
+<span class="comment">// TreeMap: O(log n) for get/put, but maintains sorted order</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">User</span>&gt; treeMap = <span class="keyword">new</span> <span class="class-name">TreeMap</span>&lt;&gt;();
+
+<span class="comment">// HashSet vs TreeSet - same tradeoffs</span>
+<span class="class-name">Set</span>&lt;<span class="class-name">String</span>&gt; hashSet = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();   <span class="comment">// O(1)</span>
+<span class="class-name">Set</span>&lt;<span class="class-name">String</span>&gt; treeSet = <span class="keyword">new</span> <span class="class-name">TreeSet</span>&lt;&gt;();   <span class="comment">// O(log n), sorted</span></code></pre>
+
+            <h3>Initial Capacity</h3>
+            <pre><code><span class="comment">// BAD: Default capacity causes resizing</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; list = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();  <span class="comment">// Initial capacity 10</span>
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10000</span>; i++) {
+    list.add(item);  <span class="comment">// Multiple resizes!</span>
+}
+
+<span class="comment">// GOOD: Pre-size when you know the size</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; list = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;(<span class="number">10000</span>);
+
+<span class="comment">// HashMap: Account for load factor (default 0.75)</span>
+<span class="keyword">int</span> expectedSize = <span class="number">1000</span>;
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; map = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;(
+    (<span class="keyword">int</span>) (expectedSize / <span class="number">0.75</span>) + <span class="number">1</span>
+);</code></pre>
+
+            <h3>Avoid Boxed Primitives in Collections</h3>
+            <pre><code><span class="comment">// BAD: Boxing overhead</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; numbers = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="keyword">int</span> sum = <span class="number">0</span>;
+<span class="keyword">for</span> (<span class="class-name">Integer</span> n : numbers) {
+    sum += n;  <span class="comment">// Unboxing on each iteration</span>
+}
+
+<span class="comment">// GOOD: Use primitive arrays when possible</span>
+<span class="keyword">int</span>[] numbers = <span class="keyword">new int</span>[<span class="number">1000</span>];
+<span class="keyword">int</span> sum = <span class="number">0</span>;
+<span class="keyword">for</span> (<span class="keyword">int</span> n : numbers) {
+    sum += n;  <span class="comment">// No boxing</span>
+}
+
+<span class="comment">// ALTERNATIVE: Use specialized collections (Eclipse Collections, etc.)</span>
+<span class="comment">// IntArrayList, LongHashSet, etc.</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Stream Performance</h2>
+
+            <pre><code><span class="comment">// Streams have overhead - avoid for simple operations</span>
+
+<span class="comment">// Simple iteration - loop is faster</span>
+<span class="keyword">for</span> (<span class="class-name">User</span> user : users) {
+    user.setActive(<span class="keyword">true</span>);
+}
+
+<span class="comment">// Complex transformations - streams shine</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt;&gt; ordersByCustomer = orders.stream()
+    .filter(<span class="class-name">Order</span>::isCompleted)
+    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Order</span>::getCustomerId));
+
+<span class="comment">// Parallel streams - only for CPU-intensive operations on large datasets</span>
+<span class="keyword">long</span> sum = numbers.parallelStream()
+    .filter(n -&gt; expensiveCheck(n))
+    .mapToLong(<span class="class-name">Long</span>::valueOf)
+    .sum();
+
+<span class="comment">// DON'T parallelize:</span>
+<span class="comment">// - Small collections (&lt; 10,000 elements)</span>
+<span class="comment">// - I/O-bound operations</span>
+<span class="comment">// - Operations with side effects</span>
+
+<span class="comment">// Avoid repeated stream creation</span>
+<span class="comment">// BAD</span>
+users.stream().filter(u -&gt; u.isActive()).count();
+users.stream().filter(u -&gt; u.isActive()).map(...);  <span class="comment">// Second traversal!</span>
+
+<span class="comment">// GOOD: Collect intermediate results if needed multiple times</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; activeUsers = users.stream()
+    .filter(<span class="class-name">User</span>::isActive)
+    .toList();
+<span class="keyword">long</span> count = activeUsers.size();
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; names = activeUsers.stream().map(<span class="class-name">User</span>::getName).toList();</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Object Creation</h2>
+
+            <pre><code><span class="comment">// Reuse immutable objects</span>
+<span class="comment">// BAD</span>
+<span class="class-name">Boolean</span> flag = <span class="keyword">new</span> <span class="class-name">Boolean</span>(<span class="keyword">true</span>);  <span class="comment">// Deprecated, creates new object</span>
+
+<span class="comment">// GOOD</span>
+<span class="class-name">Boolean</span> flag = <span class="class-name">Boolean</span>.TRUE;  <span class="comment">// Reuses cached instance</span>
+<span class="class-name">Integer</span> num = <span class="class-name">Integer</span>.valueOf(<span class="number">42</span>);  <span class="comment">// Caches -128 to 127</span>
+
+<span class="comment">// Object pooling for expensive objects</span>
+<span class="keyword">private static final</span> <span class="class-name">DateTimeFormatter</span> FORMATTER =
+    <span class="class-name">DateTimeFormatter</span>.ofPattern(<span class="string">"yyyy-MM-dd"</span>);  <span class="comment">// Create once</span>
+
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">format</span>(<span class="class-name">LocalDate</span> date) {
+    <span class="keyword">return</span> date.format(FORMATTER);  <span class="comment">// Reuse</span>
+}
+
+<span class="comment">// Lazy initialization for expensive objects</span>
+<span class="keyword">private volatile</span> <span class="class-name">ExpensiveObject</span> instance;
+
+<span class="keyword">public</span> <span class="class-name">ExpensiveObject</span> <span class="function">getInstance</span>() {
+    <span class="keyword">if</span> (instance == <span class="keyword">null</span>) {
+        <span class="keyword">synchronized</span> (<span class="keyword">this</span>) {
+            <span class="keyword">if</span> (instance == <span class="keyword">null</span>) {
+                instance = <span class="keyword">new</span> <span class="class-name">ExpensiveObject</span>();
+            }
+        }
+    }
+    <span class="keyword">return</span> instance;
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Database Performance</h2>
+
+            <pre><code><span class="comment">// Use connection pooling</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">HikariDataSource</span> <span class="function">dataSource</span>() {
+    <span class="class-name">HikariConfig</span> config = <span class="keyword">new</span> <span class="class-name">HikariConfig</span>();
+    config.setMaximumPoolSize(<span class="number">10</span>);
+    config.setMinimumIdle(<span class="number">5</span>);
+    config.setConnectionTimeout(<span class="number">30000</span>);
+    <span class="keyword">return new</span> <span class="class-name">HikariDataSource</span>(config);
+}
+
+<span class="comment">// Batch operations</span>
+<span class="comment">// BAD: Individual inserts</span>
+<span class="keyword">for</span> (<span class="class-name">User</span> user : users) {
+    userRepository.save(user);  <span class="comment">// N database calls</span>
+}
+
+<span class="comment">// GOOD: Batch insert</span>
+userRepository.saveAll(users);  <span class="comment">// Single batched call</span>
+
+<span class="comment">// Fetch only what you need</span>
+<span class="comment">// BAD: Fetch entire entity</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = userRepository.findAll();
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; emails = users.stream()
+    .map(<span class="class-name">User</span>::getEmail)
+    .toList();
+
+<span class="comment">// GOOD: Projection</span>
+<span class="annotation">@Query</span>(<span class="string">"SELECT u.email FROM User u"</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; <span class="function">findAllEmails</span>();
+
+<span class="comment">// Pagination for large datasets</span>
+<span class="class-name">Page</span>&lt;<span class="class-name">User</span>&gt; page = userRepository.findAll(<span class="class-name">PageRequest</span>.of(<span class="number">0</span>, <span class="number">20</span>));</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Caching</h2>
+
+            <pre><code><span class="comment">// Spring Cache abstraction</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">ProductService</span> {
+
+    <span class="annotation">@Cacheable</span>(<span class="string">"products"</span>)
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">findById</span>(<span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> productRepository.findById(id).orElseThrow();
+    }
+
+    <span class="annotation">@CacheEvict</span>(value = <span class="string">"products"</span>, key = <span class="string">"#product.id"</span>)
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">update</span>(<span class="class-name">Product</span> product) {
+        <span class="keyword">return</span> productRepository.save(product);
+    }
+
+    <span class="annotation">@CacheEvict</span>(value = <span class="string">"products"</span>, allEntries = <span class="keyword">true</span>)
+    <span class="keyword">public void</span> <span class="function">clearCache</span>() { }
+}
+
+<span class="comment">// In-memory memoization</span>
+<span class="keyword">private final</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Result</span>&gt; cache = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
+
+<span class="keyword">public</span> <span class="class-name">Result</span> <span class="function">compute</span>(<span class="class-name">String</span> key) {
+    <span class="keyword">return</span> cache.computeIfAbsent(key, <span class="keyword">this</span>::expensiveComputation);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Profiling Tools</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Essential Profiling Tools</div>
+                <ul>
+                    <li><strong>JProfiler / YourKit</strong> - Commercial profilers</li>
+                    <li><strong>VisualVM</strong> - Free, bundled with JDK</li>
+                    <li><strong>async-profiler</strong> - Low-overhead sampling profiler</li>
+                    <li><strong>JMH</strong> - Microbenchmarking harness</li>
+                    <li><strong>JFR (Java Flight Recorder)</strong> - Production profiling</li>
+                </ul>
+            </div>
+
+            <h3>JMH Benchmark Example</h3>
+            <pre><code><span class="annotation">@BenchmarkMode</span>(<span class="class-name">Mode</span>.AverageTime)
+<span class="annotation">@OutputTimeUnit</span>(<span class="class-name">TimeUnit</span>.NANOSECONDS)
+<span class="annotation">@State</span>(<span class="class-name">Scope</span>.Thread)
+<span class="keyword">public class</span> <span class="class-name">StringConcatBenchmark</span> {
+
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; items;
+
+    <span class="annotation">@Setup</span>
+    <span class="keyword">public void</span> <span class="function">setup</span>() {
+        items = <span class="class-name">IntStream</span>.range(<span class="number">0</span>, <span class="number">100</span>)
+            .mapToObj(<span class="class-name">String</span>::valueOf)
+            .toList();
+    }
+
+    <span class="annotation">@Benchmark</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">stringConcat</span>() {
+        <span class="class-name">String</span> result = <span class="string">""</span>;
+        <span class="keyword">for</span> (<span class="class-name">String</span> item : items) {
+            result += item;
+        }
+        <span class="keyword">return</span> result;
+    }
+
+    <span class="annotation">@Benchmark</span>
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">stringBuilder</span>() {
+        <span class="class-name">StringBuilder</span> sb = <span class="keyword">new</span> <span class="class-name">StringBuilder</span>();
+        <span class="keyword">for</span> (<span class="class-name">String</span> item : items) {
+            sb.append(item);
+        }
+        <span class="keyword">return</span> sb.toString();
+    }
+}</code></pre>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="../advanced/jvm-internals.html" class="related-link">JVM Internals</a>
+                <a href="../advanced/garbage-collection.html" class="related-link">Garbage Collection</a>
+                <a href="../fundamentals/collections.html" class="related-link">Collections Framework</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

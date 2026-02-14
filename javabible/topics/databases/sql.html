@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Basics - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#databases">Databases & Persistence</a> / SQL Basics
+            </nav>
+            <h1>SQL Basics</h1>
+            <p class="topic-subtitle">The language that powers every relational database</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is SQL?</h2>
+            <p><strong>SQL (Structured Query Language)</strong> is the standard language for interacting with relational databases. Whether you're using MySQL, PostgreSQL, Oracle, SQL Server, or H2, you'll use SQL to create, read, update, and delete data. As a Java developer, SQL is a fundamental skill you'll use throughout your career.</p>
+
+            <div class="info-box">
+                <p><strong>SQL is NOT a programming language</strong> - it's a <em>declarative query language</em>. You describe WHAT you want, not HOW to get it. The database engine figures out the optimal way to execute your query.</p>
+            </div>
+
+            <h3>Why Java Developers Need SQL</h3>
+            <ul>
+                <li><strong>Direct Database Access:</strong> JDBC requires raw SQL queries</li>
+                <li><strong>JPA/Hibernate Understanding:</strong> ORMs generate SQL - you need to understand it for debugging and optimization</li>
+                <li><strong>Performance Tuning:</strong> Slow applications often have slow queries</li>
+                <li><strong>Data Migration:</strong> Scripts for schema changes and data fixes</li>
+                <li><strong>Reporting:</strong> Complex queries for analytics and business reports</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Database Fundamentals</h2>
+
+            <h3>Relational Database Concepts</h3>
+            <pre><code><span class="comment">// Key concepts in relational databases:</span>
+
+<span class="comment">// TABLE (Relation) - Stores data in rows and columns</span>
+┌─────────────────────────────────────────────────────┐
+│                    employees                         │
+├────────┬──────────┬────────────┬───────────┬───────┤
+│   id   │   name   │   email    │  dept_id  │ salary│
+├────────┼──────────┼────────────┼───────────┼───────┤
+│   1    │  Alice   │ alice@...  │     1     │ 75000 │
+│   2    │   Bob    │  bob@...   │     1     │ 80000 │
+│   3    │ Charlie  │ charlie@...│     2     │ 65000 │
+└────────┴──────────┴────────────┴───────────┴───────┘
+
+<span class="comment">// ROW (Tuple/Record) - Single entry, represents one entity</span>
+<span class="comment">// COLUMN (Attribute/Field) - Single property of all entries</span>
+
+<span class="comment">// PRIMARY KEY - Unique identifier for each row</span>
+<span class="comment">// FOREIGN KEY - Reference to primary key in another table</span>
+<span class="comment">// INDEX - Data structure for faster lookups</span>
+
+<span class="comment">// SCHEMA - Collection of database objects (tables, views, etc.)</span>
+<span class="comment">// DATABASE - Container for schemas and data</span></code></pre>
+
+            <h3>SQL Categories</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Full Name</th>
+                        <th>Commands</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>DDL</strong></td>
+                        <td>Data Definition Language</td>
+                        <td>CREATE, ALTER, DROP, TRUNCATE</td>
+                        <td>Define/modify structure</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DML</strong></td>
+                        <td>Data Manipulation Language</td>
+                        <td>SELECT, INSERT, UPDATE, DELETE</td>
+                        <td>Work with data</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DCL</strong></td>
+                        <td>Data Control Language</td>
+                        <td>GRANT, REVOKE</td>
+                        <td>Permissions</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TCL</strong></td>
+                        <td>Transaction Control Language</td>
+                        <td>COMMIT, ROLLBACK, SAVEPOINT</td>
+                        <td>Transaction management</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>DDL: Creating Database Structure</h2>
+
+            <h3>Creating Tables</h3>
+            <pre><code><span class="comment">-- Create a simple table</span>
+<span class="keyword">CREATE TABLE</span> departments (
+    id <span class="class-name">BIGINT</span> <span class="keyword">PRIMARY KEY</span> <span class="keyword">AUTO_INCREMENT</span>,
+    name <span class="class-name">VARCHAR</span>(100) <span class="keyword">NOT NULL</span>,
+    location <span class="class-name">VARCHAR</span>(200),
+    created_at <span class="class-name">TIMESTAMP</span> <span class="keyword">DEFAULT</span> <span class="function">CURRENT_TIMESTAMP</span>
+);
+
+<span class="comment">-- Create table with foreign key</span>
+<span class="keyword">CREATE TABLE</span> employees (
+    id <span class="class-name">BIGINT</span> <span class="keyword">PRIMARY KEY</span> <span class="keyword">AUTO_INCREMENT</span>,
+    first_name <span class="class-name">VARCHAR</span>(50) <span class="keyword">NOT NULL</span>,
+    last_name <span class="class-name">VARCHAR</span>(50) <span class="keyword">NOT NULL</span>,
+    email <span class="class-name">VARCHAR</span>(100) <span class="keyword">UNIQUE NOT NULL</span>,
+    salary <span class="class-name">DECIMAL</span>(10,2) <span class="keyword">CHECK</span> (salary > 0),
+    hire_date <span class="class-name">DATE</span> <span class="keyword">NOT NULL</span>,
+    department_id <span class="class-name">BIGINT</span>,
+    manager_id <span class="class-name">BIGINT</span>,
+    active <span class="class-name">BOOLEAN</span> <span class="keyword">DEFAULT</span> <span class="keyword">TRUE</span>,
+
+    <span class="comment">-- Foreign key constraints</span>
+    <span class="keyword">CONSTRAINT</span> fk_department
+        <span class="keyword">FOREIGN KEY</span> (department_id)
+        <span class="keyword">REFERENCES</span> departments(id)
+        <span class="keyword">ON DELETE SET NULL</span>
+        <span class="keyword">ON UPDATE CASCADE</span>,
+
+    <span class="keyword">CONSTRAINT</span> fk_manager
+        <span class="keyword">FOREIGN KEY</span> (manager_id)
+        <span class="keyword">REFERENCES</span> employees(id)
+);
+
+<span class="comment">-- Create index for faster lookups</span>
+<span class="keyword">CREATE INDEX</span> idx_emp_email <span class="keyword">ON</span> employees(email);
+<span class="keyword">CREATE INDEX</span> idx_emp_dept <span class="keyword">ON</span> employees(department_id);
+
+<span class="comment">-- Composite index for common query patterns</span>
+<span class="keyword">CREATE INDEX</span> idx_emp_name <span class="keyword">ON</span> employees(last_name, first_name);</code></pre>
+
+            <h3>Common Data Types</h3>
+            <pre><code><span class="comment">-- Numeric Types</span>
+<span class="class-name">INTEGER</span> / <span class="class-name">INT</span>       <span class="comment">-- 4 bytes, -2B to +2B</span>
+<span class="class-name">BIGINT</span>              <span class="comment">-- 8 bytes, very large numbers</span>
+<span class="class-name">SMALLINT</span>            <span class="comment">-- 2 bytes, -32K to +32K</span>
+<span class="class-name">DECIMAL</span>(10,2)       <span class="comment">-- Exact numeric, 10 digits, 2 decimal places</span>
+<span class="class-name">FLOAT</span> / <span class="class-name">DOUBLE</span>      <span class="comment">-- Approximate numeric (avoid for money!)</span>
+
+<span class="comment">-- String Types</span>
+<span class="class-name">CHAR</span>(10)            <span class="comment">-- Fixed length, padded with spaces</span>
+<span class="class-name">VARCHAR</span>(255)        <span class="comment">-- Variable length, up to 255 chars</span>
+<span class="class-name">TEXT</span>                <span class="comment">-- Large text (CLOB in some databases)</span>
+
+<span class="comment">-- Date/Time Types</span>
+<span class="class-name">DATE</span>                <span class="comment">-- Date only: '2024-01-15'</span>
+<span class="class-name">TIME</span>                <span class="comment">-- Time only: '14:30:00'</span>
+<span class="class-name">TIMESTAMP</span>           <span class="comment">-- Date + Time: '2024-01-15 14:30:00'</span>
+<span class="class-name">DATETIME</span>            <span class="comment">-- Similar to TIMESTAMP (MySQL specific)</span>
+
+<span class="comment">-- Other Types</span>
+<span class="class-name">BOOLEAN</span>             <span class="comment">-- TRUE/FALSE (or 1/0 in some databases)</span>
+<span class="class-name">BLOB</span>                <span class="comment">-- Binary Large Object (files, images)</span>
+<span class="class-name">JSON</span>                <span class="comment">-- JSON data (PostgreSQL, MySQL 5.7+)</span>
+<span class="class-name">UUID</span>                <span class="comment">-- Universally Unique Identifier</span></code></pre>
+
+            <h3>Modifying Tables</h3>
+            <pre><code><span class="comment">-- Add a column</span>
+<span class="keyword">ALTER TABLE</span> employees
+<span class="keyword">ADD COLUMN</span> phone <span class="class-name">VARCHAR</span>(20);
+
+<span class="comment">-- Modify column type</span>
+<span class="keyword">ALTER TABLE</span> employees
+<span class="keyword">MODIFY COLUMN</span> phone <span class="class-name">VARCHAR</span>(30);
+
+<span class="comment">-- Add constraint</span>
+<span class="keyword">ALTER TABLE</span> employees
+<span class="keyword">ADD CONSTRAINT</span> uk_phone <span class="keyword">UNIQUE</span>(phone);
+
+<span class="comment">-- Drop column</span>
+<span class="keyword">ALTER TABLE</span> employees
+<span class="keyword">DROP COLUMN</span> phone;
+
+<span class="comment">-- Rename table</span>
+<span class="keyword">ALTER TABLE</span> employees <span class="keyword">RENAME TO</span> staff;
+
+<span class="comment">-- Drop table (CAREFUL!)</span>
+<span class="keyword">DROP TABLE IF EXISTS</span> temp_data;
+
+<span class="comment">-- Truncate (delete all data, keep structure)</span>
+<span class="keyword">TRUNCATE TABLE</span> logs;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>DML: CRUD Operations</h2>
+
+            <h3>INSERT - Creating Data</h3>
+            <pre><code><span class="comment">-- Insert single row</span>
+<span class="keyword">INSERT INTO</span> departments (name, location)
+<span class="keyword">VALUES</span> (<span class="string">'Engineering'</span>, <span class="string">'Building A'</span>);
+
+<span class="comment">-- Insert multiple rows</span>
+<span class="keyword">INSERT INTO</span> departments (name, location) <span class="keyword">VALUES</span>
+    (<span class="string">'Sales'</span>, <span class="string">'Building B'</span>),
+    (<span class="string">'HR'</span>, <span class="string">'Building A'</span>),
+    (<span class="string">'Marketing'</span>, <span class="string">'Building C'</span>);
+
+<span class="comment">-- Insert with all columns (not recommended - fragile)</span>
+<span class="keyword">INSERT INTO</span> employees
+<span class="keyword">VALUES</span> (1, <span class="string">'John'</span>, <span class="string">'Doe'</span>, <span class="string">'john@example.com'</span>, 75000, <span class="string">'2024-01-15'</span>, 1, NULL, TRUE);
+
+<span class="comment">-- Insert from SELECT</span>
+<span class="keyword">INSERT INTO</span> employee_archive (id, name, email)
+<span class="keyword">SELECT</span> id, <span class="function">CONCAT</span>(first_name, <span class="string">' '</span>, last_name), email
+<span class="keyword">FROM</span> employees
+<span class="keyword">WHERE</span> active = FALSE;
+
+<span class="comment">-- Insert with ON DUPLICATE KEY (MySQL)</span>
+<span class="keyword">INSERT INTO</span> employees (id, first_name, last_name, email, salary, hire_date)
+<span class="keyword">VALUES</span> (1, <span class="string">'John'</span>, <span class="string">'Doe'</span>, <span class="string">'john@example.com'</span>, 80000, <span class="string">'2024-01-15'</span>)
+<span class="keyword">ON DUPLICATE KEY UPDATE</span> salary = <span class="keyword">VALUES</span>(salary);
+
+<span class="comment">-- Upsert with ON CONFLICT (PostgreSQL)</span>
+<span class="keyword">INSERT INTO</span> employees (id, first_name, last_name, email, salary, hire_date)
+<span class="keyword">VALUES</span> (1, <span class="string">'John'</span>, <span class="string">'Doe'</span>, <span class="string">'john@example.com'</span>, 80000, <span class="string">'2024-01-15'</span>)
+<span class="keyword">ON CONFLICT</span> (id) <span class="keyword">DO UPDATE SET</span> salary = EXCLUDED.salary;</code></pre>
+
+            <h3>SELECT - Reading Data (The Most Important!)</h3>
+            <pre><code><span class="comment">-- Basic SELECT</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees;
+
+<span class="comment">-- Select specific columns</span>
+<span class="keyword">SELECT</span> first_name, last_name, email <span class="keyword">FROM</span> employees;
+
+<span class="comment">-- Column aliases</span>
+<span class="keyword">SELECT</span>
+    first_name <span class="keyword">AS</span> <span class="string">"First Name"</span>,
+    last_name <span class="keyword">AS</span> <span class="string">"Last Name"</span>,
+    salary * 12 <span class="keyword">AS</span> annual_salary
+<span class="keyword">FROM</span> employees;
+
+<span class="comment">-- WHERE clause - filtering</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">WHERE</span> department_id = 1
+  <span class="keyword">AND</span> salary > 50000
+  <span class="keyword">AND</span> active = TRUE;
+
+<span class="comment">-- Comparison operators</span>
+<span class="keyword">WHERE</span> salary = 50000      <span class="comment">-- Equal</span>
+<span class="keyword">WHERE</span> salary != 50000     <span class="comment">-- Not equal (or <>)</span>
+<span class="keyword">WHERE</span> salary > 50000      <span class="comment">-- Greater than</span>
+<span class="keyword">WHERE</span> salary >= 50000     <span class="comment">-- Greater or equal</span>
+<span class="keyword">WHERE</span> salary < 50000      <span class="comment">-- Less than</span>
+<span class="keyword">WHERE</span> salary <= 50000     <span class="comment">-- Less or equal</span>
+
+<span class="comment">-- BETWEEN (inclusive)</span>
+<span class="keyword">WHERE</span> salary <span class="keyword">BETWEEN</span> 50000 <span class="keyword">AND</span> 80000
+
+<span class="comment">-- IN - match any in list</span>
+<span class="keyword">WHERE</span> department_id <span class="keyword">IN</span> (1, 2, 3)
+
+<span class="comment">-- LIKE - pattern matching</span>
+<span class="keyword">WHERE</span> last_name <span class="keyword">LIKE</span> <span class="string">'S%'</span>      <span class="comment">-- Starts with 'S'</span>
+<span class="keyword">WHERE</span> last_name <span class="keyword">LIKE</span> <span class="string">'%son'</span>    <span class="comment">-- Ends with 'son'</span>
+<span class="keyword">WHERE</span> last_name <span class="keyword">LIKE</span> <span class="string">'%mi%'</span>    <span class="comment">-- Contains 'mi'</span>
+<span class="keyword">WHERE</span> last_name <span class="keyword">LIKE</span> <span class="string">'_ohn'</span>    <span class="comment">-- 4 chars, ends with 'ohn'</span>
+
+<span class="comment">-- IS NULL / IS NOT NULL</span>
+<span class="keyword">WHERE</span> manager_id <span class="keyword">IS NULL</span>
+<span class="keyword">WHERE</span> manager_id <span class="keyword">IS NOT NULL</span>
+
+<span class="comment">-- Logical operators</span>
+<span class="keyword">WHERE</span> (department_id = 1 <span class="keyword">OR</span> department_id = 2)
+  <span class="keyword">AND</span> salary > 50000
+  <span class="keyword">AND</span> <span class="keyword">NOT</span> (first_name = <span class="string">'John'</span>)</code></pre>
+
+            <h3>Sorting and Limiting</h3>
+            <pre><code><span class="comment">-- ORDER BY - sorting results</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">ORDER BY</span> last_name <span class="keyword">ASC</span>;  <span class="comment">-- Ascending (default)</span>
+
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>;  <span class="comment">-- Descending</span>
+
+<span class="comment">-- Multiple sort columns</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">ORDER BY</span> department_id <span class="keyword">ASC</span>, salary <span class="keyword">DESC</span>;
+
+<span class="comment">-- LIMIT - restrict number of rows (MySQL/PostgreSQL)</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>
+<span class="keyword">LIMIT</span> 10;
+
+<span class="comment">-- LIMIT with OFFSET - pagination</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">ORDER BY</span> id
+<span class="keyword">LIMIT</span> 10 <span class="keyword">OFFSET</span> 20;  <span class="comment">-- Skip first 20, get next 10</span>
+
+<span class="comment">-- TOP (SQL Server)</span>
+<span class="keyword">SELECT TOP</span> 10 * <span class="keyword">FROM</span> employees
+<span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>;
+
+<span class="comment">-- FETCH (Standard SQL / Oracle)</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>
+<span class="keyword">FETCH FIRST</span> 10 <span class="keyword">ROWS ONLY</span>;</code></pre>
+
+            <h3>UPDATE - Modifying Data</h3>
+            <pre><code><span class="comment">-- Update single row</span>
+<span class="keyword">UPDATE</span> employees
+<span class="keyword">SET</span> salary = 85000
+<span class="keyword">WHERE</span> id = 1;
+
+<span class="comment">-- Update multiple columns</span>
+<span class="keyword">UPDATE</span> employees
+<span class="keyword">SET</span>
+    salary = 85000,
+    department_id = 2,
+    manager_id = 5
+<span class="keyword">WHERE</span> id = 1;
+
+<span class="comment">-- Update with calculation</span>
+<span class="keyword">UPDATE</span> employees
+<span class="keyword">SET</span> salary = salary * 1.10  <span class="comment">-- 10% raise</span>
+<span class="keyword">WHERE</span> department_id = 1;
+
+<span class="comment">-- Update all rows (CAREFUL!)</span>
+<span class="keyword">UPDATE</span> employees
+<span class="keyword">SET</span> active = FALSE;  <span class="comment">-- No WHERE = updates ALL rows!</span>
+
+<span class="comment">-- Update with subquery</span>
+<span class="keyword">UPDATE</span> employees
+<span class="keyword">SET</span> salary = (
+    <span class="keyword">SELECT</span> <span class="function">AVG</span>(salary) <span class="keyword">FROM</span> employees <span class="keyword">WHERE</span> department_id = 1
+)
+<span class="keyword">WHERE</span> id = 1;
+
+<span class="comment">-- Update with JOIN (MySQL)</span>
+<span class="keyword">UPDATE</span> employees e
+<span class="keyword">JOIN</span> departments d <span class="keyword">ON</span> e.department_id = d.id
+<span class="keyword">SET</span> e.salary = e.salary * 1.05
+<span class="keyword">WHERE</span> d.name = <span class="string">'Engineering'</span>;</code></pre>
+
+            <h3>DELETE - Removing Data</h3>
+            <pre><code><span class="comment">-- Delete single row</span>
+<span class="keyword">DELETE FROM</span> employees
+<span class="keyword">WHERE</span> id = 1;
+
+<span class="comment">-- Delete multiple rows</span>
+<span class="keyword">DELETE FROM</span> employees
+<span class="keyword">WHERE</span> active = FALSE
+  <span class="keyword">AND</span> hire_date < <span class="string">'2020-01-01'</span>;
+
+<span class="comment">-- Delete all rows (CAREFUL!)</span>
+<span class="keyword">DELETE FROM</span> employees;  <span class="comment">-- Deletes everything!</span>
+
+<span class="comment">-- TRUNCATE is faster for deleting all rows</span>
+<span class="keyword">TRUNCATE TABLE</span> employees;  <span class="comment">-- Cannot be rolled back in most DBs!</span>
+
+<span class="comment">-- Delete with subquery</span>
+<span class="keyword">DELETE FROM</span> employees
+<span class="keyword">WHERE</span> department_id <span class="keyword">IN</span> (
+    <span class="keyword">SELECT</span> id <span class="keyword">FROM</span> departments <span class="keyword">WHERE</span> location = <span class="string">'Building X'</span>
+);
+
+<span class="comment">-- Soft delete pattern (recommended)</span>
+<span class="keyword">UPDATE</span> employees
+<span class="keyword">SET</span> active = FALSE, deleted_at = <span class="function">NOW</span>()
+<span class="keyword">WHERE</span> id = 1;</code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Always Use WHERE!</div>
+                <p>UPDATE and DELETE without WHERE affect ALL rows. In production, always:</p>
+                <ul>
+                    <li>Start a transaction before UPDATE/DELETE</li>
+                    <li>Run a SELECT first with the same WHERE clause</li>
+                    <li>Verify the affected row count</li>
+                    <li>COMMIT only if correct, ROLLBACK if wrong</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>JOINs: Combining Tables</h2>
+            <p>JOINs are one of the most powerful SQL features. They let you combine data from multiple tables in a single query.</p>
+
+            <h3>Types of JOINs Visualized</h3>
+            <pre><code><span class="comment">-- Sample data for examples:</span>
+
+<span class="comment">-- employees table</span>
+┌────┬───────┬─────────────┐
+│ id │ name  │ dept_id     │
+├────┼───────┼─────────────┤
+│ 1  │ Alice │ 1           │
+│ 2  │ Bob   │ 1           │
+│ 3  │ Carol │ 2           │
+│ 4  │ Dave  │ NULL        │  <span class="comment">-- No department assigned</span>
+└────┴───────┴─────────────┘
+
+<span class="comment">-- departments table</span>
+┌────┬─────────────┐
+│ id │ name        │
+├────┼─────────────┤
+│ 1  │ Engineering │
+│ 2  │ Sales       │
+│ 3  │ Marketing   │  <span class="comment">-- No employees</span>
+└────┴─────────────┘</code></pre>
+
+            <h3>INNER JOIN</h3>
+            <pre><code><span class="comment">-- INNER JOIN: Only matching rows from both tables</span>
+<span class="keyword">SELECT</span> e.name, d.name <span class="keyword">AS</span> department
+<span class="keyword">FROM</span> employees e
+<span class="keyword">INNER JOIN</span> departments d <span class="keyword">ON</span> e.dept_id = d.id;
+
+<span class="comment">-- Result: (Dave excluded - no match, Marketing excluded - no match)</span>
+┌───────┬─────────────┐
+│ name  │ department  │
+├───────┼─────────────┤
+│ Alice │ Engineering │
+│ Bob   │ Engineering │
+│ Carol │ Sales       │
+└───────┴─────────────┘
+
+<span class="comment">-- Visual representation:</span>
+     employees  ∩  departments
+        ┌───────────┐
+        │  INNER    │
+        │   JOIN    │
+        └───────────┘</code></pre>
+
+            <h3>LEFT JOIN (LEFT OUTER JOIN)</h3>
+            <pre><code><span class="comment">-- LEFT JOIN: All from left table + matching from right</span>
+<span class="keyword">SELECT</span> e.name, d.name <span class="keyword">AS</span> department
+<span class="keyword">FROM</span> employees e
+<span class="keyword">LEFT JOIN</span> departments d <span class="keyword">ON</span> e.dept_id = d.id;
+
+<span class="comment">-- Result: (All employees, NULL for Dave's department)</span>
+┌───────┬─────────────┐
+│ name  │ department  │
+├───────┼─────────────┤
+│ Alice │ Engineering │
+│ Bob   │ Engineering │
+│ Carol │ Sales       │
+│ Dave  │ NULL        │  <span class="comment">-- No matching department</span>
+└───────┴─────────────┘
+
+<span class="comment">-- Find employees without departments:</span>
+<span class="keyword">SELECT</span> e.name
+<span class="keyword">FROM</span> employees e
+<span class="keyword">LEFT JOIN</span> departments d <span class="keyword">ON</span> e.dept_id = d.id
+<span class="keyword">WHERE</span> d.id <span class="keyword">IS NULL</span>;</code></pre>
+
+            <h3>RIGHT JOIN (RIGHT OUTER JOIN)</h3>
+            <pre><code><span class="comment">-- RIGHT JOIN: All from right table + matching from left</span>
+<span class="keyword">SELECT</span> e.name, d.name <span class="keyword">AS</span> department
+<span class="keyword">FROM</span> employees e
+<span class="keyword">RIGHT JOIN</span> departments d <span class="keyword">ON</span> e.dept_id = d.id;
+
+<span class="comment">-- Result: (All departments, NULL for Marketing's employees)</span>
+┌───────┬─────────────┐
+│ name  │ department  │
+├───────┼─────────────┤
+│ Alice │ Engineering │
+│ Bob   │ Engineering │
+│ Carol │ Sales       │
+│ NULL  │ Marketing   │  <span class="comment">-- No employees in this dept</span>
+└───────┴─────────────┘
+
+<span class="comment">-- Find departments with no employees:</span>
+<span class="keyword">SELECT</span> d.name
+<span class="keyword">FROM</span> employees e
+<span class="keyword">RIGHT JOIN</span> departments d <span class="keyword">ON</span> e.dept_id = d.id
+<span class="keyword">WHERE</span> e.id <span class="keyword">IS NULL</span>;</code></pre>
+
+            <h3>FULL OUTER JOIN</h3>
+            <pre><code><span class="comment">-- FULL OUTER JOIN: All rows from both tables</span>
+<span class="keyword">SELECT</span> e.name, d.name <span class="keyword">AS</span> department
+<span class="keyword">FROM</span> employees e
+<span class="keyword">FULL OUTER JOIN</span> departments d <span class="keyword">ON</span> e.dept_id = d.id;
+
+<span class="comment">-- Result:</span>
+┌───────┬─────────────┐
+│ name  │ department  │
+├───────┼─────────────┤
+│ Alice │ Engineering │
+│ Bob   │ Engineering │
+│ Carol │ Sales       │
+│ Dave  │ NULL        │  <span class="comment">-- No department</span>
+│ NULL  │ Marketing   │  <span class="comment">-- No employees</span>
+└───────┴─────────────┘
+
+<span class="comment">-- MySQL doesn't support FULL OUTER JOIN directly, use UNION:</span>
+<span class="keyword">SELECT</span> e.name, d.name <span class="keyword">AS</span> department
+<span class="keyword">FROM</span> employees e <span class="keyword">LEFT JOIN</span> departments d <span class="keyword">ON</span> e.dept_id = d.id
+<span class="keyword">UNION</span>
+<span class="keyword">SELECT</span> e.name, d.name <span class="keyword">AS</span> department
+<span class="keyword">FROM</span> employees e <span class="keyword">RIGHT JOIN</span> departments d <span class="keyword">ON</span> e.dept_id = d.id;</code></pre>
+
+            <h3>Self JOIN</h3>
+            <pre><code><span class="comment">-- Self JOIN: Join table with itself</span>
+<span class="comment">-- Example: Find employees and their managers</span>
+
+<span class="keyword">SELECT</span>
+    e.first_name <span class="keyword">AS</span> employee,
+    m.first_name <span class="keyword">AS</span> manager
+<span class="keyword">FROM</span> employees e
+<span class="keyword">LEFT JOIN</span> employees m <span class="keyword">ON</span> e.manager_id = m.id;
+
+<span class="comment">-- Result:</span>
+┌──────────┬─────────┐
+│ employee │ manager │
+├──────────┼─────────┤
+│ Alice    │ NULL    │  <span class="comment">-- No manager (CEO?)</span>
+│ Bob      │ Alice   │
+│ Carol    │ Alice   │
+│ Dave     │ Bob     │
+└──────────┴─────────┘</code></pre>
+
+            <h3>Multiple JOINs</h3>
+            <pre><code><span class="comment">-- Joining multiple tables</span>
+<span class="keyword">SELECT</span>
+    e.first_name,
+    e.last_name,
+    d.name <span class="keyword">AS</span> department,
+    m.first_name <span class="keyword">AS</span> manager_name,
+    p.title <span class="keyword">AS</span> project
+<span class="keyword">FROM</span> employees e
+<span class="keyword">LEFT JOIN</span> departments d <span class="keyword">ON</span> e.department_id = d.id
+<span class="keyword">LEFT JOIN</span> employees m <span class="keyword">ON</span> e.manager_id = m.id
+<span class="keyword">LEFT JOIN</span> employee_projects ep <span class="keyword">ON</span> e.id = ep.employee_id
+<span class="keyword">LEFT JOIN</span> projects p <span class="keyword">ON</span> ep.project_id = p.id
+<span class="keyword">WHERE</span> e.active = TRUE
+<span class="keyword">ORDER BY</span> d.name, e.last_name;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Aggregate Functions and GROUP BY</h2>
+
+            <h3>Common Aggregate Functions</h3>
+            <pre><code><span class="comment">-- COUNT - number of rows</span>
+<span class="keyword">SELECT</span> <span class="function">COUNT</span>(*) <span class="keyword">FROM</span> employees;                    <span class="comment">-- All rows</span>
+<span class="keyword">SELECT</span> <span class="function">COUNT</span>(manager_id) <span class="keyword">FROM</span> employees;           <span class="comment">-- Non-NULL values</span>
+<span class="keyword">SELECT</span> <span class="function">COUNT</span>(<span class="keyword">DISTINCT</span> department_id) <span class="keyword">FROM</span> employees;  <span class="comment">-- Unique values</span>
+
+<span class="comment">-- SUM - total of numeric column</span>
+<span class="keyword">SELECT</span> <span class="function">SUM</span>(salary) <span class="keyword">FROM</span> employees;
+
+<span class="comment">-- AVG - average</span>
+<span class="keyword">SELECT</span> <span class="function">AVG</span>(salary) <span class="keyword">FROM</span> employees;
+
+<span class="comment">-- MIN / MAX</span>
+<span class="keyword">SELECT</span> <span class="function">MIN</span>(salary), <span class="function">MAX</span>(salary) <span class="keyword">FROM</span> employees;
+
+<span class="comment">-- String aggregates</span>
+<span class="keyword">SELECT</span> <span class="function">GROUP_CONCAT</span>(first_name) <span class="keyword">FROM</span> employees;  <span class="comment">-- MySQL</span>
+<span class="keyword">SELECT</span> <span class="function">STRING_AGG</span>(first_name, <span class="string">', '</span>) <span class="keyword">FROM</span> employees;  <span class="comment">-- PostgreSQL</span></code></pre>
+
+            <h3>GROUP BY</h3>
+            <pre><code><span class="comment">-- Group employees by department</span>
+<span class="keyword">SELECT</span>
+    department_id,
+    <span class="function">COUNT</span>(*) <span class="keyword">AS</span> employee_count,
+    <span class="function">AVG</span>(salary) <span class="keyword">AS</span> avg_salary,
+    <span class="function">SUM</span>(salary) <span class="keyword">AS</span> total_payroll
+<span class="keyword">FROM</span> employees
+<span class="keyword">GROUP BY</span> department_id;
+
+<span class="comment">-- Group by multiple columns</span>
+<span class="keyword">SELECT</span>
+    department_id,
+    <span class="function">YEAR</span>(hire_date) <span class="keyword">AS</span> hire_year,
+    <span class="function">COUNT</span>(*) <span class="keyword">AS</span> hires
+<span class="keyword">FROM</span> employees
+<span class="keyword">GROUP BY</span> department_id, <span class="function">YEAR</span>(hire_date)
+<span class="keyword">ORDER BY</span> department_id, hire_year;
+
+<span class="comment">-- With JOIN</span>
+<span class="keyword">SELECT</span>
+    d.name <span class="keyword">AS</span> department,
+    <span class="function">COUNT</span>(e.id) <span class="keyword">AS</span> employee_count,
+    <span class="function">ROUND</span>(<span class="function">AVG</span>(e.salary), 2) <span class="keyword">AS</span> avg_salary
+<span class="keyword">FROM</span> departments d
+<span class="keyword">LEFT JOIN</span> employees e <span class="keyword">ON</span> d.id = e.department_id
+<span class="keyword">GROUP BY</span> d.id, d.name
+<span class="keyword">ORDER BY</span> employee_count <span class="keyword">DESC</span>;</code></pre>
+
+            <h3>HAVING - Filtering Groups</h3>
+            <pre><code><span class="comment">-- HAVING filters groups (like WHERE filters rows)</span>
+<span class="keyword">SELECT</span>
+    department_id,
+    <span class="function">COUNT</span>(*) <span class="keyword">AS</span> employee_count,
+    <span class="function">AVG</span>(salary) <span class="keyword">AS</span> avg_salary
+<span class="keyword">FROM</span> employees
+<span class="keyword">GROUP BY</span> department_id
+<span class="keyword">HAVING</span> <span class="function">COUNT</span>(*) >= 5;  <span class="comment">-- Only departments with 5+ employees</span>
+
+<span class="comment">-- WHERE vs HAVING</span>
+<span class="keyword">SELECT</span>
+    department_id,
+    <span class="function">AVG</span>(salary) <span class="keyword">AS</span> avg_salary
+<span class="keyword">FROM</span> employees
+<span class="keyword">WHERE</span> active = TRUE       <span class="comment">-- Filters rows BEFORE grouping</span>
+<span class="keyword">GROUP BY</span> department_id
+<span class="keyword">HAVING</span> <span class="function">AVG</span>(salary) > 60000  <span class="comment">-- Filters groups AFTER grouping</span>
+<span class="keyword">ORDER BY</span> avg_salary <span class="keyword">DESC</span>;</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Query Execution Order</div>
+                <p>SQL clauses are processed in this order:</p>
+                <ol>
+                    <li><strong>FROM</strong> - Tables and JOINs</li>
+                    <li><strong>WHERE</strong> - Filter rows</li>
+                    <li><strong>GROUP BY</strong> - Create groups</li>
+                    <li><strong>HAVING</strong> - Filter groups</li>
+                    <li><strong>SELECT</strong> - Choose columns</li>
+                    <li><strong>ORDER BY</strong> - Sort results</li>
+                    <li><strong>LIMIT</strong> - Restrict rows</li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Subqueries</h2>
+            <p>A subquery is a query nested inside another query. They're powerful but can impact performance if overused.</p>
+
+            <h3>Subquery in WHERE</h3>
+            <pre><code><span class="comment">-- Find employees who earn more than average</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">WHERE</span> salary > (
+    <span class="keyword">SELECT</span> <span class="function">AVG</span>(salary) <span class="keyword">FROM</span> employees
+);
+
+<span class="comment">-- Find employees in the Engineering department</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">WHERE</span> department_id = (
+    <span class="keyword">SELECT</span> id <span class="keyword">FROM</span> departments <span class="keyword">WHERE</span> name = <span class="string">'Engineering'</span>
+);
+
+<span class="comment">-- Find employees in departments with more than 10 people</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees
+<span class="keyword">WHERE</span> department_id <span class="keyword">IN</span> (
+    <span class="keyword">SELECT</span> department_id
+    <span class="keyword">FROM</span> employees
+    <span class="keyword">GROUP BY</span> department_id
+    <span class="keyword">HAVING</span> <span class="function">COUNT</span>(*) > 10
+);</code></pre>
+
+            <h3>Subquery in FROM (Derived Table)</h3>
+            <pre><code><span class="comment">-- Use subquery result as a table</span>
+<span class="keyword">SELECT</span>
+    dept_stats.department_id,
+    dept_stats.avg_salary,
+    dept_stats.employee_count
+<span class="keyword">FROM</span> (
+    <span class="keyword">SELECT</span>
+        department_id,
+        <span class="function">AVG</span>(salary) <span class="keyword">AS</span> avg_salary,
+        <span class="function">COUNT</span>(*) <span class="keyword">AS</span> employee_count
+    <span class="keyword">FROM</span> employees
+    <span class="keyword">GROUP BY</span> department_id
+) <span class="keyword">AS</span> dept_stats
+<span class="keyword">WHERE</span> dept_stats.employee_count > 5;</code></pre>
+
+            <h3>Subquery in SELECT</h3>
+            <pre><code><span class="comment">-- Scalar subquery (returns single value)</span>
+<span class="keyword">SELECT</span>
+    first_name,
+    salary,
+    (<span class="keyword">SELECT</span> <span class="function">AVG</span>(salary) <span class="keyword">FROM</span> employees) <span class="keyword">AS</span> company_avg,
+    salary - (<span class="keyword">SELECT</span> <span class="function">AVG</span>(salary) <span class="keyword">FROM</span> employees) <span class="keyword">AS</span> diff_from_avg
+<span class="keyword">FROM</span> employees;
+
+<span class="comment">-- Correlated subquery (references outer query)</span>
+<span class="keyword">SELECT</span>
+    e.first_name,
+    e.salary,
+    (<span class="keyword">SELECT</span> <span class="function">AVG</span>(salary)
+     <span class="keyword">FROM</span> employees
+     <span class="keyword">WHERE</span> department_id = e.department_id) <span class="keyword">AS</span> dept_avg
+<span class="keyword">FROM</span> employees e;</code></pre>
+
+            <h3>EXISTS and NOT EXISTS</h3>
+            <pre><code><span class="comment">-- EXISTS - check if any rows exist</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> departments d
+<span class="keyword">WHERE EXISTS</span> (
+    <span class="keyword">SELECT</span> 1 <span class="keyword">FROM</span> employees e
+    <span class="keyword">WHERE</span> e.department_id = d.id
+);
+
+<span class="comment">-- NOT EXISTS - find departments with no employees</span>
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> departments d
+<span class="keyword">WHERE NOT EXISTS</span> (
+    <span class="keyword">SELECT</span> 1 <span class="keyword">FROM</span> employees e
+    <span class="keyword">WHERE</span> e.department_id = d.id
+);
+
+<span class="comment">-- EXISTS is often more efficient than IN for large datasets</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Table Expressions (CTEs)</h2>
+            <p>CTEs make complex queries more readable by allowing you to define named subqueries.</p>
+
+            <pre><code><span class="comment">-- Basic CTE</span>
+<span class="keyword">WITH</span> dept_stats <span class="keyword">AS</span> (
+    <span class="keyword">SELECT</span>
+        department_id,
+        <span class="function">AVG</span>(salary) <span class="keyword">AS</span> avg_salary,
+        <span class="function">COUNT</span>(*) <span class="keyword">AS</span> emp_count
+    <span class="keyword">FROM</span> employees
+    <span class="keyword">GROUP BY</span> department_id
+)
+<span class="keyword">SELECT</span>
+    d.name,
+    ds.avg_salary,
+    ds.emp_count
+<span class="keyword">FROM</span> departments d
+<span class="keyword">JOIN</span> dept_stats ds <span class="keyword">ON</span> d.id = ds.department_id
+<span class="keyword">WHERE</span> ds.emp_count > 5;
+
+<span class="comment">-- Multiple CTEs</span>
+<span class="keyword">WITH</span>
+    active_employees <span class="keyword">AS</span> (
+        <span class="keyword">SELECT</span> * <span class="keyword">FROM</span> employees <span class="keyword">WHERE</span> active = TRUE
+    ),
+    dept_salaries <span class="keyword">AS</span> (
+        <span class="keyword">SELECT</span>
+            department_id,
+            <span class="function">SUM</span>(salary) <span class="keyword">AS</span> total_salary
+        <span class="keyword">FROM</span> active_employees
+        <span class="keyword">GROUP BY</span> department_id
+    )
+<span class="keyword">SELECT</span>
+    d.name,
+    ds.total_salary
+<span class="keyword">FROM</span> departments d
+<span class="keyword">JOIN</span> dept_salaries ds <span class="keyword">ON</span> d.id = ds.department_id;
+
+<span class="comment">-- Recursive CTE (for hierarchical data)</span>
+<span class="keyword">WITH RECURSIVE</span> org_chart <span class="keyword">AS</span> (
+    <span class="comment">-- Base case: top-level managers (no manager)</span>
+    <span class="keyword">SELECT</span> id, first_name, manager_id, 1 <span class="keyword">AS</span> level
+    <span class="keyword">FROM</span> employees
+    <span class="keyword">WHERE</span> manager_id <span class="keyword">IS NULL</span>
+
+    <span class="keyword">UNION ALL</span>
+
+    <span class="comment">-- Recursive case: employees with managers</span>
+    <span class="keyword">SELECT</span> e.id, e.first_name, e.manager_id, oc.level + 1
+    <span class="keyword">FROM</span> employees e
+    <span class="keyword">JOIN</span> org_chart oc <span class="keyword">ON</span> e.manager_id = oc.id
+)
+<span class="keyword">SELECT</span> * <span class="keyword">FROM</span> org_chart
+<span class="keyword">ORDER BY</span> level, first_name;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Window Functions (Advanced)</h2>
+            <p>Window functions perform calculations across rows related to the current row, without collapsing the result set like GROUP BY.</p>
+
+            <pre><code><span class="comment">-- ROW_NUMBER - unique sequential number</span>
+<span class="keyword">SELECT</span>
+    first_name,
+    department_id,
+    salary,
+    <span class="function">ROW_NUMBER</span>() <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>) <span class="keyword">AS</span> salary_rank
+<span class="keyword">FROM</span> employees;
+
+<span class="comment">-- RANK and DENSE_RANK - handle ties differently</span>
+<span class="keyword">SELECT</span>
+    first_name,
+    salary,
+    <span class="function">RANK</span>() <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>) <span class="keyword">AS</span> rank,       <span class="comment">-- Gaps after ties</span>
+    <span class="function">DENSE_RANK</span>() <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>) <span class="keyword">AS</span> dense_rank  <span class="comment">-- No gaps</span>
+<span class="keyword">FROM</span> employees;
+
+<span class="comment">-- PARTITION BY - window functions per group</span>
+<span class="keyword">SELECT</span>
+    first_name,
+    department_id,
+    salary,
+    <span class="function">RANK</span>() <span class="keyword">OVER</span> (
+        <span class="keyword">PARTITION BY</span> department_id
+        <span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>
+    ) <span class="keyword">AS</span> dept_salary_rank
+<span class="keyword">FROM</span> employees;
+
+<span class="comment">-- Running totals and averages</span>
+<span class="keyword">SELECT</span>
+    hire_date,
+    first_name,
+    salary,
+    <span class="function">SUM</span>(salary) <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> hire_date) <span class="keyword">AS</span> running_total,
+    <span class="function">AVG</span>(salary) <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> hire_date) <span class="keyword">AS</span> running_avg,
+    <span class="function">COUNT</span>(*) <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> hire_date) <span class="keyword">AS</span> cumulative_hires
+<span class="keyword">FROM</span> employees;
+
+<span class="comment">-- LAG and LEAD - access previous/next rows</span>
+<span class="keyword">SELECT</span>
+    first_name,
+    hire_date,
+    salary,
+    <span class="function">LAG</span>(salary) <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> hire_date) <span class="keyword">AS</span> prev_hire_salary,
+    <span class="function">LEAD</span>(salary) <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> hire_date) <span class="keyword">AS</span> next_hire_salary
+<span class="keyword">FROM</span> employees;
+
+<span class="comment">-- FIRST_VALUE and LAST_VALUE</span>
+<span class="keyword">SELECT</span>
+    first_name,
+    department_id,
+    salary,
+    <span class="function">FIRST_VALUE</span>(first_name) <span class="keyword">OVER</span> (
+        <span class="keyword">PARTITION BY</span> department_id
+        <span class="keyword">ORDER BY</span> salary <span class="keyword">DESC</span>
+    ) <span class="keyword">AS</span> highest_paid_in_dept
+<span class="keyword">FROM</span> employees;
+
+<span class="comment">-- NTILE - divide rows into buckets</span>
+<span class="keyword">SELECT</span>
+    first_name,
+    salary,
+    <span class="function">NTILE</span>(4) <span class="keyword">OVER</span> (<span class="keyword">ORDER BY</span> salary) <span class="keyword">AS</span> salary_quartile
+<span class="keyword">FROM</span> employees;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Transactions</h2>
+            <p>Transactions ensure data integrity by grouping multiple operations into a single atomic unit.</p>
+
+            <pre><code><span class="comment">-- Start a transaction</span>
+<span class="keyword">START TRANSACTION</span>;  <span class="comment">-- or BEGIN</span>
+
+<span class="comment">-- Multiple operations</span>
+<span class="keyword">UPDATE</span> accounts <span class="keyword">SET</span> balance = balance - 100 <span class="keyword">WHERE</span> id = 1;
+<span class="keyword">UPDATE</span> accounts <span class="keyword">SET</span> balance = balance + 100 <span class="keyword">WHERE</span> id = 2;
+
+<span class="comment">-- If everything is OK</span>
+<span class="keyword">COMMIT</span>;
+
+<span class="comment">-- If something went wrong</span>
+<span class="keyword">ROLLBACK</span>;
+
+<span class="comment">-- Savepoints for partial rollback</span>
+<span class="keyword">START TRANSACTION</span>;
+<span class="keyword">INSERT INTO</span> orders (customer_id, total) <span class="keyword">VALUES</span> (1, 100);
+<span class="keyword">SAVEPOINT</span> order_created;
+
+<span class="keyword">INSERT INTO</span> order_items (order_id, product_id) <span class="keyword">VALUES</span> (1, 1);
+<span class="comment">-- Oops, wrong product!</span>
+<span class="keyword">ROLLBACK TO</span> order_created;
+
+<span class="keyword">INSERT INTO</span> order_items (order_id, product_id) <span class="keyword">VALUES</span> (1, 2);
+<span class="keyword">COMMIT</span>;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Performance Tips</h2>
+
+            <div class="best-practices">
+                <h3>Query Optimization Best Practices</h3>
+                <ul>
+                    <li><strong>Use indexes</strong> on columns in WHERE, JOIN, and ORDER BY clauses</li>
+                    <li><strong>Avoid SELECT *</strong> - select only needed columns</li>
+                    <li><strong>Use EXPLAIN</strong> to analyze query execution plans</li>
+                    <li><strong>Avoid functions on indexed columns</strong> in WHERE clauses</li>
+                    <li><strong>Prefer JOINs over subqueries</strong> when possible</li>
+                    <li><strong>Use LIMIT</strong> for pagination instead of fetching all rows</li>
+                    <li><strong>Batch INSERT/UPDATE</strong> operations instead of one-by-one</li>
+                </ul>
+
+                <h3>Common Anti-Patterns</h3>
+                <pre><code><span class="comment">-- BAD: Function on indexed column prevents index use</span>
+<span class="keyword">WHERE</span> <span class="function">YEAR</span>(hire_date) = 2024
+
+<span class="comment">-- GOOD: Range query can use index</span>
+<span class="keyword">WHERE</span> hire_date >= <span class="string">'2024-01-01'</span>
+  <span class="keyword">AND</span> hire_date < <span class="string">'2025-01-01'</span>
+
+<span class="comment">-- BAD: Wildcard at start prevents index use</span>
+<span class="keyword">WHERE</span> name <span class="keyword">LIKE</span> <span class="string">'%smith'</span>
+
+<span class="comment">-- GOOD: Wildcard at end can use index</span>
+<span class="keyword">WHERE</span> name <span class="keyword">LIKE</span> <span class="string">'smith%'</span>
+
+<span class="comment">-- BAD: Implicit type conversion</span>
+<span class="keyword">WHERE</span> phone = 1234567890  <span class="comment">-- phone is VARCHAR</span>
+
+<span class="comment">-- GOOD: Match types</span>
+<span class="keyword">WHERE</span> phone = <span class="string">'1234567890'</span></code></pre>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>DDL:</strong> CREATE, ALTER, DROP - define structure</li>
+                    <li><strong>DML:</strong> SELECT, INSERT, UPDATE, DELETE - work with data</li>
+                    <li><strong>JOINs:</strong> INNER, LEFT, RIGHT, FULL - combine tables</li>
+                    <li><strong>Aggregates:</strong> COUNT, SUM, AVG, MIN, MAX with GROUP BY</li>
+                    <li><strong>Subqueries:</strong> Queries within queries for complex logic</li>
+                    <li><strong>CTEs:</strong> Named subqueries for readability</li>
+                    <li><strong>Window Functions:</strong> Calculations across related rows</li>
+                    <li><strong>Transactions:</strong> ACID compliance for data integrity</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jdbc.html" class="related-link">JDBC</a>
+                <a href="jpa-hibernate.html" class="related-link">JPA & Hibernate</a>
+                <a href="transactions.html" class="related-link">Transactions (ACID)</a>
+                <a href="connection-pooling.html" class="related-link">Connection Pooling</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logging Frameworks - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#tools">Tools & Ecosystem</a> / Logging Frameworks
+            </nav>
+            <h1>Logging Frameworks</h1>
+            <p class="topic-subtitle">Effective Logging in Java Applications</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Why Logging Matters</h2>
+            <p>Logging is essential for understanding application behavior, debugging issues, monitoring performance, and maintaining audit trails. Good logging practices can dramatically reduce time spent troubleshooting production issues.</p>
+
+            <div class="info-box note">
+                <div class="info-box-title">Logging Benefits</div>
+                <ul>
+                    <li><strong>Debugging</strong> - Understand what happened when errors occur</li>
+                    <li><strong>Monitoring</strong> - Track application health and performance</li>
+                    <li><strong>Auditing</strong> - Record important business events</li>
+                    <li><strong>Analytics</strong> - Analyze usage patterns and trends</li>
+                    <li><strong>Compliance</strong> - Meet regulatory requirements</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Java Logging Landscape</h2>
+
+            <h3>Logging APIs vs Implementations</h3>
+            <pre><code><span class="comment">// Logging APIs (Facades) - What you code against</span>
+SLF4J          <span class="comment">// Most popular, recommended</span>
+Commons Logging <span class="comment">// Legacy, still used</span>
+JUL API        <span class="comment">// java.util.logging (built-in)</span>
+
+<span class="comment">// Logging Implementations - What actually logs</span>
+Logback        <span class="comment">// Native SLF4J implementation, recommended</span>
+Log4j 2        <span class="comment">// Powerful, highly configurable</span>
+JUL            <span class="comment">// java.util.logging (built-in)</span>
+
+<span class="comment">// The pattern: Use SLF4J API + Logback implementation</span></code></pre>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Framework</th>
+                        <th>Type</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>SLF4J + Logback</strong></td>
+                        <td>API + Implementation</td>
+                        <td>Recommended for new projects</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Log4j 2</strong></td>
+                        <td>Both</td>
+                        <td>High-performance needs</td>
+                    </tr>
+                    <tr>
+                        <td><strong>java.util.logging</strong></td>
+                        <td>Built-in</td>
+                        <td>Simple projects, no dependencies</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>SLF4J with Logback</h2>
+            <p>SLF4J (Simple Logging Facade for Java) provides a common API, while Logback is its native implementation. This is the most popular combination in modern Java applications.</p>
+
+            <h3>Maven Dependencies</h3>
+            <pre><code><span class="comment">&lt;!-- SLF4J API --&gt;</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;org.slf4j&lt;/groupId&gt;
+    &lt;artifactId&gt;slf4j-api&lt;/artifactId&gt;
+    &lt;version&gt;2.0.9&lt;/version&gt;
+&lt;/dependency&gt;
+
+<span class="comment">&lt;!-- Logback Implementation --&gt;</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;ch.qos.logback&lt;/groupId&gt;
+    &lt;artifactId&gt;logback-classic&lt;/artifactId&gt;
+    &lt;version&gt;1.4.14&lt;/version&gt;
+&lt;/dependency&gt;
+
+<span class="comment">&lt;!-- Spring Boot: Just include spring-boot-starter-logging --&gt;</span>
+<span class="comment">&lt;!-- It's included by default in spring-boot-starter --&gt;</span></code></pre>
+
+            <h3>Basic Usage</h3>
+            <pre><code><span class="keyword">import</span> org.slf4j.Logger;
+<span class="keyword">import</span> org.slf4j.LoggerFactory;
+
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+
+    <span class="comment">// Create logger - conventionally named 'logger' or 'log'</span>
+    <span class="keyword">private static final</span> <span class="class-name">Logger</span> logger = <span class="class-name">LoggerFactory</span>.getLogger(<span class="class-name">UserService</span>.<span class="keyword">class</span>);
+
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
+        logger.debug(<span class="string">"Finding user with id: {}"</span>, id);
+
+        <span class="keyword">try</span> {
+            <span class="class-name">User</span> user = userRepository.findById(id);
+
+            <span class="keyword">if</span> (user == <span class="keyword">null</span>) {
+                logger.warn(<span class="string">"User not found with id: {}"</span>, id);
+                <span class="keyword">return null</span>;
+            }
+
+            logger.info(<span class="string">"Successfully found user: {}"</span>, user.getUsername());
+            <span class="keyword">return</span> user;
+
+        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+            logger.error(<span class="string">"Error finding user with id: {}"</span>, id, e);
+            <span class="keyword">throw</span> e;
+        }
+    }
+}</code></pre>
+
+            <h3>Logback Configuration (logback.xml)</h3>
+            <pre><code><span class="comment">&lt;!-- src/main/resources/logback.xml --&gt;</span>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;configuration&gt;
+
+    <span class="comment">&lt;!-- Console Appender --&gt;</span>
+    &lt;appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender"&gt;
+        &lt;encoder&gt;
+            &lt;pattern&gt;%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
+        &lt;/encoder&gt;
+    &lt;/appender&gt;
+
+    <span class="comment">&lt;!-- File Appender --&gt;</span>
+    &lt;appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"&gt;
+        &lt;file&gt;logs/application.log&lt;/file&gt;
+        &lt;rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy"&gt;
+            &lt;fileNamePattern&gt;logs/application.%d{yyyy-MM-dd}.log&lt;/fileNamePattern&gt;
+            &lt;maxHistory&gt;30&lt;/maxHistory&gt;
+            &lt;totalSizeCap&gt;3GB&lt;/totalSizeCap&gt;
+        &lt;/rollingPolicy&gt;
+        &lt;encoder&gt;
+            &lt;pattern&gt;%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
+        &lt;/encoder&gt;
+    &lt;/appender&gt;
+
+    <span class="comment">&lt;!-- Logger for specific package --&gt;</span>
+    &lt;logger name="com.example" level="DEBUG"/&gt;
+
+    <span class="comment">&lt;!-- Reduce noise from frameworks --&gt;</span>
+    &lt;logger name="org.springframework" level="WARN"/&gt;
+    &lt;logger name="org.hibernate" level="WARN"/&gt;
+
+    <span class="comment">&lt;!-- Root logger --&gt;</span>
+    &lt;root level="INFO"&gt;
+        &lt;appender-ref ref="CONSOLE"/&gt;
+        &lt;appender-ref ref="FILE"/&gt;
+    &lt;/root&gt;
+
+&lt;/configuration&gt;</code></pre>
+
+            <h3>Spring Boot Configuration</h3>
+            <pre><code><span class="comment"># application.properties</span>
+
+<span class="comment"># Log levels</span>
+logging.level.root=INFO
+logging.level.com.example=DEBUG
+logging.level.org.springframework.web=WARN
+logging.level.org.hibernate.SQL=DEBUG
+
+<span class="comment"># Log file</span>
+logging.file.name=logs/application.log
+logging.file.max-size=10MB
+logging.file.max-history=30
+
+<span class="comment"># Log pattern</span>
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
+logging.pattern.file=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Log Levels</h2>
+            <p>Log levels indicate the severity or importance of log messages. Use them appropriately to control verbosity.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Level</th>
+                        <th>When to Use</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>TRACE</strong></td>
+                        <td>Very detailed debugging, method entry/exit</td>
+                        <td>Entering method processOrder()</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DEBUG</strong></td>
+                        <td>Debugging information for development</td>
+                        <td>Processing order with 5 items</td>
+                    </tr>
+                    <tr>
+                        <td><strong>INFO</strong></td>
+                        <td>Important business events, normal operation</td>
+                        <td>Order #123 completed successfully</td>
+                    </tr>
+                    <tr>
+                        <td><strong>WARN</strong></td>
+                        <td>Potential problems, recoverable issues</td>
+                        <td>Retry attempt 2 of 3 for payment</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ERROR</strong></td>
+                        <td>Errors that need attention but app continues</td>
+                        <td>Failed to process payment for order #123</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="keyword">private static final</span> <span class="class-name">Logger</span> log = <span class="class-name">LoggerFactory</span>.getLogger(<span class="class-name">OrderService</span>.<span class="keyword">class</span>);
+
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order) {
+        log.trace(<span class="string">"Entering processOrder with order: {}"</span>, order);
+
+        log.debug(<span class="string">"Processing order {} with {} items"</span>,
+                  order.getId(), order.getItems().size());
+
+        <span class="keyword">try</span> {
+            validateOrder(order);
+            log.info(<span class="string">"Order {} validated successfully"</span>, order.getId());
+
+            <span class="keyword">if</span> (order.getTotal() &gt; <span class="number">10000</span>) {
+                log.warn(<span class="string">"Large order {} requires manual review"</span>, order.getId());
+            }
+
+            completeOrder(order);
+            log.info(<span class="string">"Order {} completed, total: ${}"</span>, order.getId(), order.getTotal());
+
+        } <span class="keyword">catch</span> (<span class="class-name">PaymentException</span> e) {
+            log.error(<span class="string">"Payment failed for order {}: {}"</span>, order.getId(), e.getMessage(), e);
+            <span class="keyword">throw</span> e;
+        }
+
+        log.trace(<span class="string">"Exiting processOrder"</span>);
+        <span class="keyword">return</span> order;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Logging Best Practices</h2>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Logging Guidelines</div>
+                <ul>
+                    <li><strong>Use parameterized logging</strong> - Avoid string concatenation</li>
+                    <li><strong>Include context</strong> - Add IDs, user info, transaction details</li>
+                    <li><strong>Don't log sensitive data</strong> - Passwords, credit cards, PII</li>
+                    <li><strong>Be consistent</strong> - Use same format across application</li>
+                    <li><strong>Log at appropriate level</strong> - Don't use ERROR for normal flow</li>
+                </ul>
+            </div>
+
+            <h3>Parameterized Logging</h3>
+            <pre><code><span class="comment">// BAD - String concatenation (always evaluates)</span>
+logger.debug(<span class="string">"Processing user: "</span> + user.getName() + <span class="string">" with id: "</span> + user.getId());
+
+<span class="comment">// GOOD - Parameterized (only evaluates if debug enabled)</span>
+logger.debug(<span class="string">"Processing user: {} with id: {}"</span>, user.getName(), user.getId());
+
+<span class="comment">// For expensive operations, check level first</span>
+<span class="keyword">if</span> (logger.isDebugEnabled()) {
+    logger.debug(<span class="string">"Order details: {}"</span>, order.toDetailedString());
+}</code></pre>
+
+            <h3>Exception Logging</h3>
+            <pre><code><span class="comment">// BAD - Loses stack trace</span>
+logger.error(<span class="string">"Error: "</span> + e.getMessage());
+
+<span class="comment">// BAD - Redundant message</span>
+logger.error(<span class="string">"Exception occurred: "</span> + e.toString(), e);
+
+<span class="comment">// GOOD - Context + full stack trace</span>
+logger.error(<span class="string">"Failed to process order {}"</span>, orderId, e);
+
+<span class="comment">// GOOD - With additional context</span>
+logger.error(<span class="string">"Failed to process order {} for user {}: {}"</span>,
+             orderId, userId, e.getMessage(), e);</code></pre>
+
+            <h3>Structured Logging (JSON)</h3>
+            <pre><code><span class="comment">&lt;!-- logback.xml for JSON output --&gt;</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;net.logstash.logback&lt;/groupId&gt;
+    &lt;artifactId&gt;logstash-logback-encoder&lt;/artifactId&gt;
+    &lt;version&gt;7.4&lt;/version&gt;
+&lt;/dependency&gt;
+
+<span class="comment">&lt;!-- In logback.xml --&gt;</span>
+&lt;appender name="JSON" class="ch.qos.logback.core.ConsoleAppender"&gt;
+    &lt;encoder class="net.logstash.logback.encoder.LogstashEncoder"/&gt;
+&lt;/appender&gt;
+
+<span class="comment">// Output example:</span>
+{
+    "@timestamp": "2024-01-15T10:30:45.123Z",
+    "level": "INFO",
+    "logger_name": "com.example.OrderService",
+    "message": "Order completed",
+    "orderId": "12345",
+    "userId": "user-789"
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>MDC - Mapped Diagnostic Context</h2>
+            <p>MDC allows you to add contextual information to all log messages within a thread, perfect for tracking request IDs, user sessions, etc.</p>
+
+            <pre><code><span class="keyword">import</span> org.slf4j.MDC;
+
+<span class="keyword">public class</span> <span class="class-name">RequestFilter</span> <span class="keyword">implements</span> <span class="class-name">Filter</span> {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">doFilter</span>(<span class="class-name">ServletRequest</span> request, <span class="class-name">ServletResponse</span> response,
+                         <span class="class-name">FilterChain</span> chain) <span class="keyword">throws</span> <span class="class-name">IOException</span>, <span class="class-name">ServletException</span> {
+
+        <span class="keyword">try</span> {
+            <span class="comment">// Add context for all logs in this request</span>
+            MDC.put(<span class="string">"requestId"</span>, <span class="class-name">UUID</span>.randomUUID().toString());
+            MDC.put(<span class="string">"userId"</span>, getCurrentUserId());
+            MDC.put(<span class="string">"clientIP"</span>, request.getRemoteAddr());
+
+            chain.doFilter(request, response);
+
+        } <span class="keyword">finally</span> {
+            <span class="comment">// Always clear to prevent memory leaks</span>
+            MDC.clear();
+        }
+    }
+}
+
+<span class="comment">// In logback.xml, include MDC values in pattern</span>
+&lt;pattern&gt;%d{HH:mm:ss} [%X{requestId}] [%X{userId}] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
+
+<span class="comment">// Log output automatically includes context:</span>
+<span class="comment">// 10:30:45 [abc-123] [user-456] INFO  c.e.OrderService - Processing order</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Log4j 2</h2>
+            <p>Log4j 2 is a powerful alternative with excellent performance, especially for asynchronous logging.</p>
+
+            <h3>Maven Dependencies</h3>
+            <pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.logging.log4j&lt;/groupId&gt;
+    &lt;artifactId&gt;log4j-api&lt;/artifactId&gt;
+    &lt;version&gt;2.22.0&lt;/version&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.logging.log4j&lt;/groupId&gt;
+    &lt;artifactId&gt;log4j-core&lt;/artifactId&gt;
+    &lt;version&gt;2.22.0&lt;/version&gt;
+&lt;/dependency&gt;
+
+<span class="comment">&lt;!-- Bridge SLF4J to Log4j 2 --&gt;</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.logging.log4j&lt;/groupId&gt;
+    &lt;artifactId&gt;log4j-slf4j2-impl&lt;/artifactId&gt;
+    &lt;version&gt;2.22.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+
+            <h3>Log4j 2 Configuration (log4j2.xml)</h3>
+            <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;Configuration status="WARN"&gt;
+    &lt;Appenders&gt;
+        &lt;Console name="Console" target="SYSTEM_OUT"&gt;
+            &lt;PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/&gt;
+        &lt;/Console&gt;
+
+        <span class="comment">&lt;!-- Async file appender for performance --&gt;</span>
+        &lt;RollingRandomAccessFile name="File"
+                                  fileName="logs/app.log"
+                                  filePattern="logs/app-%d{yyyy-MM-dd}-%i.log.gz"&gt;
+            &lt;PatternLayout&gt;
+                &lt;Pattern&gt;%d %p %c{1.} [%t] %m%n&lt;/Pattern&gt;
+            &lt;/PatternLayout&gt;
+            &lt;Policies&gt;
+                &lt;TimeBasedTriggeringPolicy/&gt;
+                &lt;SizeBasedTriggeringPolicy size="100 MB"/&gt;
+            &lt;/Policies&gt;
+        &lt;/RollingRandomAccessFile&gt;
+    &lt;/Appenders&gt;
+
+    &lt;Loggers&gt;
+        &lt;AsyncLogger name="com.example" level="debug"/&gt;
+        &lt;Root level="info"&gt;
+            &lt;AppenderRef ref="Console"/&gt;
+            &lt;AppenderRef ref="File"/&gt;
+        &lt;/Root&gt;
+    &lt;/Loggers&gt;
+&lt;/Configuration&gt;</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Lombok @Slf4j</h2>
+            <p>Lombok can automatically generate the logger field, reducing boilerplate.</p>
+
+            <pre><code><span class="keyword">import</span> lombok.extern.slf4j.Slf4j;
+
+<span class="annotation">@Slf4j</span>
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+
+    <span class="comment">// No need to declare logger manually!</span>
+    <span class="comment">// Lombok generates: private static final Logger log = LoggerFactory.getLogger(UserService.class);</span>
+
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
+        log.info(<span class="string">"Finding user: {}"</span>, id);
+        <span class="comment">// ...</span>
+    }
+}
+
+<span class="comment">// Other Lombok logging annotations:</span>
+<span class="annotation">@Log</span>           <span class="comment">// java.util.logging</span>
+<span class="annotation">@Log4j2</span>        <span class="comment">// Log4j 2</span>
+<span class="annotation">@Slf4j</span>         <span class="comment">// SLF4J (recommended)</span>
+<span class="annotation">@CommonsLog</span>    <span class="comment">// Apache Commons Logging</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Security Considerations</h2>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Never Log Sensitive Data</div>
+                <ul>
+                    <li>Passwords and credentials</li>
+                    <li>Credit card numbers</li>
+                    <li>Social security numbers</li>
+                    <li>API keys and tokens</li>
+                    <li>Personal health information</li>
+                </ul>
+            </div>
+
+            <pre><code><span class="comment">// BAD - Logging sensitive data</span>
+logger.info(<span class="string">"User login: {} with password: {}"</span>, username, password);
+logger.debug(<span class="string">"Payment with card: {}"</span>, creditCardNumber);
+
+<span class="comment">// GOOD - Mask or omit sensitive data</span>
+logger.info(<span class="string">"User login attempt: {}"</span>, username);
+logger.debug(<span class="string">"Payment processed for card ending in: {}"</span>,
+             maskCardNumber(creditCardNumber));
+
+<span class="keyword">private</span> <span class="class-name">String</span> <span class="function">maskCardNumber</span>(<span class="class-name">String</span> cardNumber) {
+    <span class="keyword">if</span> (cardNumber == <span class="keyword">null</span> || cardNumber.length() &lt; <span class="number">4</span>) {
+        <span class="keyword">return</span> <span class="string">"****"</span>;
+    }
+    <span class="keyword">return</span> <span class="string">"****-****-****-"</span> + cardNumber.substring(cardNumber.length() - <span class="number">4</span>);
+}</code></pre>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="testing.html" class="related-link">Testing (JUnit, Mockito)</a>
+                <a href="code-quality.html" class="related-link">Code Quality Tools</a>
+                <a href="../best-practices/error-handling-patterns.html" class="related-link">Error Handling Patterns</a>
+                <a href="../spring/boot.html" class="related-link">Spring Boot</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

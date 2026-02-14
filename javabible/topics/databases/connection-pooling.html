@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connection Pooling - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#databases">Databases & Persistence</a> / Connection Pooling
+            </nav>
+            <h1>Connection Pooling</h1>
+            <p class="topic-subtitle">Efficiently managing database connections</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Why Connection Pooling?</h2>
+            <p>Creating a database connection is an <strong>expensive operation</strong>. It involves network handshakes, authentication, memory allocation, and resource initialization. Without pooling, each database request would create a new connection, severely impacting performance.</p>
+
+            <h3>The Problem: Connection Creation Cost</h3>
+            <pre><code><span class="comment">// Without pooling - SLOW!</span>
+<span class="keyword">public</span> User <span class="function">findUser</span>(<span class="keyword">long</span> id) {
+    <span class="comment">// Step 1: Create connection (100-500ms!)</span>
+    <span class="comment">// - TCP handshake with database server</span>
+    <span class="comment">// - SSL/TLS negotiation (if enabled)</span>
+    <span class="comment">// - Authentication (username/password)</span>
+    <span class="comment">// - Session setup on database</span>
+    Connection conn = DriverManager.getConnection(url, user, password);  <span class="comment">// SLOW!</span>
+
+    <span class="comment">// Step 2: Execute query (1-10ms)</span>
+    User user = executeQuery(conn, id);  <span class="comment">// Fast</span>
+
+    <span class="comment">// Step 3: Close connection (5-20ms)</span>
+    conn.close();  <span class="comment">// Resources freed, connection destroyed</span>
+
+    <span class="keyword">return</span> user;
+}
+
+<span class="comment">// For 1000 requests per second:</span>
+<span class="comment">// Without pooling: 1000 * 200ms = 200 seconds of connection overhead!</span>
+<span class="comment">// With pooling:    1000 * 1ms = 1 second (reuse existing connections)</span></code></pre>
+
+            <h3>The Solution: Connection Pool</h3>
+            <pre><code><span class="comment">// With pooling - FAST!</span>
+┌─────────────────────────────────────────────────────────────────────┐
+│                      CONNECTION POOL                                 │
+│                                                                      │
+│   ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐  ┌─────┐                      │
+│   │Conn1│  │Conn2│  │Conn3│  │Conn4│  │Conn5│  ... (pre-created)   │
+│   │ OK  │  │BUSY │  │ OK  │  │ OK  │  │BUSY │                      │
+│   └─────┘  └─────┘  └─────┘  └─────┘  └─────┘                      │
+│                                                                      │
+│   getConnection() → Returns available connection instantly!          │
+│   close() → Returns connection to pool (doesn't destroy it)         │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+<span class="keyword">public</span> User <span class="function">findUser</span>(<span class="keyword">long</span> id) {
+    <span class="comment">// Step 1: Get connection from pool (&lt;1ms!)</span>
+    Connection conn = dataSource.getConnection();  <span class="comment">// Already created!</span>
+
+    <span class="comment">// Step 2: Execute query (1-10ms)</span>
+    User user = executeQuery(conn, id);
+
+    <span class="comment">// Step 3: Return to pool (&lt;1ms)</span>
+    conn.close();  <span class="comment">// Doesn't close! Returns to pool for reuse.</span>
+
+    <span class="keyword">return</span> user;
+}</code></pre>
+
+            <div class="info-box">
+                <p><strong>Connection Pooling Benefits:</strong></p>
+                <ul>
+                    <li><strong>Performance:</strong> Eliminate connection creation overhead</li>
+                    <li><strong>Resource Control:</strong> Limit total connections to database</li>
+                    <li><strong>Stability:</strong> Handle connection failures gracefully</li>
+                    <li><strong>Monitoring:</strong> Track connection usage and health</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Popular Connection Pools</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Pool</th>
+                        <th>Performance</th>
+                        <th>Features</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>HikariCP</strong></td>
+                        <td>Fastest</td>
+                        <td>Lightweight, simple, bytecode optimization</td>
+                        <td>Most applications (Spring Boot default)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Apache DBCP2</strong></td>
+                        <td>Good</td>
+                        <td>Mature, commons-pool based</td>
+                        <td>Legacy applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>c3p0</strong></td>
+                        <td>Good</td>
+                        <td>Automatic retry, statement caching</td>
+                        <td>Hibernate (legacy)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Tomcat JDBC Pool</strong></td>
+                        <td>Very Good</td>
+                        <td>Async, interceptors</td>
+                        <td>Tomcat applications</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Vibur DBCP</strong></td>
+                        <td>Very Good</td>
+                        <td>Simple, well-documented</td>
+                        <td>Alternative to HikariCP</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Recommendation</div>
+                <p><strong>Use HikariCP</strong> for new projects. It's the fastest, most reliable, and is the default in Spring Boot. The creator is exceptionally dedicated to performance optimization.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>HikariCP Configuration</h2>
+
+            <h3>Maven Dependency</h3>
+            <pre><code><span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>com.zaxxer<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>HikariCP<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>5.1.0<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">&lt;!-- Spring Boot includes HikariCP by default with: --&gt;</span>
+<span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>org.springframework.boot<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>spring-boot-starter-data-jpa<span class="keyword">&lt;/artifactId&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span></code></pre>
+
+            <h3>Programmatic Configuration</h3>
+            <pre><code><span class="keyword">import</span> com.zaxxer.hikari.HikariConfig;
+<span class="keyword">import</span> com.zaxxer.hikari.HikariDataSource;
+
+<span class="keyword">public class</span> <span class="class-name">DatabaseConfig</span> {
+
+    <span class="keyword">public static</span> HikariDataSource <span class="function">createDataSource</span>() {
+        HikariConfig config = <span class="keyword">new</span> HikariConfig();
+
+        <span class="comment">// Essential settings</span>
+        config.setJdbcUrl(<span class="string">"jdbc:mysql://localhost:3306/mydb"</span>);
+        config.setUsername(<span class="string">"user"</span>);
+        config.setPassword(<span class="string">"password"</span>);
+        config.setDriverClassName(<span class="string">"com.mysql.cj.jdbc.Driver"</span>);
+
+        <span class="comment">// Pool sizing (most important!)</span>
+        config.setMaximumPoolSize(10);        <span class="comment">// Max connections in pool</span>
+        config.setMinimumIdle(5);             <span class="comment">// Min idle connections to maintain</span>
+
+        <span class="comment">// Timeouts</span>
+        config.setConnectionTimeout(30000);   <span class="comment">// 30s - wait for connection from pool</span>
+        config.setIdleTimeout(600000);        <span class="comment">// 10min - idle connection timeout</span>
+        config.setMaxLifetime(1800000);       <span class="comment">// 30min - max connection lifetime</span>
+        config.setKeepaliveTime(300000);      <span class="comment">// 5min - keepalive query interval</span>
+
+        <span class="comment">// Validation</span>
+        config.setConnectionTestQuery(<span class="string">"SELECT 1"</span>);  <span class="comment">// Optional for JDBC4+ drivers</span>
+
+        <span class="comment">// Performance</span>
+        config.setAutoCommit(<span class="keyword">true</span>);            <span class="comment">// Default auto-commit state</span>
+        config.addDataSourceProperty(<span class="string">"cachePrepStmts"</span>, <span class="string">"true"</span>);
+        config.addDataSourceProperty(<span class="string">"prepStmtCacheSize"</span>, <span class="string">"250"</span>);
+        config.addDataSourceProperty(<span class="string">"prepStmtCacheSqlLimit"</span>, <span class="string">"2048"</span>);
+
+        <span class="comment">// Pool name (for monitoring)</span>
+        config.setPoolName(<span class="string">"MyAppPool"</span>);
+
+        <span class="keyword">return new</span> HikariDataSource(config);
+    }
+}</code></pre>
+
+            <h3>Spring Boot Configuration</h3>
+            <pre><code><span class="comment"># application.yml</span>
+<span class="keyword">spring:</span>
+  <span class="keyword">datasource:</span>
+    url: <span class="string">jdbc:mysql://localhost:3306/mydb</span>
+    username: <span class="string">user</span>
+    password: <span class="string">password</span>
+    driver-class-name: <span class="string">com.mysql.cj.jdbc.Driver</span>
+
+    <span class="comment"># HikariCP specific settings</span>
+    <span class="keyword">hikari:</span>
+      pool-name: <span class="string">MyAppPool</span>
+      maximum-pool-size: <span class="number">10</span>
+      minimum-idle: <span class="number">5</span>
+      idle-timeout: <span class="number">600000</span>
+      max-lifetime: <span class="number">1800000</span>
+      connection-timeout: <span class="number">30000</span>
+      keepalive-time: <span class="number">300000</span>
+
+      <span class="comment"># MySQL optimizations</span>
+      data-source-properties:
+        cachePrepStmts: <span class="keyword">true</span>
+        prepStmtCacheSize: <span class="number">250</span>
+        prepStmtCacheSqlLimit: <span class="number">2048</span>
+        useServerPrepStmts: <span class="keyword">true</span>
+        useLocalSessionState: <span class="keyword">true</span>
+        rewriteBatchedStatements: <span class="keyword">true</span>
+        cacheResultSetMetadata: <span class="keyword">true</span>
+        cacheServerConfiguration: <span class="keyword">true</span>
+        elideSetAutoCommits: <span class="keyword">true</span>
+        maintainTimeStats: <span class="keyword">false</span></code></pre>
+
+            <h3>Configuration Explained</h3>
+            <pre><code><span class="comment">// Pool Size Configuration - The most critical settings!</span>
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    POOL SIZING VISUALIZATION                         │
+│                                                                      │
+│   maximumPoolSize: 10                                               │
+│   ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ │
+│   │  1  │ │  2  │ │  3  │ │  4  │ │  5  │ │  6  │ │  7  │ │  8  │ │
+│   └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ │
+│   │ minimumIdle: 5 (always ready) │  │ Created on demand  │        │
+│   └───────────────────────────────┘  └────────────────────┘        │
+│                                                                      │
+│   - Start with minimumIdle connections                              │
+│   - Create more as needed, up to maximumPoolSize                    │
+│   - Destroy excess idle connections after idleTimeout               │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+<span class="comment">// Key parameters:</span>
+
+<span class="comment">// maximumPoolSize: Total connections the pool can have</span>
+<span class="comment">// - Too low: Requests queue waiting for connections</span>
+<span class="comment">// - Too high: Database overwhelmed, memory wasted</span>
+<span class="comment">// - Formula: connections = ((core_count * 2) + effective_spindle_count)</span>
+<span class="comment">// - For SSD: core_count * 2 + 1 (typically 5-10 for most apps)</span>
+
+<span class="comment">// minimumIdle: Connections maintained even when idle</span>
+<span class="comment">// - Set equal to maximumPoolSize for consistent performance</span>
+<span class="comment">// - Set lower to reduce resource usage during idle periods</span>
+
+<span class="comment">// connectionTimeout: How long to wait for a connection</span>
+<span class="comment">// - If pool exhausted and no connection available within this time</span>
+<span class="comment">// - SQLException is thrown</span>
+<span class="comment">// - 30 seconds is a good default</span>
+
+<span class="comment">// idleTimeout: How long a connection can sit idle before removal</span>
+<span class="comment">// - Only applies when connections > minimumIdle</span>
+<span class="comment">// - Set to 10 minutes for most cases</span>
+
+<span class="comment">// maxLifetime: Maximum connection lifetime</span>
+<span class="comment">// - Should be less than database's wait_timeout</span>
+<span class="comment">// - MySQL default wait_timeout: 8 hours</span>
+<span class="comment">// - Set to 30 minutes for safety</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Pool Sizing Guidelines</h2>
+
+            <h3>The Formula</h3>
+            <pre><code><span class="comment">// HikariCP Creator's Formula:</span>
+<span class="comment">// connections = ((core_count * 2) + effective_spindle_count)</span>
+
+<span class="comment">// For a 4-core server with SSD:</span>
+<span class="comment">// connections = (4 * 2) + 1 = 9</span>
+
+<span class="comment">// Why so few?</span>
+<span class="comment">// - More connections ≠ More throughput</span>
+<span class="comment">// - Database spends time context-switching between connections</span>
+<span class="comment">// - Each connection uses memory (both app and DB side)</span>
+
+<span class="comment">// Analogy: Highway lanes</span>
+<span class="comment">// - 4-lane highway at capacity: cars moving smoothly</span>
+<span class="comment">// - Add 100 more lanes: traffic jams at intersections!</span></code></pre>
+
+            <h3>Common Scenarios</h3>
+            <pre><code><span class="comment">// Scenario 1: Simple Web Application</span>
+<span class="comment">// - 4 core server, 100 concurrent users</span>
+maximumPoolSize: 10
+minimumIdle: 5
+
+<span class="comment">// Scenario 2: High-Traffic API</span>
+<span class="comment">// - 8 core server, microservice, fast queries</span>
+maximumPoolSize: 15
+minimumIdle: 10
+
+<span class="comment">// Scenario 3: Batch Processing</span>
+<span class="comment">// - Long-running queries, fewer concurrent</span>
+maximumPoolSize: 5
+minimumIdle: 2
+connectionTimeout: 60000  <span class="comment">// Longer timeout</span>
+
+<span class="comment">// Scenario 4: Multiple Datasources</span>
+<span class="comment">// - Main DB + Read replica</span>
+<span class="comment">// - Split pool size between them</span>
+mainPool.maximumPoolSize: 8
+readReplicaPool.maximumPoolSize: 5</code></pre>
+
+            <h3>Calculating Based on Load</h3>
+            <pre><code><span class="comment">// If you know your workload:</span>
+
+<span class="comment">// Given:</span>
+<span class="comment">// - 1000 requests/second</span>
+<span class="comment">// - Average query time: 10ms</span>
+<span class="comment">// - Maximum query time: 100ms</span>
+
+<span class="comment">// Minimum connections needed:</span>
+<span class="comment">// connections = requests/second × average_query_time</span>
+<span class="comment">// connections = 1000 × 0.01 = 10</span>
+
+<span class="comment">// Add buffer for spikes:</span>
+<span class="comment">// maximumPoolSize = 15</span>
+
+<span class="comment">// Monitor and adjust based on:</span>
+<span class="comment">// - Connection wait times</span>
+<span class="comment">// - Pool utilization</span>
+<span class="comment">// - Database CPU/connections</span></code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Common Mistake</div>
+                <p>Don't set pool size to match concurrent users! 10,000 users don't need 10,000 connections. Most users are idle (reading pages, filling forms). A pool of 10-20 connections can serve thousands of users.</p>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Monitoring and Troubleshooting</h2>
+
+            <h3>HikariCP Metrics</h3>
+            <pre><code><span class="keyword">import</span> com.zaxxer.hikari.HikariDataSource;
+<span class="keyword">import</span> com.zaxxer.hikari.HikariPoolMXBean;
+
+<span class="keyword">public class</span> <span class="class-name">PoolMonitor</span> {
+
+    <span class="keyword">private final</span> HikariDataSource dataSource;
+
+    <span class="keyword">public void</span> <span class="function">printStats</span>() {
+        HikariPoolMXBean poolMXBean = dataSource.getHikariPoolMXBean();
+
+        System.out.println(<span class="string">"=== HikariCP Stats ==="</span>);
+        System.out.println(<span class="string">"Active Connections: "</span> + poolMXBean.getActiveConnections());
+        System.out.println(<span class="string">"Idle Connections: "</span> + poolMXBean.getIdleConnections());
+        System.out.println(<span class="string">"Total Connections: "</span> + poolMXBean.getTotalConnections());
+        System.out.println(<span class="string">"Threads Waiting: "</span> + poolMXBean.getThreadsAwaitingConnection());
+    }
+}
+
+<span class="comment">// Spring Boot Actuator integration</span>
+<span class="comment">// Add to application.yml:</span>
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,hikaricp
+
+<span class="comment">// Access metrics at:</span>
+<span class="comment">// GET /actuator/metrics/hikaricp.connections.active</span>
+<span class="comment">// GET /actuator/metrics/hikaricp.connections.idle</span>
+<span class="comment">// GET /actuator/metrics/hikaricp.connections.pending</span></code></pre>
+
+            <h3>Common Issues and Solutions</h3>
+            <pre><code><span class="comment">// Issue 1: Connection Timeout (pool exhausted)</span>
+<span class="comment">// Error: "Connection is not available, request timed out after 30000ms"</span>
+
+<span class="comment">// Causes:</span>
+<span class="comment">// - Pool too small for load</span>
+<span class="comment">// - Connection leaks (not closed properly)</span>
+<span class="comment">// - Slow queries holding connections</span>
+
+<span class="comment">// Solutions:</span>
+<span class="comment">// 1. Enable leak detection:</span>
+config.setLeakDetectionThreshold(60000);  <span class="comment">// Warn if connection held > 60s</span>
+
+<span class="comment">// 2. Find and fix leaks:</span>
+<span class="keyword">try</span> (Connection conn = dataSource.getConnection()) {
+    <span class="comment">// Always use try-with-resources!</span>
+}
+
+<span class="comment">// 3. Review slow queries</span>
+config.addDataSourceProperty(<span class="string">"logger"</span>, <span class="string">"com.mysql.cj.log.Slf4JLogger"</span>);
+config.addDataSourceProperty(<span class="string">"profileSQL"</span>, <span class="string">"true"</span>);
+
+<span class="comment">// Issue 2: Connection Reset / Stale Connections</span>
+<span class="comment">// Error: "Communications link failure" or "Connection reset"</span>
+
+<span class="comment">// Cause: Database closed idle connections</span>
+
+<span class="comment">// Solution: Configure keepalive and max lifetime</span>
+config.setMaxLifetime(1800000);    <span class="comment">// 30 minutes</span>
+config.setKeepaliveTime(300000);   <span class="comment">// 5 minutes</span>
+
+<span class="comment">// Issue 3: Too Many Connections</span>
+<span class="comment">// Error: "Too many connections" from database</span>
+
+<span class="comment">// Cause: Multiple app instances, each with large pool</span>
+
+<span class="comment">// Solution: Calculate total across all instances</span>
+<span class="comment">// 5 app instances × 10 connections = 50 database connections</span>
+<span class="comment">// MySQL default max_connections = 151</span></code></pre>
+
+            <h3>Logging Configuration</h3>
+            <pre><code><span class="comment"># logback.xml - Enable HikariCP debug logging</span>
+&lt;logger name="com.zaxxer.hikari" level="DEBUG"/&gt;
+&lt;logger name="com.zaxxer.hikari.HikariConfig" level="DEBUG"/&gt;
+
+<span class="comment"># application.yml</span>
+logging:
+  level:
+    com.zaxxer.hikari: DEBUG
+    com.zaxxer.hikari.HikariConfig: DEBUG
+
+<span class="comment"># Sample debug output:</span>
+<span class="comment"># HikariPool-1 - Pool stats (total=10, active=2, idle=8, waiting=0)</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Connection Pool with JPA/Hibernate</h2>
+
+            <pre><code><span class="comment">&lt;!-- persistence.xml with HikariCP --&gt;</span>
+<span class="keyword">&lt;persistence-unit</span> name="myPU"<span class="keyword">&gt;</span>
+    <span class="keyword">&lt;properties&gt;</span>
+        <span class="comment">&lt;!-- HikariCP as connection provider --&gt;</span>
+        <span class="keyword">&lt;property</span> name="hibernate.connection.provider_class"
+                  value="org.hibernate.hikaricp.internal.HikariCPConnectionProvider"<span class="keyword">/&gt;</span>
+
+        <span class="comment">&lt;!-- HikariCP settings --&gt;</span>
+        <span class="keyword">&lt;property</span> name="hibernate.hikari.dataSourceClassName"
+                  value="com.mysql.cj.jdbc.MysqlDataSource"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;property</span> name="hibernate.hikari.dataSource.url"
+                  value="jdbc:mysql://localhost:3306/mydb"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;property</span> name="hibernate.hikari.dataSource.user"
+                  value="user"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;property</span> name="hibernate.hikari.dataSource.password"
+                  value="password"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;property</span> name="hibernate.hikari.maximumPoolSize"
+                  value="10"<span class="keyword">/&gt;</span>
+        <span class="keyword">&lt;property</span> name="hibernate.hikari.minimumIdle"
+                  value="5"<span class="keyword">/&gt;</span>
+    <span class="keyword">&lt;/properties&gt;</span>
+<span class="keyword">&lt;/persistence-unit&gt;</span>
+
+<span class="comment">// Spring Boot - automatic (no extra config needed!)</span>
+<span class="comment">// Just add spring-boot-starter-data-jpa and configure datasource</span>
+<span class="comment">// HikariCP is used automatically</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Other Connection Pools</h2>
+
+            <h3>Apache DBCP2</h3>
+            <pre><code><span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>org.apache.commons<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>commons-dbcp2<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>2.11.0<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">// Configuration</span>
+BasicDataSource ds = <span class="keyword">new</span> BasicDataSource();
+ds.setUrl(<span class="string">"jdbc:mysql://localhost:3306/mydb"</span>);
+ds.setUsername(<span class="string">"user"</span>);
+ds.setPassword(<span class="string">"password"</span>);
+ds.setMaxTotal(10);
+ds.setMaxIdle(5);
+ds.setMinIdle(2);
+ds.setMaxWaitMillis(30000);</code></pre>
+
+            <h3>Tomcat JDBC Pool</h3>
+            <pre><code><span class="keyword">&lt;dependency&gt;</span>
+    <span class="keyword">&lt;groupId&gt;</span>org.apache.tomcat<span class="keyword">&lt;/groupId&gt;</span>
+    <span class="keyword">&lt;artifactId&gt;</span>tomcat-jdbc<span class="keyword">&lt;/artifactId&gt;</span>
+    <span class="keyword">&lt;version&gt;</span>10.1.18<span class="keyword">&lt;/version&gt;</span>
+<span class="keyword">&lt;/dependency&gt;</span>
+
+<span class="comment">// Configuration</span>
+PoolProperties p = <span class="keyword">new</span> PoolProperties();
+p.setUrl(<span class="string">"jdbc:mysql://localhost:3306/mydb"</span>);
+p.setUsername(<span class="string">"user"</span>);
+p.setPassword(<span class="string">"password"</span>);
+p.setMaxActive(10);
+p.setMaxIdle(5);
+p.setMinIdle(2);
+p.setMaxWait(30000);
+
+DataSource ds = <span class="keyword">new</span> DataSource(p);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>Do's</h3>
+                <ul>
+                    <li><strong>Always use try-with-resources</strong> for connections</li>
+                    <li><strong>Set maxLifetime</strong> lower than database timeout</li>
+                    <li><strong>Enable leak detection</strong> in development</li>
+                    <li><strong>Monitor pool metrics</strong> in production</li>
+                    <li><strong>Start small</strong> with pool size and increase if needed</li>
+                    <li><strong>Use same pool settings</strong> across all app instances</li>
+                </ul>
+
+                <h3>Don'ts</h3>
+                <ul>
+                    <li><strong>Don't set huge pool sizes</strong> (100+ connections)</li>
+                    <li><strong>Don't ignore connection leaks</strong></li>
+                    <li><strong>Don't hold connections while doing non-DB work</strong></li>
+                    <li><strong>Don't use DriverManager directly</strong> (bypasses pool)</li>
+                    <li><strong>Don't set different pool configs for different environments</strong> without testing</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>Purpose:</strong> Reuse connections instead of creating new ones</li>
+                    <li><strong>HikariCP:</strong> Fastest and most reliable (Spring Boot default)</li>
+                    <li><strong>Pool Size:</strong> (cores * 2) + 1 for SSD, typically 5-15</li>
+                    <li><strong>Key Settings:</strong> maximumPoolSize, minimumIdle, connectionTimeout</li>
+                    <li><strong>Leak Detection:</strong> Enable in dev to find unclosed connections</li>
+                    <li><strong>Monitoring:</strong> Watch active connections and wait times</li>
+                    <li><strong>Try-with-resources:</strong> Always use to prevent leaks</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jdbc.html" class="related-link">JDBC</a>
+                <a href="jpa-hibernate.html" class="related-link">JPA & Hibernate</a>
+                <a href="transactions.html" class="related-link">Transactions (ACID)</a>
+                <a href="../servers/app-server.html" class="related-link">Application Servers</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

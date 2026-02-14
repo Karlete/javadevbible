@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JAX-RS (RESTful Web Services) - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / JAX-RS
+            </nav>
+            <h1>JAX-RS (RESTful Web Services)</h1>
+            <p class="topic-subtitle">Building REST APIs with Jakarta EE</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is JAX-RS?</h2>
+            <p><strong>Think of JAX-RS like a restaurant's ordering system:</strong></p>
+            <ul>
+                <li>📱 Customer (Frontend) makes requests via menu (API endpoints)</li>
+                <li>📋 Waiter (JAX-RS) takes orders and delivers food (data)</li>
+                <li>🍳 Kitchen (Backend) prepares the order (business logic)</li>
+                <li>✨ Everything communicated in simple format (JSON)</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>JAX-RS (Jakarta RESTful Web Services)</strong> is the standard API for building REST APIs in Jakarta EE. It uses annotations to map HTTP requests to Java methods.</p>
+                <p><strong>Popular implementations:</strong> Jersey, RESTEasy, Apache CXF</p>
+            </div>
+
+            <h3>Simple REST API Example</h3>
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/hello"</span>)  <span class="comment">// Base URL: /api/hello</span>
+<span class="keyword">public class</span> <span class="class-name">HelloResource</span> {
+
+    <span class="annotation">@GET</span>  <span class="comment">// HTTP GET request</span>
+    <span class="annotation">@Produces</span>(MediaType.TEXT_PLAIN)
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">sayHello</span>() {
+        <span class="keyword">return</span> <span class="string">"Hello, World!"</span>;
+    }
+}
+
+<span class="comment">// Access: GET http://localhost:8080/api/hello</span>
+<span class="comment">// Returns: Hello, World!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Application Configuration</h2>
+
+            <pre><code><span class="keyword">import</span> jakarta.ws.rs.ApplicationPath;
+<span class="keyword">import</span> jakarta.ws.rs.core.Application;
+
+<span class="annotation">@ApplicationPath</span>(<span class="string">"/api"</span>)  <span class="comment">// All endpoints start with /api</span>
+<span class="keyword">public class</span> <span class="class-name">RestApplication</span> <span class="keyword">extends</span> <span class="class-name">Application</span> {
+    <span class="comment">// No code needed! Just this annotation configures everything</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>HTTP Methods</h2>
+
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserResource</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">UserService</span> userService;
+
+    <span class="comment">// GET /api/users - Get all users</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getAllUsers</span>() {
+        <span class="keyword">return</span> userService.findAll();
+    }
+
+    <span class="comment">// GET /api/users/123 - Get specific user</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getUser</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> userService.findById(id);
+    }
+
+    <span class="comment">// POST /api/users - Create new user</span>
+    <span class="annotation">@POST</span>
+    <span class="annotation">@Consumes</span>(MediaType.APPLICATION_JSON)
+    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">createUser</span>(<span class="annotation">@Valid</span> <span class="class-name">User</span> user) {
+        <span class="class-name">User</span> created = userService.create(user);
+        <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.CREATED)
+                       .entity(created)
+                       .build();
+    }
+
+    <span class="comment">// PUT /api/users/123 - Update user</span>
+    <span class="annotation">@PUT</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+    <span class="annotation">@Consumes</span>(MediaType.APPLICATION_JSON)
+    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">updateUser</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id, <span class="annotation">@Valid</span> <span class="class-name">User</span> user) {
+        <span class="keyword">return</span> userService.update(id, user);
+    }
+
+    <span class="comment">// DELETE /api/users/123 - Delete user</span>
+    <span class="annotation">@DELETE</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">deleteUser</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+        userService.delete(id);
+        <span class="keyword">return</span> <span class="class-name">Response</span>.noContent().build();
+    }
+}</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>HTTP Method</th>
+                        <th>Purpose</th>
+                        <th>Has Body</th>
+                        <th>Idempotent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>GET</strong></td>
+                        <td>Retrieve data</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>POST</strong></td>
+                        <td>Create resource</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PUT</strong></td>
+                        <td>Update (replace)</td>
+                        <td>Yes</td>
+                        <td>Yes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PATCH</strong></td>
+                        <td>Partial update</td>
+                        <td>Yes</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td><strong>DELETE</strong></td>
+                        <td>Remove resource</td>
+                        <td>No</td>
+                        <td>Yes</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Path Parameters</h2>
+
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/products"</span>)
+<span class="keyword">public class</span> <span class="class-name">ProductResource</span> {
+
+    <span class="comment">// Single parameter: /api/products/123</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> findProduct(id);
+    }
+
+    <span class="comment">// Multiple parameters: /api/products/electronics/laptops</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{category}/{subcategory}"</span>)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">getByCategory</span>(
+        <span class="annotation">@PathParam</span>(<span class="string">"category"</span>) <span class="class-name">String</span> category,
+        <span class="annotation">@PathParam</span>(<span class="string">"subcategory"</span>) <span class="class-name">String</span> subcategory) {
+        <span class="keyword">return</span> findByCategory(category, subcategory);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Query Parameters</h2>
+
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/search"</span>)
+<span class="keyword">public class</span> <span class="class-name">SearchResource</span> {
+
+    <span class="comment">// URL: /api/search?q=laptop&minPrice=500&maxPrice=2000</span>
+    <span class="annotation">@GET</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">search</span>(
+        <span class="annotation">@QueryParam</span>(<span class="string">"q"</span>) <span class="class-name">String</span> query,
+        <span class="annotation">@QueryParam</span>(<span class="string">"minPrice"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"0"</span>) <span class="keyword">double</span> minPrice,
+        <span class="annotation">@QueryParam</span>(<span class="string">"maxPrice"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"10000"</span>) <span class="keyword">double</span> maxPrice) {
+
+        <span class="keyword">return</span> searchProducts(query, minPrice, maxPrice);
+    }
+
+    <span class="comment">// Pagination: /api/search?page=2&size=20</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/paginated"</span>)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">getPaginated</span>(
+        <span class="annotation">@QueryParam</span>(<span class="string">"page"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"1"</span>) <span class="keyword">int</span> page,
+        <span class="annotation">@QueryParam</span>(<span class="string">"size"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"10"</span>) <span class="keyword">int</span> size) {
+
+        <span class="keyword">return</span> getPage(page, size);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Request and Response</h2>
+
+            <h3>Consuming JSON (Request Body)</h3>
+            <pre><code><span class="annotation">@POST</span>
+<span class="annotation">@Path</span>(<span class="string">"/orders"</span>)
+<span class="annotation">@Consumes</span>(MediaType.APPLICATION_JSON)  <span class="comment">// Accept JSON input</span>
+<span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)  <span class="comment">// Return JSON output</span>
+<span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">createOrder</span>(<span class="class-name">Order</span> order) {
+    <span class="comment">// JAX-RS automatically converts JSON to Order object!</span>
+    <span class="class-name">Order</span> created = orderService.create(order);
+
+    <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="number">201</span>)  <span class="comment">// HTTP 201 Created</span>
+                   .entity(created)
+                   .build();
+}</code></pre>
+
+            <h3>HTTP Status Codes</h3>
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/products"</span>)
+<span class="keyword">public class</span> <span class="class-name">ProductResource</span> {
+
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+        <span class="class-name">Product</span> product = productService.findById(id);
+
+        <span class="keyword">if</span> (product == <span class="keyword">null</span>) {
+            <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.NOT_FOUND)  <span class="comment">// 404</span>
+                           .entity(<span class="string">"Product not found"</span>)
+                           .build();
+        }
+
+        <span class="keyword">return</span> <span class="class-name">Response</span>.ok(product).build();  <span class="comment">// 200 OK</span>
+    }
+
+    <span class="annotation">@POST</span>
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">create</span>(<span class="class-name">Product</span> product) {
+        <span class="keyword">if</span> (product.getName() == <span class="keyword">null</span>) {
+            <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.BAD_REQUEST)  <span class="comment">// 400</span>
+                           .entity(<span class="string">"Name is required"</span>)
+                           .build();
+        }
+
+        <span class="class-name">Product</span> created = productService.create(product);
+        <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.CREATED).entity(created).build();  <span class="comment">// 201</span>
+    }
+
+    <span class="annotation">@DELETE</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">delete</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+        productService.delete(id);
+        <span class="keyword">return</span> <span class="class-name">Response</span>.noContent().build();  <span class="comment">// 204 No Content</span>
+    }
+}</code></pre>
+
+            <p><strong>Common Status Codes:</strong></p>
+            <ul>
+                <li><strong>200 OK:</strong> Success</li>
+                <li><strong>201 Created:</strong> Resource created</li>
+                <li><strong>204 No Content:</strong> Success, no body</li>
+                <li><strong>400 Bad Request:</strong> Invalid input</li>
+                <li><strong>401 Unauthorized:</strong> Not authenticated</li>
+                <li><strong>403 Forbidden:</strong> Not authorized</li>
+                <li><strong>404 Not Found:</strong> Resource doesn't exist</li>
+                <li><strong>500 Internal Server Error:</strong> Server error</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Exception Handling</h2>
+
+            <h3>WebApplicationException</h3>
+            <pre><code><span class="annotation">@GET</span>
+<span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+<span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+    <span class="class-name">Product</span> product = productService.findById(id);
+
+    <span class="keyword">if</span> (product == <span class="keyword">null</span>) {
+        <span class="comment">// Throw exception that becomes HTTP response</span>
+        <span class="keyword">throw new</span> <span class="class-name">WebApplicationException</span>(
+            <span class="string">"Product not found"</span>,
+            <span class="class-name">Response.Status</span>.NOT_FOUND
+        );
+    }
+
+    <span class="keyword">return</span> product;
+}</code></pre>
+
+            <h3>Exception Mapper</h3>
+            <pre><code><span class="comment">// Custom exception</span>
+<span class="keyword">public class</span> <span class="class-name">ProductNotFoundException</span> <span class="keyword">extends</span> <span class="class-name">RuntimeException</span> {
+    <span class="keyword">public</span> <span class="function">ProductNotFoundException</span>(<span class="class-name">String</span> message) {
+        <span class="keyword">super</span>(message);
+    }
+}
+
+<span class="comment">// Exception mapper</span>
+<span class="annotation">@Provider</span>
+<span class="keyword">public class</span> <span class="class-name">ProductNotFoundMapper</span>
+    <span class="keyword">implements</span> <span class="class-name">ExceptionMapper</span>&lt;<span class="class-name">ProductNotFoundException</span>&gt; {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">toResponse</span>(<span class="class-name">ProductNotFoundException</span> exception) {
+        <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.NOT_FOUND)
+                       .entity(<span class="keyword">new</span> <span class="class-name">ErrorMessage</span>(exception.getMessage()))
+                       .build();
+    }
+}
+
+<span class="comment">// Now you can throw it anywhere</span>
+<span class="annotation">@GET</span>
+<span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+<span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> productService.findById(id)
+        .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">ProductNotFoundException</span>(<span class="string">"Product not found"</span>));
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Filters and Interceptors</h2>
+
+            <h3>Request Filter (Authentication)</h3>
+            <pre><code><span class="annotation">@Provider</span>
+<span class="annotation">@Priority</span>(Priorities.AUTHENTICATION)
+<span class="keyword">public class</span> <span class="class-name">AuthenticationFilter</span> <span class="keyword">implements</span> <span class="class-name">ContainerRequestFilter</span> {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">filter</span>(<span class="class-name">ContainerRequestContext</span> requestContext) {
+        <span class="class-name">String</span> token = requestContext.getHeaderString(<span class="string">"Authorization"</span>);
+
+        <span class="keyword">if</span> (token == <span class="keyword">null</span> || !isValidToken(token)) {
+            requestContext.abortWith(
+                <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.UNAUTHORIZED)
+                        .entity(<span class="string">"Unauthorized"</span>)
+                        .build()
+            );
+        }
+    }
+
+    <span class="keyword">private</span> <span class="keyword">boolean</span> <span class="function">isValidToken</span>(<span class="class-name">String</span> token) {
+        <span class="comment">// Validate JWT token</span>
+        <span class="keyword">return</span> <span class="keyword">true</span>;
+    }
+}</code></pre>
+
+            <h3>Response Filter (CORS)</h3>
+            <pre><code><span class="annotation">@Provider</span>
+<span class="keyword">public class</span> <span class="class-name">CorsFilter</span> <span class="keyword">implements</span> <span class="class-name">ContainerResponseFilter</span> {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">filter</span>(<span class="class-name">ContainerRequestContext</span> requestContext,
+                      <span class="class-name">ContainerResponseContext</span> responseContext) {
+        responseContext.getHeaders().add(<span class="string">"Access-Control-Allow-Origin"</span>, <span class="string">"*"</span>);
+        responseContext.getHeaders().add(<span class="string">"Access-Control-Allow-Methods"</span>,
+                                         <span class="string">"GET, POST, PUT, DELETE"</span>);
+        responseContext.getHeaders().add(<span class="string">"Access-Control-Allow-Headers"</span>,
+                                         <span class="string">"Content-Type, Authorization"</span>);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Async Processing</h2>
+
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/async"</span>)
+<span class="keyword">public class</span> <span class="class-name">AsyncResource</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">ReportService</span> reportService;
+
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/report"</span>)
+    <span class="keyword">public void</span> <span class="function">generateReport</span>(<span class="annotation">@Suspended</span> <span class="class-name">AsyncResponse</span> response) {
+        <span class="comment">// Process in background thread</span>
+        <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+            <span class="keyword">try</span> {
+                <span class="comment">// Long-running task</span>
+                <span class="class-name">String</span> report = reportService.generate();
+                response.resume(report);  <span class="comment">// Send response when ready</span>
+            } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+                response.resume(e);  <span class="comment">// Send error</span>
+            }
+        }).start();
+
+        <span class="comment">// Method returns immediately, response sent later</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Content Negotiation</h2>
+
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/products"</span>)
+<span class="keyword">public class</span> <span class="class-name">ProductResource</span> {
+
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+    <span class="annotation">@Produces</span>({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+        <span class="comment">// Returns JSON or XML based on Accept header</span>
+        <span class="comment">// Accept: application/json → JSON response</span>
+        <span class="comment">// Accept: application/xml → XML response</span>
+        <span class="keyword">return</span> productService.findById(id);
+    }
+
+    <span class="annotation">@POST</span>
+    <span class="annotation">@Consumes</span>({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">create</span>(<span class="class-name">Product</span> product) {
+        <span class="comment">// Accepts JSON or XML based on Content-Type header</span>
+        <span class="keyword">return</span> <span class="class-name">Response</span>.ok(productService.create(product)).build();
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>✅ DO:</h3>
+                <ul>
+                    <li><strong>Use proper HTTP methods</strong> - GET for read, POST for create, etc.</li>
+                    <li><strong>Return correct status codes</strong> - 200, 201, 404, 500, etc.</li>
+                    <li><strong>Use @Valid for validation</strong> - Automatic bean validation</li>
+                    <li><strong>Handle exceptions properly</strong> - Use exception mappers</li>
+                    <li><strong>Version your APIs</strong> - /api/v1/users, /api/v2/users</li>
+                    <li><strong>Use pagination for large datasets</strong> - page and size parameters</li>
+                    <li><strong>Document your API</strong> - OpenAPI/Swagger</li>
+                    <li><strong>Secure endpoints</strong> - Authentication and authorization</li>
+                </ul>
+
+                <h3>❌ DON'T:</h3>
+                <ul>
+                    <li><strong>Don't use GET for mutations</strong> - Use POST/PUT/DELETE</li>
+                    <li><strong>Don't return null</strong> - Return 404 or empty list</li>
+                    <li><strong>Don't expose entities directly</strong> - Use DTOs</li>
+                    <li><strong>Don't forget CORS</strong> - Frontend needs it</li>
+                    <li><strong>Don't ignore status codes</strong> - Always return appropriate codes</li>
+                    <li><strong>Don't put business logic in resources</strong> - Use services</li>
+                    <li><strong>Don't forget error handling</strong> - Always handle exceptions</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>JAX-RS</strong> builds REST APIs with annotations</li>
+                    <li><strong>@Path:</strong> Maps URL to resource class/method</li>
+                    <li><strong>@GET, @POST, @PUT, @DELETE:</strong> HTTP methods</li>
+                    <li><strong>@PathParam:</strong> URL path variables (/users/{id})</li>
+                    <li><strong>@QueryParam:</strong> Query string parameters (?page=1)</li>
+                    <li><strong>@Produces/@Consumes:</strong> Content type (JSON, XML)</li>
+                    <li><strong>Response:</strong> Build custom HTTP responses with status codes</li>
+                    <li><strong>Exception handling:</strong> ExceptionMapper for custom error responses</li>
+                    <li><strong>Filters:</strong> Request/response interceptors (auth, CORS)</li>
+                    <li><strong>Implementations:</strong> Jersey, RESTEasy, Apache CXF</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="json.html" class="related-link">JSON Processing & Binding</a>
+                <a href="bean-validation.html" class="related-link">Bean Validation</a>
+                <a href="security.html" class="related-link">Security & Authentication</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

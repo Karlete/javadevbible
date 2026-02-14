@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EJB (Enterprise JavaBeans) - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / EJB
+            </nav>
+            <h1>EJB (Enterprise JavaBeans)</h1>
+            <p class="topic-subtitle">Server-Side Components with Built-In Enterprise Features</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What are EJBs?</h2>
+            <p><strong>Think of EJB like a premium hotel service:</strong></p>
+            <ul>
+                <li>🏨 Regular bean = Basic apartment (you handle everything)</li>
+                <li>🌟 EJB = 5-star hotel (concierge handles transactions, security, room service)</li>
+                <li>📦 You just focus on your business - the "hotel" handles the rest</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>EJB (Enterprise JavaBeans)</strong> are server-side components that provide built-in support for transactions, security, concurrency, and more. They're CDI beans with superpowers!</p>
+                <p><strong>Modern EJB:</strong> Simplified with annotations (no more XML hell from EJB 2.x days!)</p>
+            </div>
+
+            <h3>EJB vs CDI Bean</h3>
+            <pre><code><span class="comment">// CDI Bean - Basic functionality</span>
+<span class="annotation">@RequestScoped</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentService</span> payment;
+
+    <span class="keyword">public void</span> <span class="function">placeOrder</span>(<span class="class-name">Order</span> order) {
+        <span class="comment">// You handle transactions manually</span>
+        payment.process(order);
+    }
+}
+
+<span class="comment">// EJB - Built-in features!</span>
+<span class="annotation">@Stateless</span>  <span class="comment">// EJB annotation</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentService</span> payment;
+
+    <span class="comment">// Automatic transaction! Commits on success, rolls back on exception</span>
+    <span class="keyword">public void</span> <span class="function">placeOrder</span>(<span class="class-name">Order</span> order) {
+        payment.process(order);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Types of EJBs</h2>
+
+            <h3>1. @Stateless - No Client State (Most Common)</h3>
+            <pre><code><span class="annotation">@Stateless</span>  <span class="comment">// Pool of interchangeable instances</span>
+<span class="keyword">public class</span> <span class="class-name">ProductService</span> {
+    <span class="annotation">@PersistenceContext</span>
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
+
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">findProduct</span>(<span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> em.find(Product.<span class="keyword">class</span>, id);
+    }
+
+    <span class="keyword">public void</span> <span class="function">saveProduct</span>(<span class="class-name">Product</span> product) {
+        em.persist(product);
+    }
+}</code></pre>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+                <li>✅ No state stored between method calls</li>
+                <li>✅ Container pools instances (efficient)</li>
+                <li>✅ Any instance can handle any request</li>
+                <li>✅ Thread-safe (container manages concurrency)</li>
+                <li>✅ Automatic transaction management</li>
+                <li>✅ Use for: Services, repositories, business logic</li>
+            </ul>
+
+            <h3>2. @Stateful - Maintains Client State</h3>
+            <pre><code><span class="annotation">@Stateful</span>  <span class="comment">// One instance per client</span>
+<span class="keyword">public class</span> <span class="class-name">ShoppingCart</span> {
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    <span class="keyword">private</span> <span class="keyword">double</span> total = <span class="number">0.0</span>;
+
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">Product</span> product) {
+        items.add(product);
+        total += product.getPrice();
+    }
+
+    <span class="keyword">public void</span> <span class="function">removeItem</span>(<span class="class-name">Product</span> product) {
+        items.remove(product);
+        total -= product.getPrice();
+    }
+
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">getItems</span>() {
+        <span class="keyword">return</span> items;
+    }
+
+    <span class="keyword">public</span> <span class="keyword">double</span> <span class="function">getTotal</span>() {
+        <span class="keyword">return</span> total;
+    }
+
+    <span class="annotation">@Remove</span>  <span class="comment">// Call this to destroy the bean</span>
+    <span class="keyword">public void</span> <span class="function">checkout</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Checkout complete. Cart destroyed."</span>);
+    }
+}</code></pre>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+                <li>✅ Maintains state across method calls</li>
+                <li>✅ One instance dedicated to one client</li>
+                <li>✅ Can be passivated to disk if idle (saves memory)</li>
+                <li>✅ Use @Remove to destroy when done</li>
+                <li>✅ Use for: Shopping carts, wizards, conversational flows</li>
+            </ul>
+
+            <h3>3. @Singleton - One Instance for All (Shared)</h3>
+            <pre><code><span class="annotation">@Singleton</span>  <span class="comment">// Only ONE instance in entire application</span>
+<span class="annotation">@Startup</span>   <span class="comment">// Initialize at application startup</span>
+<span class="keyword">public class</span> <span class="class-name">CacheManager</span> {
+    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; cache = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
+
+    <span class="annotation">@PostConstruct</span>
+    <span class="keyword">public void</span> <span class="function">init</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Loading cache at startup..."</span>);
+        <span class="comment">// Load data</span>
+    }
+
+    <span class="annotation">@Lock</span>(LockType.READ)  <span class="comment">// Multiple threads can read</span>
+    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">get</span>(<span class="class-name">String</span> key) {
+        <span class="keyword">return</span> cache.get(key);
+    }
+
+    <span class="annotation">@Lock</span>(LockType.WRITE)  <span class="comment">// Only one thread can write</span>
+    <span class="keyword">public void</span> <span class="function">put</span>(<span class="class-name">String</span> key, <span class="class-name">Object</span> value) {
+        cache.put(key, value);
+    }
+}</code></pre>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+                <li>✅ Single instance shared by all clients</li>
+                <li>✅ Can be eagerly initialized with @Startup</li>
+                <li>✅ Built-in concurrency control with @Lock</li>
+                <li>✅ Use for: Caches, configuration, app-wide state</li>
+            </ul>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Instances</th>
+                        <th>State</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>@Stateless</strong></td>
+                        <td>Pool (many)</td>
+                        <td>No state</td>
+                        <td>Services, repositories</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@Stateful</strong></td>
+                        <td>One per client</td>
+                        <td>Maintains state</td>
+                        <td>Shopping carts, wizards</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@Singleton</strong></td>
+                        <td>One (shared)</td>
+                        <td>Shared state</td>
+                        <td>Caches, config</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Transaction Management</h2>
+            <p><strong>The killer feature of EJBs!</strong></p>
+
+            <h3>Automatic Transactions (Default)</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">BankService</span> {
+    <span class="annotation">@PersistenceContext</span>
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
+
+    <span class="comment">// Automatic transaction!</span>
+    <span class="comment">// If method completes: COMMIT</span>
+    <span class="comment">// If exception thrown: ROLLBACK</span>
+    <span class="keyword">public void</span> <span class="function">transfer</span>(<span class="class-name">Long</span> fromId, <span class="class-name">Long</span> toId, <span class="keyword">double</span> amount) {
+        <span class="class-name">Account</span> from = em.find(Account.<span class="keyword">class</span>, fromId);
+        <span class="class-name">Account</span> to = em.find(Account.<span class="keyword">class</span>, toId);
+
+        from.withdraw(amount);  <span class="comment">// Subtract from account</span>
+        to.deposit(amount);     <span class="comment">// Add to account</span>
+
+        <span class="comment">// Both updates happen together or not at all!</span>
+        <span class="keyword">if</span> (from.getBalance() < <span class="number">0</span>) {
+            <span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(<span class="string">"Insufficient funds"</span>);
+            <span class="comment">// Exception = automatic ROLLBACK!</span>
+        }
+    }
+}</code></pre>
+
+            <h3>Transaction Attributes</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="comment">// REQUIRED (default): Use existing transaction or create new one</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRED)
+    <span class="keyword">public void</span> <span class="function">placeOrder</span>(<span class="class-name">Order</span> order) {
+        <span class="comment">// Part of a transaction</span>
+    }
+
+    <span class="comment">// REQUIRES_NEW: Always create a new transaction</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRES_NEW)
+    <span class="keyword">public void</span> <span class="function">logActivity</span>(<span class="class-name">String</span> message) {
+        <span class="comment">// Separate transaction - commits even if parent fails</span>
+    }
+
+    <span class="comment">// NOT_SUPPORTED: Run without transaction</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.NOT_SUPPORTED)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">searchOrders</span>(<span class="class-name">String</span> query) {
+        <span class="comment">// No transaction needed for read-only</span>
+        <span class="keyword">return</span> <span class="keyword">null</span>;
+    }
+
+    <span class="comment">// MANDATORY: Must be called within a transaction</span>
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.MANDATORY)
+    <span class="keyword">public void</span> <span class="function">updateInventory</span>(<span class="class-name">Product</span> product) {
+        <span class="comment">// Throws exception if no transaction exists</span>
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Security with EJBs</h2>
+
+            <h3>Role-Based Access Control</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="annotation">@DeclareRoles</span>({<span class="string">"ADMIN"</span>, <span class="string">"USER"</span>, <span class="string">"MANAGER"</span>})
+<span class="keyword">public class</span> <span class="class-name">ProductService</span> {
+
+    <span class="comment">// Only ADMINs can call this</span>
+    <span class="annotation">@RolesAllowed</span>(<span class="string">"ADMIN"</span>)
+    <span class="keyword">public void</span> <span class="function">deleteProduct</span>(<span class="class-name">Long</span> id) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Deleting product "</span> + id);
+    }
+
+    <span class="comment">// ADMIN or MANAGER can call this</span>
+    <span class="annotation">@RolesAllowed</span>({<span class="string">"ADMIN"</span>, <span class="string">"MANAGER"</span>})
+    <span class="keyword">public void</span> <span class="function">updatePrice</span>(<span class="class-name">Long</span> id, <span class="keyword">double</span> newPrice) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Updating price"</span>);
+    }
+
+    <span class="comment">// Anyone authenticated can call this</span>
+    <span class="annotation">@RolesAllowed</span>({<span class="string">"ADMIN"</span>, <span class="string">"USER"</span>, <span class="string">"MANAGER"</span>})
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> <span class="keyword">null</span>;
+    }
+
+    <span class="comment">// No authentication required</span>
+    <span class="annotation">@PermitAll</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">getAllProducts</span>() {
+        <span class="keyword">return</span> <span class="keyword">null</span>;
+    }
+
+    <span class="comment">// Nobody can call this (useful for internal methods)</span>
+    <span class="annotation">@DenyAll</span>
+    <span class="keyword">private void</span> <span class="function">internalMethod</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Internal only"</span>);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Asynchronous Methods</h2>
+
+            <h3>Fire and Forget</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">EmailService</span> {
+
+    <span class="annotation">@Asynchronous</span>  <span class="comment">// Runs in separate thread</span>
+    <span class="keyword">public void</span> <span class="function">sendEmail</span>(<span class="class-name">String</span> to, <span class="class-name">String</span> subject, <span class="class-name">String</span> body) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Sending email to "</span> + to + <span class="string">"..."</span>);
+        <span class="comment">// Simulate slow email sending</span>
+        <span class="keyword">try</span> {
+            <span class="class-name">Thread</span>.sleep(<span class="number">3000</span>);
+            <span class="class-name">System</span>.out.println(<span class="string">"Email sent!"</span>);
+        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+<span class="comment">// Usage</span>
+<span class="annotation">@Inject</span>
+<span class="keyword">private</span> <span class="class-name">EmailService</span> emailService;
+
+<span class="keyword">public void</span> <span class="function">registerUser</span>(<span class="class-name">User</span> user) {
+    <span class="comment">// Save user to database</span>
+    database.save(user);
+
+    <span class="comment">// Send email asynchronously (doesn't block!)</span>
+    emailService.sendEmail(user.getEmail(), <span class="string">"Welcome!"</span>, <span class="string">"Thanks for joining!"</span>);
+
+    <span class="class-name">System</span>.out.println(<span class="string">"User registered! Email sending in background..."</span>);
+    <span class="comment">// Method returns immediately, email sent in background</span>
+}</code></pre>
+
+            <h3>With Return Value (Future)</h3>
+            <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">ReportService</span> {
+
+    <span class="annotation">@Asynchronous</span>
+    <span class="keyword">public</span> <span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt; <span class="function">generateReport</span>() {
+        <span class="comment">// Simulate long-running task</span>
+        <span class="keyword">try</span> {
+            <span class="class-name">Thread</span>.sleep(<span class="number">5000</span>);
+        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) { }
+
+        <span class="class-name">String</span> report = <span class="string">"Sales Report: $1,234,567"</span>;
+        <span class="keyword">return</span> <span class="keyword">new</span> <span class="class-name">AsyncResult</span>&lt;&gt;(report);
+    }
+}
+
+<span class="comment">// Usage</span>
+<span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt; futureReport = reportService.generateReport();
+
+<span class="class-name">System</span>.out.println(<span class="string">"Report generation started..."</span>);
+
+<span class="comment">// Do other work while report generates</span>
+doOtherWork();
+
+<span class="comment">// Wait for result when needed</span>
+<span class="class-name">String</span> report = futureReport.get();  <span class="comment">// Blocks until ready</span>
+<span class="class-name">System</span>.out.println(report);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Scheduled Tasks (Timers)</h2>
+
+            <h3>Cron-Style Scheduling</h3>
+            <pre><code><span class="annotation">@Singleton</span>
+<span class="keyword">public class</span> <span class="class-name">ScheduledTasks</span> {
+
+    <span class="comment">// Run every day at 2:00 AM</span>
+    <span class="annotation">@Schedule</span>(hour = <span class="string">"2"</span>, minute = <span class="string">"0"</span>, persistent = <span class="keyword">false</span>)
+    <span class="keyword">public void</span> <span class="function">dailyCleanup</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Running daily cleanup at 2 AM..."</span>);
+    }
+
+    <span class="comment">// Run every 30 minutes</span>
+    <span class="annotation">@Schedule</span>(minute = <span class="string">"*/30"</span>, hour = <span class="string">"*"</span>)
+    <span class="keyword">public void</span> <span class="function">checkSystemHealth</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Health check..."</span>);
+    }
+
+    <span class="comment">// Run every Monday at 9 AM</span>
+    <span class="annotation">@Schedule</span>(dayOfWeek = <span class="string">"Mon"</span>, hour = <span class="string">"9"</span>, minute = <span class="string">"0"</span>)
+    <span class="keyword">public void</span> <span class="function">weeklyReport</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Generating weekly report..."</span>);
+    }
+
+    <span class="comment">// Multiple schedules on same method</span>
+    <span class="annotation">@Schedules</span>({
+        <span class="annotation">@Schedule</span>(hour = <span class="string">"8"</span>, minute = <span class="string">"0"</span>),   <span class="comment">// 8 AM</span>
+        <span class="annotation">@Schedule</span>(hour = <span class="string">"12"</span>, minute = <span class="string">"0"</span>),  <span class="comment">// 12 PM</span>
+        <span class="annotation">@Schedule</span>(hour = <span class="string">"18"</span>, minute = <span class="string">"0"</span>)   <span class="comment">// 6 PM</span>
+    })
+    <span class="keyword">public void</span> <span class="function">syncData</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Syncing data three times daily..."</span>);
+    }
+}</code></pre>
+
+            <h3>Programmatic Timers</h3>
+            <pre><code><span class="annotation">@Singleton</span>
+<span class="keyword">public class</span> <span class="class-name">DynamicTimers</span> {
+    <span class="annotation">@Resource</span>
+    <span class="keyword">private</span> <span class="class-name">TimerService</span> timerService;
+
+    <span class="keyword">public void</span> <span class="function">scheduleTask</span>(<span class="keyword">long</span> delayMs) {
+        <span class="comment">// Create a timer that fires once after delay</span>
+        timerService.createSingleActionTimer(delayMs, <span class="keyword">new</span> <span class="class-name">TimerConfig</span>());
+    }
+
+    <span class="annotation">@Timeout</span>  <span class="comment">// Called when timer fires</span>
+    <span class="keyword">public void</span> <span class="function">handleTimeout</span>(<span class="class-name">Timer</span> timer) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Timer fired!"</span>);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>✅ DO:</h3>
+                <ul>
+                    <li><strong>Use @Stateless for most services</strong> - Default choice</li>
+                    <li><strong>Use @Stateful sparingly</strong> - Memory intensive</li>
+                    <li><strong>Let container manage transactions</strong> - Don't use manual begin/commit</li>
+                    <li><strong>Use @Asynchronous for long tasks</strong> - Keep UI responsive</li>
+                    <li><strong>Leverage security annotations</strong> - Cleaner than manual checks</li>
+                    <li><strong>Use @Schedule for background jobs</strong> - Built-in scheduler</li>
+                    <li><strong>Call @Remove on @Stateful beans</strong> - Clean up resources</li>
+                </ul>
+
+                <h3>❌ DON'T:</h3>
+                <ul>
+                    <li><strong>Don't use EJBs if CDI beans suffice</strong> - EJBs add overhead</li>
+                    <li><strong>Don't store heavy objects in @Stateful</strong> - Memory issues</li>
+                    <li><strong>Don't create threads manually</strong> - Use @Asynchronous instead</li>
+                    <li><strong>Don't catch RuntimeException in transactions</strong> - Prevents rollback</li>
+                    <li><strong>Don't call local methods directly</strong> - Transaction/security won't work</li>
+                    <li><strong>Don't make EJBs final</strong> - Container needs to create proxies</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>EJBs</strong> are CDI beans with built-in enterprise features</li>
+                    <li><strong>@Stateless:</strong> Pool of instances, no state (most common)</li>
+                    <li><strong>@Stateful:</strong> Maintains state per client</li>
+                    <li><strong>@Singleton:</strong> One instance shared by all</li>
+                    <li><strong>Automatic transactions:</strong> Commit on success, rollback on exception</li>
+                    <li><strong>Security:</strong> @RolesAllowed, @PermitAll, @DenyAll</li>
+                    <li><strong>Asynchronous:</strong> @Asynchronous for background tasks</li>
+                    <li><strong>Scheduling:</strong> @Schedule for cron-style timers</li>
+                    <li><strong>When to use:</strong> Need transactions, security, async, or timers</li>
+                    <li><strong>When not to use:</strong> Simple services (use CDI beans instead)</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="cdi.html" class="related-link">CDI (Dependency Injection)</a>
+                <a href="transactions.html" class="related-link">Transactions</a>
+                <a href="jpa.html" class="related-link">JPA (Persistence)</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

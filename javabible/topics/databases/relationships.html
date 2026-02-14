@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entity Relationships - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#databases">Databases & Persistence</a> / Entity Relationships
+            </nav>
+            <h1>Entity Relationships</h1>
+            <p class="topic-subtitle">Mapping associations between entities in JPA</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>Understanding Relationships</h2>
+            <p>In relational databases, tables are connected through foreign keys. In JPA, we map these connections as <strong>relationships</strong> between entity objects. Understanding relationships is crucial for designing efficient and maintainable data models.</p>
+
+            <h3>Types of Relationships</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Relationship</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>@OneToOne</strong></td>
+                        <td>One entity relates to exactly one other</td>
+                        <td>User - UserProfile</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@OneToMany</strong></td>
+                        <td>One entity relates to many others</td>
+                        <td>Department - Employees</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@ManyToOne</strong></td>
+                        <td>Many entities relate to one</td>
+                        <td>Employees - Department</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@ManyToMany</strong></td>
+                        <td>Many entities relate to many others</td>
+                        <td>Students - Courses</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Directionality</h3>
+            <pre><code><span class="comment">// UNIDIRECTIONAL: Only one side knows about the relationship</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+    <span class="annotation">@ManyToOne</span>
+    <span class="keyword">private</span> Department department;  <span class="comment">// Employee knows about Department</span>
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Department</span> {
+    <span class="comment">// Department doesn't know about Employees</span>
+}
+
+<span class="comment">// BIDIRECTIONAL: Both sides know about each other</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+    <span class="annotation">@ManyToOne</span>
+    <span class="keyword">private</span> Department department;
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Department</span> {
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"department"</span>)
+    <span class="keyword">private</span> List&lt;Employee&gt; employees;  <span class="comment">// Department also knows about Employees</span>
+}</code></pre>
+
+            <div class="info-box tip">
+                <div class="info-box-title">Owning Side vs Inverse Side</div>
+                <p>In bidirectional relationships, one side "owns" the relationship (has the foreign key column). The inverse side uses <code>mappedBy</code> to indicate it's not the owner.</p>
+                <ul>
+                    <li><strong>Owning side:</strong> The side that contains the foreign key (usually @ManyToOne)</li>
+                    <li><strong>Inverse side:</strong> Uses mappedBy attribute</li>
+                    <li><strong>Rule:</strong> Only changes to the owning side are persisted!</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>@OneToOne Relationship</h2>
+            <p>A one-to-one relationship where each entity instance relates to exactly one instance of another entity.</p>
+
+            <h3>Unidirectional @OneToOne</h3>
+            <pre><code><span class="comment">// User has one Profile</span>
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String username;
+
+    <span class="annotation">@OneToOne</span>(cascade = CascadeType.ALL, orphanRemoval = <span class="keyword">true</span>)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"profile_id"</span>, referencedColumnName = <span class="string">"id"</span>)
+    <span class="keyword">private</span> UserProfile profile;
+}
+
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"user_profiles"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserProfile</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String fullName;
+    <span class="keyword">private</span> String bio;
+    <span class="keyword">private</span> String avatarUrl;
+}
+
+<span class="comment">// Database tables:</span>
+<span class="comment">// users: id, username, profile_id (FK)</span>
+<span class="comment">// user_profiles: id, full_name, bio, avatar_url</span></code></pre>
+
+            <h3>Bidirectional @OneToOne</h3>
+            <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String username;
+
+    <span class="annotation">@OneToOne</span>(cascade = CascadeType.ALL, orphanRemoval = <span class="keyword">true</span>)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"profile_id"</span>)
+    <span class="keyword">private</span> UserProfile profile;
+
+    <span class="comment">// Helper method to maintain bidirectional consistency</span>
+    <span class="keyword">public void</span> <span class="function">setProfile</span>(UserProfile profile) {
+        <span class="keyword">if</span> (profile == <span class="keyword">null</span>) {
+            <span class="keyword">if</span> (<span class="keyword">this</span>.profile != <span class="keyword">null</span>) {
+                <span class="keyword">this</span>.profile.setUser(<span class="keyword">null</span>);
+            }
+        } <span class="keyword">else</span> {
+            profile.setUser(<span class="keyword">this</span>);
+        }
+        <span class="keyword">this</span>.profile = profile;
+    }
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">UserProfile</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String fullName;
+
+    <span class="annotation">@OneToOne</span>(mappedBy = <span class="string">"profile"</span>)  <span class="comment">// Inverse side</span>
+    <span class="keyword">private</span> User user;
+}</code></pre>
+
+            <h3>@OneToOne with Shared Primary Key</h3>
+            <pre><code><span class="comment">// Both entities share the same ID (more efficient, no extra FK column)</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">User</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String username;
+
+    <span class="annotation">@OneToOne</span>(mappedBy = <span class="string">"user"</span>, cascade = CascadeType.ALL)
+    <span class="annotation">@PrimaryKeyJoinColumn</span>
+    <span class="keyword">private</span> UserProfile profile;
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">UserProfile</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="keyword">private</span> Long id;  <span class="comment">// Same ID as User!</span>
+
+    <span class="keyword">private</span> String fullName;
+
+    <span class="annotation">@OneToOne</span>
+    <span class="annotation">@MapsId</span>  <span class="comment">// Use User's ID as this entity's ID</span>
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"id"</span>)
+    <span class="keyword">private</span> User user;
+}
+
+<span class="comment">// Database tables:</span>
+<span class="comment">// users: id, username</span>
+<span class="comment">// user_profiles: id (PK and FK to users), full_name</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>@OneToMany and @ManyToOne</h2>
+            <p>The most common relationship type. One entity (the "one" side) has many related entities (the "many" side).</p>
+
+            <h3>Bidirectional @OneToMany / @ManyToOne (Recommended)</h3>
+            <pre><code><span class="comment">// Department has many Employees</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Department</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@OneToMany</span>(
+        mappedBy = <span class="string">"department"</span>,           <span class="comment">// Points to field in Employee</span>
+        cascade = CascadeType.ALL,           <span class="comment">// Cascade all operations</span>
+        orphanRemoval = <span class="keyword">true</span>                 <span class="comment">// Remove orphaned employees</span>
+    )
+    <span class="keyword">private</span> List&lt;Employee&gt; employees = <span class="keyword">new</span> ArrayList&lt;&gt;();
+
+    <span class="comment">// Helper methods to maintain bidirectional consistency</span>
+    <span class="keyword">public void</span> <span class="function">addEmployee</span>(Employee employee) {
+        employees.add(employee);
+        employee.setDepartment(<span class="keyword">this</span>);
+    }
+
+    <span class="keyword">public void</span> <span class="function">removeEmployee</span>(Employee employee) {
+        employees.remove(employee);
+        employee.setDepartment(<span class="keyword">null</span>);
+    }
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)     <span class="comment">// LAZY is recommended</span>
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"department_id"</span>)    <span class="comment">// FK column name</span>
+    <span class="keyword">private</span> Department department;          <span class="comment">// Owning side!</span>
+}
+
+<span class="comment">// Database tables:</span>
+<span class="comment">// departments: id, name</span>
+<span class="comment">// employees: id, name, department_id (FK to departments)</span>
+
+<span class="comment">// Usage:</span>
+Department dept = <span class="keyword">new</span> Department();
+dept.setName(<span class="string">"Engineering"</span>);
+
+Employee emp1 = <span class="keyword">new</span> Employee();
+emp1.setName(<span class="string">"Alice"</span>);
+dept.addEmployee(emp1);  <span class="comment">// Use helper method!</span>
+
+Employee emp2 = <span class="keyword">new</span> Employee();
+emp2.setName(<span class="string">"Bob"</span>);
+dept.addEmployee(emp2);
+
+entityManager.persist(dept);  <span class="comment">// Cascade saves employees too</span></code></pre>
+
+            <h3>Unidirectional @ManyToOne (Simple)</h3>
+            <pre><code><span class="comment">// Employee knows about Department, but not vice versa</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"department_id"</span>, nullable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> Department department;
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Department</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+    <span class="comment">// No reference to employees</span>
+}
+
+<span class="comment">// To get employees of a department, use JPQL:</span>
+List&lt;Employee&gt; employees = em.createQuery(
+    <span class="string">"SELECT e FROM Employee e WHERE e.department.id = :deptId"</span>,
+    Employee.<span class="keyword">class</span>
+).setParameter(<span class="string">"deptId"</span>, departmentId)
+ .getResultList();</code></pre>
+
+            <h3>Unidirectional @OneToMany (Avoid!)</h3>
+            <pre><code><span class="comment">// NOT RECOMMENDED - Creates join table unnecessarily</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Department</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@OneToMany</span>
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"department_id"</span>)  <span class="comment">// Without this, creates join table!</span>
+    <span class="keyword">private</span> List&lt;Employee&gt; employees;
+}
+
+<span class="comment">// This works but is inefficient. Prefer bidirectional with @ManyToOne owning side.</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>@ManyToMany Relationship</h2>
+            <p>Used when entities on both sides can have multiple related entities. Requires a join table.</p>
+
+            <h3>Basic @ManyToMany</h3>
+            <pre><code><span class="comment">// Students can enroll in many Courses, Courses have many Students</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Student</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@ManyToMany</span>
+    <span class="annotation">@JoinTable</span>(
+        name = <span class="string">"student_courses"</span>,                        <span class="comment">// Join table name</span>
+        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"student_id"</span>),   <span class="comment">// FK to this entity</span>
+        inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"course_id"</span>)  <span class="comment">// FK to other entity</span>
+    )
+    <span class="keyword">private</span> Set&lt;Course&gt; courses = <span class="keyword">new</span> HashSet&lt;&gt;();
+
+    <span class="comment">// Helper methods</span>
+    <span class="keyword">public void</span> <span class="function">enrollInCourse</span>(Course course) {
+        courses.add(course);
+        course.getStudents().add(<span class="keyword">this</span>);
+    }
+
+    <span class="keyword">public void</span> <span class="function">dropCourse</span>(Course course) {
+        courses.remove(course);
+        course.getStudents().remove(<span class="keyword">this</span>);
+    }
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Course</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String title;
+
+    <span class="annotation">@ManyToMany</span>(mappedBy = <span class="string">"courses"</span>)  <span class="comment">// Inverse side</span>
+    <span class="keyword">private</span> Set&lt;Student&gt; students = <span class="keyword">new</span> HashSet&lt;&gt;();
+}
+
+<span class="comment">// Database tables:</span>
+<span class="comment">// students: id, name</span>
+<span class="comment">// courses: id, title</span>
+<span class="comment">// student_courses: student_id (FK), course_id (FK) - join table!</span></code></pre>
+
+            <h3>@ManyToMany with Extra Columns (Intermediate Entity)</h3>
+            <pre><code><span class="comment">// When join table needs extra data (enrollment_date, grade, etc.)</span>
+<span class="comment">// Use intermediate entity instead of @ManyToMany</span>
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Student</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"student"</span>, cascade = CascadeType.ALL, orphanRemoval = <span class="keyword">true</span>)
+    <span class="keyword">private</span> Set&lt;Enrollment&gt; enrollments = <span class="keyword">new</span> HashSet&lt;&gt;();
+
+    <span class="keyword">public void</span> <span class="function">enrollInCourse</span>(Course course, LocalDate enrollmentDate) {
+        Enrollment enrollment = <span class="keyword">new</span> Enrollment(<span class="keyword">this</span>, course, enrollmentDate);
+        enrollments.add(enrollment);
+        course.getEnrollments().add(enrollment);
+    }
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Course</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String title;
+
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"course"</span>)
+    <span class="keyword">private</span> Set&lt;Enrollment&gt; enrollments = <span class="keyword">new</span> HashSet&lt;&gt;();
+}
+
+<span class="comment">// The intermediate entity</span>
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"enrollments"</span>)
+<span class="keyword">public class</span> <span class="class-name">Enrollment</span> {
+
+    <span class="annotation">@EmbeddedId</span>
+    <span class="keyword">private</span> EnrollmentId id;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@MapsId</span>(<span class="string">"studentId"</span>)
+    <span class="keyword">private</span> Student student;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@MapsId</span>(<span class="string">"courseId"</span>)
+    <span class="keyword">private</span> Course course;
+
+    <span class="comment">// Extra columns!</span>
+    <span class="keyword">private</span> LocalDate enrollmentDate;
+    <span class="keyword">private</span> String grade;
+    <span class="keyword">private</span> Boolean completed;
+
+    <span class="keyword">public</span> <span class="function">Enrollment</span>() {}
+
+    <span class="keyword">public</span> <span class="function">Enrollment</span>(Student student, Course course, LocalDate enrollmentDate) {
+        <span class="keyword">this</span>.id = <span class="keyword">new</span> EnrollmentId(student.getId(), course.getId());
+        <span class="keyword">this</span>.student = student;
+        <span class="keyword">this</span>.course = course;
+        <span class="keyword">this</span>.enrollmentDate = enrollmentDate;
+    }
+}
+
+<span class="comment">// Composite key for Enrollment</span>
+<span class="annotation">@Embeddable</span>
+<span class="keyword">public class</span> <span class="class-name">EnrollmentId</span> <span class="keyword">implements</span> Serializable {
+
+    <span class="keyword">private</span> Long studentId;
+    <span class="keyword">private</span> Long courseId;
+
+    <span class="keyword">public</span> <span class="function">EnrollmentId</span>() {}
+
+    <span class="keyword">public</span> <span class="function">EnrollmentId</span>(Long studentId, Long courseId) {
+        <span class="keyword">this</span>.studentId = studentId;
+        <span class="keyword">this</span>.courseId = courseId;
+    }
+
+    <span class="comment">// equals() and hashCode() REQUIRED!</span>
+    <span class="annotation">@Override</span>
+    <span class="keyword">public boolean</span> <span class="function">equals</span>(Object o) {
+        <span class="keyword">if</span> (<span class="keyword">this</span> == o) <span class="keyword">return true</span>;
+        <span class="keyword">if</span> (o == <span class="keyword">null</span> || getClass() != o.getClass()) <span class="keyword">return false</span>;
+        EnrollmentId that = (EnrollmentId) o;
+        <span class="keyword">return</span> Objects.equals(studentId, that.studentId) &&
+               Objects.equals(courseId, that.courseId);
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public int</span> <span class="function">hashCode</span>() {
+        <span class="keyword">return</span> Objects.hash(studentId, courseId);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Self-Referential Relationships</h2>
+            <p>When an entity references itself (e.g., employee-manager, category-subcategory).</p>
+
+            <pre><code><span class="comment">// Employee with Manager (who is also an Employee)</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"manager_id"</span>)
+    <span class="keyword">private</span> Employee manager;
+
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"manager"</span>)
+    <span class="keyword">private</span> List&lt;Employee&gt; subordinates = <span class="keyword">new</span> ArrayList&lt;&gt;();
+
+    <span class="keyword">public void</span> <span class="function">addSubordinate</span>(Employee employee) {
+        subordinates.add(employee);
+        employee.setManager(<span class="keyword">this</span>);
+    }
+}
+
+<span class="comment">// Database table:</span>
+<span class="comment">// employees: id, name, manager_id (FK to employees.id)</span>
+
+<span class="comment">// Category with parent/children (tree structure)</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Category</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="keyword">private</span> String name;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"parent_id"</span>)
+    <span class="keyword">private</span> Category parent;
+
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"parent"</span>, cascade = CascadeType.ALL)
+    <span class="keyword">private</span> List&lt;Category&gt; children = <span class="keyword">new</span> ArrayList&lt;&gt;();
+
+    <span class="keyword">public boolean</span> <span class="function">isRoot</span>() {
+        <span class="keyword">return</span> parent == <span class="keyword">null</span>;
+    }
+
+    <span class="keyword">public boolean</span> <span class="function">isLeaf</span>() {
+        <span class="keyword">return</span> children.isEmpty();
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Cascade Operations</h2>
+            <p>Cascade types determine which operations propagate from parent to child entities.</p>
+
+            <pre><code><span class="comment">// CascadeType options:</span>
+
+<span class="annotation">@OneToMany</span>(cascade = CascadeType.PERSIST)  <span class="comment">// persist() cascades</span>
+<span class="annotation">@OneToMany</span>(cascade = CascadeType.MERGE)    <span class="comment">// merge() cascades</span>
+<span class="annotation">@OneToMany</span>(cascade = CascadeType.REMOVE)   <span class="comment">// remove() cascades</span>
+<span class="annotation">@OneToMany</span>(cascade = CascadeType.REFRESH)  <span class="comment">// refresh() cascades</span>
+<span class="annotation">@OneToMany</span>(cascade = CascadeType.DETACH)   <span class="comment">// detach() cascades</span>
+<span class="annotation">@OneToMany</span>(cascade = CascadeType.ALL)      <span class="comment">// All of the above</span>
+
+<span class="comment">// Multiple cascade types</span>
+<span class="annotation">@OneToMany</span>(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+
+<span class="comment">// Example: Order with OrderItems</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Order</span> {
+
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> Long id;
+
+    <span class="annotation">@OneToMany</span>(
+        mappedBy = <span class="string">"order"</span>,
+        cascade = CascadeType.ALL,  <span class="comment">// Save/delete items with order</span>
+        orphanRemoval = <span class="keyword">true</span>        <span class="comment">// Delete items removed from collection</span>
+    )
+    <span class="keyword">private</span> List&lt;OrderItem&gt; items = <span class="keyword">new</span> ArrayList&lt;&gt;();
+}
+
+<span class="comment">// orphanRemoval example:</span>
+Order order = em.find(Order.<span class="keyword">class</span>, 1L);
+order.getItems().remove(0);  <span class="comment">// This item will be DELETED from DB!</span>
+<span class="comment">// Without orphanRemoval, it would just set order_id to NULL</span></code></pre>
+
+            <div class="info-box warning">
+                <div class="info-box-title">Cascade with Care!</div>
+                <ul>
+                    <li><strong>CascadeType.REMOVE</strong> can accidentally delete more than intended</li>
+                    <li><strong>Don't cascade on @ManyToOne</strong> - deleting an employee shouldn't delete the department!</li>
+                    <li><strong>Use cascade for parent-child</strong> relationships where child can't exist without parent</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Fetch Types and Lazy Loading</h2>
+
+            <pre><code><span class="comment">// FetchType.LAZY - Load on demand (recommended for collections)</span>
+<span class="annotation">@OneToMany</span>(fetch = FetchType.LAZY)  <span class="comment">// Default for @OneToMany, @ManyToMany</span>
+<span class="keyword">private</span> List&lt;Employee&gt; employees;
+
+<span class="comment">// FetchType.EAGER - Load immediately</span>
+<span class="annotation">@ManyToOne</span>(fetch = FetchType.EAGER)  <span class="comment">// Default for @ManyToOne, @OneToOne</span>
+<span class="keyword">private</span> Department department;
+
+<span class="comment">// BEST PRACTICE: Make everything LAZY</span>
+<span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)  <span class="comment">// Override default EAGER</span>
+<span class="keyword">private</span> Department department;
+
+<span class="annotation">@OneToOne</span>(fetch = FetchType.LAZY)   <span class="comment">// Override default EAGER</span>
+<span class="keyword">private</span> UserProfile profile;
+
+<span class="comment">// LazyInitializationException: Accessing lazy field outside session</span>
+Employee emp = em.find(Employee.<span class="keyword">class</span>, 1L);
+em.close();  <span class="comment">// Session closed!</span>
+emp.getDepartment().getName();  <span class="comment">// LazyInitializationException!</span>
+
+<span class="comment">// Solutions:</span>
+
+<span class="comment">// 1. JOIN FETCH in query</span>
+Employee emp = em.createQuery(
+    <span class="string">"SELECT e FROM Employee e JOIN FETCH e.department WHERE e.id = :id"</span>,
+    Employee.<span class="keyword">class</span>
+).setParameter(<span class="string">"id"</span>, 1L).getSingleResult();
+em.close();
+emp.getDepartment().getName();  <span class="comment">// Works! Already loaded.</span>
+
+<span class="comment">// 2. Initialize before closing session</span>
+Employee emp = em.find(Employee.<span class="keyword">class</span>, 1L);
+Hibernate.initialize(emp.getDepartment());  <span class="comment">// Force load</span>
+em.close();
+
+<span class="comment">// 3. @Transactional in Spring (keeps session open)</span>
+<span class="annotation">@Transactional</span>
+<span class="keyword">public</span> EmployeeDTO <span class="function">getEmployeeWithDepartment</span>(Long id) {
+    Employee emp = repository.findById(id).orElseThrow();
+    <span class="keyword">return new</span> EmployeeDTO(emp, emp.getDepartment().getName());  <span class="comment">// Works!</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>Do's</h3>
+                <ul>
+                    <li><strong>Prefer @ManyToOne</strong> as the owning side</li>
+                    <li><strong>Use helper methods</strong> to maintain bidirectional consistency</li>
+                    <li><strong>Make all relationships LAZY</strong> by default</li>
+                    <li><strong>Use JOIN FETCH</strong> to avoid N+1 problems</li>
+                    <li><strong>Prefer Set over List</strong> for @ManyToMany to avoid duplicates</li>
+                    <li><strong>Use intermediate entities</strong> for @ManyToMany with extra columns</li>
+                    <li><strong>Always implement equals() and hashCode()</strong> for composite keys</li>
+                </ul>
+
+                <h3>Don'ts</h3>
+                <ul>
+                    <li><strong>Don't use EAGER</strong> fetching unless absolutely necessary</li>
+                    <li><strong>Don't cascade REMOVE</strong> on @ManyToOne</li>
+                    <li><strong>Don't use unidirectional @OneToMany</strong> without @JoinColumn</li>
+                    <li><strong>Don't forget mappedBy</strong> on inverse side</li>
+                    <li><strong>Don't mix business logic</strong> in entity helper methods</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>@OneToOne:</strong> One-to-one mapping, consider shared primary key</li>
+                    <li><strong>@OneToMany / @ManyToOne:</strong> Most common, prefer bidirectional with @ManyToOne owning</li>
+                    <li><strong>@ManyToMany:</strong> Uses join table, consider intermediate entity for extra data</li>
+                    <li><strong>mappedBy:</strong> Indicates inverse (non-owning) side</li>
+                    <li><strong>cascade:</strong> Propagate operations to related entities</li>
+                    <li><strong>orphanRemoval:</strong> Delete children removed from collection</li>
+                    <li><strong>FetchType.LAZY:</strong> Default for collections, use for all relationships</li>
+                    <li><strong>Helper methods:</strong> Essential for maintaining bidirectional consistency</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jpa-hibernate.html" class="related-link">JPA & Hibernate</a>
+                <a href="orms.html" class="related-link">ORMs</a>
+                <a href="transactions.html" class="related-link">Transactions (ACID)</a>
+                <a href="../spring/data-jpa.html" class="related-link">Spring Data JPA</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

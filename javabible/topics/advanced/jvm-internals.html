@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JVM Internals - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / JVM Internals
+            </nav>
+            <h1>JVM Internals</h1>
+            <p class="topic-subtitle">How the Java Virtual Machine Works Under the Hood</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is the JVM?</h2>
+            <p>Imagine you write a letter in English, but your friend only reads Spanish. You need a translator! The <strong>JVM (Java Virtual Machine)</strong> is like that translator - it takes your Java code (bytecode) and translates it into instructions the computer's processor can understand.</p>
+
+            <h3>Real-World Analogy: Universal Remote Control</h3>
+            <p>A universal remote can control any TV brand - Samsung, LG, Sony. You press the same button (bytecode), and the remote translates it to commands each TV understands. The JVM is like that universal remote for computers!</p>
+
+            <ul>
+                <li><strong>Your code:</strong> The button you press (bytecode)</li>
+                <li><strong>JVM:</strong> The universal remote (translator)</li>
+                <li><strong>Different computers:</strong> Different TV brands</li>
+                <li><strong>Result:</strong> Same action on all devices!</li>
+            </ul>
+
+            <h3>Why JVM Matters - Write Once, Run Anywhere (WORA)</h3>
+            <pre><code><span class="comment">Without JVM (Old way):</span>
+MyProgram.java → Compile for Windows → Windows.exe
+MyProgram.java → Compile for Mac → Mac.app
+MyProgram.java → Compile for Linux → Linux.bin
+<span class="comment">Problem: Need 3 different versions!</span>
+
+<span class="comment">With JVM (Java way):</span>
+MyProgram.java → Compile ONCE → MyProgram.class (bytecode)
+                          ↓
+        ┌─────────────────┼─────────────────┐
+        ↓                 ↓                 ↓
+    JVM (Windows)    JVM (Mac)        JVM (Linux)
+        ↓                 ↓                 ↓
+    Runs on Windows  Runs on Mac      Runs on Linux
+
+<span class="comment">Solution: Same .class file runs everywhere!</span></code></pre>
+
+            <p><strong>The Promise:</strong> "Write once, run anywhere" - compile your Java code once, and it runs on any device with a JVM!</p>
+        </section>
+
+        <section class="content-section">
+            <h2>JVM Architecture - The Big Picture</h2>
+
+            <pre><code><span class="comment">┌──────────────────────────────────────────────┐</span>
+<span class="comment">│         YOUR JAVA APPLICATION                │</span>
+<span class="comment">│         (MyProgram.java source code)         │</span>
+<span class="comment">└──────────────────────────────────────────────┘</span>
+                     ↓ javac (Java Compiler)
+<span class="comment">┌──────────────────────────────────────────────┐</span>
+<span class="comment">│         BYTECODE (MyProgram.class)           │</span>
+<span class="comment">│    Platform-independent instructions         │</span>
+<span class="comment">└──────────────────────────────────────────────┘</span>
+                     ↓
+<span class="comment">┌──────────────────────────────────────────────┐</span>
+<span class="comment">│         JVM (Java Virtual Machine)           │</span>
+<span class="comment">│                                              │</span>
+<span class="comment">│  ┌────────────────────────────────────────┐  │</span>
+<span class="comment">│  │  CLASS LOADER SUBSYSTEM                │  │</span>
+<span class="comment">│  │  • Loads .class files                  │  │</span>
+<span class="comment">│  │  • Verifies bytecode                   │  │</span>
+<span class="comment">│  │  • Prepares classes                    │  │</span>
+<span class="comment">│  └────────────────────────────────────────┘  │</span>
+<span class="comment">│                                              │</span>
+<span class="comment">│  ┌────────────────────────────────────────┐  │</span>
+<span class="comment">│  │  RUNTIME DATA AREAS (Memory)           │  │</span>
+<span class="comment">│  │  • Heap: Objects live here             │  │</span>
+<span class="comment">│  │  • Stack: Method calls                 │  │</span>
+<span class="comment">│  │  • Method Area: Class data             │  │</span>
+<span class="comment">│  │  • PC Register: Instruction pointer    │  │</span>
+<span class="comment">│  └────────────────────────────────────────┘  │</span>
+<span class="comment">│                                              │</span>
+<span class="comment">│  ┌────────────────────────────────────────┐  │</span>
+<span class="comment">│  │  EXECUTION ENGINE                      │  │</span>
+<span class="comment">│  │  • Interpreter: Runs bytecode          │  │</span>
+<span class="comment">│  │  • JIT Compiler: Optimizes hot code    │  │</span>
+<span class="comment">│  │  • Garbage Collector: Cleans memory    │  │</span>
+<span class="comment">│  └────────────────────────────────────────┘  │</span>
+<span class="comment">│                                              │</span>
+<span class="comment">│  ┌────────────────────────────────────────┐  │</span>
+<span class="comment">│  │  NATIVE METHOD INTERFACE (JNI)         │  │</span>
+<span class="comment">│  │  Calls to C/C++ libraries              │  │</span>
+<span class="comment">│  └────────────────────────────────────────┘  │</span>
+<span class="comment">└──────────────────────────────────────────────┘</span>
+                     ↓
+<span class="comment">┌──────────────────────────────────────────────┐</span>
+<span class="comment">│     OPERATING SYSTEM (Windows/Mac/Linux)     │</span>
+<span class="comment">└──────────────────────────────────────────────┘</span>
+                     ↓
+<span class="comment">┌──────────────────────────────────────────────┐</span>
+<span class="comment">│         HARDWARE (CPU, RAM, Disk)            │</span>
+<span class="comment">└──────────────────────────────────────────────┘</span></code></pre>
+
+            <p><strong>Think of it like a restaurant:</strong></p>
+            <ul>
+                <li><strong>Class Loader:</strong> Waiter who brings ingredients (classes) from storage</li>
+                <li><strong>Memory Areas:</strong> Kitchen workspace (heap, stack, etc.)</li>
+                <li><strong>Execution Engine:</strong> Chef who cooks (executes) your code</li>
+                <li><strong>Garbage Collector:</strong> Dishwasher who cleans up unused items</li>
+            </ul>
+        </section>
+
+        <section class="content-section">
+            <h2>Component 1: Class Loader Subsystem</h2>
+            <p>The <strong>Class Loader</strong> is like a librarian who finds and organizes books (classes) when you need them.</p>
+
+            <h3>Three Phases of Class Loading</h3>
+
+            <h4>Phase 1: Loading - Finding the Class</h4>
+            <pre><code><span class="comment">// When you write:</span>
+<span class="class-name">MyClass</span> obj = <span class="keyword">new</span> <span class="class-name">MyClass</span>();
+
+<span class="comment">// JVM thinks:</span>
+<span class="comment">"I need MyClass! Let me find it..."</span>
+
+<span class="comment">Steps:</span>
+<span class="comment">1. Search for MyClass.class file</span>
+<span class="comment">   • Check classpath</span>
+<span class="comment">   • Look in JAR files</span>
+<span class="comment">   • Search directories</span>
+<span class="comment">2. Read the .class file into memory</span>
+<span class="comment">3. Create a Class object representing MyClass</span>
+<span class="comment">4. Store it in Method Area</span></code></pre>
+
+            <h4>Phase 2: Linking - Verification, Preparation, Resolution</h4>
+            <pre><code><span class="comment">Verification (Security Check):</span>
+<span class="comment">  ✓ Is this valid bytecode?</span>
+<span class="comment">  ✓ Does it follow Java language rules?</span>
+<span class="comment">  ✓ Are there security violations?</span>
+<span class="comment">  ✓ Will it crash the JVM?</span>
+<span class="comment">  → If any check fails: ClassFormatError or VerifyError</span>
+
+<span class="comment">Preparation (Memory Allocation):</span>
+<span class="comment">  • Allocate memory for static variables</span>
+<span class="comment">  • Set default values:</span>
+<span class="comment">    - Numbers (int, long, etc.) → 0</span>
+<span class="comment">    - boolean → false</span>
+<span class="comment">    - References (Object, String, etc.) → null</span>
+
+<span class="comment">Resolution (Link References):</span>
+<span class="comment">  • Convert symbolic names to actual memory addresses</span>
+<span class="comment">  • Example: "MyClass.method()" → actual method location</span></code></pre>
+
+            <h4>Phase 3: Initialization - Running Static Code</h4>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">Example</span> {
+    <span class="keyword">static int</span> count = <span class="number">10</span>;  <span class="comment">// Step 2: Initialize to 10</span>
+
+    <span class="keyword">static</span> {
+        <span class="class-name">System</span>.out.println(<span class="string">"Static block!"</span>);  <span class="comment">// Step 3: Execute this</span>
+        count = <span class="number">20</span>;  <span class="comment">// Step 4: Set to 20</span>
+    }
+
+    <span class="keyword">static int</span> doubled = count * <span class="number">2</span>;  <span class="comment">// Step 5: doubled = 40</span>
+}
+
+<span class="comment">// First time Example is used:</span>
+<span class="comment">// Step 1: count = 0 (default from Preparation)</span>
+<span class="comment">// Step 2: count = 10 (initialization)</span>
+<span class="comment">// Step 3: Static block executes → prints "Static block!"</span>
+<span class="comment">// Step 4: count = 20</span>
+<span class="comment">// Step 5: doubled = 40 (20 * 2)</span>
+
+<span class="class-name">System</span>.out.println(<span class="class-name">Example</span>.count);    <span class="comment">// 20</span>
+<span class="class-name">System</span>.out.println(<span class="class-name">Example</span>.doubled);  <span class="comment">// 40</span></code></pre>
+
+            <h3>Class Loader Hierarchy - Parent Delegation Model</h3>
+            <pre><code><span class="comment">┌──────────────────────────────┐</span>
+<span class="comment">│  Bootstrap Class Loader      │  ← Written in C++</span>
+<span class="comment">│  Loads: rt.jar, core classes │     java.lang.*</span>
+<span class="comment">│  (String, Object, System)    │     java.util.*</span>
+<span class="comment">└──────────────────────────────┘</span>
+            ↓ parent
+<span class="comment">┌──────────────────────────────┐</span>
+<span class="comment">│  Extension Class Loader      │  ← Loads extensions</span>
+<span class="comment">│  Loads: jre/lib/ext/*.jar    │     Optional packages</span>
+<span class="comment">└──────────────────────────────┘</span>
+            ↓ parent
+<span class="comment">┌──────────────────────────────┐</span>
+<span class="comment">│  Application Class Loader    │  ← Your application</span>
+<span class="comment">│  Loads: CLASSPATH classes    │     MyClass.class</span>
+<span class="comment">│  Your .class files, libs     │     third-party JARs</span>
+<span class="comment">└──────────────────────────────┘</span>
+
+<span class="comment">Parent Delegation:</span>
+<span class="comment">1. Application ClassLoader asked to load MyClass</span>
+<span class="comment">2. Delegates to Extension ClassLoader (parent)</span>
+<span class="comment">3. Extension delegates to Bootstrap (grandparent)</span>
+<span class="comment">4. Bootstrap tries, doesn't find it</span>
+<span class="comment">5. Extension tries, doesn't find it</span>
+<span class="comment">6. Application tries, finds and loads it!</span>
+
+<span class="comment">Why? Security! Core classes (String, Object) always</span>
+<span class="comment">loaded by Bootstrap - you can't replace them!</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Component 2: Runtime Data Areas (Memory)</h2>
+
+            <h3>1. Heap - Where Objects Live</h3>
+            <p>The <strong>Heap</strong> is like a warehouse where all your objects are stored. It's shared by all threads.</p>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">MemoryDemo</span> {
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+        <span class="class-name">Person</span> alice = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Alice"</span>, <span class="number">25</span>);  <span class="comment">// Created in HEAP</span>
+        <span class="class-name">Person</span> bob = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Bob"</span>, <span class="number">30</span>);    <span class="comment">// Created in HEAP</span>
+
+        <span class="class-name">String</span> message = <span class="string">"Hello"</span>;  <span class="comment">// String in HEAP (String pool)</span>
+        <span class="keyword">int</span>[] numbers = {<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>};  <span class="comment">// Array in HEAP</span>
+    }
+}
+
+<span class="comment">HEAP Memory Visualization:</span>
+<span class="comment">┌───────────────────────────────┐</span>
+<span class="comment">│ HEAP (Shared by all threads) │</span>
+<span class="comment">├───────────────────────────────┤</span>
+<span class="comment">│ Person object                 │</span>
+<span class="comment">│ name: "Alice"                 │  ← alice variable points here</span>
+<span class="comment">│ age: 25                       │</span>
+<span class="comment">├───────────────────────────────┤</span>
+<span class="comment">│ Person object                 │</span>
+<span class="comment">│ name: "Bob"                   │  ← bob variable points here</span>
+<span class="comment">│ age: 30                       │</span>
+<span class="comment">├───────────────────────────────┤</span>
+<span class="comment">│ String: "Hello"               │  ← message variable points here</span>
+<span class="comment">├───────────────────────────────┤</span>
+<span class="comment">│ int[] {1, 2, 3}               │  ← numbers variable points here</span>
+<span class="comment">└───────────────────────────────┘</span></code></pre>
+
+            <h3>2. Stack - Method Call Stack (Thread-Specific)</h3>
+            <p>Each thread gets its own <strong>Stack</strong> - like a stack of plates. Methods are added on top (push) and removed (pop) in LIFO order.</p>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">StackDemo</span> {
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {  <span class="comment">// Frame 1</span>
+        <span class="keyword">int</span> x = <span class="number">10</span>;
+        <span class="keyword">int</span> result = calculate(x);
+        <span class="class-name">System</span>.out.println(result);
+    }
+
+    <span class="keyword">public static int</span> <span class="function">calculate</span>(<span class="keyword">int</span> a) {  <span class="comment">// Frame 2</span>
+        <span class="keyword">int</span> b = <span class="number">20</span>;
+        <span class="keyword">return</span> multiply(a, b);
+    }
+
+    <span class="keyword">public static int</span> <span class="function">multiply</span>(<span class="keyword">int</span> p, <span class="keyword">int</span> q) {  <span class="comment">// Frame 3</span>
+        <span class="keyword">int</span> result = p * q;
+        <span class="keyword">return</span> result;
+    }
+}
+
+<span class="comment">STACK Evolution (Thread's Stack):</span>
+
+<span class="comment">Step 1: main() starts</span>
+<span class="comment">┌─────────────────────┐</span>
+<span class="comment">│ main()              │  ← Current execution</span>
+<span class="comment">│ x = 10              │</span>
+<span class="comment">│ result = ?          │</span>
+<span class="comment">└─────────────────────┘</span>
+
+<span class="comment">Step 2: calculate() called</span>
+<span class="comment">┌─────────────────────┐</span>
+<span class="comment">│ calculate()         │  ← Current execution</span>
+<span class="comment">│ a = 10              │</span>
+<span class="comment">│ b = 20              │</span>
+<span class="comment">├─────────────────────┤</span>
+<span class="comment">│ main()              │</span>
+<span class="comment">│ x = 10              │</span>
+<span class="comment">│ result = ?          │</span>
+<span class="comment">└─────────────────────┘</span>
+
+<span class="comment">Step 3: multiply() called</span>
+<span class="comment">┌─────────────────────┐</span>
+<span class="comment">│ multiply()          │  ← Current execution</span>
+<span class="comment">│ p = 10, q = 20      │</span>
+<span class="comment">│ result = 200        │</span>
+<span class="comment">├─────────────────────┤</span>
+<span class="comment">│ calculate()         │</span>
+<span class="comment">│ a = 10, b = 20      │</span>
+<span class="comment">├─────────────────────┤</span>
+<span class="comment">│ main()              │</span>
+<span class="comment">│ x = 10              │</span>
+<span class="comment">│ result = ?          │</span>
+<span class="comment">└─────────────────────┘</span>
+
+<span class="comment">Step 4: multiply() returns 200, frame popped</span>
+<span class="comment">┌─────────────────────┐</span>
+<span class="comment">│ calculate()         │  ← Current execution</span>
+<span class="comment">│ a = 10, b = 20      │</span>
+<span class="comment">│ return value: 200   │</span>
+<span class="comment">├─────────────────────┤</span>
+<span class="comment">│ main()              │</span>
+<span class="comment">│ x = 10              │</span>
+<span class="comment">│ result = ?          │</span>
+<span class="comment">└─────────────────────┘</span>
+
+<span class="comment">Step 5: calculate() returns 200, frame popped</span>
+<span class="comment">┌─────────────────────┐</span>
+<span class="comment">│ main()              │  ← Current execution</span>
+<span class="comment">│ x = 10              │</span>
+<span class="comment">│ result = 200        │  ✓ Got the result!</span>
+<span class="comment">└─────────────────────┘</span>
+
+<span class="comment">Step 6: main() finishes, stack empty, program ends</span></code></pre>
+
+            <h3>What Goes in Stack vs Heap?</h3>
+            <table>
+                <tr>
+                    <th>Stack</th>
+                    <th>Heap</th>
+                </tr>
+                <tr>
+                    <td>Local variables (primitives)</td>
+                    <td>Objects (new keyword)</td>
+                </tr>
+                <tr>
+                    <td>Method parameters</td>
+                    <td>Instance variables</td>
+                </tr>
+                <tr>
+                    <td>Method call information</td>
+                    <td>Arrays</td>
+                </tr>
+                <tr>
+                    <td>References to objects</td>
+                    <td>Strings</td>
+                </tr>
+                <tr>
+                    <td>Fast access (LIFO)</td>
+                    <td>Slower access (GC managed)</td>
+                </tr>
+                <tr>
+                    <td>Thread-specific</td>
+                    <td>Shared by all threads</td>
+                </tr>
+                <tr>
+                    <td>Automatic cleanup (pop)</td>
+                    <td>Garbage Collector cleanup</td>
+                </tr>
+            </table>
+
+            <h3>3. Method Area (Metaspace in Java 8+)</h3>
+            <p>Stores class-level information shared by all threads.</p>
+
+            <pre><code><span class="comment">Method Area contains:</span>
+<span class="comment">• Class structure (name, parent, interfaces)</span>
+<span class="comment">• Method bytecode</span>
+<span class="comment">• Static variables</span>
+<span class="comment">• Constant pool (string literals, constants)</span>
+<span class="comment">• Field information (names, types)</span>
+
+<span class="keyword">public class</span> <span class="class-name">Example</span> {
+    <span class="keyword">static int</span> count = <span class="number">0</span>;  <span class="comment">// Stored in Method Area</span>
+    <span class="keyword">static final</span> <span class="class-name">String</span> APP_NAME = <span class="string">"MyApp"</span>;  <span class="comment">// Method Area</span>
+
+    <span class="keyword">public void</span> <span class="function">doWork</span>() {  <span class="comment">// Bytecode stored in Method Area</span>
+        <span class="comment">// method body...</span>
+    }
+}</code></pre>
+
+            <h3>4. Program Counter (PC) Register</h3>
+            <p>Keeps track of which instruction to execute next - like a bookmark in a book.</p>
+
+            <h3>5. Native Method Stack</h3>
+            <p>For methods written in other languages (C/C++) accessed via JNI (Java Native Interface).</p>
+        </section>
+
+        <section class="content-section">
+            <h2>Component 3: Execution Engine</h2>
+
+            <h3>1. Interpreter - Line-by-Line Execution</h3>
+            <p>Reads bytecode one instruction at a time and executes it. Simple but slow.</p>
+
+            <pre><code><span class="comment">Your Java code:</span>
+<span class="keyword">int</span> x = <span class="number">5</span>;
+<span class="keyword">int</span> y = <span class="number">10</span>;
+<span class="keyword">int</span> sum = x + y;
+
+<span class="comment">Compiled to bytecode:</span>
+<span class="number">0</span>: bipush <span class="number">5</span>        <span class="comment">// Push 5 onto operand stack</span>
+<span class="number">2</span>: istore_1        <span class="comment">// Store in local variable 1 (x)</span>
+<span class="number">3</span>: bipush <span class="number">10</span>       <span class="comment">// Push 10 onto stack</span>
+<span class="number">5</span>: istore_2        <span class="comment">// Store in local variable 2 (y)</span>
+<span class="number">6</span>: iload_1         <span class="comment">// Load x onto stack</span>
+<span class="number">7</span>: iload_2         <span class="comment">// Load y onto stack</span>
+<span class="number">8</span>: iadd            <span class="comment">// Add top two stack values</span>
+<span class="number">9</span>: istore_3        <span class="comment">// Store result in variable 3 (sum)</span>
+
+<span class="comment">Interpreter executes each instruction one by one</span></code></pre>
+
+            <h3>2. JIT (Just-In-Time) Compiler - Performance Booster</h3>
+            <p>The game-changer! JIT identifies "hot" code (frequently executed) and compiles it to native machine code for lightning-fast execution.</p>
+
+            <pre><code><span class="comment">How JIT Works:</span>
+
+<span class="comment">Phase 1: Profiling</span>
+<span class="comment">  JVM watches which code runs frequently</span>
+<span class="comment">  Example: "This loop ran 10,000 times!"</span>
+
+<span class="comment">Phase 2: Compilation</span>
+<span class="comment">  JIT compiles hot code to native machine code</span>
+<span class="comment">  Bytecode → Native CPU instructions</span>
+
+<span class="comment">Phase 3: Optimization</span>
+<span class="comment">  • Inline methods (remove function call overhead)</span>
+<span class="comment">  • Dead code elimination</span>
+<span class="comment">  • Loop unrolling</span>
+<span class="comment">  • Constant folding</span>
+
+<span class="comment">Example:</span>
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000000</span>; i++) {
+    result += calculate(i);  <span class="comment">// Called 1 million times!</span>
+}
+
+<span class="comment">Without JIT:</span>
+<span class="comment">  Interpreter executes calculate() 1 million times = SLOW</span>
+
+<span class="comment">With JIT:</span>
+<span class="comment">  First ~100 calls: Interpreted (JIT profiling)</span>
+<span class="comment">  JIT detects: "This is hot code!"</span>
+<span class="comment">  JIT compiles to native code (once)</span>
+<span class="comment">  Remaining 999,900 calls: Native code = FAST!</span>
+
+<span class="comment">Result: 10-100x faster!</span></code></pre>
+
+            <h3>3. Garbage Collector - Memory Janitor</h3>
+            <p>Automatically finds and removes unused objects. Covered in detail in next topic!</p>
+        </section>
+
+        <section class="content-section">
+            <h2>Complete Example: What Happens When You Run Java Code</h2>
+
+            <pre><code><span class="keyword">public class</span> <span class="class-name">HelloWorld</span> {
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+        <span class="class-name">String</span> message = <span class="string">"Hello, World!"</span>;
+        <span class="class-name">System</span>.out.println(message);
+    }
+}</code></pre>
+
+            <p><strong>Complete Step-by-Step Journey:</strong></p>
+
+            <ol>
+                <li><strong>Compilation Phase (Developer Machine):</strong>
+                    <ul>
+                        <li>Run: <code>javac HelloWorld.java</code></li>
+                        <li>Compiler reads source code</li>
+                        <li>Checks syntax, types</li>
+                        <li>Generates: <code>HelloWorld.class</code> (bytecode)</li>
+                    </ul>
+                </li>
+
+                <li><strong>JVM Startup:</strong>
+                    <ul>
+                        <li>Run: <code>java HelloWorld</code></li>
+                        <li>Operating System loads JVM</li>
+                        <li>JVM initializes memory areas (Heap, Stack, Method Area)</li>
+                        <li>JVM starts main thread</li>
+                    </ul>
+                </li>
+
+                <li><strong>Class Loading:</strong>
+                    <ul>
+                        <li>Application ClassLoader searches for HelloWorld.class</li>
+                        <li>Reads bytecode into memory</li>
+                        <li>Verification: Checks bytecode is safe</li>
+                        <li>Preparation: Allocates memory for static variables</li>
+                        <li>Resolution: Links references</li>
+                        <li>Stores class metadata in Method Area</li>
+                    </ul>
+                </li>
+
+                <li><strong>Execution Begins:</strong>
+                    <ul>
+                        <li>JVM finds main() method</li>
+                        <li>Creates stack frame for main() on thread's stack</li>
+                        <li>Execution starts at first instruction</li>
+                    </ul>
+                </li>
+
+                <li><strong>Line 1: <code>String message = "Hello, World!";</code></strong>
+                    <ul>
+                        <li>String literal "Hello, World!" created in Heap (String pool)</li>
+                        <li>Variable 'message' created in Stack (local variable)</li>
+                        <li>'message' holds reference to String in Heap</li>
+                    </ul>
+                </li>
+
+                <li><strong>Line 2: <code>System.out.println(message);</code></strong>
+                    <ul>
+                        <li>JVM loads System class (if not already loaded)</li>
+                        <li>Accesses static field 'out' (PrintStream object)</li>
+                        <li>Calls println() method</li>
+                        <li>Native method writes to console</li>
+                        <li>Output appears: "Hello, World!"</li>
+                    </ul>
+                </li>
+
+                <li><strong>Method Return:</strong>
+                    <ul>
+                        <li>main() completes</li>
+                        <li>Stack frame removed (popped)</li>
+                        <li>Local variables disappear</li>
+                    </ul>
+                </li>
+
+                <li><strong>Garbage Collection:</strong>
+                    <ul>
+                        <li>String object in Heap no longer referenced</li>
+                        <li>Marked for collection (happens later)</li>
+                        <li>Memory will be reclaimed</li>
+                    </ul>
+                </li>
+
+                <li><strong>JVM Shutdown:</strong>
+                    <ul>
+                        <li>No more non-daemon threads running</li>
+                        <li>JVM performs cleanup</li>
+                        <li>Returns control to Operating System</li>
+                        <li>Program terminates</li>
+                    </ul>
+                </li>
+            </ol>
+        </section>
+
+        <section class="content-section">
+            <h2>Why Understanding JVM Matters</h2>
+
+            <h3>For Developers:</h3>
+            <ul>
+                <li><strong>Performance Tuning:</strong> Adjust heap size, GC settings for optimal performance</li>
+                <li><strong>Debugging:</strong> Understand stack traces, OutOfMemoryErrors</li>
+                <li><strong>Memory Management:</strong> Write memory-efficient code</li>
+                <li><strong>Thread Safety:</strong> Understand how threads share heap but have separate stacks</li>
+            </ul>
+
+            <h3>Common JVM Flags:</h3>
+            <pre><code><span class="comment"># Set max heap size to 2GB</span>
+java -Xmx2g MyProgram
+
+<span class="comment"># Set initial heap size to 512MB</span>
+java -Xms512m MyProgram
+
+<span class="comment"># Set stack size to 1MB</span>
+java -Xss1m MyProgram
+
+<span class="comment"># Enable GC logging</span>
+java -Xlog:gc MyProgram
+
+<span class="comment"># Print JVM settings</span>
+java -XX:+PrintFlagsFinal MyProgram</code></pre>
+
+            <div class="info-box note">
+                <div class="info-box-title">Remember</div>
+                <p>The JVM is your friend - it handles memory, optimization, garbage collection, and platform compatibility so you can focus on writing great code!</p>
+                <p><strong>Think of it as:</strong> You drive the car (write code), JVM is the engine that makes it all work!</p>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="garbage-collection.html" class="related-link">Garbage Collection</a>
+                <a href="../java-versions/jdk-jre-jvm.html" class="related-link">JDK vs JRE vs JVM</a>
+                <a href="multithreading.html" class="related-link">Multithreading</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDI (Contexts & Dependency Injection) - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / CDI
+            </nav>
+            <h1>CDI (Contexts & Dependency Injection)</h1>
+            <p class="topic-subtitle">The Backbone of Jakarta EE Applications</p>
+            <a href="../../index.html" class="back-btn">← Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is CDI?</h2>
+            <p><strong>Think of CDI like a restaurant with an automated service system:</strong></p>
+            <ul>
+                <li>🍽️ You (code) don't go to the kitchen to get ingredients</li>
+                <li>🤖 A service system (CDI container) automatically brings what you need</li>
+                <li>📦 You just declare "I need a chef" and the system provides one</li>
+                <li>♻️ The system manages when to create/destroy resources</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>CDI (Contexts and Dependency Injection)</strong> is a framework that automatically creates objects and injects dependencies for you. It's the core of Jakarta EE that ties everything together.</p>
+                <p><strong>Key Benefits:</strong> No manual object creation (no 'new'), loose coupling, easier testing, lifecycle management</p>
+            </div>
+
+            <h3>The Problem CDI Solves</h3>
+            <pre><code><span class="comment">// Without CDI - Manual creation (tight coupling)</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="keyword">private</span> <span class="class-name">PaymentService</span> paymentService = <span class="keyword">new</span> <span class="class-name">PaymentService</span>();
+    <span class="keyword">private</span> <span class="class-name">EmailService</span> emailService = <span class="keyword">new</span> <span class="class-name">EmailService</span>();
+
+    <span class="comment">// Hard to test, hard to change implementation</span>
+}
+
+<span class="comment">// With CDI - Automatic injection (loose coupling)</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentService</span> paymentService;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">EmailService</span> emailService;
+
+    <span class="comment">// CDI provides instances automatically!</span>
+    <span class="comment">// Easy to test, easy to swap implementations</span>
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Basic Dependency Injection with @Inject</h2>
+
+            <h3>Simple Example</h3>
+            <pre><code><span class="comment">// 1. Create a bean (just a regular class)</span>
+<span class="keyword">public class</span> <span class="class-name">GreetingService</span> {
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">greet</span>(<span class="class-name">String</span> name) {
+        <span class="keyword">return</span> <span class="string">"Hello, "</span> + name + <span class="string">"!"</span>;
+    }
+}
+
+<span class="comment">// 2. Inject it wherever needed</span>
+<span class="keyword">public class</span> <span class="class-name">WelcomeController</span> {
+    <span class="annotation">@Inject</span>  <span class="comment">// CDI injects GreetingService automatically</span>
+    <span class="keyword">private</span> <span class="class-name">GreetingService</span> greetingService;
+
+    <span class="keyword">public void</span> <span class="function">welcome</span>() {
+        <span class="class-name">String</span> message = greetingService.greet(<span class="string">"Alice"</span>);
+        <span class="class-name">System</span>.out.println(message);  <span class="comment">// Hello, Alice!</span>
+    }
+}</code></pre>
+
+            <p><strong>What happened?</strong></p>
+            <ol>
+                <li>You marked a field with @Inject</li>
+                <li>CDI container creates a GreetingService instance</li>
+                <li>CDI automatically assigns it to your field</li>
+                <li>You use it without calling 'new'!</li>
+            </ol>
+
+            <h3>Three Ways to Inject</h3>
+            <pre><code><span class="comment">// 1. Field Injection (simplest, most common)</span>
+<span class="keyword">public class</span> <span class="class-name">ServiceA</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">Database</span> database;
+}
+
+<span class="comment">// 2. Constructor Injection (best for testing)</span>
+<span class="keyword">public class</span> <span class="class-name">ServiceB</span> {
+    <span class="keyword">private final</span> <span class="class-name">Database</span> database;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">public</span> <span class="function">ServiceB</span>(<span class="class-name">Database</span> database) {
+        <span class="keyword">this</span>.database = database;
+    }
+}
+
+<span class="comment">// 3. Setter Injection (optional dependencies)</span>
+<span class="keyword">public class</span> <span class="class-name">ServiceC</span> {
+    <span class="keyword">private</span> <span class="class-name">Database</span> database;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">public void</span> <span class="function">setDatabase</span>(<span class="class-name">Database</span> database) {
+        <span class="keyword">this</span>.database = database;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>CDI Scopes - Bean Lifecycles</h2>
+            <p><strong>Scopes control how long a bean lives and how many instances exist</strong></p>
+
+            <h3>1. @RequestScoped - One Instance Per HTTP Request</h3>
+            <pre><code><span class="keyword">import</span> jakarta.enterprise.context.RequestScoped;
+<span class="keyword">import</span> jakarta.inject.Named;
+
+<span class="annotation">@Named</span>  <span class="comment">// Makes it accessible from JSP/JSF</span>
+<span class="annotation">@RequestScoped</span>  <span class="comment">// New instance for each HTTP request</span>
+<span class="keyword">public class</span> <span class="class-name">ShoppingCartBean</span> {
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">Product</span> product) {
+        items.add(product);
+    }
+
+    <span class="comment">// Destroyed after request completes</span>
+}</code></pre>
+
+            <h3>2. @SessionScoped - One Instance Per User Session</h3>
+            <pre><code><span class="keyword">import</span> jakarta.enterprise.context.SessionScoped;
+<span class="keyword">import</span> java.io.Serializable;
+
+<span class="annotation">@Named</span>
+<span class="annotation">@SessionScoped</span>  <span class="comment">// Lives across multiple requests from same user</span>
+<span class="keyword">public class</span> <span class="class-name">UserSessionBean</span> <span class="keyword">implements</span> <span class="class-name">Serializable</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> username;
+    <span class="keyword">private</span> <span class="class-name">boolean</span> loggedIn;
+
+    <span class="keyword">public void</span> <span class="function">login</span>(<span class="class-name">String</span> username) {
+        <span class="keyword">this</span>.username = username;
+        <span class="keyword">this</span>.loggedIn = <span class="keyword">true</span>;
+    }
+
+    <span class="comment">// Destroyed when session expires or user logs out</span>
+}</code></pre>
+
+            <h3>3. @ApplicationScoped - One Instance for Entire App</h3>
+            <pre><code><span class="keyword">import</span> jakarta.enterprise.context.ApplicationScoped;
+
+<span class="annotation">@ApplicationScoped</span>  <span class="comment">// Singleton - shared by all users</span>
+<span class="keyword">public class</span> <span class="class-name">ConfigService</span> {
+    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">String</span>&gt; config = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
+
+    <span class="annotation">@PostConstruct</span>
+    <span class="keyword">public void</span> <span class="function">init</span>() {
+        <span class="comment">// Load config once when app starts</span>
+        config.put(<span class="string">"app.name"</span>, <span class="string">"My App"</span>);
+    }
+
+    <span class="comment">// Lives until application stops</span>
+}</code></pre>
+
+            <h3>4. @Dependent - New Instance Every Time (Default)</h3>
+            <pre><code><span class="keyword">import</span> jakarta.enterprise.context.Dependent;
+
+<span class="annotation">@Dependent</span>  <span class="comment">// Default scope if no annotation</span>
+<span class="keyword">public class</span> <span class="class-name">Calculator</span> {
+    <span class="keyword">public int</span> <span class="function">add</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {
+        <span class="keyword">return</span> a + b;
+    }
+
+    <span class="comment">// New instance created every time it's injected</span>
+    <span class="comment">// Destroyed with the bean that owns it</span>
+}</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Scope</th>
+                        <th>Lifetime</th>
+                        <th>Instances</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>@Dependent</strong></td>
+                        <td>Same as parent</td>
+                        <td>New every injection</td>
+                        <td>Stateless utilities</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@RequestScoped</strong></td>
+                        <td>One HTTP request</td>
+                        <td>One per request</td>
+                        <td>Form data, request processing</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@SessionScoped</strong></td>
+                        <td>User session</td>
+                        <td>One per user</td>
+                        <td>User login, shopping cart</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@ApplicationScoped</strong></td>
+                        <td>Entire app</td>
+                        <td>One (singleton)</td>
+                        <td>Config, caches, shared data</td>
+                    </tr>
+                    <tr>
+                        <td><strong>@ConversationScoped</strong></td>
+                        <td>Multi-step flow</td>
+                        <td>One per conversation</td>
+                        <td>Wizards, multi-page forms</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Qualifiers - Choosing Between Implementations</h2>
+            <p><strong>Problem:</strong> What if you have multiple implementations of an interface?</p>
+
+            <h3>Define Qualifiers</h3>
+            <pre><code><span class="keyword">import</span> jakarta.inject.Qualifier;
+<span class="keyword">import</span> java.lang.annotation.*;
+
+<span class="annotation">@Qualifier</span>
+<span class="annotation">@Retention</span>(RetentionPolicy.RUNTIME)
+<span class="annotation">@Target</span>({ElementType.FIELD, ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
+<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">CreditCard</span> { }
+
+<span class="annotation">@Qualifier</span>
+<span class="annotation">@Retention</span>(RetentionPolicy.RUNTIME)
+<span class="annotation">@Target</span>({ElementType.FIELD, ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
+<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">PayPal</span> { }</code></pre>
+
+            <h3>Use Qualifiers on Implementations</h3>
+            <pre><code><span class="comment">// Interface</span>
+<span class="keyword">public interface</span> <span class="class-name">PaymentProcessor</span> {
+    <span class="keyword">void</span> <span class="function">processPayment</span>(<span class="keyword">double</span> amount);
+}
+
+<span class="comment">// Implementation 1</span>
+<span class="annotation">@CreditCard</span>  <span class="comment">// Qualifier</span>
+<span class="keyword">public class</span> <span class="class-name">CreditCardProcessor</span> <span class="keyword">implements</span> <span class="class-name">PaymentProcessor</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="keyword">double</span> amount) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Processing $"</span> + amount + <span class="string">" via Credit Card"</span>);
+    }
+}
+
+<span class="comment">// Implementation 2</span>
+<span class="annotation">@PayPal</span>  <span class="comment">// Qualifier</span>
+<span class="keyword">public class</span> <span class="class-name">PayPalProcessor</span> <span class="keyword">implements</span> <span class="class-name">PaymentProcessor</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="keyword">double</span> amount) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Processing $"</span> + amount + <span class="string">" via PayPal"</span>);
+    }
+}</code></pre>
+
+            <h3>Inject Specific Implementation</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">CheckoutService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="annotation">@CreditCard</span>  <span class="comment">// Inject CreditCardProcessor</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentProcessor</span> creditCardProcessor;
+
+    <span class="annotation">@Inject</span>
+    <span class="annotation">@PayPal</span>  <span class="comment">// Inject PayPalProcessor</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentProcessor</span> payPalProcessor;
+
+    <span class="keyword">public void</span> <span class="function">checkout</span>(<span class="class-name">String</span> paymentMethod, <span class="keyword">double</span> amount) {
+        <span class="keyword">if</span> (<span class="string">"credit"</span>.equals(paymentMethod)) {
+            creditCardProcessor.processPayment(amount);
+        } <span class="keyword">else</span> {
+            payPalProcessor.processPayment(amount);
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Producers - Custom Bean Creation</h2>
+            <p><strong>Sometimes you need more control over how beans are created</strong></p>
+
+            <h3>@Produces Methods</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">DatabaseProducer</span> {
+
+    <span class="annotation">@Produces</span>
+    <span class="annotation">@ApplicationScoped</span>
+    <span class="keyword">public</span> <span class="class-name">DataSource</span> <span class="function">createDataSource</span>() {
+        <span class="comment">// Custom creation logic</span>
+        <span class="class-name">DataSource</span> ds = <span class="keyword">new</span> <span class="class-name">DataSource</span>();
+        ds.setUrl(<span class="string">"jdbc:postgresql://localhost/mydb"</span>);
+        ds.setUsername(<span class="string">"admin"</span>);
+        ds.setPassword(<span class="string">"secret"</span>);
+        <span class="keyword">return</span> ds;
+    }
+
+    <span class="annotation">@Produces</span>
+    <span class="annotation">@Named</span>(<span class="string">"maxConnections"</span>)
+    <span class="keyword">public int</span> <span class="function">getMaxConnections</span>() {
+        <span class="keyword">return</span> <span class="number">100</span>;
+    }
+}
+
+<span class="comment">// Now you can inject them</span>
+<span class="keyword">public class</span> <span class="class-name">UserRepository</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">DataSource</span> dataSource;  <span class="comment">// Injected from producer</span>
+
+    <span class="annotation">@Inject</span>
+    <span class="annotation">@Named</span>(<span class="string">"maxConnections"</span>)
+    <span class="keyword">private int</span> maxConnections;
+}</code></pre>
+
+            <h3>@Produces with Qualifiers</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">LoggerProducer</span> {
+
+    <span class="annotation">@Produces</span>
+    <span class="annotation">@Dependent</span>
+    <span class="keyword">public</span> <span class="class-name">Logger</span> <span class="function">createLogger</span>(<span class="class-name">InjectionPoint</span> injectionPoint) {
+        <span class="comment">// Automatically get logger for each class</span>
+        <span class="class-name">Class</span>&lt;?&gt; targetClass = injectionPoint.getMember().getDeclaringClass();
+        <span class="keyword">return</span> <span class="class-name">Logger</span>.getLogger(targetClass.getName());
+    }
+}
+
+<span class="comment">// Usage - each class gets its own logger</span>
+<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">Logger</span> logger;  <span class="comment">// Logger for UserService</span>
+
+    <span class="keyword">public void</span> <span class="function">doSomething</span>() {
+        logger.info(<span class="string">"UserService.doSomething called"</span>);
+    }
+}</code></pre>
+
+            <h3>@Disposes - Cleanup Resources</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">ResourceManager</span> {
+
+    <span class="annotation">@Produces</span>
+    <span class="annotation">@RequestScoped</span>
+    <span class="keyword">public</span> <span class="class-name">Connection</span> <span class="function">createConnection</span>() <span class="keyword">throws</span> <span class="class-name">SQLException</span> {
+        <span class="keyword">return</span> DriverManager.getConnection(<span class="string">"jdbc:..."</span>);
+    }
+
+    <span class="keyword">public void</span> <span class="function">closeConnection</span>(<span class="annotation">@Disposes</span> <span class="class-name">Connection</span> connection) {
+        <span class="keyword">try</span> {
+            <span class="keyword">if</span> (connection != <span class="keyword">null</span> && !connection.isClosed()) {
+                connection.close();
+            }
+        } <span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+            e.printStackTrace();
+        }
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Lifecycle Callbacks</h2>
+
+            <h3>@PostConstruct and @PreDestroy</h3>
+            <pre><code><span class="keyword">import</span> jakarta.annotation.*;
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">CacheService</span> {
+    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; cache;
+
+    <span class="annotation">@PostConstruct</span>  <span class="comment">// Called AFTER bean creation and injection</span>
+    <span class="keyword">public void</span> <span class="function">init</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Initializing cache..."</span>);
+        cache = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
+        <span class="comment">// Load initial data</span>
+        cache.put(<span class="string">"key1"</span>, <span class="string">"value1"</span>);
+    }
+
+    <span class="annotation">@PreDestroy</span>  <span class="comment">// Called BEFORE bean destruction</span>
+    <span class="keyword">public void</span> <span class="function">cleanup</span>() {
+        <span class="class-name">System</span>.out.println(<span class="string">"Cleaning up cache..."</span>);
+        <span class="keyword">if</span> (cache != <span class="keyword">null</span>) {
+            cache.clear();
+        }
+        <span class="comment">// Save data, close connections, etc.</span>
+    }
+
+    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">get</span>(<span class="class-name">String</span> key) {
+        <span class="keyword">return</span> cache.get(key);
+    }
+}</code></pre>
+
+            <p><strong>Order of execution:</strong></p>
+            <pre><code>1. Constructor called
+2. Dependencies injected (@Inject)
+3. @PostConstruct method called ← Initialize here
+4. Bean ready to use
+   ... bean used by application ...
+5. @PreDestroy method called ← Cleanup here
+6. Bean destroyed</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Events - Publish/Subscribe Pattern</h2>
+
+            <h3>Fire and Observe Events</h3>
+            <pre><code><span class="comment">// 1. Event class (just a POJO)</span>
+<span class="keyword">public class</span> <span class="class-name">UserRegisteredEvent</span> {
+    <span class="keyword">private final</span> <span class="class-name">String</span> username;
+    <span class="keyword">private final</span> <span class="class-name">String</span> email;
+
+    <span class="keyword">public</span> <span class="function">UserRegisteredEvent</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) {
+        <span class="keyword">this</span>.username = username;
+        <span class="keyword">this</span>.email = email;
+    }
+
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getUsername</span>() { <span class="keyword">return</span> username; }
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getEmail</span>() { <span class="keyword">return</span> email; }
+}
+
+<span class="comment">// 2. Fire event (publisher)</span>
+<span class="keyword">public class</span> <span class="class-name">RegistrationService</span> {
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">Event</span>&lt;<span class="class-name">UserRegisteredEvent</span>&gt; userRegisteredEvent;
+
+    <span class="keyword">public void</span> <span class="function">register</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) {
+        <span class="comment">// Register user in database...</span>
+
+        <span class="comment">// Fire event</span>
+        userRegisteredEvent.fire(<span class="keyword">new</span> <span class="class-name">UserRegisteredEvent</span>(username, email));
+    }
+}
+
+<span class="comment">// 3. Observe event (subscribers)</span>
+<span class="keyword">public class</span> <span class="class-name">EmailNotificationService</span> {
+    <span class="keyword">public void</span> <span class="function">onUserRegistered</span>(<span class="annotation">@Observes</span> <span class="class-name">UserRegisteredEvent</span> event) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Sending welcome email to "</span> + event.getEmail());
+        <span class="comment">// Send email...</span>
+    }
+}
+
+<span class="keyword">public class</span> <span class="class-name">AnalyticsService</span> {
+    <span class="keyword">public void</span> <span class="function">onUserRegistered</span>(<span class="annotation">@Observes</span> <span class="class-name">UserRegisteredEvent</span> event) {
+        <span class="class-name">System</span>.out.println(<span class="string">"Tracking registration for "</span> + event.getUsername());
+        <span class="comment">// Track analytics...</span>
+    }
+}</code></pre>
+
+            <p><strong>What happens:</strong></p>
+            <ol>
+                <li>User registers → RegistrationService.register() called</li>
+                <li>Event fired → <code>userRegisteredEvent.fire(event)</code></li>
+                <li>All @Observes methods automatically called</li>
+                <li>EmailNotificationService sends email</li>
+                <li>AnalyticsService tracks data</li>
+                <li>Completely decoupled!</li>
+            </ol>
+        </section>
+
+        <section class="content-section">
+            <h2>Interceptors - Cross-Cutting Concerns</h2>
+            <p><strong>Add behavior to methods without changing the code</strong></p>
+
+            <h3>Create Interceptor Binding</h3>
+            <pre><code><span class="keyword">import</span> jakarta.interceptor.InterceptorBinding;
+
+<span class="annotation">@InterceptorBinding</span>
+<span class="annotation">@Target</span>({ElementType.TYPE, ElementType.METHOD})
+<span class="annotation">@Retention</span>(RetentionPolicy.RUNTIME)
+<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">Logged</span> { }</code></pre>
+
+            <h3>Create Interceptor</h3>
+            <pre><code><span class="keyword">import</span> jakarta.interceptor.*;
+
+<span class="annotation">@Logged</span>
+<span class="annotation">@Interceptor</span>
+<span class="annotation">@Priority</span>(Interceptor.Priority.APPLICATION)
+<span class="keyword">public class</span> <span class="class-name">LoggingInterceptor</span> {
+
+    <span class="annotation">@AroundInvoke</span>
+    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">logMethod</span>(<span class="class-name">InvocationContext</span> context) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="class-name">String</span> methodName = context.getMethod().getName();
+
+        <span class="class-name">System</span>.out.println(<span class="string">"[LOG] Entering: "</span> + methodName);
+        <span class="keyword">long</span> start = <span class="class-name">System</span>.currentTimeMillis();
+
+        <span class="keyword">try</span> {
+            <span class="comment">// Proceed with the actual method call</span>
+            <span class="keyword">return</span> context.proceed();
+        } <span class="keyword">finally</span> {
+            <span class="keyword">long</span> duration = <span class="class-name">System</span>.currentTimeMillis() - start;
+            <span class="class-name">System</span>.out.println(<span class="string">"[LOG] Exiting: "</span> + methodName + <span class="string">" ("</span> + duration + <span class="string">"ms)"</span>);
+        }
+    }
+}</code></pre>
+
+            <h3>Use Interceptor</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">UserService</span> {
+
+    <span class="annotation">@Logged</span>  <span class="comment">// This method will be logged</span>
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
+        <span class="comment">// Your business logic</span>
+        <span class="keyword">return</span> database.find(id);
+    }
+
+    <span class="annotation">@Logged</span>
+    <span class="keyword">public void</span> <span class="function">saveUser</span>(<span class="class-name">User</span> user) {
+        database.save(user);
+    }
+}</code></pre>
+
+            <p><strong>Output:</strong></p>
+            <pre><code>[LOG] Entering: findUser
+[LOG] Exiting: findUser (23ms)
+[LOG] Entering: saveUser
+[LOG] Exiting: saveUser (45ms)</code></pre>
+
+            <p><strong>Common use cases:</strong> Logging, transactions, security, caching, performance monitoring</p>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>✅ DO:</h3>
+                <ul>
+                    <li><strong>Use constructor injection for required dependencies</strong> - Makes testing easier</li>
+                    <li><strong>Choose the right scope</strong> - @RequestScoped for request data, @ApplicationScoped for singletons</li>
+                    <li><strong>Use qualifiers for multiple implementations</strong> - Clear and explicit</li>
+                    <li><strong>Implement Serializable for @SessionScoped</strong> - Required for session replication</li>
+                    <li><strong>Use @PostConstruct for initialization</strong> - Not the constructor</li>
+                    <li><strong>Use events for loose coupling</strong> - Modules don't know about each other</li>
+                    <li><strong>Keep beans stateless when possible</strong> - Thread-safe and scalable</li>
+                </ul>
+
+                <h3>❌ DON'T:</h3>
+                <ul>
+                    <li><strong>Don't inject @RequestScoped into @ApplicationScoped</strong> - Scope mismatch!</li>
+                    <li><strong>Don't create beans with 'new'</strong> - CDI won't manage them</li>
+                    <li><strong>Don't forget @Named for JSF access</strong> - Required for view binding</li>
+                    <li><strong>Don't store heavy objects in @SessionScoped</strong> - Memory issues</li>
+                    <li><strong>Don't use field injection for testing</strong> - Use constructor injection</li>
+                    <li><strong>Don't put business logic in producers</strong> - Keep them simple</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>CDI</strong> is the dependency injection framework at the heart of Jakarta EE</li>
+                    <li><strong>@Inject</strong> automatically provides dependencies (no 'new' needed)</li>
+                    <li><strong>Scopes</strong> control bean lifecycle: @Dependent, @RequestScoped, @SessionScoped, @ApplicationScoped</li>
+                    <li><strong>@Qualifier</strong> distinguishes between multiple implementations</li>
+                    <li><strong>@Produces</strong> creates beans with custom logic</li>
+                    <li><strong>@PostConstruct/@PreDestroy</strong> lifecycle callbacks for init/cleanup</li>
+                    <li><strong>Events</strong> enable publish-subscribe pattern with @Observes</li>
+                    <li><strong>Interceptors</strong> add cross-cutting concerns (logging, security, etc.)</li>
+                    <li><strong>Benefits:</strong> Loose coupling, easier testing, automatic lifecycle management</li>
+                    <li><strong>Similar to:</strong> Spring's @Autowired but standards-based</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="beans.html" class="related-link">What is a Bean?</a>
+                <a href="ejb.html" class="related-link">EJB (Enterprise JavaBeans)</a>
+                <a href="overview.html" class="related-link">Jakarta EE Overview</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

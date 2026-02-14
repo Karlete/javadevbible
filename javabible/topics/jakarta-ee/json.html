@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Processing & Binding - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / JSON Processing
+            </nav>
+            <h1>JSON Processing & Binding</h1>
+            <p class="topic-subtitle">Working with JSON in Jakarta EE</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is JSON Processing in Jakarta EE?</h2>
+            <p><strong>Think of JSON Processing like mail handling:</strong></p>
+            <ul>
+                <li>JSON-P (Processing): Like opening and reading letters manually (low-level)</li>
+                <li>JSON-B (Binding): Like having a secretary who automatically files everything (high-level)</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Jakarta JSON Processing (JSON-P)</strong> provides a low-level API for parsing, generating, transforming, and querying JSON data.</p>
+                <p><strong>Jakarta JSON Binding (JSON-B)</strong> provides automatic conversion between Java objects and JSON.</p>
+            </div>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>JSON-P (Processing)</th>
+                        <th>JSON-B (Binding)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Level</strong></td>
+                        <td>Low-level API</td>
+                        <td>High-level API</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Purpose</strong></td>
+                        <td>Parse/generate JSON</td>
+                        <td>Object &lt;-&gt; JSON conversion</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Control</strong></td>
+                        <td>Full manual control</td>
+                        <td>Automatic with annotations</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Use Case</strong></td>
+                        <td>Dynamic JSON, streaming</td>
+                        <td>POJOs, DTOs</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Package</strong></td>
+                        <td>jakarta.json</td>
+                        <td>jakarta.json.bind</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>JSON-P: Processing API</h2>
+
+            <h3>Creating JSON Objects</h3>
+            <pre><code><span class="keyword">import</span> jakarta.json.*;
+
+<span class="comment">// Create JSON object using builder</span>
+<span class="class-name">JsonObject</span> person = <span class="class-name">Json</span>.createObjectBuilder()
+    .add(<span class="string">"name"</span>, <span class="string">"John Doe"</span>)
+    .add(<span class="string">"age"</span>, <span class="number">30</span>)
+    .add(<span class="string">"email"</span>, <span class="string">"john@example.com"</span>)
+    .add(<span class="string">"active"</span>, <span class="keyword">true</span>)
+    .add(<span class="string">"address"</span>, <span class="class-name">Json</span>.createObjectBuilder()
+        .add(<span class="string">"street"</span>, <span class="string">"123 Main St"</span>)
+        .add(<span class="string">"city"</span>, <span class="string">"New York"</span>)
+        .add(<span class="string">"zip"</span>, <span class="string">"10001"</span>))
+    .add(<span class="string">"phones"</span>, <span class="class-name">Json</span>.createArrayBuilder()
+        .add(<span class="string">"555-1234"</span>)
+        .add(<span class="string">"555-5678"</span>))
+    .build();
+
+<span class="comment">// Convert to string</span>
+<span class="class-name">String</span> jsonString = person.toString();
+<span class="comment">// {"name":"John Doe","age":30,"email":"john@example.com",...}</span></code></pre>
+
+            <h3>Parsing JSON</h3>
+            <pre><code><span class="keyword">import</span> jakarta.json.*;
+<span class="keyword">import</span> java.io.StringReader;
+
+<span class="class-name">String</span> json = <span class="string">"""
+    {
+        "name": "Jane Smith",
+        "age": 25,
+        "skills": ["Java", "Python", "SQL"]
+    }
+    """</span>;
+
+<span class="comment">// Parse JSON string</span>
+<span class="keyword">try</span> (<span class="class-name">JsonReader</span> reader = <span class="class-name">Json</span>.createReader(<span class="keyword">new</span> <span class="class-name">StringReader</span>(json))) {
+    <span class="class-name">JsonObject</span> obj = reader.readObject();
+
+    <span class="comment">// Access values</span>
+    <span class="class-name">String</span> name = obj.getString(<span class="string">"name"</span>);          <span class="comment">// "Jane Smith"</span>
+    <span class="keyword">int</span> age = obj.getInt(<span class="string">"age"</span>);                   <span class="comment">// 25</span>
+    <span class="class-name">JsonArray</span> skills = obj.getJsonArray(<span class="string">"skills"</span>); <span class="comment">// ["Java", "Python", "SQL"]</span>
+
+    <span class="comment">// Iterate array</span>
+    <span class="keyword">for</span> (<span class="class-name">JsonValue</span> skill : skills) {
+        <span class="class-name">System</span>.out.println(skill);
+    }
+}</code></pre>
+
+            <h3>Streaming API (Large Files)</h3>
+            <pre><code><span class="comment">// Streaming parser - memory efficient for large files</span>
+<span class="keyword">try</span> (<span class="class-name">JsonParser</span> parser = <span class="class-name">Json</span>.createParser(<span class="keyword">new</span> <span class="class-name">FileReader</span>(<span class="string">"large.json"</span>))) {
+    <span class="keyword">while</span> (parser.hasNext()) {
+        <span class="class-name">JsonParser.Event</span> event = parser.next();
+
+        <span class="keyword">switch</span> (event) {
+            <span class="keyword">case</span> KEY_NAME -> <span class="class-name">System</span>.out.println(<span class="string">"Key: "</span> + parser.getString());
+            <span class="keyword">case</span> VALUE_STRING -> <span class="class-name">System</span>.out.println(<span class="string">"String: "</span> + parser.getString());
+            <span class="keyword">case</span> VALUE_NUMBER -> <span class="class-name">System</span>.out.println(<span class="string">"Number: "</span> + parser.getBigDecimal());
+            <span class="keyword">case</span> VALUE_TRUE -> <span class="class-name">System</span>.out.println(<span class="string">"Boolean: true"</span>);
+            <span class="keyword">case</span> VALUE_FALSE -> <span class="class-name">System</span>.out.println(<span class="string">"Boolean: false"</span>);
+            <span class="keyword">case</span> VALUE_NULL -> <span class="class-name">System</span>.out.println(<span class="string">"Null"</span>);
+            <span class="keyword">case</span> START_OBJECT -> <span class="class-name">System</span>.out.println(<span class="string">"{"</span>);
+            <span class="keyword">case</span> END_OBJECT -> <span class="class-name">System</span>.out.println(<span class="string">"}"</span>);
+            <span class="keyword">case</span> START_ARRAY -> <span class="class-name">System</span>.out.println(<span class="string">"["</span>);
+            <span class="keyword">case</span> END_ARRAY -> <span class="class-name">System</span>.out.println(<span class="string">"]"</span>);
+        }
+    }
+}
+
+<span class="comment">// Streaming generator - write large files efficiently</span>
+<span class="keyword">try</span> (<span class="class-name">JsonGenerator</span> gen = <span class="class-name">Json</span>.createGenerator(<span class="keyword">new</span> <span class="class-name">FileWriter</span>(<span class="string">"output.json"</span>))) {
+    gen.writeStartArray();
+    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000000</span>; i++) {
+        gen.writeStartObject()
+           .write(<span class="string">"id"</span>, i)
+           .write(<span class="string">"name"</span>, <span class="string">"Item "</span> + i)
+           .writeEnd();
+    }
+    gen.writeEnd();
+}</code></pre>
+
+            <h3>JSON Pointer (Query JSON)</h3>
+            <pre><code><span class="class-name">String</span> json = <span class="string">"""
+    {
+        "store": {
+            "books": [
+                {"title": "Java Guide", "price": 29.99},
+                {"title": "Spring Boot", "price": 39.99}
+            ]
+        }
+    }
+    """</span>;
+
+<span class="class-name">JsonObject</span> obj = <span class="class-name">Json</span>.createReader(<span class="keyword">new</span> <span class="class-name">StringReader</span>(json)).readObject();
+
+<span class="comment">// Use JSON Pointer to navigate</span>
+<span class="class-name">JsonPointer</span> pointer = <span class="class-name">Json</span>.createPointer(<span class="string">"/store/books/0/title"</span>);
+<span class="class-name">JsonValue</span> title = pointer.getValue(obj);
+<span class="class-name">System</span>.out.println(title);  <span class="comment">// "Java Guide"</span>
+
+<span class="comment">// Get second book's price</span>
+<span class="class-name">JsonPointer</span> pricePointer = <span class="class-name">Json</span>.createPointer(<span class="string">"/store/books/1/price"</span>);
+<span class="class-name">JsonNumber</span> price = (<span class="class-name">JsonNumber</span>) pricePointer.getValue(obj);
+<span class="class-name">System</span>.out.println(price.doubleValue());  <span class="comment">// 39.99</span></code></pre>
+
+            <h3>JSON Patch (Modify JSON)</h3>
+            <pre><code><span class="class-name">JsonObject</span> original = <span class="class-name">Json</span>.createObjectBuilder()
+    .add(<span class="string">"name"</span>, <span class="string">"John"</span>)
+    .add(<span class="string">"age"</span>, <span class="number">25</span>)
+    .build();
+
+<span class="comment">// Create patch operations</span>
+<span class="class-name">JsonPatch</span> patch = <span class="class-name">Json</span>.createPatchBuilder()
+    .replace(<span class="string">"/name"</span>, <span class="string">"John Doe"</span>)   <span class="comment">// Update name</span>
+    .add(<span class="string">"/email"</span>, <span class="string">"john@mail.com"</span>) <span class="comment">// Add email</span>
+    .remove(<span class="string">"/age"</span>)                   <span class="comment">// Remove age</span>
+    .build();
+
+<span class="comment">// Apply patch</span>
+<span class="class-name">JsonObject</span> patched = patch.apply(original);
+<span class="comment">// {"name":"John Doe","email":"john@mail.com"}</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>JSON-B: Binding API</h2>
+
+            <h3>Basic Serialization/Deserialization</h3>
+            <pre><code><span class="keyword">import</span> jakarta.json.bind.*;
+
+<span class="comment">// Your POJO</span>
+<span class="keyword">public class</span> <span class="class-name">Person</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="keyword">private</span> <span class="keyword">int</span> age;
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+
+    <span class="comment">// Constructors, getters, setters</span>
+    <span class="keyword">public</span> <span class="function">Person</span>() {}
+    <span class="keyword">public</span> <span class="function">Person</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> age, <span class="class-name">String</span> email) {
+        <span class="keyword">this</span>.name = name;
+        <span class="keyword">this</span>.age = age;
+        <span class="keyword">this</span>.email = email;
+    }
+    <span class="comment">// getters and setters...</span>
+}
+
+<span class="comment">// Create Jsonb instance</span>
+<span class="class-name">Jsonb</span> jsonb = <span class="class-name">JsonbBuilder</span>.create();
+
+<span class="comment">// Object to JSON (Serialization)</span>
+<span class="class-name">Person</span> person = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"John"</span>, <span class="number">30</span>, <span class="string">"john@example.com"</span>);
+<span class="class-name">String</span> json = jsonb.toJson(person);
+<span class="comment">// {"age":30,"email":"john@example.com","name":"John"}</span>
+
+<span class="comment">// JSON to Object (Deserialization)</span>
+<span class="class-name">String</span> jsonInput = <span class="string">"""
+    {"name":"Jane","age":25,"email":"jane@example.com"}
+    """</span>;
+<span class="class-name">Person</span> parsed = jsonb.fromJson(jsonInput, <span class="class-name">Person</span>.<span class="keyword">class</span>);
+<span class="class-name">System</span>.out.println(parsed.getName());  <span class="comment">// Jane</span></code></pre>
+
+            <h3>Collections and Generics</h3>
+            <pre><code><span class="class-name">Jsonb</span> jsonb = <span class="class-name">JsonbBuilder</span>.create();
+
+<span class="comment">// List of objects</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Person</span>&gt; people = <span class="class-name">List</span>.of(
+    <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"John"</span>, <span class="number">30</span>, <span class="string">"john@mail.com"</span>),
+    <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Jane"</span>, <span class="number">25</span>, <span class="string">"jane@mail.com"</span>)
+);
+
+<span class="comment">// Serialize list</span>
+<span class="class-name">String</span> json = jsonb.toJson(people);
+<span class="comment">// [{"age":30,"email":"john@mail.com","name":"John"},...]</span>
+
+<span class="comment">// Deserialize list (need Type for generics)</span>
+<span class="class-name">String</span> jsonList = <span class="string">"[{\"name\":\"John\",\"age\":30},{\"name\":\"Jane\",\"age\":25}]"</span>;
+<span class="class-name">List</span>&lt;<span class="class-name">Person</span>&gt; parsed = jsonb.fromJson(
+    jsonList,
+    <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">Person</span>&gt;(){}.getClass().getGenericSuperclass()
+);
+
+<span class="comment">// Map serialization</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Integer</span>&gt; scores = <span class="class-name">Map</span>.of(<span class="string">"math"</span>, <span class="number">95</span>, <span class="string">"science"</span>, <span class="number">88</span>);
+<span class="class-name">String</span> mapJson = jsonb.toJson(scores);
+<span class="comment">// {"math":95,"science":88}</span></code></pre>
+
+            <h3>Customizing with Annotations</h3>
+            <pre><code><span class="keyword">import</span> jakarta.json.bind.annotation.*;
+
+<span class="keyword">public class</span> <span class="class-name">Employee</span> {
+
+    <span class="annotation">@JsonbProperty</span>(<span class="string">"employee_id"</span>)  <span class="comment">// Custom JSON key name</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@JsonbProperty</span>(<span class="string">"full_name"</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+
+    <span class="annotation">@JsonbTransient</span>  <span class="comment">// Exclude from JSON</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> password;
+
+    <span class="annotation">@JsonbDateFormat</span>(<span class="string">"yyyy-MM-dd"</span>)  <span class="comment">// Custom date format</span>
+    <span class="keyword">private</span> <span class="class-name">LocalDate</span> hireDate;
+
+    <span class="annotation">@JsonbNumberFormat</span>(<span class="string">"#,##0.00"</span>)  <span class="comment">// Custom number format</span>
+    <span class="keyword">private</span> <span class="class-name">BigDecimal</span> salary;
+
+    <span class="annotation">@JsonbNillable</span>  <span class="comment">// Include null values in JSON</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> middleName;
+
+    <span class="comment">// getters/setters</span>
+}
+
+<span class="comment">// Result:</span>
+<span class="comment">// {</span>
+<span class="comment">//   "employee_id": 123,</span>
+<span class="comment">//   "full_name": "John Doe",</span>
+<span class="comment">//   "hireDate": "2024-01-15",</span>
+<span class="comment">//   "salary": "75,000.00",</span>
+<span class="comment">//   "middleName": null</span>
+<span class="comment">// }</span></code></pre>
+
+            <h3>Property Order and Naming Strategy</h3>
+            <pre><code><span class="annotation">@JsonbPropertyOrder</span>({<span class="string">"id"</span>, <span class="string">"name"</span>, <span class="string">"email"</span>, <span class="string">"phone"</span>})  <span class="comment">// Define order</span>
+<span class="keyword">public class</span> <span class="class-name">Contact</span> {
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+    <span class="keyword">private</span> <span class="class-name">String</span> phone;
+}
+
+<span class="comment">// Configure naming strategy</span>
+<span class="class-name">JsonbConfig</span> config = <span class="keyword">new</span> <span class="class-name">JsonbConfig</span>()
+    .withPropertyNamingStrategy(<span class="class-name">PropertyNamingStrategy</span>.LOWER_CASE_WITH_UNDERSCORES);
+
+<span class="class-name">Jsonb</span> jsonb = <span class="class-name">JsonbBuilder</span>.create(config);
+
+<span class="keyword">public class</span> <span class="class-name">UserProfile</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> firstName;   <span class="comment">// becomes "first_name"</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> lastName;    <span class="comment">// becomes "last_name"</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> emailAddress; <span class="comment">// becomes "email_address"</span>
+}</code></pre>
+
+            <h3>Custom Serializer/Deserializer</h3>
+            <pre><code><span class="comment">// Custom serializer</span>
+<span class="keyword">public class</span> <span class="class-name">MoneySerializer</span> <span class="keyword">implements</span> <span class="class-name">JsonbSerializer</span>&lt;<span class="class-name">Money</span>&gt; {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">serialize</span>(<span class="class-name">Money</span> money, <span class="class-name">JsonGenerator</span> generator,
+                          <span class="class-name">SerializationContext</span> ctx) {
+        generator.writeStartObject();
+        generator.write(<span class="string">"amount"</span>, money.getAmount());
+        generator.write(<span class="string">"currency"</span>, money.getCurrency().getCurrencyCode());
+        generator.writeEnd();
+    }
+}
+
+<span class="comment">// Custom deserializer</span>
+<span class="keyword">public class</span> <span class="class-name">MoneyDeserializer</span> <span class="keyword">implements</span> <span class="class-name">JsonbDeserializer</span>&lt;<span class="class-name">Money</span>&gt; {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">Money</span> <span class="function">deserialize</span>(<span class="class-name">JsonParser</span> parser,
+                             <span class="class-name">DeserializationContext</span> ctx, <span class="class-name">Type</span> rtType) {
+        <span class="class-name">JsonObject</span> obj = parser.getObject();
+        <span class="class-name">BigDecimal</span> amount = obj.getJsonNumber(<span class="string">"amount"</span>).bigDecimalValue();
+        <span class="class-name">String</span> currencyCode = obj.getString(<span class="string">"currency"</span>);
+        <span class="keyword">return new</span> <span class="class-name">Money</span>(amount, <span class="class-name">Currency</span>.getInstance(currencyCode));
+    }
+}
+
+<span class="comment">// Use custom serializers</span>
+<span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@JsonbTypeSerializer</span>(<span class="class-name">MoneySerializer</span>.<span class="keyword">class</span>)
+    <span class="annotation">@JsonbTypeDeserializer</span>(<span class="class-name">MoneyDeserializer</span>.<span class="keyword">class</span>)
+    <span class="keyword">private</span> <span class="class-name">Money</span> totalAmount;
+}</code></pre>
+
+            <h3>Jsonb Configuration</h3>
+            <pre><code><span class="class-name">JsonbConfig</span> config = <span class="keyword">new</span> <span class="class-name">JsonbConfig</span>()
+    <span class="comment">// Pretty print JSON</span>
+    .withFormatting(<span class="keyword">true</span>)
+
+    <span class="comment">// Include null values</span>
+    .withNullValues(<span class="keyword">true</span>)
+
+    <span class="comment">// Property naming strategy</span>
+    .withPropertyNamingStrategy(<span class="class-name">PropertyNamingStrategy</span>.LOWER_CASE_WITH_DASHES)
+
+    <span class="comment">// Property visibility (include private fields)</span>
+    .withPropertyVisibilityStrategy(<span class="keyword">new</span> <span class="class-name">PropertyVisibilityStrategy</span>() {
+        <span class="annotation">@Override</span>
+        <span class="keyword">public boolean</span> <span class="function">isVisible</span>(<span class="class-name">Field</span> field) { <span class="keyword">return true</span>; }
+        <span class="annotation">@Override</span>
+        <span class="keyword">public boolean</span> <span class="function">isVisible</span>(<span class="class-name">Method</span> method) { <span class="keyword">return true</span>; }
+    })
+
+    <span class="comment">// Date format</span>
+    .withDateFormat(<span class="string">"yyyy-MM-dd'T'HH:mm:ss"</span>, <span class="class-name">Locale</span>.US)
+
+    <span class="comment">// Property ordering</span>
+    .withPropertyOrderStrategy(<span class="class-name">PropertyOrderStrategy</span>.LEXICOGRAPHICAL);
+
+<span class="class-name">Jsonb</span> jsonb = <span class="class-name">JsonbBuilder</span>.create(config);</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Integration with JAX-RS</h2>
+
+            <pre><code><span class="annotation">@Path</span>(<span class="string">"/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserResource</span> {
+
+    <span class="comment">// JSON-B automatically converts User to/from JSON!</span>
+
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getAll</span>() {
+        <span class="keyword">return</span> userService.findAll();  <span class="comment">// Auto-converted to JSON</span>
+    }
+
+    <span class="annotation">@POST</span>
+    <span class="annotation">@Consumes</span>(MediaType.APPLICATION_JSON)
+    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">create</span>(<span class="class-name">User</span> user) {  <span class="comment">// Auto-parsed from JSON</span>
+        <span class="keyword">return</span> userService.save(user);
+    }
+}
+
+<span class="comment">// Custom Jsonb provider for JAX-RS</span>
+<span class="annotation">@Provider</span>
+<span class="keyword">public class</span> <span class="class-name">JsonbContextResolver</span> <span class="keyword">implements</span> <span class="class-name">ContextResolver</span>&lt;<span class="class-name">Jsonb</span>&gt; {
+
+    <span class="keyword">private</span> <span class="keyword">final</span> <span class="class-name">Jsonb</span> jsonb;
+
+    <span class="keyword">public</span> <span class="function">JsonbContextResolver</span>() {
+        <span class="class-name">JsonbConfig</span> config = <span class="keyword">new</span> <span class="class-name">JsonbConfig</span>()
+            .withFormatting(<span class="keyword">true</span>)
+            .withNullValues(<span class="keyword">false</span>);
+        <span class="keyword">this</span>.jsonb = <span class="class-name">JsonbBuilder</span>.create(config);
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">Jsonb</span> <span class="function">getContext</span>(<span class="class-name">Class</span>&lt;?&gt; type) {
+        <span class="keyword">return</span> jsonb;
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Common Patterns</h2>
+
+            <h3>DTO with Validation</h3>
+            <pre><code><span class="keyword">public class</span> <span class="class-name">CreateUserRequest</span> {
+
+    <span class="annotation">@NotNull</span>
+    <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">50</span>)
+    <span class="annotation">@JsonbProperty</span>(<span class="string">"username"</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+
+    <span class="annotation">@NotNull</span>
+    <span class="annotation">@Email</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+
+    <span class="annotation">@JsonbTransient</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> internalCode;
+
+    <span class="annotation">@JsonbCreator</span>  <span class="comment">// Use this constructor for deserialization</span>
+    <span class="keyword">public</span> <span class="function">CreateUserRequest</span>(
+            <span class="annotation">@JsonbProperty</span>(<span class="string">"username"</span>) <span class="class-name">String</span> name,
+            <span class="annotation">@JsonbProperty</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email) {
+        <span class="keyword">this</span>.name = name;
+        <span class="keyword">this</span>.email = email;
+    }
+}</code></pre>
+
+            <h3>Polymorphic Types</h3>
+            <pre><code><span class="comment">// Base type</span>
+<span class="keyword">public abstract class</span> <span class="class-name">Notification</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> type;
+    <span class="keyword">private</span> <span class="class-name">String</span> message;
+}
+
+<span class="comment">// Subtypes</span>
+<span class="keyword">public class</span> <span class="class-name">EmailNotification</span> <span class="keyword">extends</span> <span class="class-name">Notification</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> recipient;
+    <span class="keyword">private</span> <span class="class-name">String</span> subject;
+}
+
+<span class="keyword">public class</span> <span class="class-name">SmsNotification</span> <span class="keyword">extends</span> <span class="class-name">Notification</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> phoneNumber;
+}
+
+<span class="comment">// Custom deserializer for polymorphic types</span>
+<span class="keyword">public class</span> <span class="class-name">NotificationDeserializer</span> <span class="keyword">implements</span> <span class="class-name">JsonbDeserializer</span>&lt;<span class="class-name">Notification</span>&gt; {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">Notification</span> <span class="function">deserialize</span>(<span class="class-name">JsonParser</span> parser,
+                                     <span class="class-name">DeserializationContext</span> ctx, <span class="class-name">Type</span> rtType) {
+        <span class="class-name">JsonObject</span> obj = parser.getObject();
+        <span class="class-name">String</span> type = obj.getString(<span class="string">"type"</span>);
+
+        <span class="keyword">return switch</span> (type) {
+            <span class="keyword">case</span> <span class="string">"email"</span> -> ctx.deserialize(<span class="class-name">EmailNotification</span>.<span class="keyword">class</span>, parser);
+            <span class="keyword">case</span> <span class="string">"sms"</span> -> ctx.deserialize(<span class="class-name">SmsNotification</span>.<span class="keyword">class</span>, parser);
+            <span class="keyword">default</span> -> <span class="keyword">throw new</span> <span class="class-name">JsonbException</span>(<span class="string">"Unknown type: "</span> + type);
+        };
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>DO:</h3>
+                <ul>
+                    <li><strong>Use JSON-B for POJOs</strong> - Simpler and cleaner code</li>
+                    <li><strong>Use JSON-P for dynamic JSON</strong> - When structure is unknown</li>
+                    <li><strong>Use streaming for large files</strong> - Better memory efficiency</li>
+                    <li><strong>Use DTOs</strong> - Don't expose entities directly</li>
+                    <li><strong>Configure Jsonb once</strong> - Reuse the instance</li>
+                    <li><strong>Use @JsonbTransient</strong> - Hide sensitive fields</li>
+                    <li><strong>Handle nulls properly</strong> - Configure null handling strategy</li>
+                </ul>
+
+                <h3>DON'T:</h3>
+                <ul>
+                    <li><strong>Don't create Jsonb per request</strong> - It's expensive</li>
+                    <li><strong>Don't expose passwords/secrets</strong> - Use @JsonbTransient</li>
+                    <li><strong>Don't ignore date formatting</strong> - Use @JsonbDateFormat</li>
+                    <li><strong>Don't mix JSON-P and JSON-B unnecessarily</strong> - Pick the right tool</li>
+                    <li><strong>Don't forget to close readers/parsers</strong> - Use try-with-resources</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>JSON-P:</strong> Low-level API for parsing, generating, and querying JSON</li>
+                    <li><strong>JSON-B:</strong> High-level binding between Java objects and JSON</li>
+                    <li><strong>JsonObject/JsonArray:</strong> JSON-P immutable data structures</li>
+                    <li><strong>Jsonb:</strong> Main JSON-B interface for toJson/fromJson</li>
+                    <li><strong>@JsonbProperty:</strong> Customize JSON field names</li>
+                    <li><strong>@JsonbTransient:</strong> Exclude fields from JSON</li>
+                    <li><strong>@JsonbDateFormat:</strong> Custom date formatting</li>
+                    <li><strong>JsonbConfig:</strong> Configure serialization behavior</li>
+                    <li><strong>Streaming API:</strong> Memory-efficient for large files</li>
+                    <li><strong>JSON Pointer/Patch:</strong> Query and modify JSON documents</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="jax-rs.html" class="related-link">JAX-RS (RESTful Services)</a>
+                <a href="bean-validation.html" class="related-link">Bean Validation</a>
+                <a href="cdi.html" class="related-link">CDI</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>

@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RESTful API Principles - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> / <a href="../../index.html#web-concepts">Web Concepts</a> / REST Principles
+            </nav>
+            <h1>RESTful API Principles</h1>
+            <p class="topic-subtitle">Understanding the architectural style that powers modern web APIs</p>
+            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <main class="topic-content">
+        <section class="content-section">
+            <h2>What is REST?</h2>
+            <p><strong>REST (Representational State Transfer)</strong> is an architectural style for designing networked applications, particularly web services. It was defined by Roy Fielding in his 2000 doctoral dissertation and has since become the dominant approach for building web APIs.</p>
+
+            <p>It's important to understand that <strong>REST is not a protocol, standard, or technology</strong>—it's a set of architectural constraints and principles. When an API follows these principles, we call it "RESTful." The beauty of REST is that it leverages the existing infrastructure of the web (HTTP) rather than creating something new.</p>
+
+            <h3>Why REST Became Dominant</h3>
+            <p>Before REST became popular, web services were primarily built using SOAP (Simple Object Access Protocol), which was complex, verbose, and required specialized tooling. REST gained popularity because:</p>
+            <ul>
+                <li><strong>Simplicity:</strong> REST uses standard HTTP, which developers already understand. No special libraries or protocols needed.</li>
+                <li><strong>Flexibility:</strong> REST can return data in any format (JSON, XML, HTML, plain text), whereas SOAP was limited to XML.</li>
+                <li><strong>Scalability:</strong> The stateless nature of REST makes it easy to scale by adding more servers.</li>
+                <li><strong>Cacheability:</strong> REST responses can be cached using standard HTTP caching mechanisms, improving performance dramatically.</li>
+                <li><strong>Universal:</strong> Any client that can make HTTP requests can consume a REST API—browsers, mobile apps, IoT devices, other servers.</li>
+            </ul>
+
+            <h3>The Core Philosophy: Resources and Representations</h3>
+            <p>The fundamental concept in REST is the <strong>resource</strong>. A resource is any piece of information that can be named and addressed—users, products, orders, blog posts, comments, etc. Each resource:</p>
+            <ul>
+                <li>Has a unique identifier (URI/URL)</li>
+                <li>Can have multiple representations (JSON, XML, HTML)</li>
+                <li>Can be manipulated using a fixed set of operations (HTTP methods)</li>
+            </ul>
+
+            <div class="info-box">
+                <p><strong>Key Insight:</strong> REST treats everything as a <strong>resource</strong> that can be accessed and manipulated using standard HTTP methods. Think of resources as nouns (users, products, orders) and HTTP methods as verbs (get, create, update, delete).</p>
+                <ul>
+                    <li><strong>Resource:</strong> The "thing" being accessed — <code>/users/123</code></li>
+                    <li><strong>Representation:</strong> The format of the data — JSON, XML, etc.</li>
+                    <li><strong>State Transfer:</strong> Passing resource state between client and server</li>
+                </ul>
+            </div>
+
+            <pre><code><span class="comment">// The REST mental model:</span>
+<span class="comment">// Resources are NOUNS, HTTP methods are VERBS</span>
+
+Resource: /users          <span class="comment">← The collection of all users</span>
+Resource: /users/123      <span class="comment">← A specific user (user with ID 123)</span>
+Resource: /users/123/orders  <span class="comment">← Orders belonging to user 123</span>
+
+<span class="comment">// Actions on resources use HTTP methods:</span>
+GET    /users/123   <span class="comment">← "Get me user 123"</span>
+POST   /users       <span class="comment">← "Create a new user"</span>
+PUT    /users/123   <span class="comment">← "Replace user 123 with this data"</span>
+PATCH  /users/123   <span class="comment">← "Update these specific fields of user 123"</span>
+DELETE /users/123   <span class="comment">← "Delete user 123"</span></code></pre>
+
+            <h3>REST vs SOAP</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>REST</th>
+                        <th>SOAP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Protocol</strong></td>
+                        <td>Uses HTTP directly</td>
+                        <td>Protocol-agnostic (usually HTTP)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Format</strong></td>
+                        <td>JSON, XML, HTML, plain text</td>
+                        <td>XML only</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Complexity</strong></td>
+                        <td>Lightweight, simple</td>
+                        <td>Heavy, complex</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Caching</strong></td>
+                        <td>Built-in HTTP caching</td>
+                        <td>No native caching</td>
+                    </tr>
+                    <tr>
+                        <td><strong>State</strong></td>
+                        <td>Stateless</td>
+                        <td>Can be stateful</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Use Case</strong></td>
+                        <td>Web APIs, mobile apps</td>
+                        <td>Enterprise, banking</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>The 6 REST Constraints</h2>
+
+            <h3>1. Client-Server Separation</h3>
+            <pre><code><span class="comment">// Client and server are independent</span>
+<span class="comment">// Client doesn't care HOW data is stored</span>
+<span class="comment">// Server doesn't care HOW data is displayed</span>
+
+<span class="comment">// Client (Frontend)</span>
+fetch('/api/users/123')
+    .then(response => response.json())
+    .then(user => displayUserProfile(user));
+
+<span class="comment">// Server (Backend) - Could be Java, Python, Node.js...</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{id}"</span>)
+<span class="keyword">public</span> User getUser(<span class="annotation">@PathVariable</span> Long id) {
+    <span class="keyword">return</span> userRepository.findById(id);
+}</code></pre>
+
+            <h3>2. Statelessness</h3>
+            <pre><code><span class="comment">// BAD: Server stores client state (NOT RESTful)</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/next-page"</span>)
+<span class="keyword">public</span> List&lt;Item&gt; getNextPage() {
+    <span class="comment">// Server remembers which page client is on - NOT STATELESS</span>
+    <span class="keyword">int</span> currentPage = session.getAttribute(<span class="string">"currentPage"</span>);
+    <span class="keyword">return</span> itemService.getPage(currentPage + <span class="number">1</span>);
+}
+
+<span class="comment">// GOOD: Client sends all needed information (RESTful)</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/items"</span>)
+<span class="keyword">public</span> List&lt;Item&gt; getItems(
+        <span class="annotation">@RequestParam</span> <span class="keyword">int</span> page,
+        <span class="annotation">@RequestParam</span> <span class="keyword">int</span> size) {
+    <span class="comment">// Each request contains everything needed</span>
+    <span class="keyword">return</span> itemService.getPage(page, size);
+}
+
+<span class="comment">// Client includes authentication in EVERY request</span>
+GET /api/items?page=2&size=10
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...</code></pre>
+
+            <div class="info-box note">
+                <div class="info-box-title">Why Stateless?</div>
+                <ul>
+                    <li><strong>Scalability:</strong> Any server can handle any request</li>
+                    <li><strong>Reliability:</strong> Server failure doesn't lose client state</li>
+                    <li><strong>Simplicity:</strong> No session synchronization needed</li>
+                </ul>
+            </div>
+
+            <h3>3. Cacheability</h3>
+            <pre><code><span class="comment">// Responses must define themselves as cacheable or not</span>
+
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/products/{id}"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;Product&gt; getProduct(<span class="annotation">@PathVariable</span> Long id) {
+    Product product = productService.findById(id);
+
+    <span class="keyword">return</span> ResponseEntity.ok()
+        <span class="comment">// Cache for 1 hour</span>
+        .cacheControl(CacheControl.maxAge(<span class="number">1</span>, TimeUnit.HOURS))
+        <span class="comment">// ETag for validation</span>
+        .eTag(String.valueOf(product.getVersion()))
+        .body(product);
+}
+
+<span class="comment">// HTTP Response Headers:</span>
+<span class="comment">// Cache-Control: max-age=3600</span>
+<span class="comment">// ETag: "v5"</span>
+
+<span class="comment">// For data that changes frequently:</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/stock-prices"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;List&lt;Price&gt;&gt; getPrices() {
+    <span class="keyword">return</span> ResponseEntity.ok()
+        .cacheControl(CacheControl.noCache()) <span class="comment">// Don't cache</span>
+        .body(priceService.getCurrentPrices());
+}</code></pre>
+
+            <h3>4. Uniform Interface</h3>
+            <pre><code><span class="comment">// The most fundamental constraint - consistent API design</span>
+
+<span class="comment">// a) Resource Identification via URIs</span>
+GET  /api/users/123          <span class="comment">// User with ID 123</span>
+GET  /api/users/123/orders   <span class="comment">// Orders for user 123</span>
+GET  /api/orders/456         <span class="comment">// Order with ID 456</span>
+
+<span class="comment">// b) Manipulation through Representations</span>
+<span class="comment">// Client receives JSON representation, modifies it, sends back</span>
+{
+    <span class="string">"id"</span>: <span class="number">123</span>,
+    <span class="string">"name"</span>: <span class="string">"John Doe"</span>,
+    <span class="string">"email"</span>: <span class="string">"john@example.com"</span>  <span class="comment">// Client changes this</span>
+}
+
+<span class="comment">// c) Self-Descriptive Messages</span>
+<span class="comment">// Request tells server everything it needs</span>
+PUT /api/users/123
+Content-Type: application/json
+Authorization: Bearer token123
+
+{<span class="string">"name"</span>: <span class="string">"John Updated"</span>}
+
+<span class="comment">// Response tells client everything it needs</span>
+HTTP/1.1 200 OK
+Content-Type: application/json
+Last-Modified: Wed, 22 Jan 2026 10:00:00 GMT
+
+{<span class="string">"id"</span>: <span class="number">123</span>, <span class="string">"name"</span>: <span class="string">"John Updated"</span>}</code></pre>
+
+            <h3>5. Layered System</h3>
+            <pre><code><span class="comment">// Client doesn't know (or care) about intermediate layers</span>
+
+Client
+   ↓
+[Load Balancer]     <span class="comment">← Client doesn't see this</span>
+   ↓
+[API Gateway]       <span class="comment">← Or this</span>
+   ↓
+[Cache Layer]       <span class="comment">← Or this</span>
+   ↓
+[Application Server]
+   ↓
+[Database]
+
+<span class="comment">// Benefits:</span>
+<span class="comment">// - Security: Hide internal architecture</span>
+<span class="comment">// - Scalability: Add layers as needed</span>
+<span class="comment">// - Flexibility: Change layers without client changes</span></code></pre>
+
+            <h3>6. Code on Demand (Optional)</h3>
+            <pre><code><span class="comment">// Server can send executable code to client</span>
+<span class="comment">// This is the only OPTIONAL constraint</span>
+
+<span class="comment">// Example: Server sends JavaScript to client</span>
+GET /api/validation-rules
+
+<span class="comment">// Response:</span>
+{
+    <span class="string">"script"</span>: <span class="string">"function validate(email) { return email.includes('@'); }"</span>
+}
+
+<span class="comment">// Client executes the received code</span>
+<span class="comment">// (Rarely used in practice due to security concerns)</span></code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>RESTful URL Design</h2>
+
+            <h3>Resource Naming Conventions</h3>
+            <pre><code><span class="comment">// GOOD: Use nouns, plural form, lowercase</span>
+GET  /api/users              <span class="comment">// Collection of users</span>
+GET  /api/users/123          <span class="comment">// Single user</span>
+GET  /api/users/123/orders   <span class="comment">// User's orders (sub-resource)</span>
+POST /api/users              <span class="comment">// Create new user</span>
+
+<span class="comment">// BAD: Verbs in URLs</span>
+GET  /api/getUsers           <span class="comment">// ✗ Don't use verbs</span>
+POST /api/createUser         <span class="comment">// ✗ HTTP method is the verb</span>
+GET  /api/deleteUser/123     <span class="comment">// ✗ Use DELETE method instead</span>
+
+<span class="comment">// BAD: Inconsistent naming</span>
+GET  /api/user               <span class="comment">// ✗ Use plural (users)</span>
+GET  /api/User/123           <span class="comment">// ✗ Use lowercase</span>
+GET  /api/user_orders        <span class="comment">// ✗ Use hyphens or nested resources</span></code></pre>
+
+            <h3>HTTP Methods (CRUD Operations)</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>CRUD</th>
+                        <th>URL Example</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td>Read</td>
+                        <td><code>/api/users</code></td>
+                        <td>Get all users</td>
+                    </tr>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td>Read</td>
+                        <td><code>/api/users/123</code></td>
+                        <td>Get user 123</td>
+                    </tr>
+                    <tr>
+                        <td><code>POST</code></td>
+                        <td>Create</td>
+                        <td><code>/api/users</code></td>
+                        <td>Create new user</td>
+                    </tr>
+                    <tr>
+                        <td><code>PUT</code></td>
+                        <td>Update</td>
+                        <td><code>/api/users/123</code></td>
+                        <td>Replace user 123</td>
+                    </tr>
+                    <tr>
+                        <td><code>PATCH</code></td>
+                        <td>Update</td>
+                        <td><code>/api/users/123</code></td>
+                        <td>Partial update user 123</td>
+                    </tr>
+                    <tr>
+                        <td><code>DELETE</code></td>
+                        <td>Delete</td>
+                        <td><code>/api/users/123</code></td>
+                        <td>Delete user 123</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Complete REST Controller Example</h2>
+
+            <pre><code><span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+
+    <span class="keyword">private final</span> UserService userService;
+
+    <span class="comment">// GET /api/users - Get all users</span>
+    <span class="annotation">@GetMapping</span>
+    <span class="keyword">public</span> ResponseEntity&lt;List&lt;User&gt;&gt; getAllUsers(
+            <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"0"</span>) <span class="keyword">int</span> page,
+            <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"10"</span>) <span class="keyword">int</span> size) {
+
+        List&lt;User&gt; users = userService.findAll(page, size);
+        <span class="keyword">return</span> ResponseEntity.ok(users);
+    }
+
+    <span class="comment">// GET /api/users/123 - Get single user</span>
+    <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;User&gt; getUser(<span class="annotation">@PathVariable</span> Long id) {
+        <span class="keyword">return</span> userService.findById(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    <span class="comment">// POST /api/users - Create new user</span>
+    <span class="annotation">@PostMapping</span>
+    <span class="keyword">public</span> ResponseEntity&lt;User&gt; createUser(
+            <span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> CreateUserRequest request) {
+
+        User created = userService.create(request);
+
+        URI location = ServletUriComponentsBuilder
+            .fromCurrentRequest()
+            .path(<span class="string">"/{id}"</span>)
+            .buildAndExpand(created.getId())
+            .toUri();
+
+        <span class="comment">// Return 201 Created with Location header</span>
+        <span class="keyword">return</span> ResponseEntity.created(location).body(created);
+    }
+
+    <span class="comment">// PUT /api/users/123 - Replace entire user</span>
+    <span class="annotation">@PutMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;User&gt; updateUser(
+            <span class="annotation">@PathVariable</span> Long id,
+            <span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> UpdateUserRequest request) {
+
+        <span class="keyword">return</span> userService.update(id, request)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    <span class="comment">// PATCH /api/users/123 - Partial update</span>
+    <span class="annotation">@PatchMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;User&gt; patchUser(
+            <span class="annotation">@PathVariable</span> Long id,
+            <span class="annotation">@RequestBody</span> Map&lt;String, Object&gt; updates) {
+
+        <span class="keyword">return</span> userService.patch(id, updates)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    <span class="comment">// DELETE /api/users/123 - Delete user</span>
+    <span class="annotation">@DeleteMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;Void&gt; deleteUser(<span class="annotation">@PathVariable</span> Long id) {
+        <span class="keyword">if</span> (userService.delete(id)) {
+            <span class="keyword">return</span> ResponseEntity.noContent().build(); <span class="comment">// 204 No Content</span>
+        }
+        <span class="keyword">return</span> ResponseEntity.notFound().build(); <span class="comment">// 404 Not Found</span>
+    }
+
+    <span class="comment">// GET /api/users/123/orders - Sub-resource</span>
+    <span class="annotation">@GetMapping</span>(<span class="string">"/{id}/orders"</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;List&lt;Order&gt;&gt; getUserOrders(
+            <span class="annotation">@PathVariable</span> Long id) {
+
+        <span class="keyword">return</span> ResponseEntity.ok(orderService.findByUserId(id));
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>HTTP Status Codes</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>When to Use</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>200</code></td>
+                        <td>OK</td>
+                        <td>Successful GET, PUT, PATCH</td>
+                    </tr>
+                    <tr>
+                        <td><code>201</code></td>
+                        <td>Created</td>
+                        <td>Successful POST (resource created)</td>
+                    </tr>
+                    <tr>
+                        <td><code>204</code></td>
+                        <td>No Content</td>
+                        <td>Successful DELETE (no body)</td>
+                    </tr>
+                    <tr>
+                        <td><code>400</code></td>
+                        <td>Bad Request</td>
+                        <td>Invalid request data</td>
+                    </tr>
+                    <tr>
+                        <td><code>401</code></td>
+                        <td>Unauthorized</td>
+                        <td>Authentication required</td>
+                    </tr>
+                    <tr>
+                        <td><code>403</code></td>
+                        <td>Forbidden</td>
+                        <td>Authenticated but not authorized</td>
+                    </tr>
+                    <tr>
+                        <td><code>404</code></td>
+                        <td>Not Found</td>
+                        <td>Resource doesn't exist</td>
+                    </tr>
+                    <tr>
+                        <td><code>409</code></td>
+                        <td>Conflict</td>
+                        <td>Resource state conflict</td>
+                    </tr>
+                    <tr>
+                        <td><code>422</code></td>
+                        <td>Unprocessable Entity</td>
+                        <td>Validation errors</td>
+                    </tr>
+                    <tr>
+                        <td><code>500</code></td>
+                        <td>Internal Server Error</td>
+                        <td>Server-side error</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <pre><code><span class="comment">// Proper status code usage</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/api/users"</span>)
+<span class="keyword">public</span> ResponseEntity&lt;?&gt; createUser(<span class="annotation">@RequestBody</span> UserDTO dto) {
+
+    <span class="comment">// 400 Bad Request - malformed request</span>
+    <span class="keyword">if</span> (dto == <span class="keyword">null</span>) {
+        <span class="keyword">return</span> ResponseEntity.badRequest()
+            .body(<span class="keyword">new</span> ErrorResponse(<span class="string">"Request body is required"</span>));
+    }
+
+    <span class="comment">// 409 Conflict - business rule violation</span>
+    <span class="keyword">if</span> (userService.existsByEmail(dto.getEmail())) {
+        <span class="keyword">return</span> ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(<span class="keyword">new</span> ErrorResponse(<span class="string">"Email already registered"</span>));
+    }
+
+    <span class="comment">// 422 Unprocessable Entity - validation failed</span>
+    List&lt;String&gt; errors = validate(dto);
+    <span class="keyword">if</span> (!errors.isEmpty()) {
+        <span class="keyword">return</span> ResponseEntity.unprocessableEntity()
+            .body(<span class="keyword">new</span> ValidationErrorResponse(errors));
+    }
+
+    <span class="comment">// 201 Created - success</span>
+    User created = userService.create(dto);
+    <span class="keyword">return</span> ResponseEntity.status(HttpStatus.CREATED).body(created);
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>HATEOAS (Hypermedia)</h2>
+            <p><strong>HATEOAS</strong> (Hypermedia As The Engine Of Application State) - responses include links to related actions.</p>
+
+            <pre><code><span class="comment">// Response without HATEOAS</span>
+{
+    <span class="string">"id"</span>: <span class="number">123</span>,
+    <span class="string">"name"</span>: <span class="string">"John Doe"</span>,
+    <span class="string">"email"</span>: <span class="string">"john@example.com"</span>
+}
+
+<span class="comment">// Response WITH HATEOAS - client discovers available actions</span>
+{
+    <span class="string">"id"</span>: <span class="number">123</span>,
+    <span class="string">"name"</span>: <span class="string">"John Doe"</span>,
+    <span class="string">"email"</span>: <span class="string">"john@example.com"</span>,
+    <span class="string">"_links"</span>: {
+        <span class="string">"self"</span>: { <span class="string">"href"</span>: <span class="string">"/api/users/123"</span> },
+        <span class="string">"orders"</span>: { <span class="string">"href"</span>: <span class="string">"/api/users/123/orders"</span> },
+        <span class="string">"delete"</span>: { <span class="string">"href"</span>: <span class="string">"/api/users/123"</span>, <span class="string">"method"</span>: <span class="string">"DELETE"</span> },
+        <span class="string">"update"</span>: { <span class="string">"href"</span>: <span class="string">"/api/users/123"</span>, <span class="string">"method"</span>: <span class="string">"PUT"</span> }
+    }
+}</code></pre>
+
+            <h3>Spring HATEOAS Example</h3>
+            <pre><code><span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
+<span class="keyword">public</span> EntityModel&lt;User&gt; getUser(<span class="annotation">@PathVariable</span> Long id) {
+    User user = userService.findById(id)
+        .orElseThrow(() -> <span class="keyword">new</span> UserNotFoundException(id));
+
+    <span class="keyword">return</span> EntityModel.of(user,
+        linkTo(methodOn(UserController.<span class="keyword">class</span>).getUser(id)).withSelfRel(),
+        linkTo(methodOn(UserController.<span class="keyword">class</span>).getUserOrders(id)).withRel(<span class="string">"orders"</span>),
+        linkTo(methodOn(UserController.<span class="keyword">class</span>).getAllUsers(<span class="number">0</span>, <span class="number">10</span>)).withRel(<span class="string">"users"</span>)
+    );
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>API Versioning Strategies</h2>
+
+            <pre><code><span class="comment">// 1. URL Path Versioning (Most Common)</span>
+GET /api/v1/users
+GET /api/v2/users
+
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/v1/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserControllerV1</span> { }
+
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/v2/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserControllerV2</span> { }
+
+
+<span class="comment">// 2. Query Parameter Versioning</span>
+GET /api/users?version=1
+GET /api/users?version=2
+
+
+<span class="comment">// 3. Header Versioning</span>
+GET /api/users
+Accept: application/vnd.myapi.v1+json
+
+<span class="annotation">@GetMapping</span>(produces = <span class="string">"application/vnd.myapi.v1+json"</span>)
+<span class="keyword">public</span> List&lt;UserV1&gt; getUsersV1() { }
+
+<span class="annotation">@GetMapping</span>(produces = <span class="string">"application/vnd.myapi.v2+json"</span>)
+<span class="keyword">public</span> List&lt;UserV2&gt; getUsersV2() { }
+
+
+<span class="comment">// 4. Custom Header Versioning</span>
+GET /api/users
+X-API-Version: 2</code></pre>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Pros</th>
+                        <th>Cons</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>URL Path</td>
+                        <td>Simple, visible, cacheable</td>
+                        <td>URL pollution</td>
+                    </tr>
+                    <tr>
+                        <td>Query Param</td>
+                        <td>Optional, easy to default</td>
+                        <td>Easy to forget</td>
+                    </tr>
+                    <tr>
+                        <td>Header</td>
+                        <td>Clean URLs</td>
+                        <td>Hidden, harder to test</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="content-section">
+            <h2>Error Response Design</h2>
+
+            <pre><code><span class="comment">// Consistent error response format</span>
+<span class="keyword">public class</span> <span class="class-name">ApiError</span> {
+    <span class="keyword">private</span> LocalDateTime timestamp;
+    <span class="keyword">private</span> <span class="keyword">int</span> status;
+    <span class="keyword">private</span> String error;
+    <span class="keyword">private</span> String message;
+    <span class="keyword">private</span> String path;
+    <span class="keyword">private</span> List&lt;FieldError&gt; fieldErrors; <span class="comment">// For validation errors</span>
+}
+
+<span class="comment">// Example error response</span>
+{
+    <span class="string">"timestamp"</span>: <span class="string">"2026-01-23T10:30:00"</span>,
+    <span class="string">"status"</span>: <span class="number">400</span>,
+    <span class="string">"error"</span>: <span class="string">"Bad Request"</span>,
+    <span class="string">"message"</span>: <span class="string">"Validation failed"</span>,
+    <span class="string">"path"</span>: <span class="string">"/api/users"</span>,
+    <span class="string">"fieldErrors"</span>: [
+        {
+            <span class="string">"field"</span>: <span class="string">"email"</span>,
+            <span class="string">"message"</span>: <span class="string">"must be a valid email address"</span>
+        },
+        {
+            <span class="string">"field"</span>: <span class="string">"age"</span>,
+            <span class="string">"message"</span>: <span class="string">"must be at least 18"</span>
+        }
+    ]
+}
+
+<span class="comment">// Global exception handler</span>
+<span class="annotation">@RestControllerAdvice</span>
+<span class="keyword">public class</span> <span class="class-name">GlobalExceptionHandler</span> {
+
+    <span class="annotation">@ExceptionHandler</span>(ResourceNotFoundException.<span class="keyword">class</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;ApiError&gt; handleNotFound(
+            ResourceNotFoundException ex, HttpServletRequest request) {
+
+        ApiError error = <span class="keyword">new</span> ApiError(
+            LocalDateTime.now(),
+            HttpStatus.NOT_FOUND.value(),
+            <span class="string">"Not Found"</span>,
+            ex.getMessage(),
+            request.getRequestURI()
+        );
+        <span class="keyword">return</span> ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    <span class="annotation">@ExceptionHandler</span>(MethodArgumentNotValidException.<span class="keyword">class</span>)
+    <span class="keyword">public</span> ResponseEntity&lt;ApiError&gt; handleValidation(
+            MethodArgumentNotValidException ex, HttpServletRequest request) {
+
+        List&lt;FieldError&gt; fieldErrors = ex.getBindingResult()
+            .getFieldErrors().stream()
+            .map(e -> <span class="keyword">new</span> FieldError(e.getField(), e.getDefaultMessage()))
+            .toList();
+
+        ApiError error = <span class="keyword">new</span> ApiError(
+            LocalDateTime.now(),
+            HttpStatus.BAD_REQUEST.value(),
+            <span class="string">"Validation Failed"</span>,
+            <span class="string">"Request validation failed"</span>,
+            request.getRequestURI(),
+            fieldErrors
+        );
+        <span class="keyword">return</span> ResponseEntity.badRequest().body(error);
+    }
+}</code></pre>
+        </section>
+
+        <section class="content-section">
+            <h2>Best Practices</h2>
+
+            <div class="best-practices">
+                <h3>DO:</h3>
+                <ul>
+                    <li><strong>Use nouns for resources:</strong> <code>/users</code>, <code>/orders</code>, <code>/products</code></li>
+                    <li><strong>Use HTTP methods correctly:</strong> GET for read, POST for create, etc.</li>
+                    <li><strong>Return appropriate status codes:</strong> 201 for created, 404 for not found</li>
+                    <li><strong>Use plural resource names:</strong> <code>/users</code> not <code>/user</code></li>
+                    <li><strong>Support pagination:</strong> <code>?page=1&size=20</code></li>
+                    <li><strong>Support filtering:</strong> <code>?status=active&role=admin</code></li>
+                    <li><strong>Version your API:</strong> <code>/api/v1/users</code></li>
+                    <li><strong>Use consistent error format:</strong> Same structure for all errors</li>
+                </ul>
+
+                <h3>DON'T:</h3>
+                <ul>
+                    <li><strong>Don't use verbs in URLs:</strong> <code>/getUsers</code>, <code>/createUser</code></li>
+                    <li><strong>Don't ignore status codes:</strong> Return 200 for everything</li>
+                    <li><strong>Don't store state on server:</strong> Keep it stateless</li>
+                    <li><strong>Don't expose internal IDs:</strong> Use public identifiers when needed</li>
+                    <li><strong>Don't return stack traces:</strong> Log them, return friendly messages</li>
+                    <li><strong>Don't ignore security:</strong> Always use HTTPS, validate input</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="content-section">
+            <h2>Summary</h2>
+            <div class="info-box">
+                <ul>
+                    <li><strong>REST:</strong> Architectural style based on resources and HTTP</li>
+                    <li><strong>Resources:</strong> Identified by URIs, manipulated via HTTP methods</li>
+                    <li><strong>Stateless:</strong> Each request contains all information needed</li>
+                    <li><strong>HTTP Methods:</strong> GET (read), POST (create), PUT (replace), PATCH (update), DELETE</li>
+                    <li><strong>Status Codes:</strong> Use appropriate codes (200, 201, 400, 404, etc.)</li>
+                    <li><strong>HATEOAS:</strong> Responses include links to related actions</li>
+                    <li><strong>Versioning:</strong> Plan for API evolution from day one</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="related-topics">
+            <h3>Related Topics</h3>
+            <div class="related-links">
+                <a href="http.html" class="related-link">HTTP Protocol</a>
+                <a href="request-response.html" class="related-link">Request/Response Cycle</a>
+                <a href="cors.html" class="related-link">CORS</a>
+                <a href="../spring/rest.html" class="related-link">Spring REST</a>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+</body>
+</html>
