@@ -14,8 +14,9 @@ A complete, organized reference covering everything from Java fundamentals to en
 - **Instant Search** across all topics, concepts, and keywords
 - **Categorized Sections** — Fundamentals, Advanced, Spring, Jakarta EE, Databases, Security, Build Tools, and more
 - **Syntax-Highlighted Code Examples** in every topic
-- **Fully Static** — no backend, no build step, just HTML/CSS/JS
-- **Mobile Responsive** — works on any device
+- **Beautiful Animations** — animated gradient hero, floating code particles, typing effect, smooth card hover effects
+- **Fully Static** — no backend, no build step, just HTML/CSS/JS with vanilla JavaScript
+- **Mobile Responsive** — works on any device with responsive canvas and adaptive layouts
 - **Offline Ready** — download and use without internet
 
 ## 📂 Topics Covered

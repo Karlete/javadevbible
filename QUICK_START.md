@@ -20,6 +20,7 @@ The JavaDev Bible web application has been successfully created. Here's everythi
 ✅ **Functionality** (`javabible/js/`)
    - `search.js` - Real-time search with highlighting
    - `navigation.js` - Smooth scrolling, copy buttons, keyboard shortcuts
+   - `hero-effects.js` - Animated hero with particles, typing effect, card animations
 
 ✅ **Data** (`javabible/data/`)
    - `search-index.json` - Complete search index for all 90+ topics
@@ -80,25 +81,42 @@ Then open: http://localhost:8080
 
 ## 🎯 Features to Try
 
-### 1. Search Functionality
+### 1. Visual Enhancements (Hero Section)
+- **Animated Gradient** - The hero section features a smooth, pulsing teal gradient animation
+- **Floating Particles** - Watch Java code snippets (`{}`, `int`, `for`, etc.) float gently down the background
+- **Typing Effect** - The subtitle rotates through 3 phrases with a typewriter effect:
+  - "Your Comprehensive Java Developer Knowledge Base"
+  - "From Fundamentals to Enterprise Mastery"
+  - "Multithreading, Jakarta EE, Spring & more"
+- **Blinking Cursor** - An animated cursor appears as text types
+
+### 2. Enhanced Card Animations
+- Hover over any category card to see smooth animations:
+  - Card lifts slightly (`translateY(-4px)`)
+  - Border color changes to teal
+  - Gradient bar (3px) animates in from left at the bottom
+  - Shadow intensifies for depth
+
+### 3. Search Functionality
 - Click the search bar or press `Ctrl+K` (or `Cmd+K` on Mac)
 - Type any Java keyword: "collection", "spring", "jpa", "thread"
 - Results appear instantly with highlights
 - Click any result to go to that topic
 
-### 2. Browse Categories
+### 4. Browse Categories
 - Scroll down the homepage
 - 12 major categories with icons
+- Watch the animated cards as you hover over them
 - Click any topic link to view detailed content
 
-### 3. Navigation
+### 5. Navigation
 - Each topic page has:
   - Breadcrumb navigation
   - "Back to Index" button
   - Related topics at the bottom
   - Smooth scrolling
 
-### 4. Code Examples
+### 6. Code Examples
 - All code is syntax-highlighted
 - Copy button appears on hover
 - Easy to read formatting
