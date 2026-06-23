@@ -12,15 +12,16 @@
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html" data-i18n="nav.home">Home</a> / <a href="../../index.html#fundamentals" data-i18n="nav.fundamentals">Java Fundamentals</a> / Exception Handling
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#fundamentals" data-i18n="nav.fundamentals">Java Fundamentals</a> /
+                Exception Handling
             </nav>
             <h1 data-i18n="topic.exc.h1">Exception Handling</h1>
-            <p class="topic-subtitle" data-i18n="topic.exc.subtitle">Handling Errors Gracefully in Java</p>
-            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">← Back to Index</a>
+            <p class="topic-subtitle" data-i18n="topic.exc.subtitle">The exception hierarchy, checked vs unchecked, and how to handle errors correctly</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <!-- PAGE LAYOUT: ToC sidebar + content -->
     <div class="topic-layout">
 
         <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
@@ -35,505 +36,676 @@
         </aside>
 
         <main class="topic-content">
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.1">What Are Exceptions?</h2>
-            <p>Imagine you're driving a car and suddenly a tire goes flat. You don't just crash - you pull over, fix the problem, and continue. <strong>Exceptions in Java work the same way.</strong></p>
 
-            <p>An <strong>exception</strong> is an unexpected event that occurs during program execution - something that disrupts the normal flow of your code. It could be:</p>
-            <ul>
-                <li>Trying to divide by zero</li>
-                <li>Opening a file that doesn't exist</li>
-                <li>Accessing an array element that's out of bounds</li>
-                <li>Connecting to a server that's offline</li>
-                <li>Converting invalid text to a number</li>
-            </ul>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS AN EXCEPTION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is an Exception?</h2>
+                <p>An <strong>exception</strong> is an object that represents an abnormal condition
+                    during program execution. When something goes wrong — a file doesn't exist, a
+                    network connection drops, someone passes <code>null</code> where a value was
+                    expected — the JVM (or your own code) <strong>throws</strong> an exception object.
+                    This interrupts the normal execution flow immediately.</p>
 
-            <p><strong>Without exception handling</strong>, when an error occurs, your program would crash immediately and stop running. <strong>With exception handling</strong>, you can catch these errors, deal with them gracefully, and allow your program to continue running or exit cleanly.</p>
+                <p>Without exception handling, that interruption crashes the program and the user
+                    sees a raw stack trace. With exception handling, you can <strong>catch</strong>
+                    the exception, react to it in a controlled way, and decide whether to recover,
+                    report, or propagate it up the call stack.</p>
 
-            <div class="info-box important">
-                <div class="info-box-title" data-i18n="topic.exc.ibt.1">Why Exception Handling Matters</div>
-                <p>Exception handling is crucial because:</p>
-                <ul>
-                    <li><strong>Prevents crashes</strong> - Your program doesn't just stop when something goes wrong</li>
-                    <li><strong>Provides user-friendly messages</strong> - Instead of cryptic error codes, show helpful messages</li>
-                    <li><strong>Allows recovery</strong> - Give users a chance to correct errors (like re-entering data)</li>
-                    <li><strong>Maintains data integrity</strong> - Clean up resources properly even when errors occur</li>
-                    <li><strong>Debugging</strong> - Helps you understand what went wrong and where</li>
-                </ul>
-            </div>
-        </section>
+                <pre><code><span class="comment">// Without exception handling: program crashes</span>
+<span class="keyword">int</span>[] numbers = {<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>};
+<span class="class-name">System</span>.out.println(numbers[<span class="number">10</span>]);  <span class="comment">// ← THROWS ArrayIndexOutOfBoundsException</span>
+<span class="class-name">System</span>.out.println(<span class="string">"this never runs"</span>);
 
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.2">What Happens When an Exception Occurs?</h2>
-            <p>Let's see what happens when code encounters an error:</p>
+<span class="comment">// Exception in thread "main" java.lang.ArrayIndexOutOfBoundsException:
+// Index 10 out of bounds for length 3</span>
 
-            <h3 data-i18n="topic.exc.h3.1">Example: Division by Zero (Without Exception Handling)</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">CrashExample</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Program started"</span>);
-
-        <span class="keyword">int</span> a = <span class="number">10</span>;
-        <span class="keyword">int</span> b = <span class="number">0</span>;
-        <span class="keyword">int</span> result = a / b;  <span class="comment">// BOOM! Exception thrown here!</span>
-
-        <span class="class-name">System</span>.out.println(<span class="string">"Result: "</span> + result);  <span class="comment">// This line NEVER executes</span>
-        <span class="class-name">System</span>.out.println(<span class="string">"Program finished"</span>);  <span class="comment">// This line NEVER executes</span>
-    }
-}</code></pre>
-
-            <h3 data-i18n="topic.exc.h3.2">What Actually Happens:</h3>
-            <pre><code><span class="comment">// Console Output:</span>
-Program started
-Exception in thread "main" java.lang.ArithmeticException: / by zero
-    at CrashExample.main(CrashExample.java:6)
-
-<span class="comment">// Program crashes! The last two lines never execute!</span></code></pre>
-
-            <p><strong>Step-by-step breakdown:</strong></p>
-            <ol>
-                <li>Program prints "Program started" ✅</li>
-                <li>When it tries to divide by zero, Java <strong>throws an exception</strong> (creates an ArithmeticException object)</li>
-                <li>Since there's no exception handler, the program <strong>crashes immediately</strong></li>
-                <li>The remaining code never runs ❌</li>
-                <li>The user sees a scary error message ❌</li>
-            </ol>
-        </section>
-
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.3">Try-Catch: Catching Exceptions</h2>
-            <p>Now let's handle that exception properly using a <span class="inline-code">try-catch</span> block!</p>
-
-            <h3 data-i18n="topic.exc.h3.3">Example: Handling Division by Zero</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">SafeExample</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Program started"</span>);
-
-        <span class="keyword">try</span> {
-            <span class="comment">// Code that might cause an exception</span>
-            <span class="keyword">int</span> a = <span class="number">10</span>;
-            <span class="keyword">int</span> b = <span class="number">0</span>;
-            <span class="keyword">int</span> result = a / b;  <span class="comment">// Exception thrown here!</span>
-
-            <span class="class-name">System</span>.out.println(<span class="string">"Result: "</span> + result);  <span class="comment">// This line is skipped</span>
-
-        } <span class="keyword">catch</span> (<span class="class-name">ArithmeticException</span> e) {
-            <span class="comment">// Code that runs when exception is caught</span>
-            <span class="class-name">System</span>.out.println(<span class="string">"Error: Cannot divide by zero!"</span>);
-            <span class="class-name">System</span>.out.println(<span class="string">"Please check your numbers and try again."</span>);
-        }
-
-        <span class="class-name">System</span>.out.println(<span class="string">"Program finished successfully"</span>);  <span class="comment">// This DOES execute!</span>
-    }
-}</code></pre>
-
-            <h3 data-i18n="topic.exc.h3.4">What Actually Happens:</h3>
-            <pre><code><span class="comment">// Console Output:</span>
-Program started
-Error: Cannot divide by zero!
-Please check your numbers and try again.
-Program finished successfully
-
-<span class="comment">// Program runs to completion! ✅</span></code></pre>
-
-            <p><strong>Step-by-step breakdown:</strong></p>
-            <ol>
-                <li>Program enters the <span class="inline-code">try</span> block</li>
-                <li>When division by zero occurs, Java <strong>throws</strong> an ArithmeticException</li>
-                <li>Java <strong>immediately jumps</strong> out of the try block (skipping remaining try code)</li>
-                <li>Java looks for a matching <span class="inline-code">catch</span> block</li>
-                <li>Finds the ArithmeticException catch block and <strong>executes that code</strong></li>
-                <li>After the catch block, execution <strong>continues normally</strong></li>
-                <li>Program completes successfully! ✅</li>
-            </ol>
-
-            <div class="info-box note">
-                <div class="info-box-title" data-i18n="topic.exc.ibt.2">Try-Catch Flow</div>
-                <p><strong>If NO exception occurs:</strong> Code in try block executes completely → catch block is skipped → program continues</p>
-                <p><strong>If exception occurs:</strong> try block stops at the error → matching catch block executes → program continues</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.4">Understanding Exception Objects</h2>
-            <p>When an exception is thrown, Java creates an <strong>exception object</strong> that contains information about the error.</p>
-
-            <pre><code><span class="keyword">try</span> {
-    <span class="keyword">int</span>[] numbers = {<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>};
-    <span class="class-name">System</span>.out.println(numbers[<span class="number">10</span>]);  <span class="comment">// Out of bounds!</span>
-
+<span class="comment">// With exception handling: you control what happens</span>
+<span class="keyword">try</span> {
+    <span class="class-name">System</span>.out.println(numbers[<span class="number">10</span>]);  <span class="comment">// ← throws, jumps to catch immediately</span>
 } <span class="keyword">catch</span> (<span class="class-name">ArrayIndexOutOfBoundsException</span> e) {
-    <span class="comment">// 'e' is the exception object - it has useful information!</span>
+    <span class="class-name">System</span>.out.println(<span class="string">"Index does not exist: "</span> + e.getMessage());
+}
+<span class="class-name">System</span>.out.println(<span class="string">"this DOES run"</span>);  <span class="comment">// execution continues normally</span></code></pre>
 
-    <span class="comment">// Get the error message</span>
-    <span class="class-name">System</span>.out.println(<span class="string">"Message: "</span> + e.getMessage());
-    <span class="comment">// Output: Message: Index 10 out of bounds for length 3</span>
+                <h3>Throwing vs catching</h3>
+                <p><strong>Throwing</strong> means signalling that something went wrong. You use the
+                    <code>throw</code> keyword with an exception object. Execution at the throw site
+                    stops immediately — no more code in that method runs after a throw.</p>
 
-    <span class="comment">// Get the exception type</span>
-    <span class="class-name">System</span>.out.println(<span class="string">"Type: "</span> + e.getClass().getName());
-    <span class="comment">// Output: Type: java.lang.ArrayIndexOutOfBoundsException</span>
+                <p><strong>Catching</strong> means intercepting a thrown exception before it crashes
+                    the program. You use <code>try { } catch { }</code>. The catch block only runs
+                    if an exception of the matching type was thrown inside the try block.</p>
 
-    <span class="comment">// Print the full stack trace (for debugging)</span>
-    e.printStackTrace();
-    <span class="comment">// Shows exactly where the error occurred in your code</span>
-}</code></pre>
-
-            <h3 data-i18n="topic.exc.h3.5">Common Exception Methods</h3>
-            <ul>
-                <li><span class="inline-code">getMessage()</span> - Returns the error message as a String</li>
-                <li><span class="inline-code">printStackTrace()</span> - Prints the full error trace (useful for debugging)</li>
-                <li><span class="inline-code">toString()</span> - Returns exception name and message</li>
-                <li><span class="inline-code">getCause()</span> - Returns the cause of this exception (if any)</li>
-            </ul>
-        </section>
-
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.5">Multiple Catch Blocks</h2>
-            <p>Different errors need different handling. You can have multiple catch blocks to handle different types of exceptions:</p>
-
-            <pre><code><span class="keyword">import</span> java.util.Scanner;
-
-<span class="keyword">public class</span> <span class="class-name">MultipleCatchExample</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="class-name">Scanner</span> scanner = <span class="keyword">new</span> <span class="class-name">Scanner</span>(<span class="class-name">System</span>.in);
-
-        <span class="keyword">try</span> {
-            <span class="class-name">System</span>.out.print(<span class="string">"Enter a number: "</span>);
-            <span class="class-name">String</span> input = scanner.nextLine();
-
-            <span class="comment">// Might throw NumberFormatException if input is not a number</span>
-            <span class="keyword">int</span> number = <span class="class-name">Integer</span>.parseInt(input);
-
-            <span class="comment">// Might throw ArithmeticException if number is 0</span>
-            <span class="keyword">int</span> result = <span class="number">100</span> / number;
-
-            <span class="class-name">System</span>.out.println(<span class="string">"Result: "</span> + result);
-
-        } <span class="keyword">catch</span> (<span class="class-name">NumberFormatException</span> e) {
-            <span class="comment">// Handles invalid number format</span>
-            <span class="class-name">System</span>.out.println(<span class="string">"Error: Please enter a valid number!"</span>);
-            <span class="class-name">System</span>.out.println(<span class="string">"You entered: "</span> + e.getMessage());
-
-        } <span class="keyword">catch</span> (<span class="class-name">ArithmeticException</span> e) {
-            <span class="comment">// Handles division by zero</span>
-            <span class="class-name">System</span>.out.println(<span class="string">"Error: Cannot divide by zero!"</span>);
-
-        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
-            <span class="comment">// Catches any other exception</span>
-            <span class="class-name">System</span>.out.println(<span class="string">"An unexpected error occurred: "</span> + e.getMessage());
-        }
-
-        <span class="class-name">System</span>.out.println(<span class="string">"Program continues..."</span>);
-    }
-}</code></pre>
-
-            <h3 data-i18n="topic.exc.h3.6">Example Runs:</h3>
-            <pre><code><span class="comment">// Run 1: User enters "abc"</span>
-Enter a number: abc
-Error: Please enter a valid number!
-You entered: For input string: "abc"
-Program continues...
-
-<span class="comment">// Run 2: User enters "0"</span>
-Enter a number: 0
-Error: Cannot divide by zero!
-Program continues...
-
-<span class="comment">// Run 3: User enters "5"</span>
-Enter a number: 5
-Result: 20
-Program continues...</code></pre>
-
-            <div class="info-box warning">
-                <div class="info-box-title" data-i18n="topic.exc.ibt.3">Important: Catch Block Order</div>
-                <p>Always put more specific exceptions BEFORE more general ones!</p>
-                <pre><code><span class="comment">// ✅ CORRECT - Specific first, general last</span>
-<span class="keyword">catch</span> (<span class="class-name">ArrayIndexOutOfBoundsException</span> e) { }
-<span class="keyword">catch</span> (<span class="class-name">Exception</span> e) { }
-
-<span class="comment">// ❌ WRONG - General first will catch everything!</span>
-<span class="keyword">catch</span> (<span class="class-name">Exception</span> e) { }  <span class="comment">// Catches ALL exceptions</span>
-<span class="keyword">catch</span> (<span class="class-name">ArrayIndexOutOfBoundsException</span> e) { }  <span class="comment">// Never reached!</span></code></pre>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.6">The Finally Block</h2>
-            <p>The <span class="inline-code">finally</span> block is a special block that <strong>ALWAYS executes</strong>, whether an exception occurs or not. It's perfect for cleanup code like closing files or database connections.</p>
-
-            <pre><code><span class="keyword">import</span> java.io.*;
-
-<span class="keyword">public class</span> <span class="class-name">FinallyExample</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="class-name">FileWriter</span> file = <span class="keyword">null</span>;
-
-        <span class="keyword">try</span> {
-            <span class="class-name">System</span>.out.println(<span class="string">"Opening file..."</span>);
-            file = <span class="keyword">new</span> <span class="class-name">FileWriter</span>(<span class="string">"data.txt"</span>);
-
-            <span class="class-name">System</span>.out.println(<span class="string">"Writing to file..."</span>);
-            file.write(<span class="string">"Hello, World!"</span>);
-
-            <span class="comment">// Simulate an error</span>
-            <span class="keyword">int</span> x = <span class="number">10</span> / <span class="number">0</span>;  <span class="comment">// Exception!</span>
-
-        } <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) {
-            <span class="class-name">System</span>.out.println(<span class="string">"IO Error: "</span> + e.getMessage());
-
-        } <span class="keyword">catch</span> (<span class="class-name">ArithmeticException</span> e) {
-            <span class="class-name">System</span>.out.println(<span class="string">"Math Error: "</span> + e.getMessage());
-
-        } <span class="keyword">finally</span> {
-            <span class="comment">// This ALWAYS runs - even if there's an exception!</span>
-            <span class="class-name">System</span>.out.println(<span class="string">"Closing file..."</span>);
-
-            <span class="keyword">try</span> {
-                <span class="keyword">if</span> (file != <span class="keyword">null</span>) {
-                    file.close();  <span class="comment">// Make sure file is closed</span>
-                }
-            } <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) {
-                <span class="class-name">System</span>.out.println(<span class="string">"Error closing file"</span>);
-            }
-        }
-
-        <span class="class-name">System</span>.out.println(<span class="string">"Program finished"</span>);
-    }
-}</code></pre>
-
-            <h3 data-i18n="topic.exc.h3.7">Output:</h3>
-            <pre><code>Opening file...
-Writing to file...
-Math Error: / by zero
-Closing file...        <span class="comment">← Finally block executed!</span>
-Program finished</code></pre>
-
-            <p><strong>When does finally execute?</strong></p>
-            <ul>
-                <li>✅ When try block completes normally</li>
-                <li>✅ When an exception is caught</li>
-                <li>✅ When an exception is NOT caught</li>
-                <li>✅ Even when there's a return statement in try or catch!</li>
-                <li>❌ Only if the JVM exits (System.exit()) or crashes completely</li>
-            </ul>
-        </section>
-
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.7">Checked vs Unchecked Exceptions</h2>
-            <p>Java has two categories of exceptions, and understanding the difference is crucial:</p>
-
-            <h3 data-i18n="topic.exc.h3.8">1. Checked Exceptions (Compile-Time Exceptions)</h3>
-            <p>These are exceptions that the Java compiler <strong>forces you to handle</strong>. If you don't handle them, your code won't compile!</p>
-
-            <p><strong>Examples:</strong> IOException, SQLException, ClassNotFoundException</p>
-
-            <pre><code><span class="keyword">import</span> java.io.*;
-
-<span class="keyword">public class</span> <span class="class-name">CheckedExample</span> {
-    <span class="comment">// ❌ This will NOT compile!</span>
-    <span class="keyword">public void</span> <span class="function">readFileBad</span>() {
-        <span class="class-name">FileReader</span> file = <span class="keyword">new</span> <span class="class-name">FileReader</span>(<span class="string">"data.txt"</span>);  <span class="comment">// Compiler error!</span>
-        <span class="comment">// Error: Unhandled exception: java.io.FileNotFoundException</span>
-    }
-
-    <span class="comment">// ✅ Option 1: Handle with try-catch</span>
-    <span class="keyword">public void</span> <span class="function">readFileGood1</span>() {
-        <span class="keyword">try</span> {
-            <span class="class-name">FileReader</span> file = <span class="keyword">new</span> <span class="class-name">FileReader</span>(<span class="string">"data.txt"</span>);
-            <span class="comment">// Use the file...</span>
-        } <span class="keyword">catch</span> (<span class="class-name">FileNotFoundException</span> e) {
-            <span class="class-name">System</span>.out.println(<span class="string">"File not found: "</span> + e.getMessage());
-        }
-    }
-
-    <span class="comment">// ✅ Option 2: Declare with throws (pass it to caller)</span>
-    <span class="keyword">public void</span> <span class="function">readFileGood2</span>() <span class="keyword">throws</span> <span class="class-name">FileNotFoundException</span> {
-        <span class="class-name">FileReader</span> file = <span class="keyword">new</span> <span class="class-name">FileReader</span>(<span class="string">"data.txt"</span>);
-        <span class="comment">// Now the caller must handle this exception</span>
-    }
-}</code></pre>
-
-            <h3 data-i18n="topic.exc.h3.9">2. Unchecked Exceptions (Runtime Exceptions)</h3>
-            <p>These are exceptions that occur during runtime. The compiler doesn't force you to handle them, but you can if you want to.</p>
-
-            <p><strong>Examples:</strong> NullPointerException, ArithmeticException, ArrayIndexOutOfBoundsException</p>
-
-            <pre><code><span class="keyword">public class</span> <span class="class-name">UncheckedExample</span> {
-    <span class="comment">// This compiles fine - no try-catch required</span>
-    <span class="keyword">public void</span> <span class="function">divide</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {
-        <span class="keyword">int</span> result = a / b;  <span class="comment">// Might throw ArithmeticException</span>
-        <span class="class-name">System</span>.out.println(result);
-    }
-
-    <span class="comment">// But you CAN catch them if you want to handle them</span>
-    <span class="keyword">public void</span> <span class="function">divideSafely</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {
-        <span class="keyword">try</span> {
-            <span class="keyword">int</span> result = a / b;
-            <span class="class-name">System</span>.out.println(result);
-        } <span class="keyword">catch</span> (<span class="class-name">ArithmeticException</span> e) {
-            <span class="class-name">System</span>.out.println(<span class="string">"Cannot divide by zero!"</span>);
-        }
-    }
-}</code></pre>
-
-            <div class="info-box note">
-                <div class="info-box-title" data-i18n="topic.exc.ibt.4">When to Use Each</div>
-                <p><strong>Checked Exceptions:</strong> For problems you can potentially recover from (file not found, network error)</p>
-                <p><strong>Unchecked Exceptions:</strong> For programming errors that shouldn't happen (null pointer, invalid index)</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.8">Throwing Your Own Exceptions</h2>
-            <p>You can create and throw exceptions to signal errors in your own code:</p>
-
-            <pre><code><span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
-    <span class="keyword">private</span> <span class="keyword">double</span> balance;
-
-    <span class="keyword">public void</span> <span class="function">withdraw</span>(<span class="keyword">double</span> amount) {
-        <span class="comment">// Check for negative amount</span>
-        <span class="keyword">if</span> (amount < <span class="number">0</span>) {
-            <span class="comment">// Throw an exception!</span>
-            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(
-                <span class="string">"Amount cannot be negative: "</span> + amount
-            );
-        }
-
-        <span class="comment">// Check for insufficient funds</span>
-        <span class="keyword">if</span> (amount > balance) {
-            <span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(
-                <span class="string">"Insufficient funds. Balance: "</span> + balance + <span class="string">", Requested: "</span> + amount
-            );
-        }
-
-        <span class="comment">// All checks passed - perform withdrawal</span>
-        balance -= amount;
-        <span class="class-name">System</span>.out.println(<span class="string">"Withdrew: $"</span> + amount);
-    }
+                <pre><code><span class="comment">// THROWING — you signal the problem</span>
+<span class="keyword">public void</span> <span class="function">validateAge</span>(<span class="keyword">int</span> age) {
+    <span class="keyword">if</span> (age &lt; <span class="number">0</span>)
+        <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Age cannot be negative: "</span> + age);
+    <span class="comment">// nothing below this line runs if age &lt; 0</span>
+    <span class="keyword">this</span>.age = age;
 }
 
-<span class="comment">// Usage:</span>
-<span class="class-name">BankAccount</span> account = <span class="keyword">new</span> <span class="class-name">BankAccount</span>();
-account.balance = <span class="number">100</span>;
-
+<span class="comment">// CATCHING — you handle the problem</span>
 <span class="keyword">try</span> {
-    account.withdraw(-<span class="number">50</span>);  <span class="comment">// Throws IllegalArgumentException</span>
+    validateAge(-<span class="number">5</span>);
 } <span class="keyword">catch</span> (<span class="class-name">IllegalArgumentException</span> e) {
-    <span class="class-name">System</span>.out.println(<span class="string">"Error: "</span> + e.getMessage());
-    <span class="comment">// Output: Error: Amount cannot be negative: -50</span>
+    <span class="class-name">System</span>.out.println(<span class="string">"Bad input: "</span> + e.getMessage());
+    <span class="comment">// decide: fix it, log it, re-throw it, show a message to the user...</span>
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.9">Try-With-Resources (Automatic Cleanup)</h2>
-            <p>Java 7 introduced a cleaner way to handle resources that need to be closed:</p>
+                <h3>Runtime exceptions vs compile-time exceptions</h3>
+                <p>Java distinguishes two kinds:</p>
+                <ul>
+                    <li><strong>Checked exceptions</strong> — the compiler knows this operation can
+                        fail and <em>forces</em> you to deal with it. You must either catch it or
+                        declare it with <code>throws</code> in the method signature. Examples:
+                        reading a file (<code>IOException</code>), querying a database
+                        (<code>SQLException</code>). The idea: these are <em>recoverable</em>
+                        external failures that the caller should be aware of.</li>
+                    <li><strong>Unchecked exceptions (runtime exceptions)</strong> — the compiler
+                        does not force you to handle them. They represent programming bugs or
+                        violated preconditions: <code>NullPointerException</code>,
+                        <code>IllegalArgumentException</code>, <code>IndexOutOfBoundsException</code>.
+                        The idea: if your code is correct, these shouldn't happen — so forcing every
+                        caller to wrap every method call in try-catch would be noise.</li>
+                </ul>
 
-            <pre><code><span class="comment">// Old way (lots of code!)</span>
-<span class="class-name">FileReader</span> file = <span class="keyword">null</span>;
-<span class="keyword">try</span> {
-    file = <span class="keyword">new</span> <span class="class-name">FileReader</span>(<span class="string">"data.txt"</span>);
-    <span class="comment">// Use file...</span>
-} <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) {
-    e.printStackTrace();
+                <pre><code><span class="comment">// CHECKED — compiler rejects this without try-catch or throws declaration</span>
+<span class="keyword">public void</span> <span class="function">readFile</span>(<span class="class-name">String</span> path) {
+    <span class="keyword">new</span> <span class="class-name">FileReader</span>(path);  <span class="comment">// compile error: FileNotFoundException not handled</span>
+}
+
+<span class="comment">// UNCHECKED — compiles fine, but may blow up at runtime</span>
+<span class="keyword">public void</span> <span class="function">printLength</span>(<span class="class-name">String</span> s) {
+    <span class="class-name">System</span>.out.println(s.length());  <span class="comment">// NullPointerException if s is null</span>
+}</code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">The exception object</div>
+                    <p>An exception is a regular Java object — it has fields and methods. The most
+                        useful ones: <code>getMessage()</code> returns the human-readable description,
+                        <code>getCause()</code> returns the original exception that triggered this one
+                        (if any), and <code>printStackTrace()</code> prints the full call stack at the
+                        moment of the throw — essential for debugging.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE HIERARCHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Exception Hierarchy</h2>
+                <p>In Java, everything throwable is a subclass of <code>Throwable</code>. The hierarchy
+                    determines what you must handle, what you can ignore, and what you should never catch.</p>
+
+                <pre><code><span class="comment">/*
+ *  Throwable
+ *  ├── Error                  ← JVM problems, do NOT catch
+ *  │   ├── OutOfMemoryError
+ *  │   ├── StackOverflowError
+ *  │   └── AssertionError
+ *  │
+ *  └── Exception
+ *      ├── IOException         ← CHECKED: compiler forces you to handle
+ *      │   ├── FileNotFoundException
+ *      │   └── SocketException
+ *      ├── SQLException        ← CHECKED
+ *      ├── ClassNotFoundException ← CHECKED
+ *      │
+ *      └── RuntimeException    ← UNCHECKED: optional to handle
+ *          ├── NullPointerException
+ *          ├── IllegalArgumentException
+ *          ├── IllegalStateException
+ *          ├── UnsupportedOperationException
+ *          ├── ArithmeticException
+ *          ├── ClassCastException
+ *          ├── IndexOutOfBoundsException
+ *          │   └── ArrayIndexOutOfBoundsException
+ *          └── NumberFormatException
+ */</span></code></pre>
+
+                <table>
+                    <tr>
+                        <th>Category</th>
+                        <th>Must handle?</th>
+                        <th>Typical cause</th>
+                        <th>Examples</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Error</strong></td>
+                        <td>❌ Never catch</td>
+                        <td>JVM / system failure</td>
+                        <td><code>OutOfMemoryError</code>, <code>StackOverflowError</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Checked Exception</strong></td>
+                        <td>✅ Yes (catch or declare)</td>
+                        <td>External resources</td>
+                        <td><code>IOException</code>, <code>SQLException</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Unchecked (Runtime)</strong></td>
+                        <td>Optional</td>
+                        <td>Programming bugs</td>
+                        <td><code>NullPointerException</code>, <code>IllegalArgumentException</code></td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — TRY / CATCH / FINALLY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>try / catch / finally</h2>
+
+                <pre><code><span class="keyword">try</span> {
+    <span class="comment">// code that may throw</span>
+    <span class="keyword">int</span> result = <span class="number">100</span> / divisor;
+    processResult(result);
+
+} <span class="keyword">catch</span> (<span class="class-name">ArithmeticException</span> e) {
+    <span class="comment">// specific exception first</span>
+    log.error(<span class="string">"Division failed"</span>, e);
+
+} <span class="keyword">catch</span> (<span class="class-name">IllegalArgumentException</span> | <span class="class-name">IllegalStateException</span> e) {
+    <span class="comment">// multi-catch: same handler for two unrelated exceptions (Java 7+)</span>
+    log.warn(<span class="string">"Validation error"</span>, e);
+
+} <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+    <span class="comment">// general catch last — order matters: most specific first</span>
+    log.error(<span class="string">"Unexpected error"</span>, e);
+    <span class="keyword">throw</span> e;  <span class="comment">// re-throw if you can't handle it here</span>
+
 } <span class="keyword">finally</span> {
-    <span class="keyword">if</span> (file != <span class="keyword">null</span>) {
-        <span class="keyword">try</span> {
-            file.close();
-        } <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) {
-            e.printStackTrace();
-        }
+    <span class="comment">// ALWAYS runs — with or without exception, even with return in try/catch</span>
+    <span class="comment">// Only exception: System.exit() or JVM crash</span>
+    cleanup();
+}</code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Catch order matters</div>
+                    <pre><code><span class="comment">// ❌ Unreachable catch — Exception catches everything above it</span>
+<span class="keyword">catch</span> (<span class="class-name">Exception</span> e)              { }
+<span class="keyword">catch</span> (<span class="class-name">IOException</span> e)            { }  <span class="comment">// compile error: already caught by Exception</span>
+
+<span class="comment">// ✅ Most specific first, most general last</span>
+<span class="keyword">catch</span> (<span class="class-name">FileNotFoundException</span> e)   { }  <span class="comment">// subtype of IOException</span>
+<span class="keyword">catch</span> (<span class="class-name">IOException</span> e)            { }  <span class="comment">// catches remaining IO exceptions</span>
+<span class="keyword">catch</span> (<span class="class-name">Exception</span> e)              { }  <span class="comment">// last resort</span></code></pre>
+                </div>
+
+                <h3>try-with-resources — automatic close (Java 7+)</h3>
+                <p>Any object implementing <code>AutoCloseable</code> can go in the parentheses.
+                    It is closed automatically at the end of the block, even if an exception is thrown.</p>
+                <pre><code><span class="comment">// ❌ Old way: fragile, easy to forget close in the exception path</span>
+<span class="class-name">Connection</span> conn = <span class="keyword">null</span>;
+<span class="keyword">try</span> {
+    conn = dataSource.getConnection();
+    <span class="comment">// use conn...</span>
+} <span class="keyword">finally</span> {
+    <span class="keyword">if</span> (conn != <span class="keyword">null</span>) <span class="keyword">try</span> { conn.close(); } <span class="keyword">catch</span> (<span class="class-name">SQLException</span> ignored) {}
+}
+
+<span class="comment">// ✅ try-with-resources: clean, guaranteed close, multiple resources OK</span>
+<span class="keyword">try</span> (<span class="class-name">Connection</span> conn   = dataSource.getConnection();
+     <span class="class-name">PreparedStatement</span> ps = conn.prepareStatement(<span class="string">"SELECT 1"</span>);
+     <span class="class-name">ResultSet</span> rs         = ps.executeQuery()) {
+
+    <span class="keyword">while</span> (rs.next()) { ... }
+
+} <span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+    <span class="comment">// conn, ps, rs all closed before we get here — in reverse order</span>
+    <span class="keyword">throw new</span> <span class="class-name">RuntimeException</span>(<span class="string">"DB query failed"</span>, e);
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — CHECKED VS UNCHECKED
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Checked vs Unchecked Exceptions</h2>
+
+                <h3>Checked — compiler enforces handling</h3>
+                <pre><code><span class="comment">// Checked exceptions extend Exception (but NOT RuntimeException)
+// You MUST either catch them or declare them with throws</span>
+
+<span class="comment">// Option 1: catch and handle</span>
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">readFile</span>(<span class="class-name">String</span> path) {
+    <span class="keyword">try</span> (<span class="class-name">BufferedReader</span> r = <span class="keyword">new</span> <span class="class-name">BufferedReader</span>(<span class="keyword">new</span> <span class="class-name">FileReader</span>(path))) {
+        <span class="keyword">return</span> r.lines().collect(<span class="class-name">Collectors</span>.joining(<span class="string">"\n"</span>));
+    } <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) {
+        log.error(<span class="string">"Cannot read {}"</span>, path, e);
+        <span class="keyword">return</span> <span class="string">""</span>;
     }
 }
 
-<span class="comment">// New way (automatic cleanup!) ✅</span>
-<span class="keyword">try</span> (<span class="class-name">FileReader</span> file = <span class="keyword">new</span> <span class="class-name">FileReader</span>(<span class="string">"data.txt"</span>)) {
-    <span class="comment">// Use file...</span>
-    <span class="comment">// File is automatically closed when try block ends!</span>
-} <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) {
-    e.printStackTrace();
+<span class="comment">// Option 2: declare and let the caller decide</span>
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">readFile</span>(<span class="class-name">String</span> path) <span class="keyword">throws</span> <span class="class-name">IOException</span> {
+    <span class="keyword">try</span> (<span class="class-name">BufferedReader</span> r = <span class="keyword">new</span> <span class="class-name">BufferedReader</span>(<span class="keyword">new</span> <span class="class-name">FileReader</span>(path))) {
+        <span class="keyword">return</span> r.lines().collect(<span class="class-name">Collectors</span>.joining(<span class="string">"\n"</span>));
+    }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.10">Common Exceptions You'll Encounter</h2>
+                <h3>Unchecked — for programming errors and validation failures</h3>
+                <pre><code><span class="comment">// Unchecked = extend RuntimeException
+// Use for: invalid arguments, broken preconditions, bugs
+// The compiler does NOT force callers to handle them</span>
 
-            <table>
-                <tr>
-                    <th data-i18n="topic.exc.th.1">Exception</th>
-                    <th data-i18n="topic.exc.th.2">When It Occurs</th>
-                    <th data-i18n="topic.exc.th.3">Example</th>
-                </tr>
-                <tr>
-                    <td>NullPointerException</td>
-                    <td>Using null reference</td>
-                    <td><span class="inline-code">String s = null; s.length();</span></td>
-                </tr>
-                <tr>
-                    <td>ArrayIndexOutOfBoundsException</td>
-                    <td>Invalid array index</td>
-                    <td><span class="inline-code">int[] arr = {1,2}; arr[5];</span></td>
-                </tr>
-                <tr>
-                    <td>ArithmeticException</td>
-                    <td>Math error (division by zero)</td>
-                    <td><span class="inline-code">int x = 10/0;</span></td>
-                </tr>
-                <tr>
-                    <td>NumberFormatException</td>
-                    <td>Invalid number format</td>
-                    <td><span class="inline-code">Integer.parseInt("abc");</span></td>
-                </tr>
-                <tr>
-                    <td>IOException</td>
-                    <td>Input/Output error</td>
-                    <td>Reading non-existent file</td>
-                </tr>
-                <tr>
-                    <td>FileNotFoundException</td>
-                    <td>File doesn't exist</td>
-                    <td><span class="inline-code">new FileReader("missing.txt");</span></td>
-                </tr>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2 data-i18n="topic.exc.h2.11">Best Practices</h2>
-
-            <div class="info-box tip">
-                <div class="info-box-title" data-i18n="topic.exc.ibt.5">Exception Handling Best Practices</div>
-                <ol>
-                    <li><strong>Be Specific</strong> - Catch specific exceptions, not just Exception</li>
-                    <li><strong>Don't Ignore</strong> - Never have empty catch blocks</li>
-                    <li><strong>Log Errors</strong> - Always log exceptions for debugging</li>
-                    <li><strong>User-Friendly Messages</strong> - Show helpful messages to users</li>
-                    <li><strong>Clean Up Resources</strong> - Use finally or try-with-resources</li>
-                    <li><strong>Don't Use for Control Flow</strong> - Exceptions are for exceptional cases</li>
-                </ol>
-            </div>
-
-            <pre><code><span class="comment">// ❌ BAD - Empty catch (hides errors!)</span>
-<span class="keyword">try</span> {
-    riskyOperation();
-} <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
-    <span class="comment">// Silent failure - bad!</span>
+<span class="keyword">public void</span> <span class="function">setAge</span>(<span class="keyword">int</span> age) {
+    <span class="keyword">if</span> (age &lt; <span class="number">0</span> || age &gt; <span class="number">150</span>)
+        <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Invalid age: "</span> + age);
+    <span class="keyword">this</span>.age = age;
 }
 
-<span class="comment">// ✅ GOOD - Handle properly</span>
-<span class="keyword">try</span> {
-    riskyOperation();
-} <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) {
-    logger.error(<span class="string">"Failed to perform operation"</span>, e);
-    <span class="class-name">System</span>.out.println(<span class="string">"An error occurred. Please try again."</span>);
-}</code></pre>
-        </section>
+<span class="comment">// Most useful unchecked exceptions from the JDK:</span>
+<span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"bad input"</span>);   <span class="comment">// invalid parameter value</span>
+<span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(<span class="string">"not connected"</span>);    <span class="comment">// method called at wrong time</span>
+<span class="keyword">throw new</span> <span class="class-name">NullPointerException</span>(<span class="string">"name is null"</span>);      <span class="comment">// explicit null check (rare)</span>
+<span class="keyword">throw new</span> <span class="class-name">UnsupportedOperationException</span>(<span class="string">"not implemented"</span>); <span class="comment">// stub</span>
+<span class="keyword">throw new</span> <span class="class-name">IndexOutOfBoundsException</span>(<span class="string">"index: "</span> + i);  <span class="comment">// invalid index</span>
 
-        <section class="related-topics">
-            <h3 data-i18n="topic.exc.h3.10">Related Topics</h3>
-            <div class="related-links">
-                <a href="methods.html" class="related-link" data-i18n="link.methods">Methods & Functions</a>
-                <a href="../best-practices/error-handling.html" class="related-link" data-i18n="link.error-handling">Error Handling Patterns</a>
-                <a href="variables-datatypes.html" class="related-link" data-i18n="link.variables-datatypes">Variables & Data Types</a>
-            </div>
-        </section>
-    </main>
+<span class="comment">// Objects.requireNonNull — standard null guard (throws NullPointerException)</span>
+<span class="keyword">this</span>.name = <span class="class-name">Objects</span>.requireNonNull(name, <span class="string">"name must not be null"</span>);</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — CUSTOM EXCEPTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Custom Exceptions</h2>
+                <p>Create domain-specific exceptions when standard JDK types don't convey enough
+                    meaning. The rule: extend <code>RuntimeException</code> for programming errors /
+                    unrecoverable situations; extend <code>Exception</code> for recoverable situations
+                    where callers should be forced to handle.</p>
+
+                <pre><code><span class="comment">// Custom unchecked exception — callers don't have to catch it</span>
+<span class="keyword">public class</span> <span class="class-name">InsufficientFundsException</span> <span class="keyword">extends</span> <span class="class-name">RuntimeException</span> {
+    <span class="keyword">private final double</span> available;
+    <span class="keyword">private final double</span> requested;
+
+    <span class="keyword">public</span> <span class="function">InsufficientFundsException</span>(<span class="keyword">double</span> available, <span class="keyword">double</span> requested) {
+        <span class="keyword">super</span>(<span class="class-name">String</span>.format(<span class="string">"Insufficient funds: available=%.2f, requested=%.2f"</span>,
+                            available, requested));
+        <span class="keyword">this</span>.available = available;
+        <span class="keyword">this</span>.requested = requested;
+    }
+
+    <span class="comment">// Always provide a cause-accepting constructor for exception chaining</span>
+    <span class="keyword">public</span> <span class="function">InsufficientFundsException</span>(<span class="keyword">double</span> available, <span class="keyword">double</span> requested,
+                                       <span class="class-name">Throwable</span> cause) {
+        <span class="keyword">super</span>(<span class="class-name">String</span>.format(<span class="string">"Insufficient funds: available=%.2f, requested=%.2f"</span>,
+                            available, requested), cause);
+        <span class="keyword">this</span>.available = available;
+        <span class="keyword">this</span>.requested = requested;
+    }
+
+    <span class="keyword">public double</span> <span class="function">getAvailable</span>() { <span class="keyword">return</span> available; }
+    <span class="keyword">public double</span> <span class="function">getRequested</span>() { <span class="keyword">return</span> requested; }
+}
+
+<span class="comment">// Usage — caller gets rich context, not just a message string</span>
+<span class="keyword">public void</span> <span class="function">withdraw</span>(<span class="keyword">double</span> amount) {
+    <span class="keyword">if</span> (amount &gt; balance)
+        <span class="keyword">throw new</span> <span class="class-name">InsufficientFundsException</span>(balance, amount);
+    balance -= amount;
+}
+
+<span class="keyword">try</span> {
+    account.withdraw(<span class="number">500</span>);
+} <span class="keyword">catch</span> (<span class="class-name">InsufficientFundsException</span> e) {
+    <span class="class-name">System</span>.out.printf(<span class="string">"Need %.2f more%n"</span>, e.getRequested() - e.getAvailable());
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — EXCEPTION CHAINING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Exception Chaining</h2>
+                <p>When you catch an exception and throw a different one, always pass the original
+                    as the <em>cause</em>. Without it, the root cause disappears from the stack trace —
+                    a debugging nightmare.</p>
+
+                <pre><code><span class="comment">// ❌ BAD: original cause lost — the stack trace shows only OrderException,
+// you can never find out WHAT SQLException triggered it</span>
+<span class="keyword">try</span> {
+    db.save(order);
+} <span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+    <span class="keyword">throw new</span> <span class="class-name">OrderException</span>(<span class="string">"Failed to save order"</span>);  <span class="comment">// cause dropped!</span>
+}
+
+<span class="comment">// ✅ GOOD: wrap and preserve the cause</span>
+<span class="keyword">try</span> {
+    db.save(order);
+} <span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+    <span class="keyword">throw new</span> <span class="class-name">OrderException</span>(<span class="string">"Failed to save order"</span>, e);  <span class="comment">// e is the cause</span>
+}
+
+<span class="comment">// When you inspect the exception, the full chain is visible:
+// OrderException: Failed to save order
+//   Caused by: java.sql.SQLException: Connection refused
+//   Caused by: java.net.ConnectException: Connection refused</span>
+
+<span class="comment">// Retrieve the cause programmatically:</span>
+e.getCause();           <span class="comment">// direct cause</span>
+<span class="class-name">ExceptionUtils</span>.getRootCause(e);  <span class="comment">// root cause (Apache Commons)</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — COMMON EXCEPTIONS REFERENCE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Common Exceptions Reference</h2>
+
+                <table>
+                    <tr>
+                        <th>Exception</th>
+                        <th>Type</th>
+                        <th>When it occurs</th>
+                        <th>Prevention</th>
+                    </tr>
+                    <tr>
+                        <td><code>NullPointerException</code></td>
+                        <td>Unchecked</td>
+                        <td>Method called on <code>null</code> reference</td>
+                        <td><code>Objects.requireNonNull</code>, Optional</td>
+                    </tr>
+                    <tr>
+                        <td><code>IllegalArgumentException</code></td>
+                        <td>Unchecked</td>
+                        <td>Parameter fails precondition</td>
+                        <td>Validate in method/constructor</td>
+                    </tr>
+                    <tr>
+                        <td><code>IllegalStateException</code></td>
+                        <td>Unchecked</td>
+                        <td>Method called in wrong state</td>
+                        <td>Guard with state check</td>
+                    </tr>
+                    <tr>
+                        <td><code>IndexOutOfBoundsException</code></td>
+                        <td>Unchecked</td>
+                        <td>Invalid array/list index</td>
+                        <td>Check <code>size()</code> / <code>length</code> first</td>
+                    </tr>
+                    <tr>
+                        <td><code>ClassCastException</code></td>
+                        <td>Unchecked</td>
+                        <td>Invalid cast</td>
+                        <td>Use <code>instanceof</code> before casting</td>
+                    </tr>
+                    <tr>
+                        <td><code>NumberFormatException</code></td>
+                        <td>Unchecked</td>
+                        <td><code>parseInt("abc")</code></td>
+                        <td>Validate input before parsing</td>
+                    </tr>
+                    <tr>
+                        <td><code>IOException</code></td>
+                        <td>Checked</td>
+                        <td>File / network / stream error</td>
+                        <td>try-with-resources</td>
+                    </tr>
+                    <tr>
+                        <td><code>SQLException</code></td>
+                        <td>Checked</td>
+                        <td>Database operation failed</td>
+                        <td>Wrap in domain exception with cause</td>
+                    </tr>
+                    <tr>
+                        <td><code>StackOverflowError</code></td>
+                        <td>Error</td>
+                        <td>Infinite recursion</td>
+                        <td>Ensure base case in recursion</td>
+                    </tr>
+                    <tr>
+                        <td><code>OutOfMemoryError</code></td>
+                        <td>Error</td>
+                        <td>Heap exhausted</td>
+                        <td>Fix memory leaks, tune heap</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — PITFALLS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Common Pitfalls</h2>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Swallowing exceptions — the silent killer</div>
+                    <pre><code><span class="comment">// ❌ Empty catch: the error disappears, the bug hides forever</span>
+<span class="keyword">try</span> {
+    processOrder(order);
+} <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+    <span class="comment">// nothing</span>
+}
+
+<span class="comment">// ✅ At minimum: log. If you truly can't handle it, re-throw.</span>
+<span class="keyword">try</span> {
+    processOrder(order);
+} <span class="keyword">catch</span> (<span class="class-name">OrderException</span> e) {
+    log.error(<span class="string">"Order processing failed for orderId={}"</span>, order.getId(), e);
+    <span class="keyword">throw</span> e;  <span class="comment">// or wrap in a higher-level exception</span>
+}</code></pre>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Using exceptions for flow control</div>
+                    <pre><code><span class="comment">// ❌ BAD: exceptions are expensive — stack trace captured on construction</span>
+<span class="keyword">try</span> {
+    <span class="keyword">int</span> value = map.get(<span class="string">"key"</span>).intValue();  <span class="comment">// may NPE if key absent</span>
+} <span class="keyword">catch</span> (<span class="class-name">NullPointerException</span> e) {
+    value = <span class="number">0</span>;  <span class="comment">// using exception to handle "not found" case</span>
+}
+
+<span class="comment">// ✅ GOOD: check first, exception-free path for the common case</span>
+<span class="keyword">int</span> value = map.getOrDefault(<span class="string">"key"</span>, <span class="number">0</span>);</code></pre>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Catching Error or Throwable</div>
+                    <pre><code><span class="comment">// ❌ NEVER catch Error or raw Throwable in normal application code</span>
+<span class="keyword">catch</span> (<span class="class-name">Throwable</span> t) { ... }  <span class="comment">// catches OutOfMemoryError, StackOverflowError…</span>
+<span class="keyword">catch</span> (<span class="class-name">Error</span> e) { ... }      <span class="comment">// the JVM is broken — you can't recover</span>
+
+<span class="comment">// ✅ Only catch what you can actually handle</span>
+<span class="comment">// Exception: frameworks (Spring, JUnit) catch Throwable intentionally — that's fine</span></code></pre>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Losing the cause in exception translation</div>
+                    <pre><code><span class="comment">// ❌ Root cause gone — impossible to diagnose in production</span>
+<span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+    <span class="keyword">throw new</span> <span class="class-name">ServiceException</span>(<span class="string">"DB error"</span>);  <span class="comment">// no cause!</span>
+}
+
+<span class="comment">// ✅ Always chain the cause</span>
+<span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+    <span class="keyword">throw new</span> <span class="class-name">ServiceException</span>(<span class="string">"DB error"</span>, e);  <span class="comment">// full chain preserved</span>
+}</code></pre>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — SENIOR TOPICS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Senior Topics: Exceptions in Modern Java</h2>
+
+                <h3>Exception handling in Streams and lambdas</h3>
+                <p>Lambdas cannot throw checked exceptions — functional interface methods don't
+                    declare them. This is a real pain with streams over I/O operations.</p>
+
+                <pre><code><span class="comment">// ❌ Doesn't compile: Files::readString throws IOException (checked)</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; contents = paths.stream()
+    .map(<span class="class-name">Files</span>::readString)   <span class="comment">// compile error: unhandled IOException</span>
+    .toList();
+
+<span class="comment">// Option 1: wrap checked in unchecked inside the lambda</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; contents = paths.stream()
+    .map(path -&gt; {
+        <span class="keyword">try</span> { <span class="keyword">return</span> <span class="class-name">Files</span>.readString(path); }
+        <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) { <span class="keyword">throw new</span> <span class="class-name">UncheckedIOException</span>(e); }
+    })
+    .toList();
+
+<span class="comment">// Option 2: extract to a helper that wraps (reusable)</span>
+<span class="keyword">private static</span> &lt;<span class="class-name">T</span>, <span class="class-name">R</span>&gt; <span class="class-name">Function</span>&lt;<span class="class-name">T</span>, <span class="class-name">R</span>&gt; <span class="function">wrap</span>(<span class="class-name">CheckedFunction</span>&lt;<span class="class-name">T</span>, <span class="class-name">R</span>&gt; fn) {
+    <span class="keyword">return</span> t -&gt; {
+        <span class="keyword">try</span> { <span class="keyword">return</span> fn.apply(t); }
+        <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) { <span class="keyword">throw new</span> <span class="class-name">RuntimeException</span>(e); }
+    };
+}
+<span class="comment">// Usage: paths.stream().map(wrap(Files::readString)).toList();</span>
+
+<span class="comment">// Option 3 (Java 21+): use vavr or Result types for functional error handling</span></code></pre>
+
+                <h3>Suppressed exceptions in try-with-resources</h3>
+                <pre><code><span class="comment">// If both the try body AND close() throw, close()'s exception is "suppressed"
+// The primary exception propagates; the suppressed one is attached</span>
+
+<span class="keyword">try</span> (<span class="class-name">MyResource</span> r = <span class="keyword">new</span> <span class="class-name">MyResource</span>()) {
+    r.riskyOperation();  <span class="comment">// throws ExceptionA</span>
+    <span class="comment">// r.close() called automatically → throws ExceptionB</span>
+    <span class="comment">// ExceptionA propagates; ExceptionB is attached as suppressed</span>
+}
+
+<span class="comment">// Inspect suppressed exceptions:</span>
+<span class="keyword">try</span> { ... }
+<span class="keyword">catch</span> (<span class="class-name">Exception</span> primary) {
+    <span class="keyword">for</span> (<span class="class-name">Throwable</span> suppressed : primary.getSuppressed()) {
+        log.error(<span class="string">"Suppressed: {}"</span>, suppressed.getMessage());
+    }
+    <span class="keyword">throw</span> primary;
+}</code></pre>
+
+                <h3>Global exception handling in Spring</h3>
+                <pre><code><span class="comment">// Instead of try-catch in every controller, centralise with @ControllerAdvice</span>
+<span class="annotation">@ControllerAdvice</span>
+<span class="keyword">public class</span> <span class="class-name">GlobalExceptionHandler</span> {
+
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">InsufficientFundsException</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handle</span>(<span class="class-name">InsufficientFundsException</span> e) {
+        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>
+            .status(<span class="class-name">HttpStatus</span>.UNPROCESSABLE_ENTITY)
+            .body(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"INSUFFICIENT_FUNDS"</span>, e.getMessage()));
+    }
+
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">IllegalArgumentException</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handle</span>(<span class="class-name">IllegalArgumentException</span> e) {
+        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.badRequest()
+            .body(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"INVALID_INPUT"</span>, e.getMessage()));
+    }
+
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">Exception</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handleUnexpected</span>(<span class="class-name">Exception</span> e) {
+        log.error(<span class="string">"Unhandled exception"</span>, e);
+        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.internalServerError()
+            .body(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"INTERNAL_ERROR"</span>, <span class="string">"Please try later"</span>));
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+
+                    <p><strong>Q: What is the difference between checked and unchecked exceptions?</strong><br>
+                    Checked exceptions extend <code>Exception</code> (but not <code>RuntimeException</code>).
+                    The compiler forces callers to either catch them or declare them with <code>throws</code>.
+                    Unchecked exceptions extend <code>RuntimeException</code> — handling is optional.
+                    Use checked for recoverable external failures (file not found, network timeout);
+                    use unchecked for programming errors and failed preconditions.</p>
+
+                    <p><strong>Q: What is the purpose of the finally block?</strong><br>
+                    Code in <code>finally</code> always runs: after normal completion, after a caught
+                    exception, and even after an uncaught exception unwinds the stack. The only
+                    exceptions: <code>System.exit()</code> and JVM crash. Its primary use is resource
+                    cleanup — though <code>try-with-resources</code> is the modern replacement.</p>
+
+                    <p><strong>Q: What does try-with-resources do?</strong><br>
+                    Any <code>AutoCloseable</code> declared in the parentheses is automatically closed
+                    at block exit, even on exception. Multiple resources are closed in reverse order
+                    of declaration. If both the body and <code>close()</code> throw, the close exception
+                    is <em>suppressed</em> and attached to the primary exception via
+                    <code>getSuppressed()</code>.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+
+                    <p><strong>Q: Should you use checked or unchecked exceptions for domain errors?</strong><br>
+                    This is one of Java's great debates. The original intent: checked for recoverable
+                    situations the caller must handle. In practice, most modern frameworks and libraries
+                    (Spring, Hibernate, JUnit) prefer unchecked because checked exceptions pollute
+                    call stacks (every intermediate layer must declare or wrap them), break lambdas
+                    (functional interfaces don't declare checked exceptions), and the contract
+                    enforcement argument is weak — callers often swallow checked exceptions with empty
+                    catches. Effective Java Item 71: "use unchecked exceptions for programming errors;
+                    consider checked for recoverable conditions only when the caller can reasonably
+                    be expected to handle them."</p>
+
+                    <p><strong>Q: Why is exception swallowing dangerous and how do you detect it?</strong><br>
+                    An empty <code>catch</code> block (or one that only logs without re-throwing or
+                    taking corrective action) silently absorbs the error. The system enters an unknown
+                    state with no trace of what happened. Tools: SpotBugs / PMD flag empty catches;
+                    SonarQube rules DE_MIGHT_IGNORE and REC_CATCH_EXCEPTION; code review. The rule:
+                    if you catch an exception and can't fully handle it, re-throw it (as-is, or wrapped).</p>
+
+                    <p><strong>Q: What are suppressed exceptions and when do they occur?</strong><br>
+                    When <code>try-with-resources</code> closes a resource, if both the try body and
+                    <code>close()</code> throw, the close exception is <em>suppressed</em> — attached
+                    to the primary exception rather than replacing it. Pre-Java 7, the close exception
+                    would overwrite the primary one, silently losing the real error. Access them via
+                    <code>Throwable.getSuppressed()</code>. This is why try-with-resources is safer
+                    than manual <code>finally</code> blocks for resource closing.</p>
+
+                    <p><strong>Q: How do you handle checked exceptions in lambda expressions?</strong><br>
+                    You can't — functional interface methods don't declare checked exceptions, so the
+                    compiler rejects them. Options: (1) wrap in unchecked inside the lambda —
+                    verbose but explicit; (2) create a utility <code>wrap()</code> method that converts
+                    any <code>CheckedFunction</code> to <code>Function</code>; (3) use
+                    <code>UncheckedIOException</code> for <code>IOException</code> specifically —
+                    it's a standard JDK wrapper. Libraries like Vavr and Lombok's
+                    <code>@SneakyThrows</code> provide more elegant solutions.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="methods.html" class="related-link">
+                        <span class="related-icon">⚙️</span>Methods &amp; Functions
+                    </a>
+                    <a href="optional.html" class="related-link">
+                        <span class="related-icon">❓</span>Optional Class
+                    </a>
+                    <a href="lambda-streams.html" class="related-link">
+                        <span class="related-icon">λ</span>Lambda &amp; Streams
+                    </a>
+                    <a href="constructors.html" class="related-link">
+                        <span class="related-icon">🏗️</span>Constructors
+                    </a>
+                    <a href="../best-practices/error-handling.html" class="related-link">
+                        <span class="related-icon">🛡️</span>Error Handling Patterns
+                    </a>
+                    <a href="../advanced/design-patterns.html" class="related-link">
+                        <span class="related-icon">🧱</span>Design Patterns
+                    </a>
+                </div>
+            </section>
+
+        </main>
 
     </div><!-- /.topic-layout -->
 
