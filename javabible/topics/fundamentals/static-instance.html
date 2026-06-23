@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-i18n-root="../.." data-i18n-title="topic.si.page-title">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
     <link rel="stylesheet" href="../../css/toc.css">
 </head>
+
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
@@ -17,7 +19,8 @@
                 Static vs Instance
             </nav>
             <h1 data-i18n="topic.si.h1">Static vs Instance Members</h1>
-            <p class="topic-subtitle" data-i18n="topic.si.subtitle">What belongs to the class, what belongs to the object</p>
+            <p class="topic-subtitle" data-i18n="topic.si.subtitle">What belongs to the class, what belongs to the
+                object</p>
             <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
@@ -38,13 +41,75 @@
         <main class="topic-content">
 
             <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT ARE STATIC AND INSTANCE MEMBERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Are Static and Instance Members?</h2>
+                <p>In Java, every field and method declared in a class is either
+                    <strong>static</strong> or <strong>instance</strong>. This is not just a
+                    syntax detail — it is a fundamental design decision about <em>ownership</em>:
+                    does this data or behaviour belong to the <strong>class itself</strong>, or
+                    to each individual <strong>object</strong> created from it?
+                </p>
+
+                <p>The problem it solves: some data is shared across all objects of a type
+                    — the total number of users created, a configuration constant, a utility
+                    function that needs no object state. Other data is unique per object —
+                    each user's name, each bank account's balance. Conflating the two leads
+                    to subtle bugs: shared mutable state modified by one object and unexpectedly
+                    visible to all others.</p>
+
+                <pre><code><span class="keyword">public class</span> <span class="class-name">Player</span> {
+                <span class="comment">// STATIC — one copy, shared by ALL Player objects</span>
+                <span class="comment">// "How many players exist in total?"</span>
+                <span class="keyword">private static int</span> totalPlayers = <span class="number">0</span>;
+            
+                <span class="comment">// INSTANCE — each Player object has its own copy</span>
+                <span class="comment">// "What is THIS player's name and score?"</span>
+                <span class="keyword">private final</span> <span class="class-name">String</span> name;
+                <span class="keyword">private</span>       <span class="keyword">int</span>    score;
+            
+                <span class="keyword">public</span> <span class="function">Player</span>(<span class="class-name">String</span> name) {
+                    <span class="keyword">this</span>.name = name;
+                    totalPlayers++;  <span class="comment">// increments the ONE shared counter</span>
+                }
+            }
+            
+            <span class="class-name">Player</span> alice = <span class="keyword">new</span> <span class="class-name">Player</span>(<span class="string">"Alice"</span>);
+            <span class="class-name">Player</span> bob   = <span class="keyword">new</span> <span class="class-name">Player</span>(<span class="string">"Bob"</span>);
+            
+            <span class="comment">// Each object has its own name — instance data</span>
+            alice.getName();  <span class="comment">// "Alice"</span>
+            bob.getName();    <span class="comment">// "Bob"</span>
+            
+            <span class="comment">// There is only ONE counter shared by everyone — static data</span>
+            <span class="class-name">Player</span>.getTotalPlayers();  <span class="comment">// 2</span></code></pre>
+
+                <p><strong>Static members</strong> are loaded when the class is first referenced
+                    by the JVM — before any object exists. <strong>Instance members</strong> are
+                    created fresh for each <code>new</code> call and live on the heap alongside
+                    the object. Understanding this distinction is essential for writing correct,
+                    thread-safe, and testable Java code.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">The key question to ask yourself</div>
+                    <p>Before adding <code>static</code> to any member, ask: <em>"Does this
+                            make sense without a specific object?"</em> If yes — a utility method,
+                        a constant, a factory — <code>static</code> is correct. If the answer
+                        depends on which object you're talking about — a person's age, an
+                        account's balance — it must be an instance member.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
                  SECTION 1 — THE CORE DISTINCTION
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>The Core Distinction</h2>
                 <p>Every class member in Java is either <strong>static</strong> (belongs to the class,
                     one shared copy) or <strong>instance</strong> (belongs to each object, every
-                    <code>new</code> gets its own copy). This is a design decision, not just syntax.</p>
+                    <code>new</code> gets its own copy). This is a design decision, not just syntax.
+                </p>
 
                 <table>
                     <tr>
@@ -432,62 +497,68 @@ p.describe(); <span class="comment">// "Child"  — instance, resolved by object
                     <div class="info-box-title">🎓 Junior level</div>
 
                     <p><strong>Q: What is the difference between static and instance members?</strong><br>
-                    Static members belong to the class — one shared copy loaded when the class loads.
-                    Instance members belong to individual objects — each <code>new</code> creates its
-                    own copy. Static accessed via <code>ClassName.member</code>, instance via
-                    <code>objectRef.member</code>.</p>
+                        Static members belong to the class — one shared copy loaded when the class loads.
+                        Instance members belong to individual objects — each <code>new</code> creates its
+                        own copy. Static accessed via <code>ClassName.member</code>, instance via
+                        <code>objectRef.member</code>.
+                    </p>
 
                     <p><strong>Q: Why can't static methods access instance variables?</strong><br>
-                    Static methods have no <code>this</code> reference. When you call
-                    <code>Math.sqrt(4)</code> there's no Math object — so there's no "which object's
-                    field?" answer available. To reach instance members from a static method, you
-                    must receive or create an object reference explicitly.</p>
+                        Static methods have no <code>this</code> reference. When you call
+                        <code>Math.sqrt(4)</code> there's no Math object — so there's no "which object's
+                        field?" answer available. To reach instance members from a static method, you
+                        must receive or create an object reference explicitly.
+                    </p>
 
                     <p><strong>Q: Why is <code>main()</code> static?</strong><br>
-                    The JVM must call <code>main()</code> before any objects exist. If it were an
-                    instance method, you'd need an object to call it — but you need
-                    <code>main()</code> to create objects. Making it static breaks the
-                    chicken-and-egg dependency.</p>
+                        The JVM must call <code>main()</code> before any objects exist. If it were an
+                        instance method, you'd need an object to call it — but you need
+                        <code>main()</code> to create objects. Making it static breaks the
+                        chicken-and-egg dependency.
+                    </p>
 
                     <p><strong>Q: Can static methods be overridden?</strong><br>
-                    No. Static methods are resolved at compile time based on the reference type —
-                    there's no vtable lookup, no runtime dispatch. If a subclass declares a static
-                    method with the same signature, it's <em>method hiding</em>. The result:
-                    <code>Parent p = new Child(); p.staticMethod()</code> calls
-                    <code>Parent.staticMethod()</code>, not Child's version.</p>
+                        No. Static methods are resolved at compile time based on the reference type —
+                        there's no vtable lookup, no runtime dispatch. If a subclass declares a static
+                        method with the same signature, it's <em>method hiding</em>. The result:
+                        <code>Parent p = new Child(); p.staticMethod()</code> calls
+                        <code>Parent.staticMethod()</code>, not Child's version.
+                    </p>
                 </div>
 
                 <div class="info-box important">
                     <div class="info-box-title">🔥 Senior level</div>
 
                     <p><strong>Q: What are the thread-safety implications of static variables?</strong><br>
-                    Static variables are shared across all threads. Mutable static state is a race
-                    condition waiting to happen: <code>count++</code> is three operations
-                    (read/increment/write) and two threads can interleave them. Solutions in order
-                    of preference: (1) avoid mutable static state — inject state instead,
-                    (2) <code>AtomicInteger</code>/<code>AtomicReference</code> for simple counters
-                    and references, (3) <code>volatile</code> for visibility-only guarantees,
-                    (4) <code>synchronized</code> for compound operations,
-                    (5) <code>ThreadLocal</code> for per-thread isolation.
-                    Immutable static finals are inherently safe.</p>
+                        Static variables are shared across all threads. Mutable static state is a race
+                        condition waiting to happen: <code>count++</code> is three operations
+                        (read/increment/write) and two threads can interleave them. Solutions in order
+                        of preference: (1) avoid mutable static state — inject state instead,
+                        (2) <code>AtomicInteger</code>/<code>AtomicReference</code> for simple counters
+                        and references, (3) <code>volatile</code> for visibility-only guarantees,
+                        (4) <code>synchronized</code> for compound operations,
+                        (5) <code>ThreadLocal</code> for per-thread isolation.
+                        Immutable static finals are inherently safe.</p>
 
-                    <p><strong>Q: What is the initialization-on-demand holder pattern and why is it preferred?</strong><br>
-                    A private static nested class holds the singleton instance. The JVM guarantees
-                    class initialization is thread-safe and happens lazily — only when the nested
-                    class is first accessed. No <code>synchronized</code> overhead on every call,
-                    no double-checked locking complexity, works correctly on all JVM implementations.
-                    Bloch's <em>Effective Java</em> calls this the preferred Singleton approach
-                    (Item 83). The enum Singleton is even simpler and also handles serialization
-                    and reflection attacks automatically.</p>
+                    <p><strong>Q: What is the initialization-on-demand holder pattern and why is it
+                            preferred?</strong><br>
+                        A private static nested class holds the singleton instance. The JVM guarantees
+                        class initialization is thread-safe and happens lazily — only when the nested
+                        class is first accessed. No <code>synchronized</code> overhead on every call,
+                        no double-checked locking complexity, works correctly on all JVM implementations.
+                        Bloch's <em>Effective Java</em> calls this the preferred Singleton approach
+                        (Item 83). The enum Singleton is even simpler and also handles serialization
+                        and reflection attacks automatically.</p>
 
                     <p><strong>Q: When should you NOT use static, even for utility-looking methods?</strong><br>
-                    When the method needs to be <em>mockable</em> or <em>overridable</em> in tests.
-                    Static methods can't be overridden and most mocking frameworks can't mock them
-                    without bytecode manipulation (PowerMock, Mockito's
-                    <code>mockStatic</code> — both are heavy). If a "utility" method reads from a
-                    database, calls an external API, or accesses the filesystem, make it an instance
-                    method on an injectable interface. The test replaces the real implementation
-                    with a mock. Static is for pure functions only.</p>
+                        When the method needs to be <em>mockable</em> or <em>overridable</em> in tests.
+                        Static methods can't be overridden and most mocking frameworks can't mock them
+                        without bytecode manipulation (PowerMock, Mockito's
+                        <code>mockStatic</code> — both are heavy). If a "utility" method reads from a
+                        database, calls an external API, or accesses the filesystem, make it an instance
+                        method on an injectable interface. The test replaces the real implementation
+                        with a mock. Static is for pure functions only.
+                    </p>
                 </div>
             </section>
 
@@ -529,4 +600,5 @@ p.describe(); <span class="comment">// "Child"  — instance, resolved by object
     <script src="../../js/navigation.js"></script>
     <script src="../../js/toc.js"></script>
 </body>
+
 </html>

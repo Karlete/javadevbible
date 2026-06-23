@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-i18n-root="../.." data-i18n-title="topic.ia.page-title">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
     <link rel="stylesheet" href="../../css/toc.css">
 </head>
+
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
@@ -17,7 +19,8 @@
                 Interfaces vs Abstract Classes
             </nav>
             <h1 data-i18n="topic.ia.h1">Interfaces vs Abstract Classes</h1>
-            <p class="topic-subtitle" data-i18n="topic.ia.subtitle">Contracts vs templates — and when each is the right tool</p>
+            <p class="topic-subtitle" data-i18n="topic.ia.subtitle">Contracts vs templates — and when each is the right
+                tool</p>
             <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
@@ -38,13 +41,80 @@
         <main class="topic-content">
 
             <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT ARE INTERFACES AND ABSTRACT CLASSES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Are Interfaces and Abstract Classes?</h2>
+                <p>Both interfaces and abstract classes are tools for <strong>abstraction</strong>
+                    — defining <em>what</em> something must do without specifying <em>how</em> it
+                    does it. They let you write code that works with any implementation of a
+                    contract, without knowing the concrete class behind it.</p>
+
+                <p>The problem they solve: without abstraction, your code is coupled to specific
+                    implementations. If <code>OrderService</code> directly creates a
+                    <code>StripePaymentProcessor</code>, switching to PayPal means rewriting
+                    <code>OrderService</code>. With an interface, <code>OrderService</code> depends
+                    only on <code>PaymentProcessor</code> — the concrete implementation can be
+                    swapped, tested, or extended without touching the caller.
+                </p>
+
+                <pre><code><span class="comment">// Without abstraction: tightly coupled to one implementation</span>
+            <span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+                <span class="keyword">private</span> <span class="class-name">StripePaymentProcessor</span> processor = <span class="keyword">new</span> <span class="class-name">StripePaymentProcessor</span>();
+            
+                <span class="keyword">public void</span> <span class="function">checkout</span>(<span class="class-name">Order</span> order) {
+                    processor.charge(order.total());  <span class="comment">// locked to Stripe forever</span>
+                }
+            }
+            
+            <span class="comment">// With an interface: depends on the contract, not the implementation</span>
+            <span class="keyword">public interface</span> <span class="class-name">PaymentProcessor</span> {
+                <span class="keyword">void</span> <span class="function">charge</span>(<span class="class-name">BigDecimal</span> amount);
+            }
+            
+            <span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+                <span class="keyword">private final</span> <span class="class-name">PaymentProcessor</span> processor;  <span class="comment">// any implementation works</span>
+            
+                <span class="keyword">public</span> <span class="function">OrderService</span>(<span class="class-name">PaymentProcessor</span> processor) { <span class="keyword">this</span>.processor = processor; }
+            
+                <span class="keyword">public void</span> <span class="function">checkout</span>(<span class="class-name">Order</span> order) {
+                    processor.charge(order.total());  <span class="comment">// Stripe, PayPal, mock — doesn't matter</span>
+                }
+            }
+            
+            <span class="comment">// In production: inject StripePaymentProcessor
+            // In tests: inject MockPaymentProcessor — zero infrastructure needed</span></code></pre>
+
+                <p>Java provides two mechanisms for abstraction. An <strong>interface</strong>
+                    is a pure contract — it defines capabilities a class promises to provide
+                    (<em>CAN-DO</em>). An <strong>abstract class</strong> is a partial
+                    implementation — it defines a family of related types that share common
+                    code but leave specific behaviour to subclasses (<em>IS-A</em>). Knowing
+                    when to use each is one of the marks of an experienced Java developer.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Why Java has both</div>
+                    <p>Interfaces enable <strong>multiple inheritance of type</strong> — a
+                        <code>Duck</code> can be both <code>Flyable</code> and
+                        <code>Swimmable</code> without any class hierarchy connecting those
+                        two capabilities. Abstract classes enable <strong>shared implementation
+                        </strong> — common fields, constructors, and concrete methods that
+                        every subclass inherits. Since Java 8 added <code>default</code> methods
+                        to interfaces, the line between the two has blurred — but constructors
+                        and instance state remain exclusive to abstract classes.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
                  SECTION 1 — KEY DIFFERENCES
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>Key Differences at a Glance</h2>
                 <p>Both prevent direct instantiation and both can declare abstract methods. The crucial
                     differences are in <strong>state</strong>, <strong>inheritance</strong>, and
-                    <strong>intent</strong>:</p>
+                    <strong>intent</strong>:
+                </p>
 
                 <table>
                     <tr>
@@ -452,72 +522,78 @@
                     <div class="info-box-title">🎓 Junior level</div>
 
                     <p><strong>Q: What is the main difference between an interface and an abstract class?</strong><br>
-                    A class can implement many interfaces but extend only one abstract class.
-                    Interfaces cannot have instance state or constructors; abstract classes can.
-                    Interfaces define capabilities (CAN-DO); abstract classes define identity (IS-A).
-                    Since Java 8, interfaces can have <code>default</code> and <code>static</code> methods,
-                    narrowing the gap — but state and constructors remain exclusive to abstract classes.</p>
+                        A class can implement many interfaces but extend only one abstract class.
+                        Interfaces cannot have instance state or constructors; abstract classes can.
+                        Interfaces define capabilities (CAN-DO); abstract classes define identity (IS-A).
+                        Since Java 8, interfaces can have <code>default</code> and <code>static</code> methods,
+                        narrowing the gap — but state and constructors remain exclusive to abstract classes.</p>
 
                     <p><strong>Q: Can an interface extend another interface?</strong><br>
-                    Yes, and it can extend <em>multiple</em> interfaces. An interface uses
-                    <code>extends</code> (not <code>implements</code>) to inherit from other interfaces.
-                    Example: <code>interface C extends A, B</code>. The implementing class then must
-                    provide all abstract methods from the entire chain.</p>
+                        Yes, and it can extend <em>multiple</em> interfaces. An interface uses
+                        <code>extends</code> (not <code>implements</code>) to inherit from other interfaces.
+                        Example: <code>interface C extends A, B</code>. The implementing class then must
+                        provide all abstract methods from the entire chain.
+                    </p>
 
                     <p><strong>Q: What is a functional interface?</strong><br>
-                    An interface with exactly one abstract method (SAM — Single Abstract Method).
-                    It can have any number of <code>default</code> and <code>static</code> methods;
-                    those don't count. <code>@FunctionalInterface</code> makes the compiler enforce
-                    the SAM rule. Functional interfaces are the target type for lambda expressions
-                    and method references. Examples: <code>Runnable</code>, <code>Comparator</code>,
-                    <code>Function&lt;T,R&gt;</code>.</p>
+                        An interface with exactly one abstract method (SAM — Single Abstract Method).
+                        It can have any number of <code>default</code> and <code>static</code> methods;
+                        those don't count. <code>@FunctionalInterface</code> makes the compiler enforce
+                        the SAM rule. Functional interfaces are the target type for lambda expressions
+                        and method references. Examples: <code>Runnable</code>, <code>Comparator</code>,
+                        <code>Function&lt;T,R&gt;</code>.
+                    </p>
 
                     <p><strong>Q: Can an abstract class have a constructor?</strong><br>
-                    Yes. Even though you can't instantiate it directly, its constructor runs when a
-                    concrete subclass is instantiated via <code>super()</code>. This is how abstract
-                    classes enforce shared invariants — validating and setting fields that every
-                    subclass will rely on.</p>
+                        Yes. Even though you can't instantiate it directly, its constructor runs when a
+                        concrete subclass is instantiated via <code>super()</code>. This is how abstract
+                        classes enforce shared invariants — validating and setting fields that every
+                        subclass will rely on.</p>
                 </div>
 
                 <div class="info-box important">
                     <div class="info-box-title">🔥 Senior level</div>
 
-                    <p><strong>Q: Why were default methods added to Java 8, and what problem do they create?</strong><br>
-                    They were added to enable API evolution without breaking existing implementations.
-                    Adding <code>forEach()</code> to <code>Iterable</code> or <code>stream()</code>
-                    to <code>Collection</code> would have broken every class implementing those
-                    interfaces. Default methods let the JDK add new methods while keeping backward
-                    compatibility. The problem they create: if two interfaces define the same default
-                    method, implementing classes must override to resolve ambiguity — the compiler
-                    rejects the ambiguity silently. This is Java's pragmatic answer to the diamond
-                    problem, not a clean one.</p>
+                    <p><strong>Q: Why were default methods added to Java 8, and what problem do they
+                            create?</strong><br>
+                        They were added to enable API evolution without breaking existing implementations.
+                        Adding <code>forEach()</code> to <code>Iterable</code> or <code>stream()</code>
+                        to <code>Collection</code> would have broken every class implementing those
+                        interfaces. Default methods let the JDK add new methods while keeping backward
+                        compatibility. The problem they create: if two interfaces define the same default
+                        method, implementing classes must override to resolve ambiguity — the compiler
+                        rejects the ambiguity silently. This is Java's pragmatic answer to the diamond
+                        problem, not a clean one.</p>
 
                     <p><strong>Q: When would you choose an abstract class over an interface in 2026?</strong><br>
-                    Practically: when you need (a) instance state shared across the hierarchy,
-                    (b) a constructor that enforces invariants, or (c) non-public methods
-                    (<code>protected</code> hooks for subclasses). With Java 8+ default methods,
-                    interfaces can now share behaviour — so the old reason "I need a shared method
-                    implementation" no longer applies. In Spring, the shift is clearly toward
-                    interfaces for everything and composition for sharing code.</p>
+                        Practically: when you need (a) instance state shared across the hierarchy,
+                        (b) a constructor that enforces invariants, or (c) non-public methods
+                        (<code>protected</code> hooks for subclasses). With Java 8+ default methods,
+                        interfaces can now share behaviour — so the old reason "I need a shared method
+                        implementation" no longer applies. In Spring, the shift is clearly toward
+                        interfaces for everything and composition for sharing code.</p>
 
                     <p><strong>Q: What is the Interface Segregation Principle and how does it apply here?</strong><br>
-                    ISP (the I in SOLID): clients should not be forced to depend on methods they
-                    don't use. Applied to interface design: keep interfaces small and focused.
-                    A <code>Printable</code> interface and a <code>Serializable</code> interface
-                    are better than a <code>DocumentOperations</code> interface that forces every
-                    implementor to provide both. In practice: if you find yourself writing
-                    <code>throw new UnsupportedOperationException()</code> in an interface
-                    implementation, you're violating ISP — split the interface.</p>
+                        ISP (the I in SOLID): clients should not be forced to depend on methods they
+                        don't use. Applied to interface design: keep interfaces small and focused.
+                        A <code>Printable</code> interface and a <code>Serializable</code> interface
+                        are better than a <code>DocumentOperations</code> interface that forces every
+                        implementor to provide both. In practice: if you find yourself writing
+                        <code>throw new UnsupportedOperationException()</code> in an interface
+                        implementation, you're violating ISP — split the interface.
+                    </p>
 
-                    <p><strong>Q: Why is calling an overridable method from an abstract class constructor dangerous?</strong><br>
-                    When <code>new Child()</code> is called, the JVM first runs <code>Base()</code>
-                    (the abstract class constructor). If that constructor calls <code>init()</code>
-                    which is overridden in <code>Child</code>, the <code>Child.init()</code> executes
-                    <em>before</em> <code>Child</code>'s own constructor body runs. That means any
-                    <code>final</code> fields declared in <code>Child</code> are still at their
-                    default values (<code>null</code>, <code>0</code>). This is a well-known source
-                    of NullPointerExceptions that are extremely hard to debug. Rule: never call
-                    overridable methods from constructors.</p>
+                    <p><strong>Q: Why is calling an overridable method from an abstract class constructor
+                            dangerous?</strong><br>
+                        When <code>new Child()</code> is called, the JVM first runs <code>Base()</code>
+                        (the abstract class constructor). If that constructor calls <code>init()</code>
+                        which is overridden in <code>Child</code>, the <code>Child.init()</code> executes
+                        <em>before</em> <code>Child</code>'s own constructor body runs. That means any
+                        <code>final</code> fields declared in <code>Child</code> are still at their
+                        default values (<code>null</code>, <code>0</code>). This is a well-known source
+                        of NullPointerExceptions that are extremely hard to debug. Rule: never call
+                        overridable methods from constructors.
+                    </p>
                 </div>
             </section>
 
@@ -559,4 +635,5 @@
     <script src="../../js/navigation.js"></script>
     <script src="../../js/toc.js"></script>
 </body>
+
 </html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-i18n-root="../.." data-i18n-title="topic.con.page-title">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
     <link rel="stylesheet" href="../../css/toc.css">
 </head>
+
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
@@ -17,7 +19,8 @@
                 Constructors
             </nav>
             <h1 data-i18n="topic.con.h1">Constructors</h1>
-            <p class="topic-subtitle" data-i18n="topic.con.subtitle">Enforcing valid object state from the moment of creation</p>
+            <p class="topic-subtitle" data-i18n="topic.con.subtitle">Enforcing valid object state from the moment of
+                creation</p>
             <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
@@ -38,6 +41,63 @@
         <main class="topic-content">
 
             <!-- ═══════════════════════════════════════════
+                 SECTION 0 — THE PROBLEM CONSTRUCTORS SOLVE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Problem Constructors Solve</h2>
+                <p>Every object needs to start in a <strong>valid state</strong>. A
+                    <code>BankAccount</code> without an ID is meaningless. A <code>User</code>
+                    with a null email will crash the first time someone tries to send a
+                    confirmation. A <code>Connection</code> with no host cannot connect to
+                    anything. If you leave object initialisation to the caller — setting
+                    fields manually after creation — nothing guarantees they'll do it correctly,
+                    or at all.
+                </p>
+
+                <pre><code><span class="comment">// Without a constructor: caller is responsible for initialisation
+            // Nothing stops them from forgetting, or setting invalid values</span>
+            <span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
+                <span class="keyword">public</span> <span class="class-name">String</span> id;
+                <span class="keyword">public double</span> balance;
+            }
+            
+            <span class="class-name">BankAccount</span> acc = <span class="keyword">new</span> <span class="class-name">BankAccount</span>();
+            <span class="comment">// id is null, balance is 0.0 — object exists but is completely unusable</span>
+            <span class="comment">// caller might forget to set id, or set balance = -500, and nothing stops them</span>
+            acc.balance = -<span class="number">500</span>;  <span class="comment">// perfectly legal, completely wrong</span>
+            
+            <span class="comment">// With a constructor: the class controls its own initialisation</span>
+            <span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
+                <span class="keyword">private final</span> <span class="class-name">String</span> id;
+                <span class="keyword">private</span>       <span class="keyword">double</span> balance;
+            
+                <span class="keyword">public</span> <span class="function">BankAccount</span>(<span class="class-name">String</span> id, <span class="keyword">double</span> initialBalance) {
+                    <span class="keyword">if</span> (id == <span class="keyword">null</span> || id.isBlank())
+                        <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"ID required"</span>);
+                    <span class="keyword">if</span> (initialBalance &lt; <span class="number">0</span>)
+                        <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Balance cannot be negative"</span>);
+                    <span class="keyword">this</span>.id      = id;
+                    <span class="keyword">this</span>.balance = initialBalance;
+                }
+            }
+            
+            <span class="comment">// Now there is no way to create an invalid BankAccount:
+            // new BankAccount(null, 0);   → IllegalArgumentException
+            // new BankAccount("", -500);  → IllegalArgumentException
+            // new BankAccount("ACC-001", 500); → valid, guaranteed</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">The invariant guarantee</div>
+                    <p>An <strong>invariant</strong> is a condition that must always be true
+                        about an object — "the ID is never null", "the balance is never
+                        negative". Constructors are where you establish invariants. Methods
+                        like <code>withdraw()</code> then maintain them. If the constructor
+                        enforces the invariant correctly, the object can never be in an
+                        invalid state — because it never escapes the constructor in one.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
                  SECTION 1 — WHAT IS A CONSTRUCTOR
             ════════════════════════════════════════════ -->
             <section class="content-section">
@@ -49,7 +109,8 @@
 
                 <p>Constructors differ from regular methods in three ways: same name as the class,
                     no return type (not even <code>void</code>), and called automatically by
-                    <code>new</code> — you never invoke them directly.</p>
+                    <code>new</code> — you never invoke them directly.
+                </p>
 
                 <pre><code><span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
     <span class="keyword">private final</span> <span class="class-name">String</span> id;
@@ -80,7 +141,8 @@
                         <li>No return type — not even <code>void</code></li>
                         <li>Can be overloaded (multiple constructors, different parameters)</li>
                         <li>Not inherited — subclasses must define their own and call <code>super()</code></li>
-                        <li>If you define no constructor, Java provides a free no-arg one. Define any constructor and the free one disappears.</li>
+                        <li>If you define no constructor, Java provides a free no-arg one. Define any constructor and
+                            the free one disappears.</li>
                     </ul>
                 </div>
             </section>
@@ -215,7 +277,8 @@
                 <p><code>this()</code> calls another constructor in the same class.
                     <code>super()</code> calls a constructor in the parent class.
                     Both must be the <strong>first statement</strong> in the constructor — you cannot
-                    have both in the same constructor.</p>
+                    have both in the same constructor.
+                </p>
 
                 <h3>this() — delegate within the class</h3>
                 <pre><code><span class="keyword">public class</span> <span class="class-name">Employee</span> {
@@ -495,7 +558,8 @@ m.currency();  <span class="comment">// accessor</span></code></pre>
                         <code>@Autowired</code> that the container forgot to fill.
                         Field injection also makes unit testing painful because you need reflection
                         or a DI container just to set up the object. Constructor injection works
-                        with plain <code>new</code> in tests.</p>
+                        with plain <code>new</code> in tests.
+                    </p>
                 </div>
             </section>
 
@@ -509,70 +573,75 @@ m.currency();  <span class="comment">// accessor</span></code></pre>
                     <div class="info-box-title">🎓 Junior level</div>
 
                     <p><strong>Q: What is the difference between a constructor and a method?</strong><br>
-                    Constructors have the same name as the class, no return type, and are called
-                    automatically by <code>new</code>. Methods have any name, a return type, and
-                    are called explicitly. Constructors are not inherited; methods can be. Purpose:
-                    constructors initialise; methods operate.</p>
+                        Constructors have the same name as the class, no return type, and are called
+                        automatically by <code>new</code>. Methods have any name, a return type, and
+                        are called explicitly. Constructors are not inherited; methods can be. Purpose:
+                        constructors initialise; methods operate.</p>
 
                     <p><strong>Q: What happens if you don't define any constructor?</strong><br>
-                    The compiler generates a public no-arg constructor equivalent to
-                    <code>public MyClass() { super(); }</code>. As soon as you define any
-                    constructor yourself, the generated one disappears — a frequent source of
-                    "no suitable constructor" errors when frameworks try to call the no-arg one.</p>
+                        The compiler generates a public no-arg constructor equivalent to
+                        <code>public MyClass() { super(); }</code>. As soon as you define any
+                        constructor yourself, the generated one disappears — a frequent source of
+                        "no suitable constructor" errors when frameworks try to call the no-arg one.
+                    </p>
 
                     <p><strong>Q: What is constructor chaining and why is it useful?</strong><br>
-                    <code>this()</code> delegates to another constructor in the same class.
-                    <code>super()</code> delegates to the parent. Benefits: validation and
-                    initialization live in one place (DRY), all overloads are consistent, and
-                    changes propagate automatically. The chain must be acyclic — the compiler
-                    detects circular chains at compile time.</p>
+                        <code>this()</code> delegates to another constructor in the same class.
+                        <code>super()</code> delegates to the parent. Benefits: validation and
+                        initialization live in one place (DRY), all overloads are consistent, and
+                        changes propagate automatically. The chain must be acyclic — the compiler
+                        detects circular chains at compile time.
+                    </p>
 
                     <p><strong>Q: What is the initialization order when creating an object?</strong><br>
-                    (1) Static fields + static blocks, once per class load.
-                    (2) Instance field initializers.
-                    (3) Instance initializer blocks.
-                    (4) Constructor body.
-                    For inheritance, the parent's steps 2-4 run before the child's.</p>
+                        (1) Static fields + static blocks, once per class load.
+                        (2) Instance field initializers.
+                        (3) Instance initializer blocks.
+                        (4) Constructor body.
+                        For inheritance, the parent's steps 2-4 run before the child's.</p>
                 </div>
 
                 <div class="info-box important">
                     <div class="info-box-title">🔥 Senior level</div>
 
                     <p><strong>Q: Why prefer static factory methods over constructors?</strong><br>
-                    Three reasons: (1) They have names — <code>Color.ofHex("#FF0000")</code> is
-                    clearer than <code>new Color("#FF0000")</code>. (2) They can return cached
-                    instances — <code>Boolean.valueOf(true)</code> always returns the same object;
-                    <code>new Boolean(true)</code> always creates a new one (now deprecated for
-                    this reason). (3) They can return a subtype — <code>List.of()</code> returns
-                    an internal implementation class; callers only see <code>List</code>. See
-                    Effective Java Item 1.</p>
+                        Three reasons: (1) They have names — <code>Color.ofHex("#FF0000")</code> is
+                        clearer than <code>new Color("#FF0000")</code>. (2) They can return cached
+                        instances — <code>Boolean.valueOf(true)</code> always returns the same object;
+                        <code>new Boolean(true)</code> always creates a new one (now deprecated for
+                        this reason). (3) They can return a subtype — <code>List.of()</code> returns
+                        an internal implementation class; callers only see <code>List</code>. See
+                        Effective Java Item 1.
+                    </p>
 
                     <p><strong>Q: Why is calling an overridable method from a constructor dangerous?</strong><br>
-                    When <code>new Child()</code> runs, the JVM first calls the <code>Base</code>
-                    constructor. If that constructor calls <code>init()</code>, which is overridden
-                    in <code>Child</code>, the <code>Child.init()</code> executes before
-                    <code>Child</code>'s own constructor body — meaning all of Child's
-                    <code>final</code> fields are still at their defaults (<code>null</code>, 0).
-                    The result is NPE on a field that looks initialised in the source. Rule:
-                    never call overridable (<code>non-final</code>, <code>non-private</code>)
-                    methods from constructors.</p>
+                        When <code>new Child()</code> runs, the JVM first calls the <code>Base</code>
+                        constructor. If that constructor calls <code>init()</code>, which is overridden
+                        in <code>Child</code>, the <code>Child.init()</code> executes before
+                        <code>Child</code>'s own constructor body — meaning all of Child's
+                        <code>final</code> fields are still at their defaults (<code>null</code>, 0).
+                        The result is NPE on a field that looks initialised in the source. Rule:
+                        never call overridable (<code>non-final</code>, <code>non-private</code>)
+                        methods from constructors.
+                    </p>
 
                     <p><strong>Q: When should you use Builder instead of telescoping constructors?</strong><br>
-                    When the class has more than 3-4 parameters, especially if several are optional
-                    or of the same type (easy to swap accidentally). Builder gives named parameters,
-                    default values, and multi-step validation in <code>build()</code>. It also
-                    allows the final object to be immutable (all fields <code>final</code>) while
-                    the builder is mutable during construction. Lombok's <code>@Builder</code> and
-                    records eliminate the boilerplate in modern Java.</p>
+                        When the class has more than 3-4 parameters, especially if several are optional
+                        or of the same type (easy to swap accidentally). Builder gives named parameters,
+                        default values, and multi-step validation in <code>build()</code>. It also
+                        allows the final object to be immutable (all fields <code>final</code>) while
+                        the builder is mutable during construction. Lombok's <code>@Builder</code> and
+                        records eliminate the boilerplate in modern Java.</p>
 
-                    <p><strong>Q: What is the advantage of constructor injection over field injection in Spring?</strong><br>
-                    Constructor injection enables <code>final</code> fields (guaranteed
-                    initialisation, immutability), makes dependencies explicit in the signature
-                    (visible at a glance), and allows unit testing without a Spring context —
-                    just <code>new MyService(mockRepo)</code>. Field injection hides dependencies,
-                    prevents <code>final</code>, and requires reflection or a container to set
-                    values. Spring recommends constructor injection since 4.x; it's the default
-                    when only one constructor exists (no <code>@Autowired</code> needed).</p>
+                    <p><strong>Q: What is the advantage of constructor injection over field injection in
+                            Spring?</strong><br>
+                        Constructor injection enables <code>final</code> fields (guaranteed
+                        initialisation, immutability), makes dependencies explicit in the signature
+                        (visible at a glance), and allows unit testing without a Spring context —
+                        just <code>new MyService(mockRepo)</code>. Field injection hides dependencies,
+                        prevents <code>final</code>, and requires reflection or a container to set
+                        values. Spring recommends constructor injection since 4.x; it's the default
+                        when only one constructor exists (no <code>@Autowired</code> needed).</p>
                 </div>
             </section>
 
@@ -614,4 +683,5 @@ m.currency();  <span class="comment">// accessor</span></code></pre>
     <script src="../../js/navigation.js"></script>
     <script src="../../js/toc.js"></script>
 </body>
+
 </html>
