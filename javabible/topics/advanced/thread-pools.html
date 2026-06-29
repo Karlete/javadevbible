@@ -1,447 +1,525 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.tp.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thread Pools & ExecutorService - JavaDev Bible</title>
+    <title>Thread Pools &amp; ExecutorService - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / Thread Pools & ExecutorService
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#advanced" data-i18n="nav.advanced">Advanced Java</a> /
+                Thread Pools &amp; ExecutorService
             </nav>
-            <h1>Thread Pools & ExecutorService</h1>
-            <p class="topic-subtitle">Efficient Thread Management</p>
-            <a href="../../index.html" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.tp.h1">Thread Pools &amp; ExecutorService</h1>
+            <p class="topic-subtitle" data-i18n="topic.tp.subtitle">From Executors.newFixedThreadPool to ThreadPoolExecutor internals and correct pool sizing</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is a Thread Pool?</h2>
-            <p>Imagine a restaurant with a kitchen staff. You could hire a new chef for every single order that comes in, then fire them when done (wasteful!). Or you could have a team of chefs ready to cook whenever orders arrive (efficient!). That's what a <strong>thread pool</strong> does - it maintains a group of reusable worker threads.</p>
+    <div class="topic-layout">
 
-            <h3>The Problem with Creating Threads Manually</h3>
-            <pre><code><span class="comment">// BAD: Creating 1000 threads - expensive and wasteful!</span>
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) {
-    <span class="class-name">Thread</span> t = <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> processTask());
-    t.start();  <span class="comment">// Creates a new thread EVERY time</span>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Are Thread Pools and Why Do They Exist?</h2>
+                <p>Creating a platform thread is expensive: the JVM allocates a stack (~512KB–1MB),
+                    the OS allocates a kernel thread structure, and context-switching has measurable
+                    overhead. Creating a new thread per task at scale means thousands of threads
+                    competing for CPU time — most doing nothing but sleeping or waiting.</p>
+
+                <p>A <strong>thread pool</strong> solves this by maintaining a fixed number of
+                    reusable worker threads. Tasks are submitted to a queue; idle workers pick
+                    them up. Thread creation happens once at startup, not per task.</p>
+
+                <pre><code><span class="comment">// ❌ Thread-per-task: 10,000 requests = 10,000 threads = OOM or thrashing</span>
+<span class="keyword">for</span> (<span class="class-name">Request</span> req : requests) {
+    <span class="keyword">new</span> <span class="class-name">Thread</span>(() -&gt; handle(req)).start();  <span class="comment">// unbounded, uncontrolled</span>
 }
 
-<span class="comment">Problems:</span>
-<span class="comment">❌ Creating threads is expensive (time + memory)</span>
-<span class="comment">❌ 1000 threads running at once = system overload</span>
-<span class="comment">❌ Thread creation/destruction overhead</span>
-<span class="comment">❌ Hard to manage and control</span></code></pre>
-
-            <h3>The Solution: Thread Pool</h3>
-            <pre><code><span class="comment">// GOOD: Reuse a pool of 10 threads for 1000 tasks</span>
-<span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">10</span>);
-
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) {
-    executor.submit(() -> processTask());  <span class="comment">// Reuses existing threads!</span>
+<span class="comment">// ✅ Thread pool: 10,000 requests handled by N reusable workers</span>
+<span class="class-name">ExecutorService</span> pool = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">20</span>);
+<span class="keyword">for</span> (<span class="class-name">Request</span> req : requests) {
+    pool.submit(() -&gt; handle(req));  <span class="comment">// excess tasks queue, don't spawn threads</span>
 }
 
-executor.shutdown();
+<span class="comment">/*
+ *  Internal flow:
+ *
+ *  submit(task) ──► [Task Queue] ──► [Worker Thread 1]
+ *                                 ──► [Worker Thread 2]
+ *                                 ──► [Worker Thread N]
+ *                   (tasks wait)       (pick up next task when free)
+ */</span></code></pre>
+            </section>
 
-<span class="comment">Benefits:</span>
-<span class="comment">✅ Only 10 threads created</span>
-<span class="comment">✅ Threads are reused for multiple tasks</span>
-<span class="comment">✅ Controlled resource usage</span>
-<span class="comment">✅ Better performance</span></code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — EXECUTORSERVICE API
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>ExecutorService API</h2>
 
-            <h3>How Thread Pools Work</h3>
-            <pre><code><span class="comment">┌─────────────────────────────┐</span>
-<span class="comment">│     Task Queue              │  ← Tasks waiting to be executed</span>
-<span class="comment">│  [Task1][Task2][Task3]...  │</span>
-<span class="comment">└─────────────────────────────┘</span>
-              ↓ ↓ ↓
-<span class="comment">    ┌──────┐  ┌──────┐  ┌──────┐</span>
-<span class="comment">    │Thread│  │Thread│  │Thread│  ← Worker threads (reusable)</span>
-<span class="comment">    │  1   │  │  2   │  │  3   │</span>
-<span class="comment">    └──────┘  └──────┘  └──────┘</span>
+                <h3>submit vs execute</h3>
+                <pre><code><span class="class-name">ExecutorService</span> pool = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">4</span>);
 
-<span class="comment">1. Submit tasks to the pool</span>
-<span class="comment">2. Tasks wait in queue</span>
-<span class="comment">3. Available thread picks up task from queue</span>
-<span class="comment">4. Thread executes task</span>
-<span class="comment">5. Thread goes back to pool (ready for next task)</span></code></pre>
-        </section>
+<span class="comment">// execute(Runnable) — fire and forget, no result, exceptions swallowed silently</span>
+pool.execute(() -&gt; processEvent(event));
 
-        <section class="content-section">
-            <h2>ExecutorService - The Thread Pool Interface</h2>
-            <p><strong>ExecutorService</strong> is Java's high-level API for managing thread pools. Think of it as a professional task manager for your threads.</p>
+<span class="comment">// submit(Callable) — returns Future, exceptions held until future.get()</span>
+<span class="class-name">Future</span>&lt;<span class="class-name">Report</span>&gt; future = pool.submit(() -&gt; generateReport(params));
 
-            <h3>Creating Thread Pools - Different Types</h3>
-
-            <h4>1. Fixed Thread Pool</h4>
-            <pre><code><span class="comment">// Creates a pool with exactly N threads</span>
-<span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">5</span>);
-
-<span class="comment">Use when: You know how many threads you need</span>
-<span class="comment">Example: Web server with 100 worker threads</span></code></pre>
-
-            <h4>2. Cached Thread Pool</h4>
-            <pre><code><span class="comment">// Creates threads as needed, reuses idle threads</span>
-<span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newCachedThreadPool();
-
-<span class="comment">Use when: Many short-lived tasks</span>
-<span class="comment">Example: Processing quick API calls</span>
-<span class="comment">Warning: Can create too many threads if tasks pile up!</span></code></pre>
-
-            <h4>3. Single Thread Executor</h4>
-            <pre><code><span class="comment">// Only ONE thread executes tasks sequentially</span>
-<span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newSingleThreadExecutor();
-
-<span class="comment">Use when: Tasks must execute in order</span>
-<span class="comment">Example: Writing to a log file (one at a time)</span></code></pre>
-
-            <h4>4. Scheduled Thread Pool</h4>
-            <pre><code><span class="comment">// Schedule tasks to run after delay or periodically</span>
-<span class="class-name">ScheduledExecutorService</span> executor = <span class="class-name">Executors</span>.newScheduledThreadPool(<span class="number">3</span>);
-
-<span class="comment">Use when: Need scheduled/delayed execution</span>
-<span class="comment">Example: Backup database every hour</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Complete Example - Fixed Thread Pool</h2>
-
-            <pre><code><span class="keyword">import</span> java.util.concurrent.*;
-
-<span class="keyword">public class</span> <span class="class-name">ThreadPoolExample</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="comment">// Create pool with 3 worker threads</span>
-        <span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">3</span>);
-
-        <span class="comment">// Submit 10 tasks to the pool</span>
-        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">1</span>; i <= <span class="number">10</span>; i++) {
-            <span class="keyword">int</span> taskNumber = i;
-            executor.submit(() -> {
-                <span class="class-name">String</span> threadName = <span class="class-name">Thread</span>.currentThread().getName();
-                <span class="class-name">System</span>.out.println(threadName + <span class="string">": Executing Task "</span> + taskNumber);
-
-                <span class="keyword">try</span> {
-                    <span class="class-name">Thread</span>.sleep(<span class="number">2000</span>);  <span class="comment">// Simulate work</span>
-                } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
-                    e.printStackTrace();
-                }
-
-                <span class="class-name">System</span>.out.println(threadName + <span class="string">": Completed Task "</span> + taskNumber);
-            });
-        }
-
-        <span class="comment">// Shutdown the pool</span>
-        executor.shutdown();  <span class="comment">// No new tasks accepted, existing tasks complete</span>
-
-        <span class="keyword">try</span> {
-            <span class="comment">// Wait for all tasks to finish (max 1 minute)</span>
-            <span class="keyword">if</span> (!executor.awaitTermination(<span class="number">60</span>, <span class="class-name">TimeUnit</span>.SECONDS)) {
-                executor.shutdownNow();  <span class="comment">// Force shutdown</span>
-            }
-        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
-            executor.shutdownNow();
-        }
-
-        <span class="class-name">System</span>.out.println(<span class="string">"All tasks completed!"</span>);
-    }
-}</code></pre>
-
-            <p><strong>Output:</strong></p>
-            <pre><code>pool-1-thread-1: Executing Task 1
-pool-1-thread-2: Executing Task 2
-pool-1-thread-3: Executing Task 3
-<span class="comment">... 2 seconds ...</span>
-pool-1-thread-1: Completed Task 1
-pool-1-thread-2: Completed Task 2
-pool-1-thread-3: Completed Task 3
-pool-1-thread-1: Executing Task 4  <span class="comment">← Thread 1 reused!</span>
-pool-1-thread-2: Executing Task 5
-pool-1-thread-3: Executing Task 6
-<span class="comment">... continues until all 10 tasks done ...</span>
-All tasks completed!</code></pre>
-
-            <p><strong>Notice:</strong> Only 3 threads handle all 10 tasks! Threads are reused efficiently.</p>
-        </section>
-
-        <section class="content-section">
-            <h2>submit() vs execute() - What's the Difference?</h2>
-
-            <h3>execute() - Fire and Forget</h3>
-            <pre><code><span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">5</span>);
-
-executor.execute(() -> {
-    <span class="class-name">System</span>.out.println(<span class="string">"Task executed"</span>);
-});
-
-<span class="comment">// Returns void - no way to get result or check status</span>
-<span class="comment">// Use when: You don't need the result</span></code></pre>
-
-            <h3>submit() - Get a Future</h3>
-            <pre><code><span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">5</span>);
-
-<span class="class-name">Future</span>&lt;<span class="class-name">Integer</span>&gt; future = executor.submit(() -> {
-    <span class="class-name">Thread</span>.sleep(<span class="number">1000</span>);
-    <span class="keyword">return</span> <span class="number">42</span>;  <span class="comment">// Return a result</span>
-});
-
-<span class="comment">// Returns Future - can get result later</span>
-<span class="class-name">Integer</span> result = future.get();  <span class="comment">// Blocks until task completes</span>
-<span class="class-name">System</span>.out.println(<span class="string">"Result: "</span> + result);  <span class="comment">// 42</span>
-
-<span class="comment">// Use when: You need the result or want to check status</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Working with Future - Getting Results</h2>
-
-            <pre><code><span class="keyword">import</span> java.util.concurrent.*;
-
-<span class="keyword">public class</span> <span class="class-name">FutureExample</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">3</span>);
-
-        <span class="comment">// Submit a task that returns a result</span>
-        <span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt; future = executor.submit(() -> {
-            <span class="class-name">System</span>.out.println(<span class="string">"Task started"</span>);
-            <span class="class-name">Thread</span>.sleep(<span class="number">3000</span>);  <span class="comment">// Simulate long operation</span>
-            <span class="keyword">return</span> <span class="string">"Task completed successfully!"</span>;
-        });
-
-        <span class="class-name">System</span>.out.println(<span class="string">"Main thread continues..."</span>);
-
-        <span class="comment">// Check if task is done</span>
-        <span class="keyword">if</span> (!future.isDone()) {
-            <span class="class-name">System</span>.out.println(<span class="string">"Task is still running..."</span>);
-        }
-
-        <span class="comment">// Get result - BLOCKS until task completes</span>
-        <span class="class-name">String</span> result = future.get();  <span class="comment">// Waits for completion</span>
-        <span class="class-name">System</span>.out.println(<span class="string">"Result: "</span> + result);
-
-        <span class="comment">// Get with timeout - don't wait forever!</span>
-        <span class="keyword">try</span> {
-            <span class="class-name">String</span> result2 = future.get(<span class="number">5</span>, <span class="class-name">TimeUnit</span>.SECONDS);
-        } <span class="keyword">catch</span> (<span class="class-name">TimeoutException</span> e) {
-            <span class="class-name">System</span>.out.println(<span class="string">"Task took too long!"</span>);
-            future.cancel(<span class="keyword">true</span>);  <span class="comment">// Cancel the task</span>
-        }
-
-        executor.shutdown();
-    }
-}</code></pre>
-
-            <h3>Future Methods</h3>
-            <ul>
-                <li><code>get()</code> - Wait for task to complete and get result</li>
-                <li><code>get(timeout, unit)</code> - Wait with timeout</li>
-                <li><code>isDone()</code> - Check if task completed</li>
-                <li><code>cancel()</code> - Cancel the task</li>
-                <li><code>isCancelled()</code> - Check if task was cancelled</li>
-            </ul>
-        </section>
-
-        <section class="content-section">
-            <h2>Scheduled Executor - Running Tasks Periodically</h2>
-
-            <h3>Schedule Once (After Delay)</h3>
-            <pre><code><span class="class-name">ScheduledExecutorService</span> scheduler = <span class="class-name">Executors</span>.newScheduledThreadPool(<span class="number">1</span>);
-
-<span class="comment">// Run task after 5 seconds delay</span>
-scheduler.schedule(() -> {
-    <span class="class-name">System</span>.out.println(<span class="string">"Task executed after 5 seconds"</span>);
-}, <span class="number">5</span>, <span class="class-name">TimeUnit</span>.SECONDS);
-
-scheduler.shutdown();</code></pre>
-
-            <h3>Schedule Repeatedly (Fixed Rate)</h3>
-            <pre><code><span class="class-name">ScheduledExecutorService</span> scheduler = <span class="class-name">Executors</span>.newScheduledThreadPool(<span class="number">1</span>);
-
-<span class="comment">// Run task every 10 seconds, starting after 0 second delay</span>
-scheduler.scheduleAtFixedRate(() -> {
-    <span class="class-name">System</span>.out.println(<span class="string">"Heartbeat: "</span> + <span class="keyword">new</span> <span class="class-name">Date</span>());
-}, <span class="number">0</span>, <span class="number">10</span>, <span class="class-name">TimeUnit</span>.SECONDS);
-
-<span class="comment">// Runs every 10 seconds regardless of task duration</span>
-<span class="comment">// Time between task START times = 10 seconds</span></code></pre>
-
-            <h3>Schedule with Fixed Delay</h3>
-            <pre><code><span class="class-name">ScheduledExecutorService</span> scheduler = <span class="class-name">Executors</span>.newScheduledThreadPool(<span class="number">1</span>);
-
-<span class="comment">// Wait 5 seconds AFTER task completes, then run again</span>
-scheduler.scheduleWithFixedDelay(() -> {
-    <span class="class-name">System</span>.out.println(<span class="string">"Processing batch..."</span>);
-    <span class="class-name">Thread</span>.sleep(<span class="number">2000</span>);  <span class="comment">// Task takes 2 seconds</span>
-}, <span class="number">0</span>, <span class="number">5</span>, <span class="class-name">TimeUnit</span>.SECONDS);
-
-<span class="comment">// Time between task END and next START = 5 seconds</span>
-<span class="comment">// Total cycle: 2s (task) + 5s (delay) = 7 seconds</span></code></pre>
-
-            <h3>Practical Example - Database Backup</h3>
-            <pre><code><span class="class-name">ScheduledExecutorService</span> scheduler = <span class="class-name">Executors</span>.newScheduledThreadPool(<span class="number">1</span>);
-
-<span class="comment">// Backup database every hour</span>
-scheduler.scheduleAtFixedRate(() -> {
-    <span class="class-name">System</span>.out.println(<span class="string">"Starting database backup..."</span>);
-    backupDatabase();
-    <span class="class-name">System</span>.out.println(<span class="string">"Backup completed!"</span>);
-}, <span class="number">0</span>, <span class="number">1</span>, <span class="class-name">TimeUnit</span>.HOURS);</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Shutdown Methods - Stopping Executors</h2>
-
-            <h3>1. shutdown() - Graceful Shutdown</h3>
-            <pre><code>executor.shutdown();
-<span class="comment">// ✅ Existing tasks complete</span>
-<span class="comment">// ❌ New tasks rejected</span>
-<span class="comment">// Waits for tasks to finish naturally</span></code></pre>
-
-            <h3>2. shutdownNow() - Immediate Shutdown</h3>
-            <pre><code><span class="class-name">List</span>&lt;<span class="class-name">Runnable</span>&gt; notExecuted = executor.shutdownNow();
-<span class="comment">// ❌ Running tasks interrupted</span>
-<span class="comment">// ❌ Waiting tasks not started</span>
-<span class="comment">// Returns list of tasks that never ran</span></code></pre>
-
-            <h3>3. awaitTermination() - Wait for Completion</h3>
-            <pre><code>executor.shutdown();
+<span class="comment">// Always use get() with timeout — never block indefinitely</span>
 <span class="keyword">try</span> {
-    <span class="comment">// Wait up to 60 seconds for tasks to complete</span>
-    <span class="keyword">if</span> (!executor.awaitTermination(<span class="number">60</span>, <span class="class-name">TimeUnit</span>.SECONDS)) {
-        executor.shutdownNow();  <span class="comment">// Force shutdown after timeout</span>
-    }
-} <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
-    executor.shutdownNow();
+    <span class="class-name">Report</span> report = future.get(<span class="number">30</span>, <span class="class-name">TimeUnit</span>.SECONDS);
+} <span class="keyword">catch</span> (<span class="class-name">TimeoutException</span> e) {
+    future.cancel(<span class="keyword">true</span>);   <span class="comment">// interrupt the task</span>
+    <span class="keyword">throw new</span> <span class="class-name">ServiceException</span>(<span class="string">"Report generation timed out"</span>);
+} <span class="keyword">catch</span> (<span class="class-name">ExecutionException</span> e) {
+    <span class="keyword">throw new</span> <span class="class-name">ServiceException</span>(<span class="string">"Report generation failed"</span>, e.getCause());
 }</code></pre>
 
-            <h3>Best Practice - Proper Shutdown Pattern</h3>
-            <pre><code><span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">5</span>);
+                <h3>invokeAll and invokeAny — batch operations</h3>
+                <pre><code><span class="class-name">List</span>&lt;<span class="class-name">Callable</span>&lt;<span class="class-name">Price</span>&gt;&gt; tasks = providers.stream()
+    .map(p -&gt; (<span class="class-name">Callable</span>&lt;<span class="class-name">Price</span>&gt;) () -&gt; p.fetchPrice(sku))
+    .toList();
 
-<span class="keyword">try</span> {
-    <span class="comment">// Submit your tasks</span>
-    executor.submit(() -> doWork());
+<span class="comment">// invokeAll: wait for ALL to complete (or timeout) — returns in submission order</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Future</span>&lt;<span class="class-name">Price</span>&gt;&gt; results = pool.invokeAll(tasks, <span class="number">5</span>, <span class="class-name">TimeUnit</span>.SECONDS);
+<span class="keyword">for</span> (<span class="class-name">Future</span>&lt;<span class="class-name">Price</span>&gt; f : results) {
+    <span class="keyword">if</span> (!f.isCancelled()) prices.add(f.get());  <span class="comment">// timed-out tasks are cancelled</span>
+}
 
-} <span class="keyword">finally</span> {
-    <span class="comment">// Always shutdown in finally block!</span>
-    executor.shutdown();
+<span class="comment">// invokeAny: return FIRST successful result, cancel the rest</span>
+<span class="comment">// Perfect for "try multiple sources, take fastest" pattern</span>
+<span class="class-name">Price</span> best = pool.invokeAny(tasks, <span class="number">3</span>, <span class="class-name">TimeUnit</span>.SECONDS);</code></pre>
+
+                <h3>Shutdown — always, always shut down</h3>
+                <pre><code><span class="comment">// ✅ Graceful shutdown pattern</span>
+<span class="keyword">void</span> <span class="function">shutdownGracefully</span>(<span class="class-name">ExecutorService</span> pool) {
+    pool.shutdown();  <span class="comment">// reject new tasks, let queued tasks finish</span>
     <span class="keyword">try</span> {
-        <span class="keyword">if</span> (!executor.awaitTermination(<span class="number">60</span>, <span class="class-name">TimeUnit</span>.SECONDS)) {
-            executor.shutdownNow();
+        <span class="keyword">if</span> (!pool.awaitTermination(<span class="number">30</span>, <span class="class-name">TimeUnit</span>.SECONDS)) {
+            pool.shutdownNow();  <span class="comment">// interrupt running tasks</span>
+            <span class="keyword">if</span> (!pool.awaitTermination(<span class="number">10</span>, <span class="class-name">TimeUnit</span>.SECONDS)) {
+                log.error(<span class="string">"Pool did not terminate"</span>);
+            }
         }
     } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
-        executor.shutdownNow();
-        <span class="class-name">Thread</span>.currentThread().interrupt();
+        pool.shutdownNow();
+        <span class="class-name">Thread</span>.currentThread().interrupt();  <span class="comment">// restore interrupt status</span>
+    }
+}
+
+<span class="comment">// ✅ Java 19+: ExecutorService implements AutoCloseable</span>
+<span class="keyword">try</span> (<span class="class-name">ExecutorService</span> pool = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">4</span>)) {
+    pool.submit(task1);
+    pool.submit(task2);
+}  <span class="comment">// calls shutdown() + awaitTermination() automatically</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — THREADPOOLEXECUTOR INTERNALS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>ThreadPoolExecutor — Under the Hood</h2>
+                <p>All <code>Executors</code> factory methods return a
+                    <code>ThreadPoolExecutor</code> (or subclass). Understanding its parameters
+                    is essential for production tuning — the defaults are rarely correct for your
+                    workload.</p>
+
+                <pre><code><span class="keyword">new</span> <span class="class-name">ThreadPoolExecutor</span>(
+    <span class="number">4</span>,                              <span class="comment">// corePoolSize: threads kept alive even when idle</span>
+    <span class="number">16</span>,                             <span class="comment">// maximumPoolSize: max threads when queue is full</span>
+    <span class="number">60L</span>, <span class="class-name">TimeUnit</span>.SECONDS,          <span class="comment">// keepAliveTime: idle extra threads terminated after</span>
+    <span class="keyword">new</span> <span class="class-name">LinkedBlockingQueue</span>&lt;&gt;(<span class="number">1000</span>), <span class="comment">// workQueue: bounded — critical for production</span>
+    <span class="keyword">new</span> <span class="class-name">ThreadFactory</span>() { ... },   <span class="comment">// threadFactory: name threads, set daemon status</span>
+    <span class="keyword">new</span> <span class="class-name">CallerRunsPolicy</span>()           <span class="comment">// rejectionHandler: what to do when queue is full</span>
+);
+
+<span class="comment">/*
+ *  Task submission flow:
+ *
+ *  submit(task)
+ *    │
+ *    ├─ threads < corePoolSize?     → create new core thread
+ *    │
+ *    ├─ queue not full?             → add to queue (existing threads will pick up)
+ *    │
+ *    ├─ threads < maximumPoolSize?  → create non-core thread (temporary)
+ *    │
+ *    └─ queue full AND at max?      → RejectedExecutionHandler fires
+ */</span></code></pre>
+
+                <h3>Named thread factory — non-negotiable in production</h3>
+                <pre><code><span class="comment">// Anonymous threads in stack traces = debugging nightmare
+// "pool-3-thread-7 threw an exception" tells you nothing</span>
+
+<span class="class-name">ThreadFactory</span> factory = <span class="keyword">new</span> <span class="class-name">ThreadFactory</span>() {
+    <span class="keyword">private final</span> <span class="class-name">AtomicInteger</span> count = <span class="keyword">new</span> <span class="class-name">AtomicInteger</span>();
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">Thread</span> <span class="function">newThread</span>(<span class="class-name">Runnable</span> r) {
+        <span class="class-name">Thread</span> t = <span class="keyword">new</span> <span class="class-name">Thread</span>(r, <span class="string">"order-processor-"</span> + count.incrementAndGet());
+        t.setDaemon(<span class="keyword">true</span>);  <span class="comment">// JVM can exit even if task is running</span>
+        <span class="keyword">return</span> t;
+    }
+};
+
+<span class="comment">// Or with Guava (cleaner):</span>
+<span class="class-name">ThreadFactory</span> factory = <span class="class-name">ThreadFactoryBuilder</span>.newBuilder()
+    .setNameFormat(<span class="string">"payment-worker-%d"</span>)
+    .setDaemon(<span class="keyword">true</span>)
+    .build();</code></pre>
+
+                <h3>Rejection policies</h3>
+                <pre><code><span class="comment">/*
+ *  AbortPolicy (default)  — throws RejectedExecutionException
+ *                           Caller must catch it or the task is lost silently
+ *
+ *  CallerRunsPolicy       — task runs on the submitting thread
+ *                           Natural backpressure: slows down producers
+ *                           ✅ Recommended for most services
+ *
+ *  DiscardPolicy          — task silently dropped
+ *                           ❌ Almost never correct — you lose work
+ *
+ *  DiscardOldestPolicy    — drops the oldest queued task to make room
+ *                           ❌ Also rarely correct
+ */</span>
+
+<span class="comment">// Custom policy: log + metric + controlled fail</span>
+<span class="keyword">new</span> <span class="class-name">RejectedExecutionHandler</span>() {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">rejectedExecution</span>(<span class="class-name">Runnable</span> r, <span class="class-name">ThreadPoolExecutor</span> executor) {
+        metrics.increment(<span class="string">"pool.rejections"</span>);
+        log.error(<span class="string">"Task rejected — queue={}, active={}"</span>,
+                  executor.getQueue().size(), executor.getActiveCount());
+        <span class="keyword">throw new</span> <span class="class-name">RejectedExecutionException</span>(<span class="string">"Service overloaded"</span>);
     }
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Practical Example - Web Scraper</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — POOL SIZING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Pool Sizing — The Science</h2>
+                <p>Wrong pool size is one of the most common performance bugs in Java services.
+                    Too small: throughput limited. Too large: context-switching overhead,
+                    memory pressure, I/O contention.</p>
 
-            <pre><code><span class="keyword">import</span> java.util.concurrent.*;
-<span class="keyword">import</span> java.util.*;
+                <pre><code><span class="comment">/*
+ *  Little's Law applied to thread pools:
+ *
+ *  N = λ × W
+ *
+ *  N  = number of threads needed
+ *  λ  = task arrival rate (tasks/sec)
+ *  W  = average task duration (seconds)
+ *
+ *  Example: 500 req/s, each takes 200ms average
+ *  N = 500 × 0.2 = 100 threads minimum for full throughput
+ *
+ *  ─────────────────────────────────────────────────────
+ *  CPU-BOUND tasks (image processing, crypto, computation):
+ *
+ *  threads = N_cpu + 1
+ *
+ *  +1 for when a thread stalls on GC or page fault.
+ *  More threads just means context-switching overhead.
+ *
+ *  ─────────────────────────────────────────────────────
+ *  I/O-BOUND tasks (DB, HTTP, files):
+ *
+ *  threads = N_cpu × (1 + wait_time / compute_time)
+ *
+ *  Example: 8 cores, task spends 90% waiting on DB
+ *  threads = 8 × (1 + 0.9 / 0.1) = 8 × 10 = 80
+ *
+ *  Java 21 virtual threads remove this calculation for I/O-bound work.
+ */</span>
 
-<span class="keyword">public class</span> <span class="class-name">WebScraper</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; urls = <span class="class-name">Arrays</span>.asList(
-            <span class="string">"https://example.com/page1"</span>,
-            <span class="string">"https://example.com/page2"</span>,
-            <span class="string">"https://example.com/page3"</span>,
-            <span class="string">"https://example.com/page4"</span>,
-            <span class="string">"https://example.com/page5"</span>
-        );
+<span class="keyword">int</span> cores = <span class="class-name">Runtime</span>.getRuntime().availableProcessors();
 
-        <span class="comment">// Pool of 3 threads to scrape 5 URLs</span>
-        <span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newFixedThreadPool(<span class="number">3</span>);
-        <span class="class-name">List</span>&lt;<span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt;&gt; futures = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="comment">// CPU-bound pool</span>
+<span class="class-name">ExecutorService</span> cpuPool = <span class="class-name">Executors</span>.newFixedThreadPool(cores + <span class="number">1</span>);
 
-        <span class="comment">// Submit all scraping tasks</span>
-        <span class="keyword">for</span> (<span class="class-name">String</span> url : urls) {
-            <span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt; future = executor.submit(() -> scrapeWebsite(url));
-            futures.add(future);
-        }
+<span class="comment">// I/O-bound pool (rule of thumb: 2–10x cores, measure your wait ratio)</span>
+<span class="class-name">ExecutorService</span> ioPool  = <span class="class-name">Executors</span>.newFixedThreadPool(cores * <span class="number">4</span>);
 
-        <span class="comment">// Collect all results</span>
-        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < futures.size(); i++) {
-            <span class="class-name">String</span> content = futures.get(i).get();  <span class="comment">// Wait for result</span>
-            <span class="class-name">System</span>.out.println(<span class="string">"Scraped: "</span> + urls.get(i) + <span class="string">" - Length: "</span> + content.length());
-        }
+<span class="comment">// Or for I/O-bound on Java 21: virtual threads eliminate the guessing</span>
+<span class="class-name">ExecutorService</span> vtPool  = <span class="class-name">Executors</span>.newVirtualThreadPerTaskExecutor();</code></pre>
 
-        executor.shutdown();
-        <span class="class-name">System</span>.out.println(<span class="string">"All pages scraped!"</span>);
+                <div class="info-box warning">
+                    <div class="info-box-title">Container-aware sizing — critical in Kubernetes</div>
+                    <pre><code><span class="comment">// Runtime.getRuntime().availableProcessors() returns HOST CPU count, not container limit.
+// A container limited to 2 CPUs on a 64-core host returns 64. Pool of 65 threads
+// on 2 CPUs = severe context-switching overhead.
+
+// ✅ Fix 1: JVM flags (Java 8u191+ / Java 10+)
+// -XX:ActiveProcessorCount=2  ← override what availableProcessors() returns
+
+// ✅ Fix 2: Read CPU limit from cgroup (Java 11+ does this automatically with
+//    -XX:+UseContainerSupport, which is ON by default since Java 10)
+
+// ✅ Fix 3: Read the limit programmatically for logging/sizing decisions</span>
+<span class="keyword">int</span> effectiveCpus = <span class="class-name">Runtime</span>.getRuntime().availableProcessors();
+log.info(<span class="string">"Sizing pool for {} CPUs"</span>, effectiveCpus);</code></pre>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — SCHEDULED EXECUTOR
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>ScheduledExecutorService</h2>
+                <p>The modern replacement for <code>Timer</code>. <code>Timer</code> uses a single
+                    thread for all tasks — one slow task delays all others, and an uncaught
+                    exception kills the timer permanently. <code>ScheduledExecutorService</code>
+                    has none of these problems.</p>
+
+                <pre><code><span class="class-name">ScheduledExecutorService</span> scheduler = <span class="class-name">Executors</span>.newScheduledThreadPool(<span class="number">2</span>,
+    r -&gt; { <span class="class-name">Thread</span> t = <span class="keyword">new</span> <span class="class-name">Thread</span>(r, <span class="string">"scheduler"</span>); t.setDaemon(<span class="keyword">true</span>); <span class="keyword">return</span> t; });
+
+<span class="comment">// schedule: run once after delay</span>
+scheduler.schedule(() -&gt; retryFailedPayments(), <span class="number">30</span>, <span class="class-name">TimeUnit</span>.MINUTES);
+
+<span class="comment">// scheduleAtFixedRate: next run starts N units after PREVIOUS START</span>
+<span class="comment">// If task takes longer than the period, runs back-to-back (no overlap)</span>
+scheduler.scheduleAtFixedRate(() -&gt; {
+    metrics.report();
+}, <span class="number">0</span>, <span class="number">1</span>, <span class="class-name">TimeUnit</span>.MINUTES);
+
+<span class="comment">// scheduleWithFixedDelay: next run starts N units after PREVIOUS END</span>
+<span class="comment">// Guarantees a gap between runs — use for tasks of variable duration</span>
+scheduler.scheduleWithFixedDelay(() -&gt; {
+    processPendingOrders();  <span class="comment">// takes unpredictable time</span>
+}, <span class="number">0</span>, <span class="number">5</span>, <span class="class-name">TimeUnit</span>.SECONDS);  <span class="comment">// always 5s gap after completion</span>
+
+<span class="comment">// ⚠️ Uncaught exceptions in scheduled tasks SILENTLY STOP the schedule
+// The future completes exceptionally — no more executions, no log output</span>
+<span class="class-name">ScheduledFuture</span>&lt;?&gt; handle = scheduler.scheduleAtFixedRate(() -&gt; {
+    <span class="keyword">try</span> {
+        doWork();
+    } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
+        log.error(<span class="string">"Scheduled task failed — will retry next cycle"</span>, e);
+        <span class="comment">// Don't rethrow: that would cancel the schedule</span>
+    }
+}, <span class="number">0</span>, <span class="number">1</span>, <span class="class-name">TimeUnit</span>.MINUTES);</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — FORKJOINPOOL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>ForkJoinPool — Divide and Conquer</h2>
+                <p><code>ForkJoinPool</code> is designed for <strong>recursive, CPU-bound work</strong>
+                    that can be split into subtasks. It uses <em>work stealing</em>: idle threads
+                    steal tasks from busy threads' queues, maximising CPU utilisation.
+                    It is the engine behind parallel streams and <code>CompletableFuture</code>
+                    defaults.</p>
+
+                <pre><code><span class="comment">// Direct use: RecursiveTask returns a result</span>
+<span class="keyword">class</span> <span class="class-name">SumTask</span> <span class="keyword">extends</span> <span class="class-name">RecursiveTask</span>&lt;<span class="class-name">Long</span>&gt; {
+    <span class="keyword">private static final int</span> THRESHOLD = <span class="number">10_000</span>;
+    <span class="keyword">private final long</span>[] array;
+    <span class="keyword">private final int</span> from, to;
+
+    <span class="function">SumTask</span>(<span class="keyword">long</span>[] array, <span class="keyword">int</span> from, <span class="keyword">int</span> to) {
+        <span class="keyword">this</span>.array = array; <span class="keyword">this</span>.from = from; <span class="keyword">this</span>.to = to;
     }
 
-    <span class="keyword">private static</span> <span class="class-name">String</span> <span class="function">scrapeWebsite</span>(<span class="class-name">String</span> url) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Scraping: "</span> + url);
-        <span class="keyword">try</span> {
-            <span class="class-name">Thread</span>.sleep(<span class="number">2000</span>);  <span class="comment">// Simulate network delay</span>
-        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {}
-        <span class="keyword">return</span> <span class="string">"Content from "</span> + url;  <span class="comment">// Simulated content</span>
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected</span> <span class="class-name">Long</span> <span class="function">compute</span>() {
+        <span class="keyword">int</span> size = to - from;
+        <span class="keyword">if</span> (size &lt;= THRESHOLD) {
+            <span class="comment">// Base case: compute directly</span>
+            <span class="keyword">long</span> sum = <span class="number">0</span>;
+            <span class="keyword">for</span> (<span class="keyword">int</span> i = from; i &lt; to; i++) sum += array[i];
+            <span class="keyword">return</span> sum;
+        }
+        <span class="comment">// Recursive case: split and fork</span>
+        <span class="keyword">int</span> mid = from + size / <span class="number">2</span>;
+        <span class="class-name">SumTask</span> left  = <span class="keyword">new</span> <span class="class-name">SumTask</span>(array, from, mid);
+        <span class="class-name">SumTask</span> right = <span class="keyword">new</span> <span class="class-name">SumTask</span>(array, mid, to);
+        left.fork();                     <span class="comment">// schedule left asynchronously</span>
+        <span class="keyword">long</span> rightResult = right.compute(); <span class="comment">// compute right on current thread</span>
+        <span class="keyword">return</span> left.join() + rightResult;   <span class="comment">// wait for left, combine</span>
     }
-}</code></pre>
-        </section>
+}
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+<span class="keyword">long</span>[] data = <span class="comment">/* large array */</span> <span class="keyword">new long</span>[<span class="number">10_000_000</span>];
+<span class="class-name">ForkJoinPool</span> pool = <span class="class-name">ForkJoinPool</span>.commonPool();  <span class="comment">// shared across JVM</span>
+<span class="keyword">long</span> total = pool.invoke(<span class="keyword">new</span> <span class="class-name">SumTask</span>(data, <span class="number">0</span>, data.length));
 
-            <div class="info-box tip">
-                <div class="info-box-title">Thread Pool Best Practices</div>
-                <ul>
-                    <li>✅ <strong>Always shutdown executors:</strong> Use try-finally to ensure cleanup</li>
-                    <li>✅ <strong>Size pools appropriately:</strong> CPU-bound = cores, I/O-bound = more threads</li>
-                    <li>✅ <strong>Use submit() over execute():</strong> Better error handling with Future</li>
-                    <li>✅ <strong>Handle InterruptedException:</strong> Don't ignore it!</li>
-                    <li>✅ <strong>Use timeouts with get():</strong> Prevent infinite waiting</li>
-                    <li>✅ <strong>Name thread pools:</strong> Easier debugging</li>
-                    <li>✅ <strong>Monitor pool health:</strong> Check queue sizes, rejected tasks</li>
-                    <li>❌ <strong>Don't create unlimited pools:</strong> CachedThreadPool can be dangerous</li>
-                    <li>❌ <strong>Don't forget to shutdown:</strong> Threads keep JVM alive</li>
-                    <li>❌ <strong>Don't use Thread directly:</strong> Use ExecutorService instead</li>
-                </ul>
-            </div>
+<span class="comment">// For custom parallelism level (avoid monopolising common pool):</span>
+<span class="class-name">ForkJoinPool</span> custom = <span class="keyword">new</span> <span class="class-name">ForkJoinPool</span>(<span class="number">4</span>);
+<span class="keyword">long</span> result = custom.submit(<span class="keyword">new</span> <span class="class-name">SumTask</span>(data, <span class="number">0</span>, data.length)).get();</code></pre>
 
-            <h3>Choosing Pool Size</h3>
-            <pre><code><span class="comment">// CPU-intensive tasks (calculations, data processing)</span>
-<span class="keyword">int</span> cpuCores = <span class="class-name">Runtime</span>.getRuntime().availableProcessors();
-<span class="class-name">ExecutorService</span> cpuPool = <span class="class-name">Executors</span>.newFixedThreadPool(cpuCores);
+                <div class="info-box note">
+                    <div class="info-box-title">commonPool vs custom ForkJoinPool</div>
+                    <p><code>ForkJoinPool.commonPool()</code> is shared by parallel streams,
+                        <code>CompletableFuture.supplyAsync()</code> (when no executor specified),
+                        and any code that uses it directly. Blocking tasks in the common pool
+                        (I/O, locks) starve everyone else. For I/O-bound work in
+                        <code>CompletableFuture</code>, always pass a dedicated executor.
+                        For CPU-bound parallel work, the common pool is appropriate.</p>
+                </div>
+            </section>
 
-<span class="comment">// I/O-intensive tasks (network, file operations)</span>
-<span class="class-name">ExecutorService</span> ioPool = <span class="class-name">Executors</span>.newFixedThreadPool(cpuCores * <span class="number">2</span>);</code></pre>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — MONITORING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Monitoring Pool Health</h2>
+                <p>A thread pool that silently saturates is one of the hardest production
+                    issues to diagnose. Expose metrics from the start.</p>
 
-        <section class="content-section">
-            <h2>Why It Matters</h2>
-            <ul>
-                <li><strong>Performance:</strong> Reusing threads is much faster than creating new ones</li>
-                <li><strong>Resource Management:</strong> Prevents system overload from too many threads</li>
-                <li><strong>Scalability:</strong> Handle thousands of tasks with limited resources</li>
-                <li><strong>Simplicity:</strong> Easier to manage than manual thread creation</li>
-                <li><strong>Professional Standard:</strong> Industry best practice for concurrent programming</li>
-            </ul>
+                <pre><code><span class="class-name">ThreadPoolExecutor</span> tpe = (<span class="class-name">ThreadPoolExecutor</span>) pool;
 
-            <div class="info-box note">
-                <div class="info-box-title">Remember</div>
-                <p>Thread pools are like having a skilled team ready to work, rather than hiring and training someone new for every single task. Much more efficient!</p>
-            </div>
-        </section>
+<span class="comment">// Key metrics to expose (Micrometer, Prometheus, etc.)</span>
+tpe.getPoolSize();           <span class="comment">// current number of threads</span>
+tpe.getActiveCount();        <span class="comment">// threads actively executing tasks</span>
+tpe.getCorePoolSize();       <span class="comment">// core thread count</span>
+tpe.getMaximumPoolSize();    <span class="comment">// max thread count</span>
+tpe.getQueue().size();       <span class="comment">// tasks waiting — KEY signal for saturation</span>
+tpe.getQueue().remainingCapacity(); <span class="comment">// 0 = about to reject</span>
+tpe.getCompletedTaskCount(); <span class="comment">// total tasks completed since pool creation</span>
+tpe.getTaskCount();          <span class="comment">// total submitted</span>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="multithreading.html" class="related-link">Multithreading & Concurrency</a>
-                <a href="synchronization.html" class="related-link">Synchronization Mechanisms</a>
-                <a href="../fundamentals/lambda-streams.html" class="related-link">Lambda & Streams</a>
-            </div>
-        </section>
-    </main>
+<span class="comment">// Hook into lifecycle for custom metrics</span>
+<span class="class-name">ExecutorService</span> monitored = <span class="keyword">new</span> <span class="class-name">ThreadPoolExecutor</span>(<span class="number">4</span>, <span class="number">16</span>, <span class="number">60L</span>, <span class="class-name">TimeUnit</span>.SECONDS,
+        <span class="keyword">new</span> <span class="class-name">LinkedBlockingQueue</span>&lt;&gt;(<span class="number">1000</span>)) {
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> <span class="function">beforeExecute</span>(<span class="class-name">Thread</span> t, <span class="class-name">Runnable</span> r) {
+        metrics.gauge(<span class="string">"pool.queue.size"</span>, getQueue().size());
+    }
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> <span class="function">afterExecute</span>(<span class="class-name">Runnable</span> r, <span class="class-name">Throwable</span> ex) {
+        <span class="keyword">if</span> (ex != <span class="keyword">null</span>) metrics.increment(<span class="string">"pool.task.failures"</span>);
+    }
+};</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+
+                    <p><strong>Q: Why use a thread pool instead of creating threads manually?</strong><br>
+                    Thread creation is expensive (OS thread allocation, stack memory). Creating one
+                    thread per task at scale means thousands of threads competing for CPU, exhausting
+                    memory and causing excessive context switching. A thread pool creates threads
+                    once and reuses them, queuing excess tasks instead of spawning new threads.</p>
+
+                    <p><strong>Q: What is the difference between execute() and submit()?</strong><br>
+                    <code>execute(Runnable)</code> returns void — no way to get a result or catch
+                    exceptions (they're passed to the thread's uncaught exception handler).
+                    <code>submit(Callable)</code> returns a <code>Future</code> — you can retrieve
+                    the result, and exceptions are held until <code>future.get()</code> is called,
+                    where they're wrapped in <code>ExecutionException</code>.</p>
+
+                    <p><strong>Q: What happens if you don't call shutdown() on an ExecutorService?</strong><br>
+                    The pool's worker threads are non-daemon by default and will keep the JVM alive
+                    indefinitely — even after <code>main()</code> returns. This is a resource
+                    leak: threads consume memory and OS handles without doing any work.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+
+                    <p><strong>Q: Explain the ThreadPoolExecutor task submission flow.</strong><br>
+                    (1) If running threads &lt; <code>corePoolSize</code>, create a new core thread
+                    even if idle threads exist. (2) If at core size, try to enqueue the task. If
+                    the queue accepts it, return — existing threads will pick it up. (3) If the
+                    queue is full and running threads &lt; <code>maximumPoolSize</code>, create a
+                    temporary non-core thread. (4) If at max size and queue is full, the rejection
+                    handler fires. This is why with an <em>unbounded</em> queue (as in
+                    <code>Executors.newFixedThreadPool</code>), <code>maximumPoolSize</code> is
+                    irrelevant — the queue never fills, so extra threads are never created.</p>
+
+                    <p><strong>Q: What is the danger of Executors.newCachedThreadPool() in production?</strong><br>
+                    <code>newCachedThreadPool()</code> uses a <code>SynchronousQueue</code> (zero
+                    capacity) and <code>maximumPoolSize = Integer.MAX_VALUE</code>. Every submitted
+                    task either finds an idle thread or spawns a new one — there is no queue and
+                    no upper bound. Under sustained load, this creates thousands of threads, leading
+                    to <code>OutOfMemoryError</code>. In production, always use
+                    <code>ThreadPoolExecutor</code> directly with a bounded queue and explicit
+                    core/max sizes.</p>
+
+                    <p><strong>Q: What is work stealing and when does ForkJoinPool outperform fixed thread pools?</strong><br>
+                    In a fixed pool, each thread has a shared task queue — all threads compete for
+                    the same lock. In <code>ForkJoinPool</code>, each thread has its own
+                    double-ended deque. Threads push/pop from their own deque (no contention) and
+                    steal from the <em>tail</em> of other threads' deques when idle. This reduces
+                    contention and keeps all threads busy. ForkJoinPool outperforms fixed pools for
+                    recursive divide-and-conquer tasks where subtask counts are high and tasks are
+                    short. For independent tasks of similar duration, a fixed pool is simpler and
+                    equally efficient.</p>
+
+                    <p><strong>Q: How do you handle uncaught exceptions in scheduled tasks?</strong><br>
+                    An uncaught exception in a <code>scheduleAtFixedRate</code> task silently cancels
+                    all future executions — the <code>ScheduledFuture</code> completes exceptionally
+                    and no more executions are scheduled. The fix: wrap the task body in a
+                    try-catch that logs and does NOT rethrow. To detect silent cancellation, call
+                    <code>future.get()</code> periodically — it will throw <code>ExecutionException</code>
+                    if the task failed. In Spring, <code>@Scheduled</code> with
+                    <code>TaskSchedulerCustomizer</code> can configure a global error handler.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="multithreading.html" class="related-link">
+                        <span class="related-icon">🧵</span>Multithreading &amp; Concurrency
+                    </a>
+                    <a href="synchronization.html" class="related-link">
+                        <span class="related-icon">🔒</span>Synchronisation Mechanisms
+                    </a>
+                    <a href="../fundamentals/lambda-streams.html" class="related-link">
+                        <span class="related-icon">λ</span>Lambda &amp; Streams
+                    </a>
+                    <a href="jvm-internals.html" class="related-link">
+                        <span class="related-icon">🔬</span>JVM Internals
+                    </a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

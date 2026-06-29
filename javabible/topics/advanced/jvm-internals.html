@@ -1,589 +1,672 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.jvm.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JVM Internals - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / JVM Internals
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#advanced" data-i18n="nav.advanced">Advanced Java</a> /
+                JVM Internals
             </nav>
-            <h1>JVM Internals</h1>
-            <p class="topic-subtitle">How the Java Virtual Machine Works Under the Hood</p>
-            <a href="../../index.html" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.jvm.h1">JVM Internals</h1>
+            <p class="topic-subtitle" data-i18n="topic.jvm.subtitle">How Java code goes from source to execution — and what the JVM does at every step</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is the JVM?</h2>
-            <p>Imagine you write a letter in English, but your friend only reads Spanish. You need a translator! The <strong>JVM (Java Virtual Machine)</strong> is like that translator - it takes your Java code (bytecode) and translates it into instructions the computer's processor can understand.</p>
+    <div class="topic-layout">
 
-            <h3>Real-World Analogy: Universal Remote Control</h3>
-            <p>A universal remote can control any TV brand - Samsung, LG, Sony. You press the same button (bytecode), and the remote translates it to commands each TV understands. The JVM is like that universal remote for computers!</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <ul>
-                <li><strong>Your code:</strong> The button you press (bytecode)</li>
-                <li><strong>JVM:</strong> The universal remote (translator)</li>
-                <li><strong>Different computers:</strong> Different TV brands</li>
-                <li><strong>Result:</strong> Same action on all devices!</li>
-            </ul>
+        <main class="topic-content">
 
-            <h3>Why JVM Matters - Write Once, Run Anywhere (WORA)</h3>
-            <pre><code><span class="comment">Without JVM (Old way):</span>
-MyProgram.java → Compile for Windows → Windows.exe
-MyProgram.java → Compile for Mac → Mac.app
-MyProgram.java → Compile for Linux → Linux.bin
-<span class="comment">Problem: Need 3 different versions!</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — JDK vs JRE vs JVM
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JDK, JRE, JVM — What Each One Is</h2>
+                <p>These three terms are used interchangeably in conversation but refer to very
+                    different things. Confusing them in an interview is a red flag.</p>
 
-<span class="comment">With JVM (Java way):</span>
-MyProgram.java → Compile ONCE → MyProgram.class (bytecode)
-                          ↓
-        ┌─────────────────┼─────────────────┐
-        ↓                 ↓                 ↓
-    JVM (Windows)    JVM (Mac)        JVM (Linux)
-        ↓                 ↓                 ↓
-    Runs on Windows  Runs on Mac      Runs on Linux
+                <pre><code><span class="comment">/*
+ *  ┌─────────────────────────────────────────────────────────────┐
+ *  │  JDK  (Java Development Kit)                                │
+ *  │                                                             │
+ *  │  Everything you need to WRITE and BUILD Java programs.      │
+ *  │  Install this on your development machine.                  │
+ *  │                                                             │
+ *  │  Includes:                                                  │
+ *  │  • javac    — the compiler (.java → .class)                │
+ *  │  • java     — the launcher (runs .class files)             │
+ *  │  • jar      — packages .class files into .jar archives     │
+ *  │  • javadoc  — generates HTML docs from Javadoc comments    │
+ *  │  • jshell   — REPL for interactive Java (Java 9+)          │
+ *  │  • jconsole / jvisualvm — profiling and monitoring tools   │
+ *  │  • JRE  (see below)                                        │
+ *  │                                                             │
+ *  │  ┌─────────────────────────────────────────────────────┐   │
+ *  │  │  JRE  (Java Runtime Environment)                    │   │
+ *  │  │                                                     │   │
+ *  │  │  Everything you need to RUN a compiled Java program.│   │
+ *  │  │  Install this on production servers / end-user PCs. │   │
+ *  │  │  (Since Java 11, JRE is no longer distributed       │   │
+ *  │  │   separately — you install the JDK everywhere.)     │   │
+ *  │  │                                                     │   │
+ *  │  │  Includes:                                          │   │
+ *  │  │  • Standard library (java.lang, java.util, …)      │   │
+ *  │  │  • JVM  (see below)                                │   │
+ *  │  │                                                     │   │
+ *  │  │  ┌───────────────────────────────────────────────┐ │   │
+ *  │  │  │  JVM  (Java Virtual Machine)                  │ │   │
+ *  │  │  │                                               │ │   │
+ *  │  │  │  The engine that actually EXECUTES bytecode.  │ │   │
+ *  │  │  │  Platform-specific: there's a Windows JVM,    │ │   │
+ *  │  │  │  a Linux JVM, a macOS JVM — each translates   │ │   │
+ *  │  │  │  the same bytecode to native instructions for │ │   │
+ *  │  │  │  that OS and CPU.                             │ │   │
+ *  │  │  │                                               │ │   │
+ *  │  │  │  The JVM is a specification (JVMS).           │ │   │
+ *  │  │  │  HotSpot (Oracle/OpenJDK) is its main         │ │   │
+ *  │  │  │  implementation. Others: GraalVM, OpenJ9.     │ │   │
+ *  │  │  └───────────────────────────────────────────────┘ │   │
+ *  │  └─────────────────────────────────────────────────────┘   │
+ *  └─────────────────────────────────────────────────────────────┘
+ */</span></code></pre>
 
-<span class="comment">Solution: Same .class file runs everywhere!</span></code></pre>
+                <table>
+                    <tr>
+                        <th>Component</th>
+                        <th>You need it to…</th>
+                        <th>Install on…</th>
+                    </tr>
+                    <tr>
+                        <td><strong>JDK</strong></td>
+                        <td>Write, compile, run, debug Java code</td>
+                        <td>Developer machines, CI/CD servers</td>
+                    </tr>
+                    <tr>
+                        <td><strong>JRE</strong></td>
+                        <td>Run pre-compiled Java programs</td>
+                        <td>Production (Java 8/11 era — now just install JDK)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>JVM</strong></td>
+                        <td>Execute bytecode (part of JRE/JDK)</td>
+                        <td>Always bundled — not installed separately</td>
+                    </tr>
+                </table>
 
-            <p><strong>The Promise:</strong> "Write once, run anywhere" - compile your Java code once, and it runs on any device with a JVM!</p>
-        </section>
+                <div class="info-box note">
+                    <div class="info-box-title">JVM is a specification, not a single program</div>
+                    <p>The <em>Java Virtual Machine Specification</em> defines the instruction
+                        set, memory model, and behaviour. <strong>HotSpot</strong> (OpenJDK/Oracle)
+                        is the reference implementation — what virtually everyone runs. But
+                        <strong>GraalVM</strong> is another full JVM implementation that also
+                        supports ahead-of-time compilation to native binaries. <strong>OpenJ9</strong>
+                        (Eclipse/IBM) is optimised for lower memory footprint in containers.
+                        All of them run the same bytecode.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>JVM Architecture - The Big Picture</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — FROM SOURCE TO EXECUTION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>From Source Code to Execution — The Full Journey</h2>
+                <p>What actually happens from the moment you type <code>java MyApp</code> to the
+                    first instruction executing. Every step below happens in order, every time.</p>
 
-            <pre><code><span class="comment">┌──────────────────────────────────────────────┐</span>
-<span class="comment">│         YOUR JAVA APPLICATION                │</span>
-<span class="comment">│         (MyProgram.java source code)         │</span>
-<span class="comment">└──────────────────────────────────────────────┘</span>
-                     ↓ javac (Java Compiler)
-<span class="comment">┌──────────────────────────────────────────────┐</span>
-<span class="comment">│         BYTECODE (MyProgram.class)           │</span>
-<span class="comment">│    Platform-independent instructions         │</span>
-<span class="comment">└──────────────────────────────────────────────┘</span>
-                     ↓
-<span class="comment">┌──────────────────────────────────────────────┐</span>
-<span class="comment">│         JVM (Java Virtual Machine)           │</span>
-<span class="comment">│                                              │</span>
-<span class="comment">│  ┌────────────────────────────────────────┐  │</span>
-<span class="comment">│  │  CLASS LOADER SUBSYSTEM                │  │</span>
-<span class="comment">│  │  • Loads .class files                  │  │</span>
-<span class="comment">│  │  • Verifies bytecode                   │  │</span>
-<span class="comment">│  │  • Prepares classes                    │  │</span>
-<span class="comment">│  └────────────────────────────────────────┘  │</span>
-<span class="comment">│                                              │</span>
-<span class="comment">│  ┌────────────────────────────────────────┐  │</span>
-<span class="comment">│  │  RUNTIME DATA AREAS (Memory)           │  │</span>
-<span class="comment">│  │  • Heap: Objects live here             │  │</span>
-<span class="comment">│  │  • Stack: Method calls                 │  │</span>
-<span class="comment">│  │  • Method Area: Class data             │  │</span>
-<span class="comment">│  │  • PC Register: Instruction pointer    │  │</span>
-<span class="comment">│  └────────────────────────────────────────┘  │</span>
-<span class="comment">│                                              │</span>
-<span class="comment">│  ┌────────────────────────────────────────┐  │</span>
-<span class="comment">│  │  EXECUTION ENGINE                      │  │</span>
-<span class="comment">│  │  • Interpreter: Runs bytecode          │  │</span>
-<span class="comment">│  │  • JIT Compiler: Optimizes hot code    │  │</span>
-<span class="comment">│  │  • Garbage Collector: Cleans memory    │  │</span>
-<span class="comment">│  └────────────────────────────────────────┘  │</span>
-<span class="comment">│                                              │</span>
-<span class="comment">│  ┌────────────────────────────────────────┐  │</span>
-<span class="comment">│  │  NATIVE METHOD INTERFACE (JNI)         │  │</span>
-<span class="comment">│  │  Calls to C/C++ libraries              │  │</span>
-<span class="comment">│  └────────────────────────────────────────┘  │</span>
-<span class="comment">└──────────────────────────────────────────────┘</span>
-                     ↓
-<span class="comment">┌──────────────────────────────────────────────┐</span>
-<span class="comment">│     OPERATING SYSTEM (Windows/Mac/Linux)     │</span>
-<span class="comment">└──────────────────────────────────────────────┘</span>
-                     ↓
-<span class="comment">┌──────────────────────────────────────────────┐</span>
-<span class="comment">│         HARDWARE (CPU, RAM, Disk)            │</span>
-<span class="comment">└──────────────────────────────────────────────┘</span></code></pre>
+                <pre><code><span class="comment">/*
+ *  STEP 1: You write source code
+ *  ─────────────────────────────────────────────────────────────
+ *  MyApp.java  (human-readable text file)
+ *
+ *
+ *  STEP 2: javac compiles to bytecode
+ *  ─────────────────────────────────────────────────────────────
+ *  $ javac MyApp.java
+ *
+ *  javac reads MyApp.java, checks types, resolves imports,
+ *  and produces MyApp.class — a binary file containing bytecode:
+ *  platform-independent instructions for the JVM.
+ *
+ *  Bytecode is NOT machine code. A CPU can't execute it directly.
+ *  It's an intermediate representation designed for the JVM.
+ *
+ *
+ *  STEP 3: java launcher starts the JVM process
+ *  ─────────────────────────────────────────────────────────────
+ *  $ java MyApp
+ *
+ *  The OS creates a new process. The JVM executable loads into RAM.
+ *  The JVM initialises its internal memory areas (see next section).
+ *  The main thread is created and its stack is allocated.
+ *
+ *
+ *  STEP 4: Class Loader loads MyApp.class
+ *  ─────────────────────────────────────────────────────────────
+ *  The JVM needs MyApp before it can run main().
+ *
+ *  1. Bootstrap ClassLoader loads java.lang.* (String, Object…)
+ *     from the JDK's core modules — happens first, always.
+ *  2. Application ClassLoader searches the classpath for MyApp.class.
+ *  3. Bytecode is read from disk into the Method Area (Metaspace).
+ *  4. Bytecode verifier checks: is this valid and safe bytecode?
+ *     Malformed bytecode → VerifyError (JVM won't run it).
+ *  5. Static fields allocated and set to defaults (0, null, false).
+ *  6. Static blocks and field initialisers run (class initialisation).
+ *
+ *
+ *  STEP 5: main() is located and a stack frame is pushed
+ *  ─────────────────────────────────────────────────────────────
+ *  JVM finds: public static void main(String[] args)
+ *  Creates a stack frame on the main thread's stack.
+ *  The frame holds: local variables, operand stack, reference to
+ *  the constant pool, and the program counter (current instruction).
+ *
+ *
+ *  STEP 6: Execution — interpreter and JIT
+ *  ─────────────────────────────────────────────────────────────
+ *  The Execution Engine runs bytecode:
+ *
+ *  Initially: the interpreter executes bytecode instructions
+ *  one by one — simple, always correct, but slow.
+ *
+ *  Simultaneously: the JIT profiler counts how many times each
+ *  method is called. Methods called > threshold (C1: ~2000,
+ *  C2: ~10000 in HotSpot) are compiled to native machine code
+ *  and cached. Subsequent calls run at native speed.
+ *
+ *
+ *  STEP 7: GC runs in background
+ *  ─────────────────────────────────────────────────────────────
+ *  As objects are created on the heap and references are dropped,
+ *  the Garbage Collector identifies and reclaims unreachable objects.
+ *  GC runs on its own threads, pausing application threads as needed.
+ *
+ *
+ *  STEP 8: JVM shutdown
+ *  ─────────────────────────────────────────────────────────────
+ *  When main() returns (and no non-daemon threads remain),
+ *  the JVM runs shutdown hooks (registered via Runtime.addShutdownHook),
+ *  finalises resources, and exits — returning control to the OS.
+ */</span></code></pre>
 
-            <p><strong>Think of it like a restaurant:</strong></p>
-            <ul>
-                <li><strong>Class Loader:</strong> Waiter who brings ingredients (classes) from storage</li>
-                <li><strong>Memory Areas:</strong> Kitchen workspace (heap, stack, etc.)</li>
-                <li><strong>Execution Engine:</strong> Chef who cooks (executes) your code</li>
-                <li><strong>Garbage Collector:</strong> Dishwasher who cleans up unused items</li>
-            </ul>
-        </section>
+                <h3>Bytecode — what it looks like</h3>
+                <pre><code><span class="comment">// Java source</span>
+<span class="keyword">public static int</span> <span class="function">add</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) { <span class="keyword">return</span> a + b; }
 
-        <section class="content-section">
-            <h2>Component 1: Class Loader Subsystem</h2>
-            <p>The <strong>Class Loader</strong> is like a librarian who finds and organizes books (classes) when you need them.</p>
+<span class="comment">// Corresponding bytecode (javap -c MyClass)</span>
+<span class="comment">// public static int add(int, int);</span>
+<span class="comment">//   Code:</span>
+<span class="comment">//     0: iload_0    ← push local variable 0 (a) onto operand stack</span>
+<span class="comment">//     1: iload_1    ← push local variable 1 (b) onto operand stack</span>
+<span class="comment">//     2: iadd       ← pop two ints, push their sum</span>
+<span class="comment">//     3: ireturn    ← return top of operand stack as int</span>
 
-            <h3>Three Phases of Class Loading</h3>
+<span class="comment">// View bytecode yourself:</span>
+javap -c <span class="class-name">MyClass</span>.class     <span class="comment">// bytecode instructions</span>
+javap -verbose <span class="class-name">MyClass</span>.class <span class="comment">// full detail: constant pool, attributes</span></code></pre>
+            </section>
 
-            <h4>Phase 1: Loading - Finding the Class</h4>
-            <pre><code><span class="comment">// When you write:</span>
-<span class="class-name">MyClass</span> obj = <span class="keyword">new</span> <span class="class-name">MyClass</span>();
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — MEMORY AREAS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JVM Memory Areas</h2>
+                <pre><code><span class="comment">/*
+ *  JVM MEMORY LAYOUT
+ *  ═══════════════════════════════════════════════════════════════
+ *
+ *  ┌─────────────────────────────────────────────────────────────┐
+ *  │  METASPACE  (native memory — not in heap)                   │
+ *  │  Class metadata, method bytecode, constant pools,           │
+ *  │  static variables, vtables.                                 │
+ *  │  No fixed limit by default (can grow to exhaust native RAM).│
+ *  │  -XX:MaxMetaspaceSize=256m to cap it.                       │
+ *  │  Replaced PermGen (Java 7 and earlier).                     │
+ *  └─────────────────────────────────────────────────────────────┘
+ *
+ *  ┌─────────────────────────────────────────────────────────────┐
+ *  │  HEAP  (GC-managed, shared by all threads)                  │
+ *  │                                                             │
+ *  │  ┌───────────────────────┬─────────────────────────────┐   │
+ *  │  │  YOUNG GENERATION     │  OLD GENERATION (Tenured)   │   │
+ *  │  │                       │                             │   │
+ *  │  │  ┌──────┬──────┬────┐ │  Long-lived objects         │   │
+ *  │  │  │ Eden │ S0   │ S1 │ │  that survived many GCs     │   │
+ *  │  │  └──────┴──────┴────┘ │                             │   │
+ *  │  │  New objects born here│                             │   │
+ *  │  │  Minor GC runs here   │  Major/Full GC runs here    │   │
+ *  │  └───────────────────────┴─────────────────────────────┘   │
+ *  │                                                             │
+ *  │  -Xms = initial heap size    -Xmx = max heap size          │
+ *  └─────────────────────────────────────────────────────────────┘
+ *
+ *  ┌──────────────────────────────┐  (one per thread)
+ *  │  THREAD STACK                │
+ *  │  Stack frames (one per call) │
+ *  │  Local variables             │
+ *  │  Operand stack               │
+ *  │  Return address              │
+ *  │  -Xss = stack size per thread│
+ *  └──────────────────────────────┘
+ *
+ *  ┌────────────────────────────────────────────────────────────┐
+ *  │  CODE CACHE  (native memory)                               │
+ *  │  JIT-compiled native code — kept here for fast reuse       │
+ *  │  -XX:ReservedCodeCacheSize=256m to size it                 │
+ *  └────────────────────────────────────────────────────────────┘
+ */</span></code></pre>
 
-<span class="comment">// JVM thinks:</span>
-<span class="comment">"I need MyClass! Let me find it..."</span>
+                <h3>The call stack in detail</h3>
+                <pre><code><span class="comment">// Each method call creates a new stack frame.
+// Each frame contains: local variable table, operand stack, constant pool ref, PC.</span>
 
-<span class="comment">Steps:</span>
-<span class="comment">1. Search for MyClass.class file</span>
-<span class="comment">   • Check classpath</span>
-<span class="comment">   • Look in JAR files</span>
-<span class="comment">   • Search directories</span>
-<span class="comment">2. Read the .class file into memory</span>
-<span class="comment">3. Create a Class object representing MyClass</span>
-<span class="comment">4. Store it in Method Area</span></code></pre>
+<span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {   <span class="comment">// frame 1 pushed</span>
+    <span class="keyword">int</span> x = calculate(<span class="number">10</span>);                    <span class="comment">// calls calculate → frame 2 pushed</span>
+    <span class="class-name">System</span>.out.println(x);
+}
+<span class="keyword">static int</span> <span class="function">calculate</span>(<span class="keyword">int</span> n) {               <span class="comment">// frame 2</span>
+    <span class="keyword">return</span> multiply(n, <span class="number">2</span>);                    <span class="comment">// calls multiply → frame 3 pushed</span>
+}
+<span class="keyword">static int</span> <span class="function">multiply</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {          <span class="comment">// frame 3 — top of stack</span>
+    <span class="keyword">return</span> a * b;                              <span class="comment">// returns → frame 3 popped</span>
+}                                              <span class="comment">// frame 2 resumes → popped</span>
+                                               <span class="comment">// frame 1 resumes, prints, exits</span>
 
-            <h4>Phase 2: Linking - Verification, Preparation, Resolution</h4>
-            <pre><code><span class="comment">Verification (Security Check):</span>
-<span class="comment">  ✓ Is this valid bytecode?</span>
-<span class="comment">  ✓ Does it follow Java language rules?</span>
-<span class="comment">  ✓ Are there security violations?</span>
-<span class="comment">  ✓ Will it crash the JVM?</span>
-<span class="comment">  → If any check fails: ClassFormatError or VerifyError</span>
+<span class="comment">/*
+ *  Stack overflow = too many nested calls (usually infinite recursion):
+ *  java.lang.StackOverflowError
+ *
+ *  Each frame costs memory. Default stack is 512KB–1MB.
+ *  Deep recursion (e.g. tree traversal on large graphs) may need: -Xss4m
+ *  Better: convert to iteration with an explicit Deque<> stack.
+ */</span></code></pre>
 
-<span class="comment">Preparation (Memory Allocation):</span>
-<span class="comment">  • Allocate memory for static variables</span>
-<span class="comment">  • Set default values:</span>
-<span class="comment">    - Numbers (int, long, etc.) → 0</span>
-<span class="comment">    - boolean → false</span>
-<span class="comment">    - References (Object, String, etc.) → null</span>
+                <h3>Heap generational layout — why it matters</h3>
+                <pre><code><span class="comment">/*
+ *  The generational hypothesis: most objects die young.
+ *  Java exploits this by dividing the heap into generations.
+ *
+ *  Object lifecycle:
+ *
+ *  1. new Person()  →  allocated in Eden (Young Gen)
+ *
+ *  2. Minor GC fires (Young Gen full):
+ *     - Live objects copied to Survivor space (S0 or S1)
+ *     - Dead objects reclaimed immediately (no scanning Old Gen)
+ *     - Very fast: typically < 100ms
+ *
+ *  3. Objects that survive N minor GCs (default: 15)
+ *     are promoted to Old Gen (Tenured).
+ *
+ *  4. Major/Full GC fires (Old Gen nearly full):
+ *     - Scans entire heap
+ *     - Much slower: can be seconds for large heaps
+ *     - Stop-the-world pauses hurt latency
+ *
+ *  5. Modern GCs (G1, ZGC, Shenandoah) reduce stop-the-world
+ *     by doing most work concurrently with application threads.
+ */</span>
 
-<span class="comment">Resolution (Link References):</span>
-<span class="comment">  • Convert symbolic names to actual memory addresses</span>
-<span class="comment">  • Example: "MyClass.method()" → actual method location</span></code></pre>
+<span class="comment">// Key JVM flags for heap tuning</span>
+-<span class="class-name">Xms512m</span>                      <span class="comment">// initial heap size</span>
+-<span class="class-name">Xmx4g</span>                        <span class="comment">// max heap size (set equal to Xms to avoid resize)</span>
+-<span class="class-name">XX</span>:NewRatio=<span class="number">3</span>                 <span class="comment">// Old:Young ratio (3 = 75% old, 25% young)</span>
+-<span class="class-name">XX</span>:MaxRAMPercentage=<span class="number">75.0</span>      <span class="comment">// use 75% of container RAM (critical in Kubernetes)</span>
+-<span class="class-name">XX</span>:+UseZGC                    <span class="comment">// use ZGC (sub-ms pauses, Java 15+)</span></code></pre>
+            </section>
 
-            <h4>Phase 3: Initialization - Running Static Code</h4>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">Example</span> {
-    <span class="keyword">static int</span> count = <span class="number">10</span>;  <span class="comment">// Step 2: Initialize to 10</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — CLASS LOADING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Class Loading</h2>
+                <p>Classes are loaded lazily — the JVM loads a class the first time something
+                    needs it, not at startup. Class loading happens in three phases.</p>
+
+                <pre><code><span class="comment">/*
+ *  PHASE 1: LOADING
+ *  Find the .class file (on classpath, in a JAR, from network, from DB…),
+ *  read the bytes, and create a java.lang.Class object in Metaspace.
+ *
+ *  PHASE 2: LINKING
+ *  (a) Verification: bytecode verifier checks structural validity.
+ *      Is the constant pool consistent? Do type references resolve?
+ *      Is there any stack under/overflow? → VerifyError if not.
+ *
+ *  (b) Preparation: allocate storage for static fields in Metaspace
+ *      and set them to their JVM defaults (0, null, false).
+ *      NOT the initialiser values yet.
+ *
+ *  (c) Resolution: replace symbolic references (class names, method names)
+ *      in the constant pool with direct memory references.
+ *      Can be lazy (deferred until first use) or eager.
+ *
+ *  PHASE 3: INITIALISATION
+ *  Run the class initialiser: static field initialisers and static blocks,
+ *  in textual order. Only one thread initialises a class — the JVM
+ *  guarantees this and uses a lock on the Class object.
+ */</span>
+
+<span class="keyword">class</span> <span class="class-name">Config</span> {
+    <span class="keyword">static</span> <span class="keyword">int</span>    timeout = <span class="number">30</span>;                <span class="comment">// Prep: 0 → Init: 30</span>
+    <span class="keyword">static</span> <span class="class-name">String</span> host;                          <span class="comment">// Prep: null</span>
 
     <span class="keyword">static</span> {
-        <span class="class-name">System</span>.out.println(<span class="string">"Static block!"</span>);  <span class="comment">// Step 3: Execute this</span>
-        count = <span class="number">20</span>;  <span class="comment">// Step 4: Set to 20</span>
-    }
-
-    <span class="keyword">static int</span> doubled = count * <span class="number">2</span>;  <span class="comment">// Step 5: doubled = 40</span>
-}
-
-<span class="comment">// First time Example is used:</span>
-<span class="comment">// Step 1: count = 0 (default from Preparation)</span>
-<span class="comment">// Step 2: count = 10 (initialization)</span>
-<span class="comment">// Step 3: Static block executes → prints "Static block!"</span>
-<span class="comment">// Step 4: count = 20</span>
-<span class="comment">// Step 5: doubled = 40 (20 * 2)</span>
-
-<span class="class-name">System</span>.out.println(<span class="class-name">Example</span>.count);    <span class="comment">// 20</span>
-<span class="class-name">System</span>.out.println(<span class="class-name">Example</span>.doubled);  <span class="comment">// 40</span></code></pre>
-
-            <h3>Class Loader Hierarchy - Parent Delegation Model</h3>
-            <pre><code><span class="comment">┌──────────────────────────────┐</span>
-<span class="comment">│  Bootstrap Class Loader      │  ← Written in C++</span>
-<span class="comment">│  Loads: rt.jar, core classes │     java.lang.*</span>
-<span class="comment">│  (String, Object, System)    │     java.util.*</span>
-<span class="comment">└──────────────────────────────┘</span>
-            ↓ parent
-<span class="comment">┌──────────────────────────────┐</span>
-<span class="comment">│  Extension Class Loader      │  ← Loads extensions</span>
-<span class="comment">│  Loads: jre/lib/ext/*.jar    │     Optional packages</span>
-<span class="comment">└──────────────────────────────┘</span>
-            ↓ parent
-<span class="comment">┌──────────────────────────────┐</span>
-<span class="comment">│  Application Class Loader    │  ← Your application</span>
-<span class="comment">│  Loads: CLASSPATH classes    │     MyClass.class</span>
-<span class="comment">│  Your .class files, libs     │     third-party JARs</span>
-<span class="comment">└──────────────────────────────┘</span>
-
-<span class="comment">Parent Delegation:</span>
-<span class="comment">1. Application ClassLoader asked to load MyClass</span>
-<span class="comment">2. Delegates to Extension ClassLoader (parent)</span>
-<span class="comment">3. Extension delegates to Bootstrap (grandparent)</span>
-<span class="comment">4. Bootstrap tries, doesn't find it</span>
-<span class="comment">5. Extension tries, doesn't find it</span>
-<span class="comment">6. Application tries, finds and loads it!</span>
-
-<span class="comment">Why? Security! Core classes (String, Object) always</span>
-<span class="comment">loaded by Bootstrap - you can't replace them!</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Component 2: Runtime Data Areas (Memory)</h2>
-
-            <h3>1. Heap - Where Objects Live</h3>
-            <p>The <strong>Heap</strong> is like a warehouse where all your objects are stored. It's shared by all threads.</p>
-
-            <pre><code><span class="keyword">public class</span> <span class="class-name">MemoryDemo</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="class-name">Person</span> alice = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Alice"</span>, <span class="number">25</span>);  <span class="comment">// Created in HEAP</span>
-        <span class="class-name">Person</span> bob = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Bob"</span>, <span class="number">30</span>);    <span class="comment">// Created in HEAP</span>
-
-        <span class="class-name">String</span> message = <span class="string">"Hello"</span>;  <span class="comment">// String in HEAP (String pool)</span>
-        <span class="keyword">int</span>[] numbers = {<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>};  <span class="comment">// Array in HEAP</span>
+        host = <span class="class-name">System</span>.getenv(<span class="string">"HOST"</span>);          <span class="comment">// Init: read env var</span>
+        <span class="keyword">if</span> (host == <span class="keyword">null</span>) host = <span class="string">"localhost"</span>;   <span class="comment">// default</span>
     }
 }
+<span class="comment">// Config is initialised ONCE, on first reference, thread-safely.
+// All subsequent accesses see the fully initialised state.</span></code></pre>
 
-<span class="comment">HEAP Memory Visualization:</span>
-<span class="comment">┌───────────────────────────────┐</span>
-<span class="comment">│ HEAP (Shared by all threads) │</span>
-<span class="comment">├───────────────────────────────┤</span>
-<span class="comment">│ Person object                 │</span>
-<span class="comment">│ name: "Alice"                 │  ← alice variable points here</span>
-<span class="comment">│ age: 25                       │</span>
-<span class="comment">├───────────────────────────────┤</span>
-<span class="comment">│ Person object                 │</span>
-<span class="comment">│ name: "Bob"                   │  ← bob variable points here</span>
-<span class="comment">│ age: 30                       │</span>
-<span class="comment">├───────────────────────────────┤</span>
-<span class="comment">│ String: "Hello"               │  ← message variable points here</span>
-<span class="comment">├───────────────────────────────┤</span>
-<span class="comment">│ int[] {1, 2, 3}               │  ← numbers variable points here</span>
-<span class="comment">└───────────────────────────────┘</span></code></pre>
+                <h3>ClassLoader hierarchy and parent delegation</h3>
+                <pre><code><span class="comment">/*
+ *  Bootstrap ClassLoader  (C++, part of JVM itself)
+ *  │  Loads: java.lang.*, java.util.*, etc. from the JDK modules
+ *  │  Has no parent. Returns null when asked for its parent.
+ *  │
+ *  ├── Platform ClassLoader  (was Extension CL, renamed Java 9+)
+ *  │   Loads: java.se modules, optional/extension modules
+ *  │
+ *  └── Application ClassLoader
+ *      Loads: everything on your --classpath / --module-path
+ *      Your .class files, your JAR dependencies
+ *
+ *  Parent delegation: when asked to load com.example.Foo,
+ *  Application CL first asks Platform CL, who asks Bootstrap CL.
+ *  Bootstrap says "not mine" → Platform says "not mine"
+ *  → Application finds and loads it.
+ *
+ *  Why: prevents you from accidentally (or maliciously) replacing
+ *  core classes like java.lang.String with your own version.
+ *
+ *  Custom ClassLoader: used by frameworks (Spring, OSGi, hot-reload)
+ *  to load classes from non-standard locations or isolate plugins.
+ */</span>
 
-            <h3>2. Stack - Method Call Stack (Thread-Specific)</h3>
-            <p>Each thread gets its own <strong>Stack</strong> - like a stack of plates. Methods are added on top (push) and removed (pop) in LIFO order.</p>
+<span class="comment">// Inspect the ClassLoader chain</span>
+<span class="class-name">Class</span>&lt;?&gt; cls = <span class="class-name">String</span>.<span class="keyword">class</span>;
+cls.getClassLoader();        <span class="comment">// null — Bootstrap loaded it</span>
 
-            <pre><code><span class="keyword">public class</span> <span class="class-name">StackDemo</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {  <span class="comment">// Frame 1</span>
-        <span class="keyword">int</span> x = <span class="number">10</span>;
-        <span class="keyword">int</span> result = calculate(x);
-        <span class="class-name">System</span>.out.println(result);
-    }
+<span class="class-name">Class</span>&lt;?&gt; mine = <span class="class-name">MyApp</span>.<span class="keyword">class</span>;
+mine.getClassLoader();       <span class="comment">// jdk.internal.loader.ClassLoaders$AppClassLoader</span>
+mine.getClassLoader().getParent();  <span class="comment">// PlatformClassLoader</span></code></pre>
+            </section>
 
-    <span class="keyword">public static int</span> <span class="function">calculate</span>(<span class="keyword">int</span> a) {  <span class="comment">// Frame 2</span>
-        <span class="keyword">int</span> b = <span class="number">20</span>;
-        <span class="keyword">return</span> multiply(a, b);
-    }
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — EXECUTION ENGINE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Execution Engine — Interpreter, JIT, and Tiered Compilation</h2>
 
-    <span class="keyword">public static int</span> <span class="function">multiply</span>(<span class="keyword">int</span> p, <span class="keyword">int</span> q) {  <span class="comment">// Frame 3</span>
-        <span class="keyword">int</span> result = p * q;
-        <span class="keyword">return</span> result;
-    }
-}
+                <pre><code><span class="comment">/*
+ *  HotSpot uses TIERED COMPILATION — four tiers:
+ *
+ *  Tier 0: Interpreter
+ *    Executes bytecode directly. No compilation overhead.
+ *    Slow (~10x native), but starts immediately.
+ *    Profiler data collected here.
+ *
+ *  Tier 1-3: C1 compiler (client compiler)
+ *    Triggered after ~2,000 invocations (configurable).
+ *    Fast compilation, limited optimisations.
+ *    Good for: methods that are called often but not CPU-critical.
+ *    Still collects profiling data.
+ *
+ *  Tier 4: C2 compiler (server compiler)
+ *    Triggered after ~10,000-15,000 invocations.
+ *    Slow to compile, aggressive optimisations.
+ *    Produces highly optimised native code.
+ *    Used for "hot" methods — the real performance gain.
+ *
+ *  The path: interpreted → C1 (with profiling) → C2 (optimised)
+ */</span>
 
-<span class="comment">STACK Evolution (Thread's Stack):</span>
+<span class="comment">// See JIT compilation in action:</span>
+java -XX:+PrintCompilation <span class="class-name">MyApp</span>
+<span class="comment">// Output like: 42   3       4  java.util.HashMap::hash (20 bytes)
+//              ^    ^    ^  ^      method name             size
+//         stamp  id tier  </span>
+<span class="comment">// tier 4 = C2 compiled</span>
 
-<span class="comment">Step 1: main() starts</span>
-<span class="comment">┌─────────────────────┐</span>
-<span class="comment">│ main()              │  ← Current execution</span>
-<span class="comment">│ x = 10              │</span>
-<span class="comment">│ result = ?          │</span>
-<span class="comment">└─────────────────────┘</span>
+<span class="comment">// Force interpretation (disable JIT) — for reproducible benchmarking:</span>
+java -Xint <span class="class-name">MyApp</span>
 
-<span class="comment">Step 2: calculate() called</span>
-<span class="comment">┌─────────────────────┐</span>
-<span class="comment">│ calculate()         │  ← Current execution</span>
-<span class="comment">│ a = 10              │</span>
-<span class="comment">│ b = 20              │</span>
-<span class="comment">├─────────────────────┤</span>
-<span class="comment">│ main()              │</span>
-<span class="comment">│ x = 10              │</span>
-<span class="comment">│ result = ?          │</span>
-<span class="comment">└─────────────────────┘</span>
+<span class="comment">// Force all compilation at start (AOT-like warm-up trick):</span>
+java -XX:CompileThreshold=<span class="number">1</span> <span class="class-name">MyApp</span></code></pre>
 
-<span class="comment">Step 3: multiply() called</span>
-<span class="comment">┌─────────────────────┐</span>
-<span class="comment">│ multiply()          │  ← Current execution</span>
-<span class="comment">│ p = 10, q = 20      │</span>
-<span class="comment">│ result = 200        │</span>
-<span class="comment">├─────────────────────┤</span>
-<span class="comment">│ calculate()         │</span>
-<span class="comment">│ a = 10, b = 20      │</span>
-<span class="comment">├─────────────────────┤</span>
-<span class="comment">│ main()              │</span>
-<span class="comment">│ x = 10              │</span>
-<span class="comment">│ result = ?          │</span>
-<span class="comment">└─────────────────────┘</span>
+                <h3>Key JIT optimisations</h3>
+                <pre><code><span class="comment">/*
+ *  INLINING: the most impactful optimisation.
+ *  Small methods are inlined into callers — eliminates call overhead
+ *  and enables further optimisations on the combined code.
+ *  Default threshold: 35 bytecodes (-XX:MaxInlineSize=35).
+ *
+ *  ESCAPE ANALYSIS: if an object doesn't "escape" the method
+ *  (no reference stored outside it), the JIT can allocate it on the
+ *  stack instead of the heap — or eliminate it entirely.
+ *
+ *  Example: StringBuilder in string concatenation is often eliminated.
+ *
+ *  NULL CHECKS ELISION: after a null check, the JIT removes subsequent
+ *  checks on the same reference within the same scope.
+ *
+ *  DEVIRTUALISATION: if profiling shows that a virtual call always
+ *  goes to one concrete implementation, the JIT replaces it with a
+ *  direct call (and inlines it). Falls back if a new subclass appears.
+ *
+ *  LOOP UNROLLING / VECTORISATION: loops over arrays are transformed
+ *  to use SIMD CPU instructions (via Java's Vector API, Java 17+).
+ *
+ *  DEOPTIMISATION: if an assumption (e.g. "only one subclass") becomes
+ *  invalid, the JIT reverts to interpreted mode — "bails out" — and
+ *  recompiles with updated profile data.
+ */</span></code></pre>
+            </section>
 
-<span class="comment">Step 4: multiply() returns 200, frame popped</span>
-<span class="comment">┌─────────────────────┐</span>
-<span class="comment">│ calculate()         │  ← Current execution</span>
-<span class="comment">│ a = 10, b = 20      │</span>
-<span class="comment">│ return value: 200   │</span>
-<span class="comment">├─────────────────────┤</span>
-<span class="comment">│ main()              │</span>
-<span class="comment">│ x = 10              │</span>
-<span class="comment">│ result = ?          │</span>
-<span class="comment">└─────────────────────┘</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — GC OVERVIEW
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Garbage Collection — Overview</h2>
+                <p>The GC's job: find objects that are no longer reachable from any live thread
+                    and reclaim their memory. The challenge: doing this without pausing the
+                    application for too long.</p>
 
-<span class="comment">Step 5: calculate() returns 200, frame popped</span>
-<span class="comment">┌─────────────────────┐</span>
-<span class="comment">│ main()              │  ← Current execution</span>
-<span class="comment">│ x = 10              │</span>
-<span class="comment">│ result = 200        │  ✓ Got the result!</span>
-<span class="comment">└─────────────────────┘</span>
+                <pre><code><span class="comment">/*
+ *  GC ROOTS — starting points for reachability tracing:
+ *  • Local variables and parameters on thread stacks
+ *  • Static fields of loaded classes
+ *  • JNI references (native code holding Java objects)
+ *
+ *  REACHABILITY ALGORITHM (mark phase):
+ *  Start from all GC roots, follow every reference.
+ *  Any object you reach = LIVE. Everything else = DEAD.
+ *
+ *  COLLECTION ALGORITHM (sweep/compact):
+ *  Varies by GC: copy survivors, compact in-place, or mark-and-sweep.
+ */</span>
 
-<span class="comment">Step 6: main() finishes, stack empty, program ends</span></code></pre>
+<span class="comment">// GC algorithms available in modern JVMs:</span>
+-<span class="class-name">XX</span>:+UseSerialGC        <span class="comment">// single-threaded, tiny footprint — embedded only</span>
+-<span class="class-name">XX</span>:+UseG1GC            <span class="comment">// default since Java 9: balanced throughput+latency</span>
+-<span class="class-name">XX</span>:+UseZGC             <span class="comment">// Java 15+ production: sub-ms pauses, any heap size</span>
+-<span class="class-name">XX</span>:+UseShenandoahGC    <span class="comment">// Red Hat: similar goals to ZGC</span>
+-<span class="class-name">XX</span>:+UseParallelGC      <span class="comment">// max throughput, larger pauses — batch jobs</span>
 
-            <h3>What Goes in Stack vs Heap?</h3>
-            <table>
-                <tr>
-                    <th>Stack</th>
-                    <th>Heap</th>
-                </tr>
-                <tr>
-                    <td>Local variables (primitives)</td>
-                    <td>Objects (new keyword)</td>
-                </tr>
-                <tr>
-                    <td>Method parameters</td>
-                    <td>Instance variables</td>
-                </tr>
-                <tr>
-                    <td>Method call information</td>
-                    <td>Arrays</td>
-                </tr>
-                <tr>
-                    <td>References to objects</td>
-                    <td>Strings</td>
-                </tr>
-                <tr>
-                    <td>Fast access (LIFO)</td>
-                    <td>Slower access (GC managed)</td>
-                </tr>
-                <tr>
-                    <td>Thread-specific</td>
-                    <td>Shared by all threads</td>
-                </tr>
-                <tr>
-                    <td>Automatic cleanup (pop)</td>
-                    <td>Garbage Collector cleanup</td>
-                </tr>
-            </table>
+<span class="comment">// G1 tuning — the most common production choice:</span>
+-<span class="class-name">XX</span>:MaxGCPauseMillis=<span class="number">200</span>   <span class="comment">// target pause goal (not a hard guarantee)</span>
+-<span class="class-name">XX</span>:G1HeapRegionSize=<span class="number">16m</span>   <span class="comment">// region size (1MB–32MB, power of 2)</span>
 
-            <h3>3. Method Area (Metaspace in Java 8+)</h3>
-            <p>Stores class-level information shared by all threads.</p>
+<span class="comment">// Enable GC logging (essential in production):</span>
+-<span class="class-name">Xlog</span>:gc*:file=/var/log/app-gc.log:time,uptime:filecount=<span class="number">5</span>,filesize=<span class="number">20m</span></code></pre>
 
-            <pre><code><span class="comment">Method Area contains:</span>
-<span class="comment">• Class structure (name, parent, interfaces)</span>
-<span class="comment">• Method bytecode</span>
-<span class="comment">• Static variables</span>
-<span class="comment">• Constant pool (string literals, constants)</span>
-<span class="comment">• Field information (names, types)</span>
+                <div class="info-box tip">
+                    <div class="info-box-title">GC selection guide (2026)</div>
+                    <p><strong>Default (most services):</strong> G1GC — good balance, well understood.<br>
+                    <strong>Latency-sensitive (trading, gaming, real-time):</strong> ZGC — pauses under 1ms regardless of heap size.<br>
+                    <strong>Throughput-first (batch, analytics):</strong> ParallelGC — maximises work done, longer pauses acceptable.<br>
+                    <strong>Microservices in containers:</strong> ZGC or G1 with <code>-XX:MaxRAMPercentage=75</code>.<br>
+                    <strong>Virtual threads (Java 21):</strong> More short-lived objects from continuations — ZGC handles this better than G1 at scale.</p>
+                </div>
+            </section>
 
-<span class="keyword">public class</span> <span class="class-name">Example</span> {
-    <span class="keyword">static int</span> count = <span class="number">0</span>;  <span class="comment">// Stored in Method Area</span>
-    <span class="keyword">static final</span> <span class="class-name">String</span> APP_NAME = <span class="string">"MyApp"</span>;  <span class="comment">// Method Area</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — ESSENTIAL JVM FLAGS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Essential JVM Flags for Production</h2>
 
-    <span class="keyword">public void</span> <span class="function">doWork</span>() {  <span class="comment">// Bytecode stored in Method Area</span>
-        <span class="comment">// method body...</span>
-    }
-}</code></pre>
+                <pre><code><span class="comment"># ── Memory ──────────────────────────────────────────────────────</span>
+-Xms2g -Xmx2g          <span class="comment"># Fix heap size (avoids resize pauses) — set equal in prod</span>
+-XX:MaxRAMPercentage=75 <span class="comment"># Container-aware: use 75% of container limit (Java 10+)</span>
+-XX:MaxMetaspaceSize=256m <span class="comment"># Cap Metaspace growth (prevent OOM from class leaks)</span>
+-Xss512k               <span class="comment"># Reduce stack per thread (default 1MB) — more threads in RAM</span>
 
-            <h3>4. Program Counter (PC) Register</h3>
-            <p>Keeps track of which instruction to execute next - like a bookmark in a book.</p>
+<span class="comment"># ── GC ──────────────────────────────────────────────────────────</span>
+-XX:+UseZGC            <span class="comment"># Low-latency GC (Java 15+ production, Java 21 gen ZGC)</span>
+-XX:+UseG1GC           <span class="comment"># Balanced default (Java 9+)</span>
+-XX:MaxGCPauseMillis=100 <span class="comment"># G1 pause target</span>
+-Xlog:gc*:file=gc.log  <span class="comment"># GC log — must-have for production diagnosis</span>
 
-            <h3>5. Native Method Stack</h3>
-            <p>For methods written in other languages (C/C++) accessed via JNI (Java Native Interface).</p>
-        </section>
+<span class="comment"># ── Diagnostics ─────────────────────────────────────────────────</span>
+-XX:+HeapDumpOnOutOfMemoryError  <span class="comment"># Dump heap on OOM — essential for post-mortem</span>
+-XX:HeapDumpPath=/dumps/oom.hprof
+-XX:+ExitOnOutOfMemoryError      <span class="comment"># Kill JVM on OOM (let k8s restart it) — safer than limping</span>
+-XX:+PrintFlagsFinal -version    <span class="comment"># Print all JVM flags — use for auditing defaults</span>
 
-        <section class="content-section">
-            <h2>Component 3: Execution Engine</h2>
+<span class="comment"># ── JIT ─────────────────────────────────────────────────────────</span>
+-XX:ReservedCodeCacheSize=256m  <span class="comment"># Code cache for JIT-compiled methods</span>
+-XX:+TieredCompilation          <span class="comment"># Default on Java 8+ — use C1+C2 tiered</span>
 
-            <h3>1. Interpreter - Line-by-Line Execution</h3>
-            <p>Reads bytecode one instruction at a time and executes it. Simple but slow.</p>
+<span class="comment"># ── Container / Kubernetes ───────────────────────────────────────</span>
+-XX:+UseContainerSupport        <span class="comment"># Default on Java 10+ — reads cgroup CPU/memory limits</span>
+-XX:ActiveProcessorCount=2      <span class="comment"># Override if availableProcessors() is wrong</span></code></pre>
+            </section>
 
-            <pre><code><span class="comment">Your Java code:</span>
-<span class="keyword">int</span> x = <span class="number">5</span>;
-<span class="keyword">int</span> y = <span class="number">10</span>;
-<span class="keyword">int</span> sum = x + y;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-<span class="comment">Compiled to bytecode:</span>
-<span class="number">0</span>: bipush <span class="number">5</span>        <span class="comment">// Push 5 onto operand stack</span>
-<span class="number">2</span>: istore_1        <span class="comment">// Store in local variable 1 (x)</span>
-<span class="number">3</span>: bipush <span class="number">10</span>       <span class="comment">// Push 10 onto stack</span>
-<span class="number">5</span>: istore_2        <span class="comment">// Store in local variable 2 (y)</span>
-<span class="number">6</span>: iload_1         <span class="comment">// Load x onto stack</span>
-<span class="number">7</span>: iload_2         <span class="comment">// Load y onto stack</span>
-<span class="number">8</span>: iadd            <span class="comment">// Add top two stack values</span>
-<span class="number">9</span>: istore_3        <span class="comment">// Store result in variable 3 (sum)</span>
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
 
-<span class="comment">Interpreter executes each instruction one by one</span></code></pre>
+                    <p><strong>Q: What is the difference between JDK, JRE, and JVM?</strong><br>
+                    JVM is the engine that executes bytecode — platform-specific, handles memory
+                    and GC. JRE = JVM + standard library — what you need to run Java programs.
+                    JDK = JRE + compiler (<code>javac</code>) + tools — what you need to develop.
+                    Since Java 11, JRE is no longer distributed separately; you install the JDK
+                    everywhere.</p>
 
-            <h3>2. JIT (Just-In-Time) Compiler - Performance Booster</h3>
-            <p>The game-changer! JIT identifies "hot" code (frequently executed) and compiles it to native machine code for lightning-fast execution.</p>
+                    <p><strong>Q: What is bytecode and why does it exist?</strong><br>
+                    Bytecode is the intermediate binary format produced by <code>javac</code>.
+                    It's not native machine code — a CPU can't execute it directly. The JVM
+                    translates it to native instructions at runtime. This is what enables
+                    "Write Once, Run Anywhere": the same <code>.class</code> file runs on any
+                    OS and CPU that has a JVM, without recompilation.</p>
 
-            <pre><code><span class="comment">How JIT Works:</span>
+                    <p><strong>Q: What is the difference between heap and stack?</strong><br>
+                    The stack is per-thread, holds method frames (local variables, return
+                    addresses), is LIFO, and is reclaimed automatically when a method returns.
+                    The heap is shared by all threads, holds all objects created with
+                    <code>new</code>, and is managed by the Garbage Collector. A stack overflow
+                    means too many nested method calls. An OutOfMemoryError means the heap is
+                    full.</p>
+                </div>
 
-<span class="comment">Phase 1: Profiling</span>
-<span class="comment">  JVM watches which code runs frequently</span>
-<span class="comment">  Example: "This loop ran 10,000 times!"</span>
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
 
-<span class="comment">Phase 2: Compilation</span>
-<span class="comment">  JIT compiles hot code to native machine code</span>
-<span class="comment">  Bytecode → Native CPU instructions</span>
+                    <p><strong>Q: What is tiered compilation and why does Java have a "warm-up" period?</strong><br>
+                    HotSpot uses four compilation tiers. Initially, bytecode is interpreted
+                    (slow but immediate). The C1 compiler kicks in after ~2,000 invocations,
+                    producing lightly optimised native code while still profiling. The C2
+                    compiler kicks in after ~10,000–15,000 invocations, applying aggressive
+                    optimisations based on the profiling data. This is why Java services perform
+                    worse in the first minutes after startup — the JIT hasn't had enough data to
+                    compile hot paths. Solutions: warm-up load in staging before prod traffic,
+                    GraalVM native image (compiles ahead-of-time, no warm-up), or JVM snapshots
+                    with CRaC (Checkpoint/Restore, Java 21+).</p>
 
-<span class="comment">Phase 3: Optimization</span>
-<span class="comment">  • Inline methods (remove function call overhead)</span>
-<span class="comment">  • Dead code elimination</span>
-<span class="comment">  • Loop unrolling</span>
-<span class="comment">  • Constant folding</span>
+                    <p><strong>Q: What is escape analysis and what can the JIT do with it?</strong><br>
+                    Escape analysis determines whether an object reference can "escape" the
+                    current method or thread — i.e., be stored in a field, returned, or passed
+                    to another thread. If an object doesn't escape: (1) <em>Stack allocation</em>
+                    — the JIT allocates it on the thread stack instead of the heap, eliminating
+                    GC pressure; (2) <em>Scalar replacement</em> — the object is decomposed into
+                    its individual fields, which the CPU keeps in registers; (3) <em>Lock
+                    elision</em> — if a synchronised block on the object is unreachable by other
+                    threads, the JIT removes the lock entirely. A common example: the
+                    <code>StringBuilder</code> created by string concatenation in a loop is often
+                    stack-allocated or eliminated.</p>
 
-<span class="comment">Example:</span>
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000000</span>; i++) {
-    result += calculate(i);  <span class="comment">// Called 1 million times!</span>
-}
+                    <p><strong>Q: Why is PermGen gone and what replaced it?</strong><br>
+                    PermGen (Permanent Generation) was a fixed-size region of the heap (pre-Java 8)
+                    that stored class metadata. Its fixed size caused <code>OutOfMemoryError:
+                    PermGen space</code> in applications with many classes or heavy use of CGLIB
+                    proxies (Spring, Hibernate). Java 8 replaced it with <strong>Metaspace</strong>:
+                    same purpose but uses native memory (outside the heap) and grows dynamically
+                    by default. This eliminated most PermGen OOMs — but also means Metaspace can
+                    grow unbounded if classes leak (common with custom ClassLoaders in frameworks).
+                    Always set <code>-XX:MaxMetaspaceSize</code> in production.</p>
+                </div>
+            </section>
 
-<span class="comment">Without JIT:</span>
-<span class="comment">  Interpreter executes calculate() 1 million times = SLOW</span>
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="garbage-collection.html" class="related-link">
+                        <span class="related-icon">🗑️</span>Garbage Collection
+                    </a>
+                    <a href="multithreading.html" class="related-link">
+                        <span class="related-icon">🧵</span>Multithreading
+                    </a>
+                    <a href="thread-pools.html" class="related-link">
+                        <span class="related-icon">⚙️</span>Thread Pools
+                    </a>
+                    <a href="../fundamentals/what-is-java.html" class="related-link">
+                        <span class="related-icon">☕</span>What is Java?
+                    </a>
+                    <a href="../java-versions/jdk-jre-jvm.html" class="related-link">
+                        <span class="related-icon">🔍</span>JDK vs JRE vs JVM (deep dive)
+                    </a>
+                </div>
+            </section>
 
-<span class="comment">With JIT:</span>
-<span class="comment">  First ~100 calls: Interpreted (JIT profiling)</span>
-<span class="comment">  JIT detects: "This is hot code!"</span>
-<span class="comment">  JIT compiles to native code (once)</span>
-<span class="comment">  Remaining 999,900 calls: Native code = FAST!</span>
+        </main>
 
-<span class="comment">Result: 10-100x faster!</span></code></pre>
-
-            <h3>3. Garbage Collector - Memory Janitor</h3>
-            <p>Automatically finds and removes unused objects. Covered in detail in next topic!</p>
-        </section>
-
-        <section class="content-section">
-            <h2>Complete Example: What Happens When You Run Java Code</h2>
-
-            <pre><code><span class="keyword">public class</span> <span class="class-name">HelloWorld</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="class-name">String</span> message = <span class="string">"Hello, World!"</span>;
-        <span class="class-name">System</span>.out.println(message);
-    }
-}</code></pre>
-
-            <p><strong>Complete Step-by-Step Journey:</strong></p>
-
-            <ol>
-                <li><strong>Compilation Phase (Developer Machine):</strong>
-                    <ul>
-                        <li>Run: <code>javac HelloWorld.java</code></li>
-                        <li>Compiler reads source code</li>
-                        <li>Checks syntax, types</li>
-                        <li>Generates: <code>HelloWorld.class</code> (bytecode)</li>
-                    </ul>
-                </li>
-
-                <li><strong>JVM Startup:</strong>
-                    <ul>
-                        <li>Run: <code>java HelloWorld</code></li>
-                        <li>Operating System loads JVM</li>
-                        <li>JVM initializes memory areas (Heap, Stack, Method Area)</li>
-                        <li>JVM starts main thread</li>
-                    </ul>
-                </li>
-
-                <li><strong>Class Loading:</strong>
-                    <ul>
-                        <li>Application ClassLoader searches for HelloWorld.class</li>
-                        <li>Reads bytecode into memory</li>
-                        <li>Verification: Checks bytecode is safe</li>
-                        <li>Preparation: Allocates memory for static variables</li>
-                        <li>Resolution: Links references</li>
-                        <li>Stores class metadata in Method Area</li>
-                    </ul>
-                </li>
-
-                <li><strong>Execution Begins:</strong>
-                    <ul>
-                        <li>JVM finds main() method</li>
-                        <li>Creates stack frame for main() on thread's stack</li>
-                        <li>Execution starts at first instruction</li>
-                    </ul>
-                </li>
-
-                <li><strong>Line 1: <code>String message = "Hello, World!";</code></strong>
-                    <ul>
-                        <li>String literal "Hello, World!" created in Heap (String pool)</li>
-                        <li>Variable 'message' created in Stack (local variable)</li>
-                        <li>'message' holds reference to String in Heap</li>
-                    </ul>
-                </li>
-
-                <li><strong>Line 2: <code>System.out.println(message);</code></strong>
-                    <ul>
-                        <li>JVM loads System class (if not already loaded)</li>
-                        <li>Accesses static field 'out' (PrintStream object)</li>
-                        <li>Calls println() method</li>
-                        <li>Native method writes to console</li>
-                        <li>Output appears: "Hello, World!"</li>
-                    </ul>
-                </li>
-
-                <li><strong>Method Return:</strong>
-                    <ul>
-                        <li>main() completes</li>
-                        <li>Stack frame removed (popped)</li>
-                        <li>Local variables disappear</li>
-                    </ul>
-                </li>
-
-                <li><strong>Garbage Collection:</strong>
-                    <ul>
-                        <li>String object in Heap no longer referenced</li>
-                        <li>Marked for collection (happens later)</li>
-                        <li>Memory will be reclaimed</li>
-                    </ul>
-                </li>
-
-                <li><strong>JVM Shutdown:</strong>
-                    <ul>
-                        <li>No more non-daemon threads running</li>
-                        <li>JVM performs cleanup</li>
-                        <li>Returns control to Operating System</li>
-                        <li>Program terminates</li>
-                    </ul>
-                </li>
-            </ol>
-        </section>
-
-        <section class="content-section">
-            <h2>Why Understanding JVM Matters</h2>
-
-            <h3>For Developers:</h3>
-            <ul>
-                <li><strong>Performance Tuning:</strong> Adjust heap size, GC settings for optimal performance</li>
-                <li><strong>Debugging:</strong> Understand stack traces, OutOfMemoryErrors</li>
-                <li><strong>Memory Management:</strong> Write memory-efficient code</li>
-                <li><strong>Thread Safety:</strong> Understand how threads share heap but have separate stacks</li>
-            </ul>
-
-            <h3>Common JVM Flags:</h3>
-            <pre><code><span class="comment"># Set max heap size to 2GB</span>
-java -Xmx2g MyProgram
-
-<span class="comment"># Set initial heap size to 512MB</span>
-java -Xms512m MyProgram
-
-<span class="comment"># Set stack size to 1MB</span>
-java -Xss1m MyProgram
-
-<span class="comment"># Enable GC logging</span>
-java -Xlog:gc MyProgram
-
-<span class="comment"># Print JVM settings</span>
-java -XX:+PrintFlagsFinal MyProgram</code></pre>
-
-            <div class="info-box note">
-                <div class="info-box-title">Remember</div>
-                <p>The JVM is your friend - it handles memory, optimization, garbage collection, and platform compatibility so you can focus on writing great code!</p>
-                <p><strong>Think of it as:</strong> You drive the car (write code), JVM is the engine that makes it all work!</p>
-            </div>
-        </section>
-
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="garbage-collection.html" class="related-link">Garbage Collection</a>
-                <a href="../java-versions/jdk-jre-jvm.html" class="related-link">JDK vs JRE vs JVM</a>
-                <a href="multithreading.html" class="related-link">Multithreading</a>
-            </div>
-        </section>
-    </main>
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
