@@ -1,463 +1,316 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.ver.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Version Management - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#build-tools">Build Tools</a> / Version Management
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#build-tools" data-i18n="nav.build-tools">Build Tools</a> /
+                Version Management
             </nav>
-            <h1>Version Management</h1>
-            <p class="topic-subtitle">Managing dependency versions effectively in Maven and Gradle</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.ver.h1">Version Management</h1>
+            <p class="topic-subtitle" data-i18n="topic.ver.subtitle">Semantic versioning, Gradle version catalogs, and a real strategy for keeping dependencies current</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>Why Version Management Matters</h2>
-            <p><strong>Think of versions like recipe ingredients:</strong></p>
-            <ul>
-                <li><strong>Without version management:</strong> "Add some flour" - unclear, inconsistent results</li>
-                <li><strong>With version management:</strong> "Add 2 cups of flour" - precise, reproducible</li>
-            </ul>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>Version management ensures:</strong></p>
-                <ul>
-                    <li><strong>Reproducible builds:</strong> Same code + same versions = same result</li>
-                    <li><strong>Security:</strong> Track and update vulnerable dependencies</li>
-                    <li><strong>Compatibility:</strong> Avoid conflicts between libraries</li>
-                    <li><strong>Maintainability:</strong> Centralized version updates</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Semantic Versioning (SemVer)</h2>
+        <main class="topic-content">
 
-            <pre><code><span class="comment">// Version format: MAJOR.MINOR.PATCH</span>
-<span class="comment">//                   1   . 2   . 3</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHY VERSION MANAGEMENT MATTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Why Version Management Matters</h2>
+                <p>A version number is a promise about compatibility. Trusting that promise —
+                    and managing it deliberately rather than reactively — is what makes a build
+                    reproducible: the same source checked out a year from now should still
+                    compile to the same behaviour, not silently pull in a different dependency
+                    graph. For the mechanics of how Maven actually <em>resolves</em> conflicting
+                    versions transitively, BOMs, and exclusions, see
+                    <a href="dependencies.html">Dependencies Management</a> — this page focuses
+                    on the versioning scheme itself and how to manage updates as a deliberate
+                    process rather than an accident.</p>
+            </section>
 
-<span class="comment">// Examples:</span>
-<span class="comment">// 1.0.0  - First stable release</span>
-<span class="comment">// 1.0.1  - Bug fix (PATCH)</span>
-<span class="comment">// 1.1.0  - New feature, backward compatible (MINOR)</span>
-<span class="comment">// 2.0.0  - Breaking changes (MAJOR)</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — SEMANTIC VERSIONING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Semantic Versioning (SemVer)</h2>
+                <p><code>MAJOR.MINOR.PATCH</code> is a contract, not just a counter — and the
+                    contract is only as good as the library maintainer's discipline in following
+                    it.</p>
 
-<span class="comment">// When to increment:</span>
-<span class="comment">// MAJOR - Incompatible API changes (breaking)</span>
-<span class="comment">//         Example: Removed method, changed signature</span>
-<span class="comment">// MINOR - Added functionality (backward compatible)</span>
-<span class="comment">//         Example: New method, new feature</span>
-<span class="comment">// PATCH - Bug fixes (backward compatible)</span>
-<span class="comment">//         Example: Fixed null pointer, performance fix</span></code></pre>
+                <pre><code><span class="comment">// 1 . 2 . 3
+//   MAJOR.MINOR.PATCH
 
-            <table class="comparison-table">
-                <thead>
+// MAJOR — incompatible API changes (a method removed, a signature changed,
+//         a default behaviour flipped). Upgrading requires review.
+// MINOR — new functionality, backward compatible. Existing code keeps working.
+// PATCH — bug fixes only, backward compatible. Should always be safe.</span></code></pre>
+
+                <table>
                     <tr>
-                        <th>Version Change</th>
+                        <th>Change</th>
                         <th>Meaning</th>
-                        <th>Safe to Upgrade?</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>1.2.3 &rarr; 1.2.4</td>
-                        <td>Bug fix</td>
-                        <td>Yes, always</td>
+                        <th>Safe to upgrade blindly?</th>
                     </tr>
                     <tr>
-                        <td>1.2.3 &rarr; 1.3.0</td>
-                        <td>New features</td>
-                        <td>Yes, usually</td>
+                        <td>1.2.3 → 1.2.4</td>
+                        <td>Patch — bug fix</td>
+                        <td>Generally yes</td>
                     </tr>
                     <tr>
-                        <td>1.2.3 &rarr; 2.0.0</td>
-                        <td>Breaking changes</td>
-                        <td>Review required</td>
+                        <td>1.2.3 → 1.3.0</td>
+                        <td>Minor — new feature</td>
+                        <td>Usually, but read the changelog</td>
                     </tr>
-                </tbody>
-            </table>
-        </section>
+                    <tr>
+                        <td>1.2.3 → 2.0.0</td>
+                        <td>Major — breaking change</td>
+                        <td>No — review required, expect code changes</td>
+                    </tr>
+                </table>
 
-        <section class="content-section">
-            <h2>SNAPSHOT vs Release Versions</h2>
+                <div class="info-box warning">
+                    <div class="info-box-title">SemVer is a convention, not an enforced contract</div>
+                    <p>Nothing stops a maintainer from shipping a breaking change in a minor or
+                        patch release — accidentally or otherwise. SemVer tells you the
+                        <em>intended</em> risk level, not a guarantee. For dependencies your
+                        production system relies on heavily, run your test suite after every
+                        upgrade regardless of how "safe" the version bump looks on paper.</p>
+                </div>
 
-            <pre><code><span class="comment">&lt;!-- SNAPSHOT - Development version --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;1.0.0-SNAPSHOT&lt;/<span class="keyword">version</span>&gt;
+                <h3>Pre-release qualifiers and their ordering</h3>
+                <pre><code>1.0.0-alpha   <span class="comment">// earliest, most unstable — internal testing</span>
+1.0.0-beta    <span class="comment">// feature-complete, still finding bugs</span>
+1.0.0-RC1     <span class="comment">// release candidate — believed ready, final verification</span>
+1.0.0         <span class="comment">// final, stable release</span>
 
-<span class="comment">&lt;!-- Release - Stable, immutable version --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;1.0.0&lt;/<span class="keyword">version</span>&gt;</code></pre>
+<span class="comment">// SemVer precedence: alpha < beta < rc < (no suffix = final)
+// A SNAPSHOT sits conceptually before its corresponding release —
+// 1.0.0-SNAPSHOT precedes 1.0.0 once it's actually released</span></code></pre>
+            </section>
 
-            <table class="comparison-table">
-                <thead>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SNAPSHOT VS RELEASE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>SNAPSHOT vs Release — the Practical Difference</h2>
+                <table>
                     <tr>
                         <th>Aspect</th>
                         <th>SNAPSHOT</th>
                         <th>Release</th>
                     </tr>
-                </thead>
-                <tbody>
                     <tr>
-                        <td><strong>Purpose</strong></td>
-                        <td>Development, testing</td>
-                        <td>Production use</td>
+                        <td>Mutability</td>
+                        <td>Can be re-published under the same version</td>
+                        <td>Immutable once published — repository normally rejects re-deploy</td>
                     </tr>
                     <tr>
-                        <td><strong>Mutability</strong></td>
-                        <td>Can change anytime</td>
-                        <td>Immutable (never changes)</td>
+                        <td>Maven's default behaviour</td>
+                        <td>Re-checks the remote repo for updates regularly</td>
+                        <td>Downloaded once, cached forever (with <code>-o</code> offline mode safe)</td>
                     </tr>
                     <tr>
-                        <td><strong>Maven behavior</strong></td>
-                        <td>Checks for updates daily</td>
-                        <td>Downloads once, cached forever</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Reproducibility</strong></td>
-                        <td>Not guaranteed</td>
+                        <td>Reproducibility</td>
+                        <td>Not guaranteed — same coordinate, different bytes over time</td>
                         <td>Guaranteed</td>
                     </tr>
                     <tr>
-                        <td><strong>In production?</strong></td>
-                        <td>Never!</td>
+                        <td>Use in production</td>
+                        <td>Never</td>
                         <td>Always</td>
                     </tr>
-                </tbody>
-            </table>
+                </table>
+                <p>The detailed CI/CD mechanics of publishing SNAPSHOT vs release artifacts, and
+                    why builds containing a SNAPSHOT typically fail a release pipeline gate, are
+                    covered in <a href="maven.html">What is Maven?</a>.</p>
+            </section>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Warning</div>
-                <p>Never deploy SNAPSHOT versions to production! They can change without notice, making builds unreproducible and potentially introducing bugs.</p>
-            </div>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — GRADLE VERSION CATALOGS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Gradle Version Catalogs — Centralised, Type-Safe Versions</h2>
+                <p>Maven centralises versions with <code>&lt;properties&gt;</code>; Gradle's
+                    modern equivalent is the <strong>version catalog</strong> — a single TOML
+                    file shared across every module in a multi-project build, with IDE
+                    autocomplete and compile-time checking of the references themselves.</p>
 
-            <h3>Other Version Suffixes</h3>
-            <pre><code><span class="comment">&lt;!-- Common version qualifiers --&gt;</span>
-1.0.0-SNAPSHOT     <span class="comment">&lt;!-- Development --&gt;</span>
-1.0.0-alpha        <span class="comment">&lt;!-- Early testing, unstable --&gt;</span>
-1.0.0-beta         <span class="comment">&lt;!-- Feature complete, testing --&gt;</span>
-1.0.0-RC1          <span class="comment">&lt;!-- Release Candidate 1 --&gt;</span>
-1.0.0-M1           <span class="comment">&lt;!-- Milestone 1 --&gt;</span>
-1.0.0              <span class="comment">&lt;!-- Final release --&gt;</span>
-1.0.0-GA           <span class="comment">&lt;!-- General Availability (same as final) --&gt;</span>
+                <pre><code><span class="comment">// gradle/libs.versions.toml — one file, the single source of truth</span>
+[versions]
+spring-boot = <span class="string">"3.2.0"</span>
+jackson     = <span class="string">"2.16.0"</span>
+junit       = <span class="string">"5.10.0"</span>
 
-<span class="comment">&lt;!-- Version ordering (lowest to highest): --&gt;</span>
-<span class="comment">&lt;!-- alpha &lt; beta &lt; milestone &lt; rc &lt; snapshot &lt; final --&gt;</span></code></pre>
-        </section>
+[libraries]
+spring-boot-starter-web = { module = <span class="string">"org.springframework.boot:spring-boot-starter-web"</span>, version.ref = <span class="string">"spring-boot"</span> }
+jackson-databind        = { module = <span class="string">"com.fasterxml.jackson.core:jackson-databind"</span>, version.ref = <span class="string">"jackson"</span> }
+junit-jupiter           = { module = <span class="string">"org.junit.jupiter:junit-jupiter"</span>, version.ref = <span class="string">"junit"</span> }
 
-        <section class="content-section">
-            <h2>Centralizing Versions with Properties</h2>
+[bundles]
+<span class="comment"># group related libraries under one name, declared together everywhere they're used</span>
+testing = [<span class="string">"junit-jupiter"</span>]
 
-            <pre><code>&lt;<span class="keyword">project</span>&gt;
-    &lt;<span class="keyword">properties</span>&gt;
-        <span class="comment">&lt;!-- Define versions in one place --&gt;</span>
-        &lt;<span class="keyword">spring.version</span>&gt;6.1.0&lt;/<span class="keyword">spring.version</span>&gt;
-        &lt;<span class="keyword">jackson.version</span>&gt;2.16.0&lt;/<span class="keyword">jackson.version</span>&gt;
-        &lt;<span class="keyword">junit.version</span>&gt;5.10.0&lt;/<span class="keyword">junit.version</span>&gt;
-        &lt;<span class="keyword">lombok.version</span>&gt;1.18.30&lt;/<span class="keyword">lombok.version</span>&gt;
-    &lt;/<span class="keyword">properties</span>&gt;
+[plugins]
+spring-boot = { id = <span class="string">"org.springframework.boot"</span>, version.ref = <span class="string">"spring-boot"</span> }</code></pre>
 
-    &lt;<span class="keyword">dependencies</span>&gt;
-        <span class="comment">&lt;!-- Use property references --&gt;</span>
-        &lt;<span class="keyword">dependency</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;spring-core&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;${spring.version}&lt;/<span class="keyword">version</span>&gt;
-        &lt;/<span class="keyword">dependency</span>&gt;
+                <pre><code><span class="comment">// build.gradle.kts — reference via the generated type-safe accessor 'libs'</span>
+dependencies {
+    implementation(libs.spring.boot.starter.web)   <span class="comment">// IDE autocompletes this — typo = compile error, not a runtime surprise</span>
+    implementation(libs.jackson.databind)
+    testImplementation(libs.bundles.testing)
+}
 
-        &lt;<span class="keyword">dependency</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;spring-web&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;${spring.version}&lt;/<span class="keyword">version</span>&gt;  <span class="comment">&lt;!-- Same version --&gt;</span>
-        &lt;/<span class="keyword">dependency</span>&gt;
+plugins {
+    alias(libs.plugins.spring.boot)
+}</code></pre>
 
-        &lt;<span class="keyword">dependency</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.core&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;jackson-databind&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;${jackson.version}&lt;/<span class="keyword">version</span>&gt;
-        &lt;/<span class="keyword">dependency</span>&gt;
-    &lt;/<span class="keyword">dependencies</span>&gt;
-&lt;/<span class="keyword">project</span>&gt;</code></pre>
+                <div class="info-box tip">
+                    <div class="info-box-title">Why this beats a plain val/property approach</div>
+                    <p>A Kotlin <code>val springVersion = "6.1.0"</code> at the top of a
+                        <code>build.gradle.kts</code> only helps within that single file. A
+                        version catalog is visible and IDE-autocompleted across every module in a
+                        multi-project build, and referencing a non-existent entry is a build
+                        script compile error — caught immediately, not discovered at dependency
+                        resolution time. For any multi-module Gradle project, the catalog should
+                        be the default, not an optional extra.</p>
+                </div>
+            </section>
 
-            <div class="info-box note">
-                <div class="info-box-title">Benefits</div>
-                <ul>
-                    <li>Update version in one place, applies everywhere</li>
-                    <li>Ensures related libraries use matching versions</li>
-                    <li>Easy to review all versions at a glance</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — A REAL UPDATE STRATEGY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>A Practical Strategy for Staying Current</h2>
+                <p>"Update dependencies regularly" is advice nobody disagrees with and almost
+                    nobody operationalises. Here's what it looks like as an actual process.</p>
 
-        <section class="content-section">
-            <h2>Bill of Materials (BOM)</h2>
-            <p>A BOM is a special POM that defines a set of compatible dependency versions.</p>
-
-            <pre><code><span class="comment">&lt;!-- Import a BOM to manage versions automatically --&gt;</span>
-&lt;<span class="keyword">dependencyManagement</span>&gt;
-    &lt;<span class="keyword">dependencies</span>&gt;
-        <span class="comment">&lt;!-- Spring Boot BOM --&gt;</span>
-        &lt;<span class="keyword">dependency</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;spring-boot-dependencies&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;3.2.0&lt;/<span class="keyword">version</span>&gt;
-            &lt;<span class="keyword">type</span>&gt;pom&lt;/<span class="keyword">type</span>&gt;
-            &lt;<span class="keyword">scope</span>&gt;import&lt;/<span class="keyword">scope</span>&gt;
-        &lt;/<span class="keyword">dependency</span>&gt;
-
-        <span class="comment">&lt;!-- Jackson BOM --&gt;</span>
-        &lt;<span class="keyword">dependency</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;jackson-bom&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;2.16.0&lt;/<span class="keyword">version</span>&gt;
-            &lt;<span class="keyword">type</span>&gt;pom&lt;/<span class="keyword">type</span>&gt;
-            &lt;<span class="keyword">scope</span>&gt;import&lt;/<span class="keyword">scope</span>&gt;
-        &lt;/<span class="keyword">dependency</span>&gt;
-    &lt;/<span class="keyword">dependencies</span>&gt;
-&lt;/<span class="keyword">dependencyManagement</span>&gt;
-
-<span class="comment">&lt;!-- Now you can omit versions! --&gt;</span>
-&lt;<span class="keyword">dependencies</span>&gt;
-    &lt;<span class="keyword">dependency</span>&gt;
-        &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
-        &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-web&lt;/<span class="keyword">artifactId</span>&gt;
-        <span class="comment">&lt;!-- Version managed by BOM --&gt;</span>
-    &lt;/<span class="keyword">dependency</span>&gt;
-
-    &lt;<span class="keyword">dependency</span>&gt;
-        &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.core&lt;/<span class="keyword">groupId</span>&gt;
-        &lt;<span class="keyword">artifactId</span>&gt;jackson-databind&lt;/<span class="keyword">artifactId</span>&gt;
-        <span class="comment">&lt;!-- Version managed by Jackson BOM --&gt;</span>
-    &lt;/<span class="keyword">dependency</span>&gt;
-&lt;/<span class="keyword">dependencies</span>&gt;</code></pre>
-
-            <h3>Popular BOMs</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>BOM</th>
-                        <th>What It Manages</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>spring-boot-dependencies</code></td>
-                        <td>All Spring Boot compatible libraries</td>
-                    </tr>
-                    <tr>
-                        <td><code>spring-framework-bom</code></td>
-                        <td>Spring Framework modules</td>
-                    </tr>
-                    <tr>
-                        <td><code>jackson-bom</code></td>
-                        <td>Jackson JSON library modules</td>
-                    </tr>
-                    <tr>
-                        <td><code>junit-bom</code></td>
-                        <td>JUnit 5 modules</td>
-                    </tr>
-                    <tr>
-                        <td><code>aws-sdk-java-pom</code></td>
-                        <td>AWS SDK modules</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2>Version Ranges (Use Carefully!)</h2>
-
-            <pre><code><span class="comment">&lt;!-- Maven version range syntax --&gt;</span>
-
-<span class="comment">&lt;!-- Exact version --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;1.0&lt;/<span class="keyword">version</span>&gt;           <span class="comment">&lt;!-- 1.0 (soft requirement) --&gt;</span>
-
-<span class="comment">&lt;!-- Ranges --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;[1.0]&lt;/<span class="keyword">version</span>&gt;         <span class="comment">&lt;!-- Exactly 1.0 (hard requirement) --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;[1.0,2.0)&lt;/<span class="keyword">version</span>&gt;     <span class="comment">&lt;!-- 1.0 &lt;= x &lt; 2.0 --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;[1.0,2.0]&lt;/<span class="keyword">version</span>&gt;     <span class="comment">&lt;!-- 1.0 &lt;= x &lt;= 2.0 --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;(1.0,2.0)&lt;/<span class="keyword">version</span>&gt;     <span class="comment">&lt;!-- 1.0 &lt; x &lt; 2.0 --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;[1.0,)&lt;/<span class="keyword">version</span>&gt;        <span class="comment">&lt;!-- x &gt;= 1.0 --&gt;</span>
-&lt;<span class="keyword">version</span>&gt;(,2.0]&lt;/<span class="keyword">version</span>&gt;        <span class="comment">&lt;!-- x &lt;= 2.0 --&gt;</span>
-
-<span class="comment">&lt;!-- Example: Accept any 1.x version --&gt;</span>
-&lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;com.example&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;my-lib&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;[1.0,2.0)&lt;/<span class="keyword">version</span>&gt;
-&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Avoid Version Ranges</div>
-                <p>Version ranges make builds non-reproducible. A build today might use 1.5, tomorrow 1.6. This can introduce unexpected bugs. Use exact versions instead.</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Resolving Version Conflicts</h2>
-
-            <pre><code><span class="comment"># When two dependencies need different versions of the same library</span>
-
-<span class="comment"># Check your dependency tree</span>
-mvn dependency:tree
-
-<span class="comment"># Example output showing conflict:</span>
-<span class="comment"># [INFO] com.example:my-app:jar:1.0.0</span>
-<span class="comment"># [INFO] +- org.springframework:spring-web:jar:6.1.0:compile</span>
-<span class="comment"># [INFO] |  \- org.springframework:spring-core:jar:6.1.0:compile</span>
-<span class="comment"># [INFO] \- some-library:some-lib:jar:1.0:compile</span>
-<span class="comment"># [INFO]    \- org.springframework:spring-core:jar:5.3.0:compile (conflict!)</span></code></pre>
-
-            <h3>Solution 1: Exclude Transitive Dependency</h3>
-            <pre><code>&lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;some-library&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;some-lib&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;1.0&lt;/<span class="keyword">version</span>&gt;
-    &lt;<span class="keyword">exclusions</span>&gt;
-        &lt;<span class="keyword">exclusion</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;spring-core&lt;/<span class="keyword">artifactId</span>&gt;
-        &lt;/<span class="keyword">exclusion</span>&gt;
-    &lt;/<span class="keyword">exclusions</span>&gt;
-&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
-
-            <h3>Solution 2: Force Version in dependencyManagement</h3>
-            <pre><code>&lt;<span class="keyword">dependencyManagement</span>&gt;
-    &lt;<span class="keyword">dependencies</span>&gt;
-        <span class="comment">&lt;!-- This version wins for ALL transitive dependencies --&gt;</span>
-        &lt;<span class="keyword">dependency</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;spring-core&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;6.1.0&lt;/<span class="keyword">version</span>&gt;
-        &lt;/<span class="keyword">dependency</span>&gt;
-    &lt;/<span class="keyword">dependencies</span>&gt;
-&lt;/<span class="keyword">dependencyManagement</span>&gt;</code></pre>
-
-            <h3>Maven's Conflict Resolution Rules</h3>
-            <ol>
-                <li><strong>Nearest definition wins:</strong> Closer to your project in the dependency tree</li>
-                <li><strong>First declaration wins:</strong> If same depth, first in POM order</li>
-                <li><strong>dependencyManagement overrides all:</strong> Versions declared here always win</li>
-            </ol>
-        </section>
-
-        <section class="content-section">
-            <h2>Checking for Updates</h2>
-
-            <pre><code><span class="comment"># Check for newer versions of dependencies</span>
+                <pre><code><span class="comment"># Step 1 — see what's available, on a schedule (weekly/monthly), not reactively</span>
 mvn versions:display-dependency-updates
+<span class="comment"># or for Gradle:</span>
+./gradlew dependencyUpdates  <span class="comment"># (com.github.ben-manes.versions plugin)</span>
 
-<span class="comment"># Output:</span>
-<span class="comment"># [INFO] The following dependencies have newer versions:</span>
-<span class="comment"># [INFO]   org.springframework:spring-core .......... 6.0.0 -> 6.1.0</span>
-<span class="comment"># [INFO]   com.fasterxml.jackson.core:jackson-core . 2.15.0 -> 2.16.0</span>
+<span class="comment"># Step 2 — patch releases: batch-update, low risk, run full test suite</span>
+mvn versions:use-latest-releases -DallowMajorUpdates=false -DallowMinorUpdates=false
 
-<span class="comment"># Check for plugin updates</span>
-mvn versions:display-plugin-updates
+<span class="comment"># Step 3 — minor releases: update one at a time, read changelogs, run test suite
+# Step 4 — major releases: NEVER batch. One major upgrade per PR, dedicated review,
+#           explicit migration notes, and a rollback plan before merging</span></code></pre>
 
-<span class="comment"># Update versions in pom.xml (interactive)</span>
-mvn versions:use-latest-versions
+                <div class="info-box note">
+                    <div class="info-box-title">Security updates are not optional, regardless of "stability"</div>
+                    <p>A CVE patch released as a patch version still needs to go out even if it's
+                        inconvenient — unlike feature updates, security fixes shouldn't wait for
+                        a "convenient" release window. Tools like
+                        <code>mvn org.owasp:dependency-check-maven:check</code> or GitHub's
+                        Dependabot alerts should feed directly into this process as a
+                        higher-priority lane than routine version bumps.</p>
+                </div>
+            </section>
 
-<span class="comment"># Update to latest release versions</span>
-mvn versions:use-latest-releases
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-<span class="comment"># Update properties that define versions</span>
-mvn versions:update-properties</code></pre>
-        </section>
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
 
-        <section class="content-section">
-            <h2>Version Management in Gradle</h2>
+                    <p><strong>Q: What do the three numbers in semantic versioning mean?</strong><br>
+                    <code>MAJOR.MINOR.PATCH</code>. MAJOR increments for incompatible/breaking
+                    API changes. MINOR increments for new, backward-compatible functionality.
+                    PATCH increments for backward-compatible bug fixes. The version number is a
+                    signal of risk level for upgrading.</p>
 
-            <pre><code><span class="comment">// build.gradle.kts (Kotlin DSL)</span>
+                    <p><strong>Q: Why should SNAPSHOT versions never reach production?</strong><br>
+                    A SNAPSHOT coordinate can be republished with different content under the
+                    same version — the build is not reproducible. The exact bytes your production
+                    system runs could silently differ from what you tested, depending purely on
+                    when the artifact was resolved.</p>
+                </div>
 
-<span class="comment">// Define versions in one place</span>
-<span class="keyword">val</span> springVersion = <span class="string">"6.1.0"</span>
-<span class="keyword">val</span> jacksonVersion = <span class="string">"2.16.0"</span>
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
 
-dependencies {
-    implementation(<span class="string">"org.springframework:spring-core:$springVersion"</span>)
-    implementation(<span class="string">"org.springframework:spring-web:$springVersion"</span>)
-    implementation(<span class="string">"com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"</span>)
-}
+                    <p><strong>Q: Why can SemVer still produce a broken build even when followed correctly?</strong><br>
+                    SemVer is a promise about the library's <em>own</em> public API, but says
+                    nothing about transitive consistency across an entire dependency graph. A
+                    minor version bump in library A might transitively pull a newer minor version
+                    of a shared dependency that library B (unrelated, unchanged) is incompatible
+                    with at the binary level — this is exactly the scenario covered in
+                    <a href="dependencies.html">Dependencies Management</a>'s discussion of
+                    "nearest definition wins". SemVer discipline reduces but does not eliminate
+                    this risk, which is why automated dependency update tools should always run
+                    the full test suite, never just trust the version number.</p>
 
-<span class="comment">// Or use a BOM (platform)</span>
-dependencies {
-    implementation(platform(<span class="string">"org.springframework.boot:spring-boot-dependencies:3.2.0"</span>))
-    implementation(<span class="string">"org.springframework.boot:spring-boot-starter-web"</span>)  <span class="comment">// No version!</span>
-}
+                    <p><strong>Q: What advantage does a Gradle version catalog have over Maven's
+                    property-based centralisation?</strong><br>
+                    Both centralise the version string, but a Maven property is just text
+                    substitution — referencing <code>${nonexistent.version}</code> silently
+                    resolves to a literal empty string rather than failing fast. A Gradle version
+                    catalog generates type-safe accessors (<code>libs.spring.boot.starter.web</code>)
+                    that are checked at build-script compile time — a typo or stale reference is
+                    a clear compile error in the IDE before you ever run a build. The catalog is
+                    also natively cross-module in a multi-project build without needing parent
+                    POM inheritance to share it.</p>
+                </div>
+            </section>
 
-<span class="comment">// Version catalogs (recommended for larger projects)</span>
-<span class="comment">// gradle/libs.versions.toml</span>
-<span class="comment">// [versions]</span>
-<span class="comment">// spring = "6.1.0"</span>
-<span class="comment">// jackson = "2.16.0"</span>
-<span class="comment">// [libraries]</span>
-<span class="comment">// spring-core = { module = "org.springframework:spring-core", version.ref = "spring" }</span></code></pre>
-        </section>
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="maven.html" class="related-link">
+                        <span class="related-icon">📜</span>What is Maven?
+                    </a>
+                    <a href="dependencies.html" class="related-link">
+                        <span class="related-icon">📦</span>Dependencies Management
+                    </a>
+                    <a href="gradle.html" class="related-link">
+                        <span class="related-icon">🐘</span>Gradle Basics
+                    </a>
+                    <a href="scopes.html" class="related-link">
+                        <span class="related-icon">🎯</span>Dependency Scopes
+                    </a>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+        </main>
 
-            <div class="best-practices">
-                <h3>DO:</h3>
-                <ul>
-                    <li><strong>Use exact versions</strong> - Reproducible builds</li>
-                    <li><strong>Centralize versions</strong> - Properties or BOMs</li>
-                    <li><strong>Use BOMs</strong> - For compatible library sets</li>
-                    <li><strong>Review updates regularly</strong> - Security patches</li>
-                    <li><strong>Test after upgrades</strong> - Even minor versions</li>
-                    <li><strong>Document major version changes</strong> - Migration notes</li>
-                    <li><strong>Use dependencyManagement</strong> - Control transitive versions</li>
-                </ul>
-
-                <h3>DON'T:</h3>
-                <ul>
-                    <li><strong>Don't use SNAPSHOT in production</strong> - Unreliable</li>
-                    <li><strong>Don't use version ranges</strong> - Non-reproducible</li>
-                    <li><strong>Don't mix major versions</strong> - spring-core 5 + spring-web 6</li>
-                    <li><strong>Don't ignore security updates</strong> - CVE vulnerabilities</li>
-                    <li><strong>Don't upgrade everything at once</strong> - Incremental upgrades</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Semantic Versioning:</strong> MAJOR.MINOR.PATCH for clear meaning</li>
-                    <li><strong>SNAPSHOT:</strong> Development only, never production</li>
-                    <li><strong>Properties:</strong> Centralize versions in one place</li>
-                    <li><strong>BOM:</strong> Pre-tested compatible version sets</li>
-                    <li><strong>Conflicts:</strong> Use exclusions or dependencyManagement</li>
-                    <li><strong>Updates:</strong> Regular reviews with <code>versions:display-dependency-updates</code></li>
-                    <li><strong>Reproducibility:</strong> Exact versions ensure consistent builds</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="maven.html" class="related-link">What is Maven?</a>
-                <a href="pom.html" class="related-link">POM.xml Structure</a>
-                <a href="dependencies.html" class="related-link">Dependencies Management</a>
-                <a href="scopes.html" class="related-link">Dependency Scopes</a>
-            </div>
-        </section>
-    </main>
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

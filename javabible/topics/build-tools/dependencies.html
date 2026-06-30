@@ -1,171 +1,212 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.deps.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dependencies Management - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#build-tools">Build Tools</a> / Dependencies
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#build-tools" data-i18n="nav.build-tools">Build Tools</a> /
+                Dependencies Management
             </nav>
-            <h1>Dependencies Management</h1>
-            <p class="topic-subtitle">Managing libraries and their versions in Maven</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.deps.h1">Dependencies Management</h1>
+            <p class="topic-subtitle" data-i18n="topic.deps.subtitle">How Maven resolves transitive dependencies — and what to do when it resolves them wrong</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What are Dependencies?</h2>
-            <p>Dependencies are external libraries (JAR files) that your project needs to compile and run.</p>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>Transitive Dependencies:</strong> If you add library A, and A needs library B, Maven automatically downloads B too!</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Adding Dependencies</h2>
+        <main class="topic-content">
 
-            <pre><code>&lt;<span class="keyword">dependencies</span>&gt;
-    <span class="comment">&lt;!-- Basic dependency --&gt;</span>
-    &lt;<span class="keyword">dependency</span>&gt;
-        &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
-        &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-web&lt;/<span class="keyword">artifactId</span>&gt;
-        &lt;<span class="keyword">version</span>&gt;3.2.0&lt;/<span class="keyword">version</span>&gt;
-    &lt;/<span class="keyword">dependency</span>&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT ARE TRANSITIVE DEPENDENCIES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Are Transitive Dependencies?</h2>
+                <p>When you declare a dependency on library A, and A itself depends on library
+                    B, Maven automatically resolves and downloads B too — you never declare B
+                    yourself. This is <strong>transitive dependency resolution</strong>, and it's
+                    what makes a single <code>spring-boot-starter-web</code> declaration pull in
+                    dozens of actual JARs.</p>
 
-    <span class="comment">&lt;!-- Test dependency --&gt;</span>
-    &lt;<span class="keyword">dependency</span>&gt;
-        &lt;<span class="keyword">groupId</span>&gt;org.junit.jupiter&lt;/<span class="keyword">groupId</span>&gt;
-        &lt;<span class="keyword">artifactId</span>&gt;junit-jupiter&lt;/<span class="keyword">artifactId</span>&gt;
-        &lt;<span class="keyword">version</span>&gt;5.10.0&lt;/<span class="keyword">version</span>&gt;
-        &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
-    &lt;/<span class="keyword">dependency</span>&gt;
+                <p>The problem it creates: in any real project, multiple libraries transitively
+                    depend on different versions of the same artifact. Two different libraries
+                    might each want a different version of <code>jackson-databind</code>. Maven
+                    has to pick exactly one — this page is about understanding <em>how</em> it
+                    picks, and how you take control when it picks wrong. For basic dependency
+                    syntax and scopes, see <a href="scopes.html">Dependency Scopes</a>; for the
+                    full POM structure, see <a href="pom.html">POM.xml Structure</a>.</p>
 
-    <span class="comment">&lt;!-- Optional dependency --&gt;</span>
-    &lt;<span class="keyword">dependency</span>&gt;
-        &lt;<span class="keyword">groupId</span>&gt;org.projectlombok&lt;/<span class="keyword">groupId</span>&gt;
-        &lt;<span class="keyword">artifactId</span>&gt;lombok&lt;/<span class="keyword">artifactId</span>&gt;
-        &lt;<span class="keyword">version</span>&gt;1.18.30&lt;/<span class="keyword">version</span>&gt;
-        &lt;<span class="keyword">optional</span>&gt;true&lt;/<span class="keyword">optional</span>&gt;
-    &lt;/<span class="keyword">dependency</span>&gt;
-&lt;/<span class="keyword">dependencies</span>&gt;</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Dependency Scopes</h2>
-
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Scope</th>
-                        <th>Compile</th>
-                        <th>Test</th>
-                        <th>Runtime</th>
-                        <th>Packaged</th>
-                        <th>Use Case</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>compile</strong></td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>Default, most deps</td>
-                    </tr>
-                    <tr>
-                        <td><strong>provided</strong></td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>No</td>
-                        <td>No</td>
-                        <td>Servlet API (server provides)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>runtime</strong></td>
-                        <td>No</td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>JDBC drivers</td>
-                    </tr>
-                    <tr>
-                        <td><strong>test</strong></td>
-                        <td>No</td>
-                        <td>Yes</td>
-                        <td>No</td>
-                        <td>No</td>
-                        <td>JUnit, Mockito</td>
-                    </tr>
-                    <tr>
-                        <td><strong>system</strong></td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>No</td>
-                        <td>No</td>
-                        <td>Local JAR (avoid!)</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <pre><code><span class="comment">&lt;!-- Examples --&gt;</span>
+                <pre><code><span class="comment">// You declare ONE dependency...</span>
 &lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;jakarta.servlet&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;jakarta.servlet-api&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;6.0.0&lt;/<span class="keyword">version</span>&gt;
-    &lt;<span class="keyword">scope</span>&gt;provided&lt;/<span class="keyword">scope</span>&gt;  <span class="comment">&lt;!-- Tomcat provides this --&gt;</span>
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-web&lt;/<span class="keyword">artifactId</span>&gt;
 &lt;/<span class="keyword">dependency</span>&gt;
 
+<span class="comment">// ...and transitively get dozens, including:
+//   spring-web, spring-webmvc, jackson-databind, tomcat-embed-core,
+//   spring-boot-starter, spring-boot-starter-json, spring-boot-starter-tomcat...
+// Run `mvn dependency:tree` to see the full resolved list.</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — HOW MAVEN RESOLVES CONFLICTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>How Maven Resolves Version Conflicts</h2>
+                <p>When the dependency graph contains two different versions of the same
+                    artifact, Maven applies <strong>"nearest definition wins"</strong> — not
+                    "newest version wins", which surprises almost everyone the first time they
+                    hit it.</p>
+
+                <pre><code><span class="comment">/*
+ *  Your project
+ *  ├── library-A:1.0  ──depends on──▶  jackson-databind:2.15.3   (depth 2)
+ *  └── library-B:1.0  ──depends on──▶  jackson-databind:2.9.8    (depth 2)
+ *
+ *  Same depth → first declared in YOUR pom.xml's &lt;dependencies&gt; wins.
+ *  If library-A is declared before library-B, jackson 2.15.3 wins —
+ *  NOT because it's newer, but because of declaration order.
+ *
+ *  Different depths:
+ *  Your project
+ *  ├── jackson-databind:2.15.3                                  (depth 1 — DIRECT)
+ *  └── library-A:1.0  ──depends on──▶  jackson-databind:2.9.8    (depth 2)
+ *
+ *  Depth 1 (direct dependency) ALWAYS wins over depth 2+, regardless
+ *  of version. This is the most reliable way to force a version:
+ *  declare it directly in your own pom.xml.
+ */</span></code></pre>
+
+                <pre><code><span class="comment"># See exactly what won and what got overridden ("omitted for conflict")</span>
+mvn dependency:tree -Dverbose
+
+<span class="comment"># Output excerpt:
+# [INFO] +- library-a:1.0:compile
+# [INFO] |  \- com.fasterxml.jackson.core:jackson-databind:jar:2.15.3:compile
+# [INFO] \- library-b:1.0:compile
+# [INFO]    \- (com.fasterxml.jackson.core:jackson-databind:jar:2.9.8:compile - omitted for conflict with 2.15.3)</span></code></pre>
+
+                <h3>Three ways to take control — in order of preference</h3>
+                <pre><code><span class="comment">// 1. ✅ BEST: declare the version directly — depth 1 always wins</span>
 &lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;org.postgresql&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;postgresql&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;42.6.0&lt;/<span class="keyword">version</span>&gt;
-    &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;  <span class="comment">&lt;!-- Not needed at compile time --&gt;</span>
-&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
-        </section>
+    &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.core&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;jackson-databind&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;2.15.3&lt;/<span class="keyword">version</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
 
-        <section class="content-section">
-            <h2>Dependency Management</h2>
-
-            <pre><code><span class="comment">&lt;!-- Parent POM - define versions centrally --&gt;</span>
+<span class="comment">// 2. ✅ BEST AT SCALE: pin it project-wide via dependencyManagement —
+// no need to also add it as a direct dependency, applies to ALL modules</span>
 &lt;<span class="keyword">dependencyManagement</span>&gt;
+    &lt;<span class="keyword">dependencies</span>&gt;
+        &lt;<span class="keyword">dependency</span>&gt;
+            &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.core&lt;/<span class="keyword">groupId</span>&gt;
+            &lt;<span class="keyword">artifactId</span>&gt;jackson-databind&lt;/<span class="keyword">artifactId</span>&gt;
+            &lt;<span class="keyword">version</span>&gt;2.15.3&lt;/<span class="keyword">version</span>&gt;
+        &lt;/<span class="keyword">dependency</span>&gt;
+    &lt;/<span class="keyword">dependencies</span>&gt;
+&lt;/<span class="keyword">dependencyManagement</span>&gt;
+
+<span class="comment">// 3. Last resort: exclude it from the offending parent and declare separately —
+// more maintenance burden (you must remember to re-declare it)</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.legacy&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;old-utils&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">exclusions</span>&gt;
+        &lt;<span class="keyword">exclusion</span>&gt;
+            &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.core&lt;/<span class="keyword">groupId</span>&gt;
+            &lt;<span class="keyword">artifactId</span>&gt;jackson-databind&lt;/<span class="keyword">artifactId</span>&gt;
+        &lt;/<span class="keyword">exclusion</span>&gt;
+    &lt;/<span class="keyword">exclusions</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">A silently-resolved conflict is not a solved conflict</div>
+                    <p>Maven will always pick <em>a</em> version and build successfully — it
+                        never fails the build just because of a version mismatch. That means a
+                        binary-incompatible API change between 2.9.8 and 2.15.3 can compile fine
+                        and explode at runtime with <code>NoSuchMethodError</code>, far from
+                        wherever the actual conflict originated. Treat any unexpected entry in
+                        <code>dependency:tree -Dverbose</code> as something to actively verify,
+                        not ignore because the build went green.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — BOM IMPORTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Importing a BOM</h2>
+                <p>A <strong>Bill of Materials</strong> is a <code>pom</code>-packaged artifact
+                    containing only <code>dependencyManagement</code> — a coordinated set of
+                    version pins published by a project so consumers never have to guess which
+                    versions work together.</p>
+
+                <pre><code>&lt;<span class="keyword">dependencyManagement</span>&gt;
     &lt;<span class="keyword">dependencies</span>&gt;
         &lt;<span class="keyword">dependency</span>&gt;
             &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
             &lt;<span class="keyword">artifactId</span>&gt;spring-framework-bom&lt;/<span class="keyword">artifactId</span>&gt;
             &lt;<span class="keyword">version</span>&gt;6.1.0&lt;/<span class="keyword">version</span>&gt;
             &lt;<span class="keyword">type</span>&gt;pom&lt;/<span class="keyword">type</span>&gt;
-            &lt;<span class="keyword">scope</span>&gt;import&lt;/<span class="keyword">scope</span>&gt;  <span class="comment">&lt;!-- Import BOM --&gt;</span>
+            &lt;<span class="keyword">scope</span>&gt;import&lt;/<span class="keyword">scope</span>&gt;  <span class="comment">&lt;!-- merges its dependencyManagement into yours --&gt;</span>
         &lt;/<span class="keyword">dependency</span>&gt;
     &lt;/<span class="keyword">dependencies</span>&gt;
 &lt;/<span class="keyword">dependencyManagement</span>&gt;
 
-<span class="comment">&lt;!-- Child POM - no version needed! --&gt;</span>
-&lt;<span class="keyword">dependencies</span>&gt;
-    &lt;<span class="keyword">dependency</span>&gt;
-        &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
-        &lt;<span class="keyword">artifactId</span>&gt;spring-core&lt;/<span class="keyword">artifactId</span>&gt;
-        <span class="comment">&lt;!-- Version from BOM --&gt;</span>
-    &lt;/<span class="keyword">dependency</span>&gt;
-&lt;/<span class="keyword">dependencies</span>&gt;</code></pre>
-        </section>
+<span class="comment">// Now declare without a version — the BOM supplies it</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-core&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
 
-        <section class="content-section">
-            <h2>Excluding Transitive Dependencies</h2>
+                <div class="info-box tip">
+                    <div class="info-box-title">spring-boot-starter-parent vs importing the BOM directly</div>
+                    <p>When you inherit from <code>spring-boot-starter-parent</code>, you get
+                        the Spring Boot BOM <em>and</em> plugin defaults <em>and</em> resource
+                        filtering — but a project can only have ONE
+                        <code>&lt;parent&gt;</code>. If your project already has its own parent
+                        (a company-wide parent POM, for example), you can't also parent from
+                        Spring Boot. The fix: import
+                        <code>spring-boot-dependencies</code> as a BOM instead of inheriting from
+                        <code>spring-boot-starter-parent</code> — you get the version
+                        management without giving up your own parent.</p>
+                </div>
+            </section>
 
-            <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — EXCLUDING DEPENDENCIES (PRACTICAL CASE)
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Practical Exclusion: Swapping an Embedded Server</h2>
+                <p>The classic real-world exclusion isn't fixing a conflict — it's swapping out
+                    a transitively-included implementation for an alternative.</p>
+
+                <pre><code><span class="comment">// Spring Boot's web starter pulls in embedded Tomcat by default —
+// exclude it to use Jetty or Undertow instead</span>
+&lt;<span class="keyword">dependency</span>&gt;
     &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
     &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-web&lt;/<span class="keyword">artifactId</span>&gt;
     &lt;<span class="keyword">exclusions</span>&gt;
-        <span class="comment">&lt;!-- Exclude Tomcat to use Jetty instead --&gt;</span>
         &lt;<span class="keyword">exclusion</span>&gt;
             &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
             &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-tomcat&lt;/<span class="keyword">artifactId</span>&gt;
@@ -173,70 +214,133 @@
     &lt;/<span class="keyword">exclusions</span>&gt;
 &lt;/<span class="keyword">dependency</span>&gt;
 
-<span class="comment">&lt;!-- Add Jetty instead --&gt;</span>
 &lt;<span class="keyword">dependency</span>&gt;
     &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-jetty&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-undertow&lt;/<span class="keyword">artifactId</span>&gt;
 &lt;/<span class="keyword">dependency</span>&gt;</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Useful Commands</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — VERSION RANGES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Version Ranges — and Why You Shouldn't Use Them</h2>
+                <pre><code><span class="comment">// Maven supports mathematical version ranges</span>
+&lt;<span class="keyword">version</span>&gt;[1.0,2.0)&lt;/<span class="keyword">version</span>&gt;   <span class="comment">&lt;!-- &gt;=1.0, &lt;2.0 --&gt;</span>
+&lt;<span class="keyword">version</span>&gt;[1.5,)&lt;/<span class="keyword">version</span>&gt;     <span class="comment">&lt;!-- &gt;=1.5, any upper bound --&gt;</span>
+&lt;<span class="keyword">version</span>&gt;(,2.0]&lt;/<span class="keyword">version</span>&gt;     <span class="comment">&lt;!-- &lt;=2.0 --&gt;</span></code></pre>
 
-            <pre><code><span class="comment"># Show dependency tree</span>
-mvn dependency:tree
+                <div class="info-box warning">
+                    <div class="info-box-title">Avoid version ranges in production builds</div>
+                    <p>A range means the exact resolved version can change between builds without
+                        any change to your <code>pom.xml</code> — the build is no longer
+                        reproducible. The same commit can produce different binaries depending
+                        purely on when it was built. Pin exact versions (via properties or a
+                        BOM) and update deliberately with
+                        <code>mvn versions:display-dependency-updates</code> instead of letting
+                        the range silently drift.</p>
+                </div>
+            </section>
 
-<span class="comment"># Show tree for specific artifact</span>
-mvn dependency:tree -Dincludes=org.springframework
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — DIAGNOSTIC COMMANDS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Diagnostic Commands Reference</h2>
+                <pre><code><span class="comment"># Full dependency tree with conflict resolution shown</span>
+mvn dependency:tree -Dverbose
 
-<span class="comment"># Find unused dependencies</span>
+<span class="comment"># Filter to one artifact — find where it's coming from</span>
+mvn dependency:tree -Dincludes=com.fasterxml.jackson.core
+
+<span class="comment"># Declared-but-unused, or used-but-undeclared dependencies
+# (the latter is a real risk: it compiles because of a transitive dependency
+# that could disappear if an unrelated library changes)</span>
 mvn dependency:analyze
 
-<span class="comment"># Download sources and javadocs</span>
+<span class="comment"># Pull down sources/javadoc jars for IDE navigation</span>
 mvn dependency:sources
 mvn dependency:resolve -Dclassifier=javadoc
 
-<span class="comment"># Check for updates</span>
+<span class="comment"># Check for newer available versions across all dependencies</span>
 mvn versions:display-dependency-updates</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Finding Dependencies</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-            <div class="info-box">
-                <p><strong>Maven Central Search:</strong> <a href="https://search.maven.org" target="_blank">search.maven.org</a></p>
-                <p>Search for any library, copy the dependency XML, paste into your pom.xml!</p>
-            </div>
-        </section>
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Dependencies:</strong> External libraries in &lt;dependencies&gt;</li>
-                    <li><strong>Scopes:</strong> compile, provided, runtime, test</li>
-                    <li><strong>Transitive:</strong> Maven downloads dependencies of dependencies</li>
-                    <li><strong>Exclusions:</strong> Remove unwanted transitive deps</li>
-                    <li><strong>DependencyManagement:</strong> Centralize versions</li>
-                    <li><strong>BOM:</strong> Bill of Materials for version management</li>
-                </ul>
-            </div>
-        </section>
+                    <p><strong>Q: What is a transitive dependency?</strong><br>
+                    A dependency of a dependency. If your project depends on library A, and A
+                    depends on library B, B is pulled in automatically as a transitive
+                    dependency — you never declare it yourself.</p>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="maven.html" class="related-link">What is Maven?</a>
-                <a href="scopes.html" class="related-link">Dependency Scopes</a>
-                <a href="versions.html" class="related-link">Version Management</a>
-            </div>
-        </section>
-    </main>
+                    <p><strong>Q: What does the exclusions element do?</strong><br>
+                    Prevents a specific transitive dependency from being pulled in by a declared
+                    dependency. Common uses: removing a conflicting/vulnerable version, or
+                    swapping an implementation (excluding Tomcat to use Jetty instead).</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+
+                    <p><strong>Q: Explain "nearest definition wins" and why it can silently
+                    select the wrong version.</strong><br>
+                    Maven resolves version conflicts by depth in the dependency tree — the
+                    shallowest declaration wins, regardless of which version is actually newer
+                    or more correct. A direct dependency (depth 1) always beats a transitive one
+                    (depth 2+). At equal depth, declaration order in the POM decides. This means
+                    adding an unrelated dependency that happens to declare an old version of a
+                    shared library, earlier in your POM, can silently downgrade something you
+                    rely on — with no warning, since Maven always resolves to <em>some</em>
+                    version and builds successfully regardless of binary compatibility.</p>
+
+                    <p><strong>Q: Why prefer dependencyManagement over a direct exclusion+redeclare for fixing conflicts?</strong><br>
+                    <code>dependencyManagement</code> applies the pin project-wide (or across an
+                    entire multi-module reactor if declared in the parent), automatically, for
+                    every current and future dependency that transitively pulls in that artifact
+                    — no exclusions needed anywhere. Exclusion+redeclare only fixes the one
+                    dependency you applied it to; if a second, unrelated library later pulls in
+                    the same conflicting version, you'd need to repeat the exclusion there too.
+                    It doesn't scale and is easy to forget.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="maven.html" class="related-link">
+                        <span class="related-icon">📜</span>What is Maven?
+                    </a>
+                    <a href="pom.html" class="related-link">
+                        <span class="related-icon">📄</span>POM.xml Structure
+                    </a>
+                    <a href="scopes.html" class="related-link">
+                        <span class="related-icon">🎯</span>Dependency Scopes
+                    </a>
+                    <a href="versions.html" class="related-link">
+                        <span class="related-icon">🔢</span>Version Management
+                    </a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

@@ -1,383 +1,434 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.refl.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reflection API - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#advanced">Advanced Java</a> / Reflection API
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#advanced" data-i18n="nav.advanced">Advanced Java</a> /
+                Reflection API
             </nav>
-            <h1>Reflection API</h1>
-            <p class="topic-subtitle">Inspecting and Modifying Code at Runtime</p>
-            <a href="../../index.html" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.refl.h1">Reflection API</h1>
+            <p class="topic-subtitle" data-i18n="topic.refl.subtitle">Inspecting and invoking code at runtime — and how every major framework is built on it</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is Reflection?</h2>
-            <p>Imagine having X-ray vision to see inside a sealed box, and magic hands that can reach through and rearrange things inside. <strong>Reflection</strong> gives Java programs this superpower - the ability to inspect and modify classes, methods, and fields at runtime!</p>
+    <div class="topic-layout">
 
-            <h3>Real-World Analogy: Building Inspector</h3>
-            <p>A building inspector can:</p>
-            <ul>
-                <li>See the building's blueprint without opening walls (class structure)</li>
-                <li>Count rooms and identify their purpose (methods, fields)</li>
-                <li>Check room dimensions and features (method parameters, return types)</li>
-                <li>Even access locked rooms with a master key (private members!)</li>
-            </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <p>Reflection lets Java code be its own inspector!</p>
+        <main class="topic-content">
 
-            <h3>Simple Example - The Magic</h3>
-            <pre><code><span class="keyword">class</span> <span class="class-name">Person</span> {
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS REFLECTION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Reflection?</h2>
+                <p><strong>Reflection</strong> is the ability of Java code to inspect and
+                    manipulate classes, methods, fields, and constructors at runtime — even
+                    ones it has no compile-time knowledge of. Normal Java code is bound by
+                    static types: you call methods that exist on a known type, checked by the
+                    compiler. Reflection breaks that boundary: code can ask an object
+                    "what fields do you have?" and read or modify them by name, as a string.</p>
+
+                <p>The problem it solves: frameworks need to operate on <em>your</em> classes
+                    without knowing them in advance. Spring needs to inject dependencies into
+                    classes it has never seen. Jackson needs to serialise any object to JSON.
+                    JUnit needs to find and run methods annotated <code>@Test</code>. None of
+                    this is possible with static method calls — the framework code is compiled
+                    before your classes even exist.</p>
+
+                <pre><code><span class="keyword">class</span> <span class="class-name">Person</span> {
     <span class="keyword">private</span> <span class="class-name">String</span> name = <span class="string">"Alice"</span>;
-    <span class="keyword">private</span> <span class="keyword">int</span> age = <span class="number">25</span>;
 }
 
-<span class="comment">// Normal Java - Can't access private fields!</span>
+<span class="comment">// Normal Java: compile-time access only</span>
 <span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
-<span class="comment">// System.out.println(p.name); // ❌ ERROR! name is private</span>
+<span class="comment">// p.name;   ❌ compile error — private, not accessible</span>
 
-<span class="comment">// With Reflection - Break the rules!</span>
-<span class="class-name">Class</span>&lt;?&gt; clazz = p.getClass();
-<span class="class-name">Field</span> nameField = clazz.getDeclaredField(<span class="string">"name"</span>);
-nameField.setAccessible(<span class="keyword">true</span>);  <span class="comment">// Bypass private!</span>
-<span class="class-name">String</span> name = (<span class="class-name">String</span>) nameField.get(p);
-<span class="class-name">System</span>.out.println(name);  <span class="comment">// ✅ "Alice" - accessed private field!</span></code></pre>
-        </section>
+<span class="comment">// Reflection: runtime access by name, bypassing access control</span>
+<span class="class-name">Field</span> nameField = p.getClass().getDeclaredField(<span class="string">"name"</span>);
+nameField.setAccessible(<span class="keyword">true</span>);
+<span class="class-name">String</span> name = (<span class="class-name">String</span>) nameField.get(p);  <span class="comment">// "Alice" — read via reflection</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Getting Class Information</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — INSPECTING CLASSES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Inspecting Classes</h2>
 
-            <h3>Three Ways to Get Class Object</h3>
-            <pre><code><span class="comment">// Way 1: From an object instance</span>
-<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
-<span class="class-name">Class</span>&lt;?&gt; clazz1 = p.getClass();
+                <pre><code><span class="comment">// Three ways to get a Class object</span>
+<span class="class-name">Class</span>&lt;?&gt; c1 = p.getClass();                       <span class="comment">// from an instance</span>
+<span class="class-name">Class</span>&lt;?&gt; c2 = <span class="class-name">Person</span>.<span class="keyword">class</span>;                       <span class="comment">// class literal — preferred, type-checked</span>
+<span class="class-name">Class</span>&lt;?&gt; c3 = <span class="class-name">Class</span>.forName(<span class="string">"com.app.Person"</span>); <span class="comment">// by name — for dynamic loading (plugins)</span>
 
-<span class="comment">// Way 2: From class literal</span>
-<span class="class-name">Class</span>&lt;?&gt; clazz2 = <span class="class-name">Person</span>.<span class="keyword">class</span>;
+<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
+clazz.getName();              <span class="comment">// "com.app.Person"</span>
+clazz.getSimpleName();        <span class="comment">// "Person"</span>
+clazz.getSuperclass();        <span class="comment">// parent class</span>
+clazz.getInterfaces();        <span class="comment">// implemented interfaces</span>
+clazz.isInterface();          <span class="comment">// false</span>
+clazz.isAnnotationPresent(<span class="class-name">Entity</span>.<span class="keyword">class</span>);  <span class="comment">// check for an annotation</span>
 
-<span class="comment">// Way 3: From class name string (useful for dynamic loading)</span>
-<span class="class-name">Class</span>&lt;?&gt; clazz3 = <span class="class-name">Class</span>.forName(<span class="string">"com.example.Person"</span>);</code></pre>
-
-            <h3>Inspecting Class Details</h3>
-            <pre><code><span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
-
-<span class="comment">// Get names</span>
-<span class="class-name">System</span>.out.println(clazz.getName());         <span class="comment">// "com.example.Person"</span>
-<span class="class-name">System</span>.out.println(clazz.getSimpleName());  <span class="comment">// "Person"</span>
-
-<span class="comment">// Get package</span>
-<span class="class-name">System</span>.out.println(clazz.getPackage().getName());
-
-<span class="comment">// Get parent class</span>
-<span class="class-name">Class</span>&lt;?&gt; parent = clazz.getSuperclass();
-
-<span class="comment">// Get interfaces</span>
-<span class="class-name">Class</span>&lt;?&gt;[] interfaces = clazz.getInterfaces();
-
-<span class="comment">// Check modifiers</span>
 <span class="keyword">int</span> mods = clazz.getModifiers();
-<span class="class-name">System</span>.out.println(<span class="class-name">Modifier</span>.isPublic(mods));     <span class="comment">// true/false</span>
-<span class="class-name">System</span>.out.println(<span class="class-name">Modifier</span>.isAbstract(mods));   <span class="comment">// true/false</span></code></pre>
-        </section>
+<span class="class-name">Modifier</span>.isPublic(mods);
+<span class="class-name">Modifier</span>.isAbstract(mods);</code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Working with Fields</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — FIELDS, METHODS, CONSTRUCTORS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Fields, Methods, and Constructors</h2>
 
-            <pre><code><span class="keyword">class</span> <span class="class-name">Person</span> {
-    <span class="keyword">public</span> <span class="class-name">String</span> name = <span class="string">"Alice"</span>;
-    <span class="keyword">private</span> <span class="keyword">int</span> age = <span class="number">25</span>;
-    <span class="keyword">protected</span> <span class="class-name">String</span> address = <span class="string">"NYC"</span>;
-}
-
-<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
+                <h3>Fields</h3>
+                <pre><code><span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
 <span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
 
-<span class="comment">// Get ALL declared fields (public, private, protected)</span>
-<span class="class-name">Field</span>[] allFields = clazz.getDeclaredFields();
-<span class="keyword">for</span> (<span class="class-name">Field</span> f : allFields) {
-    <span class="class-name">System</span>.out.println(f.getName() + <span class="string">": "</span> + f.getType());
-}
+clazz.getDeclaredFields();    <span class="comment">// ALL fields of THIS class (any access level)</span>
+clazz.getFields();            <span class="comment">// only PUBLIC fields (this class + inherited)</span>
 
-<span class="comment">// Get only PUBLIC fields (including inherited)</span>
-<span class="class-name">Field</span>[] publicFields = clazz.getFields();
-
-<span class="comment">// Get specific field</span>
 <span class="class-name">Field</span> ageField = clazz.getDeclaredField(<span class="string">"age"</span>);
+ageField.setAccessible(<span class="keyword">true</span>);     <span class="comment">// required to read/write private fields</span>
+<span class="keyword">int</span> age = (<span class="keyword">int</span>) ageField.get(p);
+ageField.set(p, <span class="number">30</span>);              <span class="comment">// mutate even a private/final field (with caveats)</span></code></pre>
 
-<span class="comment">// Read private field</span>
-ageField.setAccessible(<span class="keyword">true</span>);  <span class="comment">// REQUIRED for private!</span>
-<span class="keyword">int</span> ageValue = (<span class="keyword">int</span>) ageField.get(p);
-<span class="class-name">System</span>.out.println(<span class="string">"Age: "</span> + ageValue);  <span class="comment">// 25</span>
+                <h3>Methods</h3>
+                <pre><code><span class="comment">// getMethod: must specify exact parameter types — finds public methods (incl. inherited)</span>
+<span class="class-name">Method</span> add = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+<span class="class-name">Object</span> result = add.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);   <span class="comment">// returns Object — caller must cast</span>
 
-<span class="comment">// Modify private field</span>
-ageField.set(p, <span class="number">30</span>);
-<span class="class-name">System</span>.out.println(<span class="string">"New age: "</span> + ageField.get(p));  <span class="comment">// 30</span></code></pre>
-        </section>
+<span class="comment">// getDeclaredMethod: finds ANY method declared on this class (incl. private)</span>
+<span class="class-name">Method</span> privateMethod = clazz.getDeclaredMethod(<span class="string">"multiply"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+privateMethod.setAccessible(<span class="keyword">true</span>);
+result = privateMethod.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
 
-        <section class="content-section">
-            <h2>Working with Methods</h2>
+<span class="comment">// Exceptions are wrapped — always unwrap the real cause</span>
+<span class="keyword">try</span> {
+    add.invoke(calc, <span class="string">"not"</span>, <span class="string">"ints"</span>);
+} <span class="keyword">catch</span> (<span class="class-name">InvocationTargetException</span> e) {
+    <span class="class-name">Throwable</span> realCause = e.getCause();  <span class="comment">// the ACTUAL exception thrown inside</span>
+}</code></pre>
 
-            <pre><code><span class="keyword">class</span> <span class="class-name">Calculator</span> {
-    <span class="keyword">public</span> <span class="keyword">int</span> <span class="function">add</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {
-        <span class="keyword">return</span> a + b;
-    }
-
-    <span class="keyword">private</span> <span class="keyword">int</span> <span class="function">multiply</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {
-        <span class="keyword">return</span> a * b;
-    }
-
-    <span class="keyword">public</span> <span class="keyword">void</span> <span class="function">display</span>(<span class="class-name">String</span> msg) {
-        <span class="class-name">System</span>.out.println(msg);
-    }
-}
-
-<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Calculator</span>.<span class="keyword">class</span>;
-<span class="class-name">Calculator</span> calc = <span class="keyword">new</span> <span class="class-name">Calculator</span>();
-
-<span class="comment">// Get all methods</span>
-<span class="class-name">Method</span>[] methods = clazz.getDeclaredMethods();
-<span class="keyword">for</span> (<span class="class-name">Method</span> m : methods) {
-    <span class="class-name">System</span>.out.println(m.getName());
-}
-
-<span class="comment">// Get specific public method (specify parameter types!)</span>
-<span class="class-name">Method</span> addMethod = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
-
-<span class="comment">// Invoke method</span>
-<span class="class-name">Object</span> result = addMethod.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
-<span class="class-name">System</span>.out.println(<span class="string">"5 + 3 = "</span> + result);  <span class="comment">// 8</span>
-
-<span class="comment">// Invoke private method</span>
-<span class="class-name">Method</span> multiplyMethod = clazz.getDeclaredMethod(<span class="string">"multiply"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
-multiplyMethod.setAccessible(<span class="keyword">true</span>);  <span class="comment">// Bypass private</span>
-result = multiplyMethod.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
-<span class="class-name">System</span>.out.println(<span class="string">"5 * 3 = "</span> + result);  <span class="comment">// 15</span>
-
-<span class="comment">// Method with no return (void)</span>
-<span class="class-name">Method</span> displayMethod = clazz.getMethod(<span class="string">"display"</span>, <span class="class-name">String</span>.<span class="keyword">class</span>);
-displayMethod.invoke(calc, <span class="string">"Hello!"</span>);  <span class="comment">// Prints "Hello!"</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Creating Objects Dynamically</h2>
-
-            <pre><code><span class="keyword">class</span> <span class="class-name">Person</span> {
-    <span class="keyword">public</span> <span class="function">Person</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"No-arg constructor"</span>);
-    }
-
-    <span class="keyword">public</span> <span class="function">Person</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> age) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Name: "</span> + name + <span class="string">", Age: "</span> + age);
-    }
-}
-
-<span class="comment">// Normal way</span>
-<span class="class-name">Person</span> p1 = <span class="keyword">new</span> <span class="class-name">Person</span>();
-
-<span class="comment">// Reflection way - no-arg constructor</span>
-<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
+                <h3>Constructors and dynamic instantiation</h3>
+                <pre><code><span class="comment">// No-arg constructor</span>
 <span class="class-name">Object</span> p2 = clazz.getDeclaredConstructor().newInstance();
 
-<span class="comment">// With constructor parameters</span>
-<span class="class-name">Constructor</span>&lt;?&gt; constructor = clazz.getConstructor(<span class="class-name">String</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
-<span class="class-name">Object</span> p3 = constructor.newInstance(<span class="string">"Alice"</span>, <span class="number">25</span>);
+<span class="comment">// With parameters</span>
+<span class="class-name">Constructor</span>&lt;?&gt; ctor = clazz.getConstructor(<span class="class-name">String</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+<span class="class-name">Object</span> p3 = ctor.newInstance(<span class="string">"Alice"</span>, <span class="number">25</span>);
 
-<span class="comment">// Load class by name (dynamic!)</span>
-<span class="class-name">String</span> className = <span class="string">"com.example.Person"</span>;
-<span class="class-name">Class</span>&lt;?&gt; dynamicClass = <span class="class-name">Class</span>.forName(className);
-<span class="class-name">Object</span> p4 = dynamicClass.getDeclaredConstructor().newInstance();</code></pre>
-        </section>
+<span class="comment">// Fully dynamic: load a class by name and instantiate it — the foundation
+// of plugin architectures and dependency injection containers</span>
+<span class="class-name">Class</span>&lt;?&gt; dynamicClass = <span class="class-name">Class</span>.forName(pluginClassName);
+<span class="class-name">Object</span> plugin = dynamicClass.getDeclaredConstructor().newInstance();</code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Real-World Use Cases</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — HOW FRAMEWORKS USE REFLECTION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>How Frameworks Use Reflection</h2>
+                <p>Almost every major Java framework you use is built on reflection. Knowing
+                    this demystifies "magic" annotations and helps you debug framework
+                    behaviour.</p>
 
-            <h3>1. Dependency Injection (Spring Framework)</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">UserController</span> {
-    <span class="annotation">@Autowired</span>  <span class="comment">// Spring uses reflection!</span>
+                <pre><code><span class="comment">// Spring: @Autowired fields are populated via reflection</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+    <span class="annotation">@Autowired</span>
     <span class="keyword">private</span> <span class="class-name">UserService</span> userService;
 }
+<span class="comment">// At startup, Spring: scans for @Autowired fields via reflection,
+// resolves the bean, calls field.setAccessible(true), then field.set(controller, bean)</span>
 
-<span class="comment">// Spring internally does:</span>
-<span class="comment">// 1. Finds @Autowired fields via reflection</span>
-<span class="comment">// 2. Creates UserService instance</span>
-<span class="comment">// 3. Sets field value using reflection (setAccessible!)</span></code></pre>
+<span class="comment">// Jackson: serialises by reading every field via reflection</span>
+<span class="class-name">String</span> json = objectMapper.writeValueAsString(person);
+<span class="comment">// Internally: getDeclaredFields(), setAccessible(true) on each, field.get(person),
+// build a JSON tree from the (name, value) pairs</span>
 
-            <h3>2. JSON Serialization (Jackson, Gson)</h3>
-            <pre><code><span class="comment">// Convert Java object to JSON</span>
-<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Alice"</span>, <span class="number">25</span>);
-<span class="class-name">String</span> json = objectMapper.writeValueAsString(p);
-
-<span class="comment">// Jackson internally:</span>
-<span class="comment">// 1. Uses reflection to find all fields</span>
-<span class="comment">// 2. Reads field values via reflection</span>
-<span class="comment">// 3. Converts to JSON format</span>
-
-<span class="comment">// Convert JSON back to object</span>
-<span class="class-name">Person</span> p2 = objectMapper.readValue(json, <span class="class-name">Person</span>.<span class="keyword">class</span>);
-
-<span class="comment">// Jackson:</span>
-<span class="comment">// 1. Creates empty Person object via reflection</span>
-<span class="comment">// 2. Sets field values from JSON using reflection</span></code></pre>
-
-            <h3>3. Testing Frameworks (JUnit, Mockito)</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">MyTest</span> {
-    <span class="annotation">@Test</span>  <span class="comment">// JUnit finds this via reflection</span>
-    <span class="keyword">public void</span> <span class="function">testSomething</span>() {
-        <span class="comment">// test code...</span>
-    }
-
-    <span class="annotation">@BeforeEach</span>  <span class="comment">// Reflection identifies setup methods</span>
-    <span class="keyword">public void</span> <span class="function">setup</span>() {
-        <span class="comment">// setup code...</span>
-    }
+<span class="comment">// JUnit: finds and invokes @Test methods</span>
+<span class="keyword">public class</span> <span class="class-name">MyTest</span> {
+    <span class="annotation">@Test</span> <span class="keyword">void</span> <span class="function">shouldWork</span>() { ... }
 }
+<span class="comment">// JUnit: clazz.getDeclaredMethods(), filters by isAnnotationPresent(Test.class),
+// creates a test instance via no-arg constructor, invokes each test method</span>
 
-<span class="comment">// JUnit uses reflection to:</span>
-<span class="comment">// 1. Find all @Test methods</span>
-<span class="comment">// 2. Create test class instance</span>
-<span class="comment">// 3. Invoke @BeforeEach methods</span>
-<span class="comment">// 4. Invoke @Test methods</span>
-<span class="comment">// 5. Invoke @AfterEach methods</span></code></pre>
-
-            <h3>4. ORM Frameworks (Hibernate, JPA)</h3>
-            <pre><code><span class="annotation">@Entity</span>
+<span class="comment">// Hibernate/JPA: maps entity fields to database columns</span>
+<span class="annotation">@Entity</span>
 <span class="keyword">public class</span> <span class="class-name">User</span> {
-    <span class="annotation">@Id</span>
-    <span class="keyword">private</span> <span class="class-name">Long</span> id;
-
-    <span class="annotation">@Column</span>
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="annotation">@Id</span> <span class="keyword">private</span> <span class="class-name">Long</span> id;
+    <span class="annotation">@Column</span> <span class="keyword">private</span> <span class="class-name">String</span> name;
 }
+<span class="comment">// Hibernate: reads @Entity/@Id/@Column via reflection at startup, builds
+// a mapping, then uses reflection to populate fields from ResultSet rows</span></code></pre>
+            </section>
 
-<span class="comment">// Hibernate uses reflection to:</span>
-<span class="comment">// 1. Find @Entity classes</span>
-<span class="comment">// 2. Map fields to database columns</span>
-<span class="comment">// 3. Create objects from database rows</span>
-<span class="comment">// 4. Read/write field values</span></code></pre>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — PERFORMANCE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Performance: Reflection Is Slow — Cache It</h2>
+                <pre><code><span class="comment">// Reflection invocation: typically 10-30x slower than a direct call.
+// Cost comes from: access checks on every call, argument boxing, no JIT inlining.</span>
 
-        <section class="content-section">
-            <h2>Performance Considerations</h2>
-
-            <pre><code><span class="comment">// Direct call - FAST</span>
-<span class="keyword">long</span> start = <span class="class-name">System</span>.nanoTime();
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000000</span>; i++) {
-    calc.add(<span class="number">5</span>, <span class="number">3</span>);
-}
-<span class="keyword">long</span> end = <span class="class-name">System</span>.nanoTime();
-<span class="class-name">System</span>.out.println(<span class="string">"Direct: "</span> + (end - start) + <span class="string">"ns"</span>);
-
-<span class="comment">// Reflection call - SLOW (10-50x slower)</span>
-<span class="class-name">Method</span> method = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
-start = <span class="class-name">System</span>.nanoTime();
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000000</span>; i++) {
-    method.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
-}
-end = <span class="class-name">System</span>.nanoTime();
-<span class="class-name">System</span>.out.println(<span class="string">"Reflection: "</span> + (end - start) + <span class="string">"ns"</span>);</code></pre>
-
-            <h3>Optimization Tip: Cache Reflection Objects</h3>
-            <pre><code><span class="comment">// BAD: Look up method every time (SLOW!)</span>
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) {
-    <span class="class-name">Method</span> m = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+<span class="comment">// ❌ WORST: look up the Method every single call</span>
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">1_000</span>; i++) {
+    <span class="class-name">Method</span> m = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);  <span class="comment">// expensive lookup</span>
     m.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
 }
 
-<span class="comment">// GOOD: Cache method lookup (FASTER!)</span>
-<span class="class-name">Method</span> m = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i < <span class="number">1000</span>; i++) {
-    m.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Best Practices & Warnings</h2>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Reflection Drawbacks</div>
-                <ul>
-                    <li>❌ <strong>Performance:</strong> 10-50x slower than direct calls</li>
-                    <li>❌ <strong>Security:</strong> Breaks encapsulation (accesses private members)</li>
-                    <li>❌ <strong>Type Safety:</strong> Errors at runtime, not compile time</li>
-                    <li>❌ <strong>Code Clarity:</strong> Harder to read and understand</li>
-                    <li>❌ <strong>Refactoring:</strong> IDEs can't safely rename reflected members</li>
-                </ul>
-            </div>
-
-            <div class="info-box tip">
-                <div class="info-box-title">When to Use Reflection</div>
-                <p><strong>DO use for:</strong></p>
-                <ul>
-                    <li>✅ Building frameworks and libraries</li>
-                    <li>✅ Dependency injection containers</li>
-                    <li>✅ Object-Relational Mapping (ORM)</li>
-                    <li>✅ Serialization/deserialization</li>
-                    <li>✅ Testing frameworks and mocking</li>
-                    <li>✅ Plugin architectures</li>
-                </ul>
-
-                <p><strong>DON'T use for:</strong></p>
-                <ul>
-                    <li>❌ Regular application business logic</li>
-                    <li>❌ When you can use interfaces/polymorphism instead</li>
-                    <li>❌ Performance-critical code</li>
-                    <li>❌ Simple getter/setter access</li>
-                </ul>
-            </div>
-
-            <h3>Security Considerations</h3>
-            <pre><code><span class="comment">// Reflection can bypass security!</span>
-<span class="keyword">class</span> <span class="class-name">Secrets</span> {
-    <span class="keyword">private static final</span> <span class="class-name">String</span> PASSWORD = <span class="string">"secret123"</span>;
+<span class="comment">// ✅ BETTER: cache the Method/Field/Constructor lookup once</span>
+<span class="keyword">private static final</span> <span class="class-name">Method</span> ADD_METHOD;
+<span class="keyword">static</span> {
+    <span class="keyword">try</span> { <span class="class-name">ADD_METHOD</span> = <span class="class-name">Calculator</span>.<span class="keyword">class</span>.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>); }
+    <span class="keyword">catch</span> (<span class="class-name">NoSuchMethodException</span> e) { <span class="keyword">throw new</span> <span class="class-name">ExceptionInInitializerError</span>(e); }
+}
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">1_000</span>; i++) {
+    <span class="class-name">ADD_METHOD</span>.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);  <span class="comment">// no lookup cost, still has invocation overhead</span>
 }
 
-<span class="comment">// Attacker can access it via reflection!</span>
-<span class="class-name">Field</span> f = <span class="class-name">Secrets</span>.<span class="keyword">class</span>.getDeclaredField(<span class="string">"PASSWORD"</span>);
+<span class="comment">// This is exactly why Spring, Hibernate, and Jackson cache reflective
+// metadata aggressively at startup instead of looking it up per request.</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SENIOR TOPICS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Senior Topics: Modules and MethodHandles</h2>
+
+                <h3>The Java 9+ module problem with setAccessible()</h3>
+                <pre><code><span class="comment">// Before Java 9: setAccessible(true) could bypass ANY access modifier, always.
+// Since Java 9 (strong encapsulation, fully enforced by default since 16/17):
+// a MODULE must explicitly "open" a package before reflection can break into it.</span>
+
+<span class="comment">// ❌ Without an opens declaration, this throws InaccessibleObjectException:</span>
+field.setAccessible(<span class="keyword">true</span>);
+<span class="comment">// java.lang.reflect.InaccessibleObjectException: Unable to make field
+// private java.lang.String com.app.Secret.value accessible:
+// module com.app does not "opens com.app" to module spring.core</span>
+
+<span class="comment">// ✅ Fix 1: declare opens in module-info.java</span>
+<span class="keyword">module</span> com.app {
+    <span class="keyword">opens</span> com.app <span class="keyword">to</span> spring.core, com.fasterxml.jackson.databind;
+}
+
+<span class="comment">// ✅ Fix 2: JVM flag (workaround, common during Java 9-17 migrations)</span>
+<span class="comment">// java --add-opens com.app/com.app=ALL-UNNAMED MyApp</span>
+
+<span class="comment">// This is precisely why Spring Boot, Hibernate, and Jackson required
+// migration work when projects moved past Java 8 — they all rely
+// heavily on setAccessible() for proxies, field injection, and serialisation.</span></code></pre>
+
+                <h3>MethodHandles — the modern, faster alternative</h3>
+                <pre><code><span class="comment">// java.lang.invoke.MethodHandle (Java 7+) offers near-direct-call performance
+// after JIT warms up — the JVM can inline through a MethodHandle, but NOT
+// through reflective Method.invoke().</span>
+
+<span class="class-name">MethodHandles</span>.<span class="class-name">Lookup</span> lookup = <span class="class-name">MethodHandles</span>.lookup();
+<span class="class-name">MethodType</span> type = <span class="class-name">MethodType</span>.methodType(<span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+<span class="class-name">MethodHandle</span> addHandle = lookup.findVirtual(<span class="class-name">Calculator</span>.<span class="keyword">class</span>, <span class="string">"add"</span>, type);
+
+<span class="keyword">int</span> result = (<span class="keyword">int</span>) addHandle.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);  <span class="comment">// type-checked at the invoke() call</span>
+
+<span class="comment">/*
+ *  Reflection vs MethodHandle:
+ *
+ *  Method.invoke()        MethodHandle.invoke()
+ *  ──────────────────     ──────────────────────
+ *  Access check every call  Access check once, at lookup
+ *  Args boxed in Object[]   Args passed natively (with invokeExact)
+ *  JIT cannot inline easily JIT CAN inline after warm-up
+ *  Simpler, more common API More verbose, more performant
+ *
+ *  Used internally by: java.lang.invoke (lambdas use it!), modern
+ *  serialisation libraries, and high-performance frameworks.
+ */</span>
+
+<span class="comment">// Lambdas themselves are implemented via invokedynamic + MethodHandles —
+// NOT via reflection. This is why method references (String::toUpperCase)
+// have essentially zero overhead compared to a direct call.</span></code></pre>
+
+                <h3>Security: setAccessible() is a real attack surface</h3>
+                <pre><code><span class="keyword">class</span> <span class="class-name">Secrets</span> {
+    <span class="keyword">private static final</span> <span class="class-name">String</span> API_KEY = <span class="string">"sk-secret-123"</span>;
+}
+
+<span class="comment">// Reflection bypasses ALL access control — private, final, everything</span>
+<span class="class-name">Field</span> f = <span class="class-name">Secrets</span>.<span class="keyword">class</span>.getDeclaredField(<span class="string">"API_KEY"</span>);
 f.setAccessible(<span class="keyword">true</span>);
 <span class="class-name">String</span> stolen = (<span class="class-name">String</span>) f.get(<span class="keyword">null</span>);
 
-<span class="comment">// Use SecurityManager to prevent this in production!</span></code></pre>
-        </section>
+<span class="comment">// Mitigation: the Java 9+ module system's "opens" requirement is the
+// CURRENT mechanism for restricting this — only modules you explicitly
+// open are reflectively accessible from outside. (SecurityManager,
+// the older mechanism, is deprecated for removal since Java 17 — do
+// not rely on it for new code.)</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Why It Matters</h2>
-            <ul>
-                <li><strong>Frameworks:</strong> Powers Spring, Hibernate, and most Java frameworks</li>
-                <li><strong>Flexibility:</strong> Build generic, reusable code</li>
-                <li><strong>Dynamic Behavior:</strong> Load classes at runtime, plugin systems</li>
-                <li><strong>Tools:</strong> IDE code completion, debuggers use reflection</li>
-                <li><strong>Understanding:</strong> Helps you understand how frameworks work</li>
-            </ul>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — WHEN TO USE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>When to Use Reflection</h2>
 
-            <div class="info-box note">
-                <div class="info-box-title">Remember</div>
-                <p>Reflection is like a skeleton key - powerful but should be used responsibly! Use it when you need the flexibility, but prefer normal Java code when possible.</p>
-            </div>
-        </section>
+                <table>
+                    <tr>
+                        <th>✅ Good fit</th>
+                        <th>❌ Avoid</th>
+                    </tr>
+                    <tr>
+                        <td>Building frameworks/libraries</td>
+                        <td>Regular application business logic</td>
+                    </tr>
+                    <tr>
+                        <td>Dependency injection containers</td>
+                        <td>Anywhere interfaces/polymorphism would work</td>
+                    </tr>
+                    <tr>
+                        <td>Serialisation (JSON, XML mapping)</td>
+                        <td>Performance-critical hot paths</td>
+                    </tr>
+                    <tr>
+                        <td>Testing frameworks, mocking</td>
+                        <td>Simple getter/setter access</td>
+                    </tr>
+                    <tr>
+                        <td>Plugin architectures (dynamic loading)</td>
+                        <td>Anything an IDE should be able to refactor safely</td>
+                    </tr>
+                </table>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="annotations.html" class="related-link">Annotations</a>
-                <a href="jvm-internals.html" class="related-link">JVM Internals</a>
-                <a href="../fundamentals/generics.html" class="related-link">Generics</a>
-            </div>
-        </section>
-    </main>
+                <div class="info-box warning">
+                    <div class="info-box-title">The real cost is not just performance</div>
+                    <p>Reflection breaks compile-time type safety — errors that would be caught
+                        by the compiler instead surface as <code>NoSuchMethodException</code> or
+                        <code>ClassCastException</code> at runtime. It also breaks IDE refactoring:
+                        renaming a field doesn't update <code>"fieldName"</code> string literals
+                        used in reflective lookups. Use reflection only when there is genuinely no
+                        static alternative — which, for application code, is almost never.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+
+                    <p><strong>Q: What is reflection and what problem does it solve?</strong><br>
+                    Reflection lets code inspect and invoke classes, methods, and fields at
+                    runtime, even ones unknown at compile time. It solves the problem of
+                    frameworks needing to operate generically on application code they've never
+                    seen — Spring injecting into your classes, JUnit finding your test methods,
+                    Jackson serialising your objects to JSON.</p>
+
+                    <p><strong>Q: What is the difference between getMethod() and getDeclaredMethod()?</strong><br>
+                    <code>getMethod()</code> returns only <code>public</code> methods, including
+                    inherited ones from superclasses and interfaces. <code>getDeclaredMethod()</code>
+                    returns any method declared directly on that class — public, private,
+                    protected, or package-private — but does NOT include inherited methods.</p>
+
+                    <p><strong>Q: Why is reflection slower than a direct method call?</strong><br>
+                    Every reflective call performs an access check, boxes primitive arguments
+                    into <code>Object[]</code>, and cannot be inlined by the JIT compiler the way
+                    a direct call can. Typical overhead is 10-30x compared to direct invocation.
+                    Mitigate by caching the <code>Method</code>/<code>Field</code> lookup once
+                    rather than repeating <code>getMethod()</code> on every call.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+
+                    <p><strong>Q: How did the Java 9 module system change reflection?</strong><br>
+                    Before Java 9, <code>setAccessible(true)</code> could bypass any access
+                    modifier unconditionally. Java 9 introduced strong encapsulation: a module
+                    must explicitly declare <code>opens package to otherModule</code> in its
+                    <code>module-info.java</code> before reflective access from outside is
+                    permitted — otherwise it throws <code>InaccessibleObjectException</code>.
+                    This is enforced by default since Java 16/17. It broke many frameworks
+                    (Spring, Hibernate, Mockito) during migration because they rely on deep
+                    reflection for proxies and field injection — fixed with explicit
+                    <code>opens</code> declarations or <code>--add-opens</code> JVM flags as a
+                    bridge.</p>
+
+                    <p><strong>Q: What is the difference between Method.invoke() and MethodHandle, and why does it matter?</strong><br>
+                    Both invoke methods reflectively, but <code>MethodHandle</code>
+                    (<code>java.lang.invoke</code>, Java 7+) performs its access check once at
+                    lookup time rather than on every call, passes arguments without boxing
+                    (via <code>invokeExact</code>), and — critically — the JIT compiler CAN
+                    inline through a MethodHandle after warm-up, while it essentially cannot
+                    through <code>Method.invoke()</code>. This is why lambdas and method
+                    references compile to <code>invokedynamic</code> + MethodHandles instead of
+                    classic reflection: near-zero overhead at steady state.</p>
+
+                    <p><strong>Q: Why is SecurityManager not the answer to reflection security in 2026?</strong><br>
+                    <code>SecurityManager</code> has been deprecated for removal since Java 17
+                    (JEP 411) due to performance overhead and a complexity that almost nobody
+                    used correctly. The current and forward-looking mechanism for restricting
+                    reflective access is the module system's <code>opens</code> directive —
+                    explicit, declarative, and checked by the module system itself rather than
+                    a pluggable runtime policy. New code should not architect security around
+                    SecurityManager.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="annotations.html" class="related-link">
+                        <span class="related-icon">🏷️</span>Annotations
+                    </a>
+                    <a href="jvm-internals.html" class="related-link">
+                        <span class="related-icon">🔬</span>JVM Internals
+                    </a>
+                    <a href="../fundamentals/generics.html" class="related-link">
+                        <span class="related-icon">🔷</span>Generics
+                    </a>
+                    <a href="design-patterns.html" class="related-link">
+                        <span class="related-icon">🧱</span>Design Patterns
+                    </a>
+                    <a href="../fundamentals/access-modifiers.html" class="related-link">
+                        <span class="related-icon">🔒</span>Access Modifiers
+                    </a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
