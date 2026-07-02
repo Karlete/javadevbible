@@ -1,171 +1,368 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.spprofiles.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profiles & Environments - JavaDev Bible</title>
+    <title>Profiles &amp; Environments - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#spring">Spring Framework</a> / Profiles
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#spring" data-i18n="nav.spring">Spring Framework</a> /
+                Profiles &amp; Environments
             </nav>
-            <h1>Profiles & Environments</h1>
-            <p class="topic-subtitle">Managing different configurations for different environments</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.spprofiles.h1">Profiles &amp; Environments</h1>
+            <p class="topic-subtitle" data-i18n="topic.spprofiles.subtitle">Environment-specific configuration, profile-conditional beans, and the right way to activate profiles in dev, CI, and production</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What are Profiles?</h2>
-            <p>Profiles allow you to have different configurations for different environments (dev, test, prod).</p>
+    <div class="topic-layout">
 
-            <h3>Profile-Specific Files</h3>
-            <pre><code>src/main/resources/
-├── application.properties          <span class="comment"># Default/shared config</span>
-├── application-dev.properties      <span class="comment"># Development</span>
-├── application-test.properties     <span class="comment"># Testing</span>
-└── application-prod.properties     <span class="comment"># Production</span></code></pre>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>Example Configurations</h3>
-            <pre><code><span class="comment"># application.properties (shared)</span>
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT ARE PROFILES AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Are Profiles, and Why Do They Exist?</h2>
+                <p>A Spring profile is a named configuration scope. When a profile is active,
+                    Spring loads its profile-specific property files and registers only the beans
+                    annotated for that profile — everything else stays exactly the same. The
+                    result is one application binary that behaves differently in development,
+                    CI, and production without any code changes between environments.</p>
+
+                <p>This fits directly into the property source priority system covered in
+                    <a href="properties.html">Application Properties</a>: profile-specific
+                    files (<code>application-prod.properties</code>) sit higher in the priority
+                    order than the default <code>application.properties</code>, so they
+                    selectively override only the keys that genuinely differ per environment
+                    while the shared base file covers the rest.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">No active profile = no profile-specific file loaded</div>
+                    <p>If <code>spring.profiles.active</code> is not set anywhere, Spring Boot
+                        loads only <code>application.properties</code> / <code>application.yml</code>
+                        — no profile-specific file is touched. The implicit fallback is
+                        <code>default</code>: a file named
+                        <code>application-default.properties</code> <em>is</em> loaded when no
+                        other profile is active, which is useful for local dev defaults you
+                        don't want to commit as the universal base config.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — PROFILE-SPECIFIC FILES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Profile-Specific Property Files</h2>
+
+                <pre><code>src/main/resources/
+├── application.properties          <span class="comment"># Shared defaults — loaded always</span>
+├── application-dev.properties      <span class="comment"># Loaded only when "dev" profile is active</span>
+├── application-test.properties     <span class="comment"># Loaded only when "test" profile is active</span>
+└── application-prod.properties     <span class="comment"># Loaded only when "prod" profile is active</span></code></pre>
+
+                <pre><code><span class="comment"># application.properties — keys shared by ALL environments</span>
 app.name=My Application
-spring.jpa.show-sql=false
+spring.jpa.open-in-view=false
 
-<span class="comment"># application-dev.properties</span>
+<span class="comment"># application-dev.properties — dev overrides only</span>
 spring.datasource.url=jdbc:h2:mem:devdb
-spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.hibernate.ddl-auto=create-drop  <span class="comment"># destroys schema on shutdown — fine for dev, never for prod</span>
 spring.jpa.show-sql=true
 logging.level.com.example=DEBUG
 
-<span class="comment"># application-prod.properties</span>
-spring.datasource.url=jdbc:postgresql://prod-db:5432/myapp
+<span class="comment"># application-prod.properties — prod overrides only</span>
+spring.datasource.url=${DB_URL}            <span class="comment"># resolved from env var — never hardcoded here</span>
 spring.jpa.hibernate.ddl-auto=validate
 logging.level.root=WARN</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Activating Profiles</h2>
+                <div class="info-box warning">
+                    <div class="info-box-title">create-drop in dev will surprise you exactly once</div>
+                    <p><code>ddl-auto=create-drop</code> drops and recreates the entire schema
+                        every time the application starts <em>and</em> every time it stops. Any
+                        data you inserted during a dev session is gone the moment you stop the
+                        app. This is intentional for a truly disposable dev database, but
+                        developers who expect data to persist between restarts hit this hard the
+                        first time. The alternative for dev is <code>update</code> (schema
+                        evolves, data survives restarts) — still never acceptable in production,
+                        but less destructive for iterative dev work.</p>
+                </div>
+            </section>
 
-            <pre><code><span class="comment"># In application.properties</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — ACTIVATING PROFILES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Activating Profiles</h2>
+
+                <pre><code><span class="comment"># In application.properties — useful for local dev, never commit "prod" here</span>
 spring.profiles.active=dev
 
-<span class="comment"># Command line</span>
+<span class="comment"># Command-line argument — overrides the file, useful for one-off runs</span>
 java -jar app.jar --spring.profiles.active=prod
 
-<span class="comment"># Environment variable</span>
+<span class="comment"># Environment variable — the correct approach in containers and CI/CD</span>
 export SPRING_PROFILES_ACTIVE=prod
 java -jar app.jar
 
-<span class="comment"># Multiple profiles</span>
-java -jar app.jar --spring.profiles.active=prod,metrics</code></pre>
-        </section>
+<span class="comment"># Multiple profiles — all their property files are loaded, all their @Profile beans register</span>
+java -jar app.jar --spring.profiles.active=prod,metrics,featureX</code></pre>
 
-        <section class="content-section">
-            <h2>Profile-Specific Beans</h2>
+                <div class="info-box important">
+                    <div class="info-box-title">Never commit spring.profiles.active=prod to version control</div>
+                    <p>Setting <code>spring.profiles.active=prod</code> inside
+                        <code>application.properties</code> and committing it means every
+                        developer who clones the repo runs production config locally — wrong
+                        database, wrong log level, wrong everything. The convention is:
+                        <code>application.properties</code> sets <code>active=dev</code> (or
+                        nothing), and production activation is handled exclusively by the
+                        deployment environment via <code>SPRING_PROFILES_ACTIVE</code>.</p>
+                </div>
+            </section>
 
-            <pre><code><span class="annotation">@Configuration</span>
-<span class="keyword">public class</span> <span class="class-name">DataSourceConfig</span> {
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — PROFILE-CONDITIONAL BEANS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Profile-Conditional Beans</h2>
 
-    <span class="annotation">@Bean</span>
-    <span class="annotation">@Profile</span>(<span class="string">"dev"</span>)
-    <span class="keyword">public</span> <span class="class-name">DataSource</span> <span class="function">devDataSource</span>() {
-        <span class="comment">// H2 in-memory database for development</span>
-        <span class="keyword">return new</span> <span class="class-name">EmbeddedDatabaseBuilder</span>()
-            .setType(<span class="class-name">EmbeddedDatabaseType</span>.H2)
-            .build();
-    }
-
-    <span class="annotation">@Bean</span>
-    <span class="annotation">@Profile</span>(<span class="string">"prod"</span>)
-    <span class="keyword">public</span> <span class="class-name">DataSource</span> <span class="function">prodDataSource</span>() {
-        <span class="comment">// Real database for production</span>
-        <span class="class-name">HikariDataSource</span> ds = <span class="keyword">new</span> <span class="class-name">HikariDataSource</span>();
-        ds.setJdbcUrl(<span class="string">"jdbc:postgresql://prod:5432/db"</span>);
-        <span class="keyword">return</span> ds;
-    }
-
-    <span class="annotation">@Bean</span>
-    <span class="annotation">@Profile</span>(<span class="string">"!prod"</span>)  <span class="comment">// Any profile except prod</span>
-    <span class="keyword">public</span> <span class="class-name">DataInitializer</span> <span class="function">dataInitializer</span>() {
-        <span class="keyword">return new</span> <span class="class-name">DataInitializer</span>();
-    }
-}
-
-<span class="comment">// Profile on entire class</span>
+                <pre><code><span class="comment">// Two implementations of the same interface — only one registers per profile</span>
 <span class="annotation">@Service</span>
 <span class="annotation">@Profile</span>(<span class="string">"dev"</span>)
 <span class="keyword">public class</span> <span class="class-name">MockEmailService</span> <span class="keyword">implements</span> <span class="class-name">EmailService</span> {
-    <span class="comment">// Mock implementation for dev</span>
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">send</span>(<span class="class-name">String</span> to, <span class="class-name">String</span> body) {
+        log.info(<span class="string">"[DEV] Fake email to {}: {}"</span>, to, body);  <span class="comment">// no real email sent</span>
+    }
 }
 
 <span class="annotation">@Service</span>
 <span class="annotation">@Profile</span>(<span class="string">"prod"</span>)
 <span class="keyword">public class</span> <span class="class-name">SmtpEmailService</span> <span class="keyword">implements</span> <span class="class-name">EmailService</span> {
-    <span class="comment">// Real implementation for prod</span>
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">send</span>(<span class="class-name">String</span> to, <span class="class-name">String</span> body) { <span class="comment">/* real SMTP */</span> }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>YAML Multi-Document</h2>
+                <pre><code><span class="annotation">@Configuration</span>
+<span class="keyword">public class</span> <span class="class-name">DataSourceConfig</span> {
 
-            <pre><code><span class="comment"># application.yml - all profiles in one file</span>
+    <span class="comment">// Registers in any profile except prod — dev, test, staging, local, etc.</span>
+    <span class="annotation">@Bean</span>
+    <span class="annotation">@Profile</span>(<span class="string">"!prod"</span>)
+    <span class="keyword">public</span> <span class="class-name">DataSource</span> <span class="function">embeddedDataSource</span>() {
+        <span class="keyword">return new</span> <span class="class-name">EmbeddedDatabaseBuilder</span>()
+            .setType(<span class="class-name">EmbeddedDatabaseType</span>.H2)
+            .build();
+    }
 
-<span class="comment"># Default config</span>
+    <span class="comment">// Prod DataSource reads its config from @ConfigurationProperties — no hardcoded URLs here</span>
+    <span class="annotation">@Bean</span>
+    <span class="annotation">@Profile</span>(<span class="string">"prod"</span>)
+    <span class="keyword">public</span> <span class="class-name">DataSource</span> <span class="function">prodDataSource</span>(<span class="class-name">DataSourceProperties</span> props) {
+        <span class="keyword">return</span> props.initializeDataSourceBuilder().build();
+        <span class="comment">// spring.datasource.url/username/password are resolved from env vars in prod</span>
+    }
+
+    <span class="comment">// Seed data loader — only outside prod, AND only when the "seed" feature profile is active</span>
+    <span class="annotation">@Bean</span>
+    <span class="annotation">@Profile</span>({<span class="string">"dev"</span>, <span class="string">"test"</span>})
+    <span class="keyword">public</span> <span class="class-name">DataInitializer</span> <span class="function">dataInitializer</span>() {
+        <span class="keyword">return new</span> <span class="class-name">DataInitializer</span>();
+    }
+}</code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">@Profile accepts SpEL-style expressions for complex conditions</div>
+                    <p><code>@Profile("!prod")</code> means "active if prod is NOT active."
+                        <code>@Profile({"dev", "test"})</code> means "active if dev OR test is
+                        active." For AND logic — "active only if BOTH staging AND metrics are
+                        active" — use the expression syntax:
+                        <code>@Profile("staging &amp; metrics")</code>. This keeps the condition
+                        on the bean itself rather than duplicating it across multiple callers.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — YAML MULTI-DOCUMENT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>YAML Multi-Document — All Profiles in One File</h2>
+
+                <pre><code><span class="comment"># application.yml — shared defaults (no profile block)</span>
 <span class="keyword">app</span>:
   <span class="keyword">name</span>: My Application
+<span class="keyword">spring</span>:
+  <span class="keyword">jpa</span>:
+    <span class="keyword">open-in-view</span>: <span class="keyword">false</span>
 
 ---
+<span class="comment"># Document 2 — active only when profile "dev" is active</span>
 <span class="keyword">spring</span>:
   <span class="keyword">config</span>:
     <span class="keyword">activate</span>:
       <span class="keyword">on-profile</span>: dev
-
-<span class="keyword">spring</span>:
   <span class="keyword">datasource</span>:
     <span class="keyword">url</span>: jdbc:h2:mem:devdb
+  <span class="keyword">jpa</span>:
+    <span class="keyword">hibernate</span>:
+      <span class="keyword">ddl-auto</span>: create-drop
+    <span class="keyword">show-sql</span>: <span class="keyword">true</span>
 
 ---
+<span class="comment"># Document 3 — active only when profile "prod" is active</span>
 <span class="keyword">spring</span>:
   <span class="keyword">config</span>:
     <span class="keyword">activate</span>:
       <span class="keyword">on-profile</span>: prod
-
-<span class="keyword">spring</span>:
   <span class="keyword">datasource</span>:
-    <span class="keyword">url</span>: jdbc:postgresql://prod:5432/db</code></pre>
-        </section>
+    <span class="keyword">url</span>: <span class="string">"${DB_URL}"</span>
+  <span class="keyword">jpa</span>:
+    <span class="keyword">hibernate</span>:
+      <span class="keyword">ddl-auto</span>: validate
+<span class="keyword">logging</span>:
+  <span class="keyword">level</span>:
+    <span class="keyword">root</span>: WARN</code></pre>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Profiles:</strong> Environment-specific configuration</li>
-                    <li><strong>application-{profile}.properties:</strong> Profile-specific files</li>
-                    <li><strong>spring.profiles.active:</strong> Activate profiles</li>
-                    <li><strong>@Profile:</strong> Profile-specific beans</li>
-                    <li><strong>@Profile("!prod"):</strong> All except prod</li>
-                </ul>
-            </div>
-        </section>
+                <div class="info-box warning">
+                    <div class="info-box-title">The most common YAML multi-document bug: duplicate top-level keys in the same document</div>
+                    <p>YAML does not allow two keys with the same name at the same level in the
+                        same document. Writing <code>spring:</code> twice in one
+                        <code>---</code>-separated block — once for
+                        <code>spring.config.activate</code> and once for
+                        <code>spring.datasource</code> — means the second <code>spring:</code>
+                        block silently overwrites the first. Everything under
+                        <code>spring.config.activate</code> disappears, the profile activation
+                        condition is lost, and the document loads for every profile. The fix,
+                        as shown above, is a single <code>spring:</code> key per document,
+                        with all spring-namespaced config nested beneath it.</p>
+                </div>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="boot.html" class="related-link">Spring Boot</a>
-                <a href="properties.html" class="related-link">Application Properties</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — PROFILES IN TESTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Profiles in Tests</h2>
+
+                <pre><code><span class="comment">// @ActiveProfiles activates the named profile for the entire test class</span>
+<span class="annotation">@SpringBootTest</span>
+<span class="annotation">@ActiveProfiles</span>(<span class="string">"test"</span>)
+<span class="keyword">class</span> <span class="class-name">UserServiceIntegrationTest</span> {
+    <span class="comment">// Loads application.properties + application-test.properties
+    // Registers all @Profile("test") beans, none of the @Profile("prod") ones</span>
+}
+
+<span class="comment">// @DataJpaTest already activates an embedded database — combine with a custom profile
+// to load test-specific seed data or configuration without a full context</span>
+<span class="annotation">@DataJpaTest</span>
+<span class="annotation">@ActiveProfiles</span>(<span class="string">"test"</span>)
+<span class="keyword">class</span> <span class="class-name">UserRepositoryTest</span> { ... }</code></pre>
+
+                <pre><code><span class="comment"># application-test.properties — test-specific overrides</span>
+spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+spring.jpa.hibernate.ddl-auto=create-drop
+logging.level.root=WARN  <span class="comment"># suppress noise during test runs</span></code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">@DataJpaTest already replaces the DataSource — application-test.properties may be redundant</div>
+                    <p><code>@DataJpaTest</code> auto-configures an in-memory H2 database by
+                        default, replacing whatever <code>spring.datasource.*</code> is
+                        configured. An explicit <code>application-test.properties</code> with
+                        H2 settings is harmless but redundant for repository slice tests. It
+                        becomes genuinely necessary when using
+                        <code>@AutoConfigureTestDatabase(replace = Replace.NONE)</code> with
+                        Testcontainers against a real database — see
+                        <a href="data-jpa.html">Spring Data JPA — Testing</a>.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What happens if no profile is active?</strong><br>
+                    Only <code>application.properties</code> / <code>application.yml</code> is
+                    loaded. No profile-specific file is touched. If an
+                    <code>application-default.properties</code> file exists, Spring Boot loads
+                    it as the implicit fallback when no other profile is active.</p>
+
+                    <p><strong>Q: Can multiple profiles be active at the same time?</strong><br>
+                    Yes — <code>--spring.profiles.active=prod,metrics</code> activates both.
+                    All matching property files are loaded and all matching
+                    <code>@Profile</code> beans register. Properties from later-activated
+                    profiles override earlier ones for the same key.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Where should spring.profiles.active be set, and what should never set it?</strong><br>
+                    Production activation belongs exclusively in the deployment environment —
+                    a container env var (<code>SPRING_PROFILES_ACTIVE=prod</code>), a CI/CD
+                    pipeline variable, or a Kubernetes ConfigMap. The only legitimate use of
+                    <code>spring.profiles.active</code> inside a committed
+                    <code>application.properties</code> is setting <code>dev</code> as a
+                    local convenience default, with the explicit expectation that any real
+                    environment overrides it. Committing <code>active=prod</code> to a shared
+                    repo is a configuration management failure, not a style preference.</p>
+
+                    <p><strong>Q: What's the YAML multi-document bug with duplicate top-level keys, and why is it silent?</strong><br>
+                    YAML's spec disallows duplicate keys at the same level in the same
+                    mapping — but many parsers (including SnakeYAML, which Spring uses) treat
+                    this as a "last key wins" situation rather than an error. Writing
+                    <code>spring:</code> twice in one document means the first block is
+                    silently discarded — the profile activation condition in
+                    <code>spring.config.activate.on-profile</code> disappears, and the
+                    document is loaded unconditionally for all profiles. The fix is a single
+                    <code>spring:</code> root key per document, with all spring-namespaced
+                    properties nested under it.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="properties.html" class="related-link"><span class="related-icon">⚙️</span>Application Properties</a>
+                    <a href="boot.html" class="related-link"><span class="related-icon">🍃</span>Spring Boot Basics</a>
+                    <a href="core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
+                    <a href="data-jpa.html" class="related-link"><span class="related-icon">💾</span>Spring Data JPA</a>
+                    <a href="../tools/testing.html" class="related-link"><span class="related-icon">🧪</span>Testing (JUnit, Mockito)</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

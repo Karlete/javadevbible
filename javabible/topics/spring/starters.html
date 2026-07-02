@@ -1,162 +1,336 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.spstarters.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spring Boot Starters - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#spring">Spring Framework</a> / Starters
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#spring" data-i18n="nav.spring">Spring Framework</a> /
+                Spring Boot Starters
             </nav>
-            <h1>Spring Boot Starters</h1>
-            <p class="topic-subtitle">Pre-configured dependency bundles</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.spstarters.h1">Spring Boot Starters</h1>
+            <p class="topic-subtitle" data-i18n="topic.spstarters.subtitle">What a starter actually is, how auto-configuration is triggered, and when to exclude or write your own</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What are Starters?</h2>
-            <p>Starters are dependency descriptors that bundle common dependencies with compatible versions.</p>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p>Instead of manually adding 10+ dependencies for web development, just add <code>spring-boot-starter-web</code>!</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Common Starters</h2>
+        <main class="topic-content">
 
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Starter</th>
-                        <th>What It Includes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>spring-boot-starter-web</strong></td>
-                        <td>Spring MVC, embedded Tomcat, Jackson JSON</td>
-                    </tr>
-                    <tr>
-                        <td><strong>spring-boot-starter-data-jpa</strong></td>
-                        <td>Spring Data JPA, Hibernate, JDBC</td>
-                    </tr>
-                    <tr>
-                        <td><strong>spring-boot-starter-security</strong></td>
-                        <td>Spring Security, authentication filters</td>
-                    </tr>
-                    <tr>
-                        <td><strong>spring-boot-starter-validation</strong></td>
-                        <td>Bean Validation (Hibernate Validator)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>spring-boot-starter-test</strong></td>
-                        <td>JUnit 5, Mockito, AssertJ, Spring Test</td>
-                    </tr>
-                    <tr>
-                        <td><strong>spring-boot-starter-actuator</strong></td>
-                        <td>Health checks, metrics, monitoring</td>
-                    </tr>
-                    <tr>
-                        <td><strong>spring-boot-starter-mail</strong></td>
-                        <td>Java Mail API, Spring mail support</td>
-                    </tr>
-                    <tr>
-                        <td><strong>spring-boot-starter-cache</strong></td>
-                        <td>Spring Cache abstraction</td>
-                    </tr>
-                    <tr>
-                        <td><strong>spring-boot-starter-webflux</strong></td>
-                        <td>Reactive web with Spring WebFlux</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS A STARTER, REALLY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What a Starter Actually Is — Two Things, Not One</h2>
+                <p>The name "starter" suggests a single mechanism. It's actually two separate
+                    things working together, and conflating them is the source of most
+                    "why did adding this dependency change my app's behaviour" confusion:</p>
 
-        <section class="content-section">
-            <h2>Usage Example</h2>
+                <table>
+                    <tr><th>Part</th><th>What it is</th><th>Where the code lives</th></tr>
+                    <tr>
+                        <td><strong>The starter POM</strong></td>
+                        <td>An empty JAR whose only content is a
+                            <code>pom.xml</code> declaring a curated set of
+                            transitive dependencies at compatible versions</td>
+                        <td>No Java code at all — pure Maven dependency management</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Auto-configuration</strong></td>
+                        <td><code>@AutoConfiguration</code> classes in the
+                            pulled-in libraries that Spring Boot registers and
+                            conditionally activates</td>
+                        <td>Inside the actual library JARs
+                            (<code>spring-webmvc</code>,
+                            <code>jackson-databind</code>, etc.), not in the
+                            starter itself</td>
+                    </tr>
+                </table>
 
-            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+                <p>Adding <code>spring-boot-starter-web</code> to your POM does two things at
+                    once: it pulls in <code>spring-webmvc</code>, <code>spring-boot-starter-tomcat</code>,
+                    <code>jackson-databind</code>, and a handful of others (the starter's job),
+                    and those JARs each ship <code>@AutoConfiguration</code> classes that Spring
+                    Boot discovers and conditionally activates (auto-configuration's job). The
+                    starter is the trigger; the auto-configuration is the actual behaviour
+                    change.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">How auto-configuration is discovered: AutoConfiguration.imports</div>
+                    <p>Since Spring Boot 2.7, each library that provides auto-configuration
+                        ships a file at
+                        <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code>
+                        listing its <code>@AutoConfiguration</code> class names. Spring Boot
+                        reads this file on startup and registers every class in it as a
+                        candidate. Before 2.7, the same information lived in
+                        <code>META-INF/spring.factories</code> under the
+                        <code>EnableAutoConfiguration</code> key — that file still works for
+                        backwards compatibility, but new libraries use
+                        <code>AutoConfiguration.imports</code>.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — COMMON STARTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Common Starters and What They Actually Pull In</h2>
+
+                <table>
+                    <tr><th>Starter</th><th>Key transitive dependencies</th><th>Auto-configuration effect</th></tr>
+                    <tr>
+                        <td><code>spring-boot-starter-web</code></td>
+                        <td>spring-webmvc, embedded Tomcat, jackson-databind</td>
+                        <td>Configures <code>DispatcherServlet</code>, starts Tomcat, registers Jackson <code>HttpMessageConverter</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>spring-boot-starter-data-jpa</code></td>
+                        <td>spring-data-jpa, Hibernate, spring-jdbc, HikariCP</td>
+                        <td>Configures <code>EntityManagerFactory</code>, connection pool, transaction manager, repository scanning</td>
+                    </tr>
+                    <tr>
+                        <td><code>spring-boot-starter-security</code></td>
+                        <td>spring-security-web, spring-security-config</td>
+                        <td>Registers <code>DelegatingFilterProxy</code>, secures all endpoints by default — see <a href="security.html">Spring Security</a></td>
+                    </tr>
+                    <tr>
+                        <td><code>spring-boot-starter-validation</code></td>
+                        <td>jakarta.validation-api, hibernate-validator</td>
+                        <td>Registers <code>MethodValidationPostProcessor</code>; enables <code>@Valid</code> on controller parameters</td>
+                    </tr>
+                    <tr>
+                        <td><code>spring-boot-starter-test</code></td>
+                        <td>JUnit 5, Mockito, AssertJ, Spring Test, Hamcrest</td>
+                        <td>No runtime auto-configuration — test-scope only</td>
+                    </tr>
+                    <tr>
+                        <td><code>spring-boot-starter-actuator</code></td>
+                        <td>spring-boot-actuator, Micrometer</td>
+                        <td>Exposes <code>/actuator/health</code>, <code>/actuator/metrics</code> and other management endpoints</td>
+                    </tr>
+                    <tr>
+                        <td><code>spring-boot-starter-cache</code></td>
+                        <td>spring-context-support</td>
+                        <td>Enables <code>@EnableCaching</code> infrastructure; a cache provider (Caffeine, Redis) must still be added separately</td>
+                    </tr>
+                    <tr>
+                        <td><code>spring-boot-starter-webflux</code></td>
+                        <td>spring-webflux, Reactor Netty</td>
+                        <td>Configures reactive <code>DispatcherHandler</code> on Netty — mutually exclusive with <code>starter-web</code> on the same classpath</td>
+                    </tr>
+                </table>
+
+                <pre><code><span class="comment">&lt;!-- pom.xml — no &lt;version&gt; needed: spring-boot-starter-parent manages all versions --&gt;</span>
 &lt;<span class="keyword">dependencies</span>&gt;
-    <span class="comment">&lt;!-- Web application --&gt;</span>
     &lt;<span class="keyword">dependency</span>&gt;
         &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
         &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-web&lt;/<span class="keyword">artifactId</span>&gt;
     &lt;/<span class="keyword">dependency</span>&gt;
-
-    <span class="comment">&lt;!-- Database access --&gt;</span>
     &lt;<span class="keyword">dependency</span>&gt;
         &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
         &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-jpa&lt;/<span class="keyword">artifactId</span>&gt;
     &lt;/<span class="keyword">dependency</span>&gt;
-
-    <span class="comment">&lt;!-- Security --&gt;</span>
-    &lt;<span class="keyword">dependency</span>&gt;
-        &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
-        &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-security&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;/<span class="keyword">dependency</span>&gt;
-
-    <span class="comment">&lt;!-- Testing --&gt;</span>
     &lt;<span class="keyword">dependency</span>&gt;
         &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
         &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-test&lt;/<span class="keyword">artifactId</span>&gt;
         &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
     &lt;/<span class="keyword">dependency</span>&gt;
 &lt;/<span class="keyword">dependencies</span>&gt;</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>How Starters Work</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — EXCLUDING AUTO-CONFIGURATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Excluding Auto-Configuration</h2>
+                <p>Auto-configuration is conditional — every <code>@AutoConfiguration</code>
+                    class is gated by one or more
+                    <code>@ConditionalOn*</code> annotations (<code>@ConditionalOnClass</code>,
+                    <code>@ConditionalOnMissingBean</code>, etc.) and only activates when those
+                    conditions are met. Usually this means it stays out of your way — the moment
+                    you define your own <code>DataSource</code> bean,
+                    <code>DataSourceAutoConfiguration</code> backs off. Sometimes, though, you
+                    need to exclude it explicitly:</p>
 
-            <pre><code><span class="comment">// When you add spring-boot-starter-web:</span>
+                <pre><code><span class="comment">// Exclude at the application level — affects all contexts</span>
+<span class="annotation">@SpringBootApplication</span>(exclude = {
+    <span class="class-name">DataSourceAutoConfiguration</span>.<span class="keyword">class</span>,       <span class="comment">// module that has no database</span>
+    <span class="class-name">SecurityAutoConfiguration</span>.<span class="keyword">class</span>           <span class="comment">// internal tool with no login required</span>
+})
+<span class="keyword">public class</span> <span class="class-name">MyApp</span> { ... }
 
-<span class="comment">// 1. Dependencies included:</span>
-<span class="comment">//    - spring-web</span>
-<span class="comment">//    - spring-webmvc</span>
-<span class="comment">//    - spring-boot-starter-tomcat</span>
-<span class="comment">//    - jackson-databind</span>
-<span class="comment">//    - spring-boot-starter (logging, etc.)</span>
+<span class="comment">// Or via properties — useful when you can't modify the main class</span></code></pre>
 
-<span class="comment">// 2. Auto-configuration enabled:</span>
-<span class="comment">//    - DispatcherServlet configured</span>
-<span class="comment">//    - Embedded Tomcat started</span>
-<span class="comment">//    - JSON serialization configured</span>
-<span class="comment">//    - Error handling configured</span></code></pre>
-        </section>
+                <pre><code><span class="comment"># application.properties</span>
+spring.autoconfigure.exclude=\
+  org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,\
+  org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration</code></pre>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Starters:</strong> Curated dependency bundles</li>
-                    <li><strong>Version management:</strong> Compatible versions guaranteed</li>
-                    <li><strong>Auto-configuration:</strong> Enabled by starter dependencies</li>
-                    <li><strong>No version needed:</strong> Parent POM manages versions</li>
-                    <li><strong>Convention:</strong> spring-boot-starter-{feature}</li>
-                </ul>
-            </div>
-        </section>
+                <div class="info-box tip">
+                    <div class="info-box-title">How to find what auto-configuration is active in your app</div>
+                    <p>Add <code>spring-boot-starter-actuator</code> and hit
+                        <code>/actuator/conditions</code> — it lists every
+                        <code>@AutoConfiguration</code> candidate, whether it matched, and
+                        which <code>@ConditionalOn*</code> condition decided the outcome.
+                        Alternatively, start the app with
+                        <code>--debug</code> (or <code>logging.level.org.springframework.boot.autoconfigure=DEBUG</code>)
+                        to get the same report in the console as the "CONDITIONS EVALUATION
+                        REPORT". This is the correct diagnostic tool, not trial-and-error with
+                        exclusions.</p>
+                </div>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="boot.html" class="related-link">Spring Boot</a>
-                <a href="core.html" class="related-link">Spring Core</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — WRITING A CUSTOM STARTER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Writing a Custom Starter</h2>
+                <p>A custom starter is the right pattern when a cross-cutting concern — audit
+                    logging, a company-wide HTTP client configuration, a shared security policy
+                    — needs to be reused across multiple Spring Boot applications without each
+                    team re-implementing it. The structure follows the same two-part pattern as
+                    official starters:</p>
+
+                <pre><code><span class="comment">/*
+ * Recommended layout:
+ *
+ *   my-feature-spring-boot-starter/     ← empty POM, declares the autoconfigure module
+ *   my-feature-spring-boot-autoconfigure/ ← the actual @AutoConfiguration class + conditions
+ *
+ * Naming convention: {feature}-spring-boot-starter
+ * Official starters use spring-boot-starter-{feature} — the reversed form is reserved for
+ * Spring's own starters; third-party and internal starters use your-name first.
+ */</span>
+
+<span class="comment">// 1. The auto-configuration class</span>
+<span class="annotation">@AutoConfiguration</span>
+<span class="annotation">@ConditionalOnClass</span>(<span class="class-name">AuditService</span>.<span class="keyword">class</span>)          <span class="comment">// only if the feature is on the classpath</span>
+<span class="annotation">@ConditionalOnMissingBean</span>(<span class="class-name">AuditService</span>.<span class="keyword">class</span>)    <span class="comment">// back off if the app defined its own</span>
+<span class="annotation">@EnableConfigurationProperties</span>(<span class="class-name">AuditProperties</span>.<span class="keyword">class</span>)
+<span class="keyword">public class</span> <span class="class-name">AuditAutoConfiguration</span> {
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> <span class="class-name">AuditService</span> <span class="function">auditService</span>(<span class="class-name">AuditProperties</span> props) {
+        <span class="keyword">return new</span> <span class="class-name">DefaultAuditService</span>(props);
+    }
+}</code></pre>
+
+                <pre><code><span class="comment"># 2. Register it for discovery
+# src/main/resources/META-INF/spring/
+#   org.springframework.boot.autoconfigure.AutoConfiguration.imports</span>
+
+com.example.audit.AuditAutoConfiguration</code></pre>
+
+                <pre><code><span class="comment">&lt;!-- 3. The starter POM — no Java code, just dependency declarations --&gt;</span>
+&lt;<span class="keyword">dependencies</span>&gt;
+    &lt;<span class="keyword">dependency</span>&gt;
+        &lt;<span class="keyword">groupId</span>&gt;com.example&lt;/<span class="keyword">groupId</span>&gt;
+        &lt;<span class="keyword">artifactId</span>&gt;my-feature-spring-boot-autoconfigure&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;/<span class="keyword">dependency</span>&gt;
+    <span class="comment">&lt;!-- any other transitive dependencies the feature needs --&gt;</span>
+&lt;/<span class="keyword">dependencies</span>&gt;</code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">@ConditionalOnMissingBean is what makes auto-configuration non-invasive</div>
+                    <p>Without <code>@ConditionalOnMissingBean</code>, your starter's bean
+                        would conflict with any application that defines its own. With it, the
+                        auto-configured default steps aside the moment the consuming application
+                        declares its own bean of that type — the consuming application always
+                        wins. This is the contract that makes every official Spring Boot starter
+                        safe to add without fear of overriding something the developer
+                        intentionally configured.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is a Spring Boot starter?</strong><br>
+                    A starter is a POM-only JAR that declares a curated set of transitive
+                    dependencies at compatible versions. It contains no Java code — its sole
+                    purpose is to pull in the right libraries so you don't have to manually
+                    manage each one and their version compatibility.</p>
+
+                    <p><strong>Q: Does adding a starter automatically configure the feature?</strong><br>
+                    Not directly. The starter pulls in library JARs; those JARs ship
+                    <code>@AutoConfiguration</code> classes that Spring Boot discovers via
+                    <code>AutoConfiguration.imports</code>. The auto-configuration activates
+                    conditionally — usually only if certain classes are on the classpath and
+                    no conflicting bean is already defined.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: How does Spring Boot discover auto-configuration classes, and how did this change in Boot 2.7?</strong><br>
+                    Before 2.7, auto-configuration class names were listed in
+                    <code>META-INF/spring.factories</code> under the
+                    <code>EnableAutoConfiguration</code> key. From 2.7, the preferred mechanism
+                    is a dedicated file at
+                    <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code>,
+                    one class name per line. The old <code>spring.factories</code> key still
+                    works for backwards compatibility but new starters — including all official
+                    Spring ones — use <code>AutoConfiguration.imports</code>.</p>
+
+                    <p><strong>Q: What is the role of @ConditionalOnMissingBean in a starter's auto-configuration, and what breaks without it?</strong><br>
+                    It causes the auto-configured bean to register only if no bean of that
+                    type already exists in the context. Without it, adding the starter to an
+                    application that intentionally defines its own implementation of the same
+                    type would create a duplicate bean conflict —
+                    <code>NoUniqueBeanDefinitionException</code> at startup. With it, the
+                    application's explicit bean takes precedence and the starter's default
+                    silently backs off. This is the contract that makes auto-configuration
+                    non-invasive by design.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="boot.html" class="related-link"><span class="related-icon">🍃</span>Spring Boot Basics</a>
+                    <a href="core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
+                    <a href="properties.html" class="related-link"><span class="related-icon">⚙️</span>Application Properties</a>
+                    <a href="../build-tools/dependencies.html" class="related-link"><span class="related-icon">🔧</span>Dependencies Management</a>
+                    <a href="../build-tools/pom.html" class="related-link"><span class="related-icon">🔧</span>POM.xml Structure</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

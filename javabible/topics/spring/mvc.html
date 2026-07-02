@@ -1,518 +1,713 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.spmvc.page-title">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spring MVC Architecture - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
+
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#spring">Spring Framework</a> / Spring MVC
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#spring" data-i18n="nav.spring">Spring Framework</a> /
+                Spring MVC
             </nav>
-            <h1>Spring MVC Architecture</h1>
-            <p class="topic-subtitle">Building web applications with Model-View-Controller</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.spmvc.h1">Spring MVC Architecture</h1>
+            <p class="topic-subtitle" data-i18n="topic.spmvc.subtitle">The Front Controller pattern, the request
+                lifecycle, and what actually happens between a browser and your @Controller</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is Spring MVC?</h2>
-            <p><strong>Think of Spring MVC like a restaurant:</strong></p>
-            <ul>
-                <li><strong>DispatcherServlet:</strong> The host who directs customers (requests)</li>
-                <li><strong>Controller:</strong> The waiter who takes orders</li>
-                <li><strong>Service:</strong> The kitchen that prepares food</li>
-                <li><strong>Model:</strong> The food being served (data)</li>
-                <li><strong>View:</strong> The plate presentation (HTML/JSON)</li>
-            </ul>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>Spring MVC</strong> is a web framework built on the Servlet API that follows the Model-View-Controller design pattern. It provides:</p>
-                <ul>
-                    <li>Clean separation of concerns</li>
-                    <li>Flexible request mapping</li>
-                    <li>Support for multiple view technologies</li>
-                    <li>Data binding and validation</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Request Flow</h2>
+        <main class="topic-content">
 
-            <pre><code>┌──────────────┐    ┌────────────────────┐    ┌────────────────┐
-│   Browser    │───▶│  DispatcherServlet │───▶│  HandlerMapping│
-└──────────────┘    └────────────────────┘    └────────────────┘
-                              │                        │
-                              │                        ▼
-                              │                 ┌────────────────┐
-                              │                 │   Controller   │
-                              │                 └────────────────┘
-                              │                        │
-                              ▼                        ▼
-                    ┌────────────────────┐    ┌────────────────┐
-                    │   ViewResolver     │◀───│     Model      │
-                    └────────────────────┘    └────────────────┘
-                              │
-                              ▼
-                    ┌────────────────────┐
-                    │       View         │───▶ Response
-                    └────────────────────┘</code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS SPRING MVC AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Spring MVC, and Why Does the Front Controller Pattern Exist?</h2>
+                <p><strong>Spring MVC</strong> is the web layer of Spring Framework, built on top
+                    of the Servlet API (<code>jakarta.servlet.*</code> since Spring Framework 6 /
+                    Spring Boot 3 — it was <code>javax.servlet.*</code> before). It implements the
+                    <strong>Front Controller</strong> design pattern: every single HTTP request,
+                    regardless of URL, is received by <em>one</em> object —
+                    <code>DispatcherServlet</code> — which then delegates to the right handler.
+                </p>
 
-            <ol>
-                <li><strong>Request arrives</strong> at DispatcherServlet (Front Controller)</li>
-                <li><strong>HandlerMapping</strong> finds the right Controller method</li>
-                <li><strong>Controller</strong> processes request, returns Model and View name</li>
-                <li><strong>ViewResolver</strong> finds the actual View template</li>
-                <li><strong>View</strong> renders the Model into HTML/JSON response</li>
-            </ol>
-        </section>
+                <p>The alternative — one raw <code>Servlet</code> per URL, the pre-Spring
+                    approach — means every cross-cutting concern (authentication, logging,
+                    exception formatting, content negotiation) has to be duplicated or
+                    hand-wired into every single servlet. A front controller centralises all of
+                    that in one place: the request always enters through
+                    <code>DispatcherServlet</code>, which applies interceptors, resolves the
+                    correct controller method, converts the response, and hands back a result —
+                    identically, for every endpoint in the application.
+                </p>
 
-        <section class="content-section">
-            <h2>Controllers</h2>
+                <div class="info-box note">
+                    <div class="info-box-title">Where this fits with what you already know</div>
+                    <p>Everything on this page — <code>DispatcherServlet</code>, controllers,
+                        interceptors — sits on top of the Spring container covered in
+                        <a href="core.html">Spring Core</a>. Every <code>@Controller</code> is
+                        itself a Spring bean, built and wired the exact same way as any
+                        <code>@Service</code>. When you use Spring Boot,
+                        <code>spring-boot-starter-web</code> on the classpath is what triggers
+                        auto-configuration of <code>DispatcherServlet</code> and an embedded
+                        Tomcat — see <a href="boot.html">Spring Boot Basics</a> for the mechanism
+                        behind that.
+                    </p>
+                </div>
 
-            <h3>Basic Controller</h3>
-            <pre><code><span class="annotation">@Controller</span>  <span class="comment">// Returns views (HTML pages)</span>
+                <div class="info-box warning">
+                    <div class="info-box-title">This page covers Spring MVC — not Spring WebFlux</div>
+                    <p>Spring MVC is <strong>servlet-based and blocking</strong>: one thread is
+                        occupied per in-flight request. Spring also ships
+                        <strong>WebFlux</strong>, a separate reactive stack (non-blocking,
+                        <code>Mono</code>/<code>Flux</code>) for high-concurrency I/O-bound
+                        workloads. They share almost none of their runtime internals despite
+                        similar annotations. WebFlux deserves — and will get — its own dedicated
+                        page; don't conflate the two.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE REQUEST LIFECYCLE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Request Lifecycle</h2>
+
+                <pre><code><span class="comment">/*
+ *  Browser ──▶ DispatcherServlet ──▶ HandlerMapping ──▶ Controller method
+ *                    │                                        │
+ *                    │                          returns "view name" + Model
+ *                    │                          OR a @ResponseBody / ResponseEntity
+ *                    │                                        │
+ *          ┌─────────┴─────────┐                  ┌───────────┴───────────┐
+ *          ▼                   ▼                  ▼                       ▼
+ *   HandlerAdapter      ViewResolver        HttpMessageConverter    (nothing to convert:
+ *  (invokes the method   (view name →          (object → JSON,       void / already sent)
+ *   with the right         View instance)        via Jackson)
+ *   arguments resolved)         │                       │
+ *                               ▼                       ▼
+ *                          View.render()          Response body written
+ *                               │                       │
+ *                               └───────────┬───────────┘
+ *                                           ▼
+ *                                   HTTP Response to Browser
+ */</span></code></pre>
+
+                <ol>
+                    <li><strong>DispatcherServlet</strong> receives the request — the single entry point for the whole
+                        application.</li>
+                    <li><strong>HandlerMapping</strong> finds <em>which</em> controller method matches the URL, HTTP
+                        method, headers, and content type.</li>
+                    <li><strong>HandlerAdapter</strong> actually <em>invokes</em> that method — resolving each parameter
+                        (<code>@PathVariable</code>, <code>@RequestBody</code>, <code>Model</code>, etc.) into the right
+                        argument.</li>
+                    <li>The method returns either <strong>a view name + Model</strong> (traditional, server-rendered) or
+                        <strong>data directly</strong> (<code>@ResponseBody</code> / <code>ResponseEntity</code> — the
+                        REST path).
+                    </li>
+                    <li><strong>View path:</strong> <code>ViewResolver</code> turns the view name into an actual
+                        <code>View</code> (e.g. a Thymeleaf template), which renders the Model into HTML.
+                    </li>
+                    <li><strong>Data path:</strong> an <code>HttpMessageConverter</code> (Jackson, by default)
+                        serialises the returned object straight into the response body — <code>ViewResolver</code> is
+                        never involved.</li>
+                </ol>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">HandlerMapping vs HandlerAdapter — a real distinction, not a
+                        technicality</div>
+                    <p>These are commonly conflated. <strong>HandlerMapping</strong>'s only job is
+                        deciding <em>which</em> method should handle this request.
+                        <strong>HandlerAdapter</strong>'s job is <em>invoking</em> that method
+                        correctly — resolving every parameter via the registered
+                        <code>HandlerMethodArgumentResolver</code>s (one exists for
+                        <code>@PathVariable</code>, one for <code>@RequestBody</code>, one for
+                        <code>Model</code>, and so on). This separation is why adding support for
+                        a brand-new parameter annotation doesn't require touching routing logic
+                        at all — you register a new argument resolver, and the existing
+                        <code>HandlerMapping</code> is untouched.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — DECLARING CONTROLLERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Declaring Controllers</h2>
+
+                <pre><code><span class="annotation">@Controller</span>  <span class="comment">// resolves a VIEW NAME — for server-rendered HTML</span>
 <span class="keyword">public class</span> <span class="class-name">HomeController</span> {
 
     <span class="annotation">@GetMapping</span>(<span class="string">"/"</span>)
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">home</span>(<span class="class-name">Model</span> model) {
         model.addAttribute(<span class="string">"message"</span>, <span class="string">"Welcome!"</span>);
-        <span class="keyword">return</span> <span class="string">"home"</span>;  <span class="comment">// Returns view name "home.html"</span>
+        <span class="keyword">return</span> <span class="string">"home"</span>;  <span class="comment">// ViewResolver maps this to a template, e.g. templates/home.html</span>
     }
 }
 
-<span class="annotation">@RestController</span>  <span class="comment">// Returns data (JSON/XML)</span>
+<span class="annotation">@RestController</span>  <span class="comment">// = @Controller + @ResponseBody — writes the return value to the body directly</span>
 <span class="keyword">public class</span> <span class="class-name">ApiController</span> {
 
     <span class="annotation">@GetMapping</span>(<span class="string">"/api/data"</span>)
     <span class="keyword">public</span> <span class="class-name">DataResponse</span> <span class="function">getData</span>() {
-        <span class="keyword">return new</span> <span class="class-name">DataResponse</span>(<span class="string">"Hello"</span>);  <span class="comment">// Converted to JSON</span>
+        <span class="keyword">return new</span> <span class="class-name">DataResponse</span>(<span class="string">"Hello"</span>);  <span class="comment">// serialised to JSON by Jackson via HttpMessageConverter</span>
     }
-}
+}</code></pre>
 
-<span class="comment">// @RestController = @Controller + @ResponseBody</span></code></pre>
+                <div class="info-box note">
+                    <div class="info-box-title">@GetMapping etc. are meta-annotations, not separate features</div>
+                    <p>Since Spring 4.3, <code>@GetMapping</code>, <code>@PostMapping</code>,
+                        <code>@PutMapping</code>, <code>@DeleteMapping</code> and
+                        <code>@PatchMapping</code> are all shorthand meta-annotations of
+                        <code>@RequestMapping(method = RequestMethod.X)</code>. There is no
+                        separate mechanism — writing <code>@RequestMapping(method =
+                        RequestMethod.GET)</code> today is just more verbose, not more correct.
+                    </p>
+                </div>
 
-            <h3>Request Mapping</h3>
-            <pre><code><span class="annotation">@Controller</span>
-<span class="annotation">@RequestMapping</span>(<span class="string">"/products"</span>)  <span class="comment">// Base path for all methods</span>
+                <pre><code><span class="annotation">@Controller</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/products"</span>)  <span class="comment">// base path — combined with each method's mapping</span>
 <span class="keyword">public class</span> <span class="class-name">ProductController</span> {
 
-    <span class="comment">// GET /products</span>
-    <span class="annotation">@GetMapping</span>
+    <span class="keyword">private final</span> <span class="class-name">ProductService</span> productService;  <span class="comment">// constructor injection — same rule as any other Spring bean</span>
+
+    <span class="keyword">public</span> <span class="function">ProductController</span>(<span class="class-name">ProductService</span> productService) {
+        <span class="keyword">this</span>.productService = productService;
+    }
+
+    <span class="annotation">@GetMapping</span>  <span class="comment">// GET /products</span>
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">list</span>(<span class="class-name">Model</span> model) {
+        model.addAttribute(<span class="string">"products"</span>, productService.findAll());
         <span class="keyword">return</span> <span class="string">"products/list"</span>;
     }
 
-    <span class="comment">// GET /products/123</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)  <span class="comment">// GET /products/123</span>
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">show</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id, <span class="class-name">Model</span> model) {
+        model.addAttribute(<span class="string">"product"</span>, productService.findById(id));
         <span class="keyword">return</span> <span class="string">"products/show"</span>;
     }
 
-    <span class="comment">// GET /products/new</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/new"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">newForm</span>(<span class="class-name">Model</span> model) {
-        model.addAttribute(<span class="string">"product"</span>, <span class="keyword">new</span> <span class="class-name">Product</span>());
-        <span class="keyword">return</span> <span class="string">"products/form"</span>;
-    }
-
-    <span class="comment">// POST /products</span>
-    <span class="annotation">@PostMapping</span>
+    <span class="annotation">@PostMapping</span>  <span class="comment">// POST /products</span>
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">create</span>(<span class="annotation">@ModelAttribute</span> <span class="class-name">Product</span> product) {
         productService.save(product);
-        <span class="keyword">return</span> <span class="string">"redirect:/products"</span>;  <span class="comment">// Redirect after POST</span>
-    }
-
-    <span class="comment">// PUT /products/123</span>
-    <span class="annotation">@PutMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">update</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id,
-                         <span class="annotation">@ModelAttribute</span> <span class="class-name">Product</span> product) {
-        productService.update(id, product);
-        <span class="keyword">return</span> <span class="string">"redirect:/products/"</span> + id;
-    }
-
-    <span class="comment">// DELETE /products/123</span>
-    <span class="annotation">@DeleteMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">delete</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-        productService.delete(id);
-        <span class="keyword">return</span> <span class="string">"redirect:/products"</span>;
+        <span class="keyword">return</span> <span class="string">"redirect:/products"</span>;  <span class="comment">// redirect after POST — prevents duplicate submission on refresh</span>
     }
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Request Parameters</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — BINDING REQUEST DATA
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Binding Request Data</h2>
 
-            <pre><code><span class="annotation">@Controller</span>
+                <pre><code><span class="annotation">@RestController</span>
 <span class="keyword">public class</span> <span class="class-name">SearchController</span> {
 
-    <span class="comment">// Path variable: /users/123</span>
+    <span class="comment">// Path variable — /users/123 → id = 123</span>
     <span class="annotation">@GetMapping</span>(<span class="string">"/users/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-        <span class="comment">// id = 123</span>
-    }
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
 
-    <span class="comment">// Query parameter: /search?q=java&page=1</span>
+    <span class="comment">// Query parameters — /search?q=java&page=2</span>
     <span class="annotation">@GetMapping</span>(<span class="string">"/search"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">search</span>(
-            <span class="annotation">@RequestParam</span> <span class="class-name">String</span> q,
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Result</span>&gt; <span class="function">search</span>(
+            <span class="annotation">@RequestParam</span> <span class="class-name">String</span> q,                              <span class="comment">// required by default — 400 if missing</span>
             <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"1"</span>) <span class="keyword">int</span> page,
-            <span class="annotation">@RequestParam</span>(required = <span class="keyword">false</span>) <span class="class-name">String</span> sort) {
-        <span class="comment">// q = "java", page = 1, sort = null</span>
-    }
+            <span class="annotation">@RequestParam</span>(required = <span class="keyword">false</span>) <span class="class-name">String</span> sort) { ... }
 
-    <span class="comment">// Request header</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/api/data"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getData</span>(<span class="annotation">@RequestHeader</span>(<span class="string">"Authorization"</span>) <span class="class-name">String</span> authHeader) {
-        <span class="comment">// Access Authorization header</span>
-    }
+    <span class="comment">// Header and cookie</span>
+    <span class="annotation">@GetMapping</span>(<span class="string">"/data"</span>)
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getData</span>(<span class="annotation">@RequestHeader</span>(<span class="string">"Authorization"</span>) <span class="class-name">String</span> authHeader,
+                            <span class="annotation">@CookieValue</span>(<span class="string">"theme"</span>) <span class="class-name">String</span> theme) { ... }
 
-    <span class="comment">// Cookie value</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/prefs"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getPrefs</span>(<span class="annotation">@CookieValue</span>(<span class="string">"theme"</span>) <span class="class-name">String</span> theme) {
-        <span class="comment">// Access cookie value</span>
-    }
+    <span class="comment">// JSON body — converted by an HttpMessageConverter (Jackson), based on Content-Type</span>
+    <span class="annotation">@PostMapping</span>(<span class="string">"/users"</span>)
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">createUser</span>(<span class="annotation">@RequestBody</span> <span class="class-name">User</span> user) { ... }
 
-    <span class="comment">// Request body (for POST/PUT)</span>
-    <span class="annotation">@PostMapping</span>(<span class="string">"/api/users"</span>)
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">createUser</span>(<span class="annotation">@RequestBody</span> <span class="class-name">User</span> user) {
-        <span class="comment">// JSON body converted to User object</span>
-    }
-
-    <span class="comment">// Form data</span>
+    <span class="comment">// Form fields (application/x-www-form-urlencoded) — bound to object properties</span>
     <span class="annotation">@PostMapping</span>(<span class="string">"/register"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">register</span>(<span class="annotation">@ModelAttribute</span> <span class="class-name">RegistrationForm</span> form) {
-        <span class="comment">// Form fields bound to object</span>
-    }
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">register</span>(<span class="annotation">@ModelAttribute</span> <span class="class-name">RegistrationForm</span> form) { ... }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Model and View</h2>
+                <div class="info-box warning">
+                    <div class="info-box-title">@PathVariable("id") — why the explicit name sometimes matters</div>
+                    <p>Spring matches <code>@PathVariable Long id</code> to the <code>{id}</code>
+                        template segment by <em>parameter name</em>. That only works if the
+                        compiler retained parameter names in the bytecode — which requires the
+                        <code>-parameters</code> compiler flag. Spring Boot's Maven and Gradle
+                        plugins enable it by default, so most Boot projects never notice. Compile
+                        outside those plugins, or with an IDE run configuration that strips it,
+                        and every implicit-name <code>@PathVariable</code> breaks at runtime with
+                        an unhelpful error — the fix, and the safe default in library code, is
+                        always specifying the name explicitly: <code>@PathVariable("id") Long
+                        id</code>.
+                    </p>
+                </div>
 
-            <h3>Adding Data to Model</h3>
-            <pre><code><span class="annotation">@Controller</span>
+                <div class="info-box note">
+                    <div class="info-box-title">@RequestBody / @ResponseBody are driven by HttpMessageConverter, not
+                        magic</div>
+                    <p>Spring maintains a list of <code>HttpMessageConverter</code>s. For JSON,
+                        that's <code>MappingJackson2HttpMessageConverter</code> — auto-registered
+                        by Spring Boot the moment <code>jackson-databind</code> is on the
+                        classpath (it is, transitively, via
+                        <code>spring-boot-starter-web</code>). Which converter runs is decided by
+                        <strong>content negotiation</strong>: the request's <code>Content-Type</code>
+                        header for deserialising <code>@RequestBody</code>, and the request's
+                        <code>Accept</code> header for serialising the response.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — MODEL, VIEW RESOLUTION, RETURNING DATA
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Model, View Resolution, and Returning Data Directly</h2>
+
+                <pre><code><span class="annotation">@Controller</span>
 <span class="keyword">public class</span> <span class="class-name">DashboardController</span> {
 
-    <span class="comment">// Method 1: Model parameter</span>
     <span class="annotation">@GetMapping</span>(<span class="string">"/dashboard"</span>)
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">dashboard</span>(<span class="class-name">Model</span> model) {
-        model.addAttribute(<span class="string">"user"</span>, getCurrentUser());
-        model.addAttribute(<span class="string">"stats"</span>, getStats());
-        <span class="keyword">return</span> <span class="string">"dashboard"</span>;
+        model.addAttribute(<span class="string">"stats"</span>, statsService.currentStats());
+        <span class="keyword">return</span> <span class="string">"dashboard"</span>;  <span class="comment">// resolved via spring.thymeleaf.prefix/suffix</span>
     }
 
-    <span class="comment">// Method 2: ModelAndView</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/profile"</span>)
-    <span class="keyword">public</span> <span class="class-name">ModelAndView</span> <span class="function">profile</span>() {
-        <span class="class-name">ModelAndView</span> mav = <span class="keyword">new</span> <span class="class-name">ModelAndView</span>(<span class="string">"profile"</span>);
-        mav.addObject(<span class="string">"user"</span>, getCurrentUser());
-        <span class="keyword">return</span> mav;
-    }
-
-    <span class="comment">// Method 3: Return object directly with @ModelAttribute</span>
+    <span class="comment">// Runs before EVERY handler method in this controller — shared model data</span>
     <span class="annotation">@ModelAttribute</span>(<span class="string">"categories"</span>)
     <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Category</span>&gt; <span class="function">categories</span>() {
-        <span class="comment">// Available to ALL handler methods in this controller</span>
         <span class="keyword">return</span> categoryService.findAll();
     }
 }</code></pre>
 
-            <h3>View Resolution with Thymeleaf</h3>
-            <pre><code><span class="comment">&lt;!-- src/main/resources/templates/dashboard.html --&gt;</span>
-&lt;!DOCTYPE html&gt;
-&lt;<span class="keyword">html</span> xmlns:th="http://www.thymeleaf.org"&gt;
-&lt;<span class="keyword">head</span>&gt;
-    &lt;<span class="keyword">title</span>&gt;Dashboard&lt;/<span class="keyword">title</span>&gt;
-&lt;/<span class="keyword">head</span>&gt;
-&lt;<span class="keyword">body</span>&gt;
-    &lt;<span class="keyword">h1</span> th:text="${user.name}"&gt;Username&lt;/<span class="keyword">h1</span>&gt;
+                <p>By default, a Thymeleaf-backed Boot app resolves the view name
+                    <code>"dashboard"</code> to
+                    <code>src/main/resources/templates/dashboard.html</code> — the
+                    <code>spring.thymeleaf.prefix</code> (<code>classpath:/templates/</code>) and
+                    <code>spring.thymeleaf.suffix</code> (<code>.html</code>) properties, which
+                    you rarely need to touch. Binding into the template happens through
+                    Thymeleaf's <code>th:*</code> attributes reading straight from the Model:
+                </p>
 
-    &lt;<span class="keyword">ul</span>&gt;
-        &lt;<span class="keyword">li</span> th:each="stat : ${stats}"&gt;
-            &lt;<span class="keyword">span</span> th:text="${stat.name}"&gt;Stat&lt;/<span class="keyword">span</span>&gt;:
-            &lt;<span class="keyword">span</span> th:text="${stat.value}"&gt;0&lt;/<span class="keyword">span</span>&gt;
-        &lt;/<span class="keyword">li</span>&gt;
-    &lt;/<span class="keyword">ul</span>&gt;
+                <pre><code><span class="comment">&lt;!-- templates/dashboard.html --&gt;</span>
+&lt;<span class="keyword">h1</span> th:text="${stats.totalOrders}"&gt;0&lt;/<span class="keyword">h1</span>&gt;
+&lt;<span class="keyword">select</span>&gt;
+    &lt;<span class="keyword">option</span> th:each="cat : ${categories}" th:value="${cat.id}" th:text="${cat.name}"&gt;&lt;/<span class="keyword">option</span>&gt;
+&lt;/<span class="keyword">select</span>&gt;</code></pre>
 
-    <span class="comment">&lt;!-- Categories from @ModelAttribute --&gt;</span>
-    &lt;<span class="keyword">select</span>&gt;
-        &lt;<span class="keyword">option</span> th:each="cat : ${categories}"
-                th:value="${cat.id}"
-                th:text="${cat.name}"&gt;Category&lt;/<span class="keyword">option</span>&gt;
-    &lt;/<span class="keyword">select</span>&gt;
-&lt;/<span class="keyword">body</span>&gt;
-&lt;/<span class="keyword">html</span>&gt;</code></pre>
-        </section>
+                <div class="info-box important">
+                    <div class="info-box-title">The production reality: most new backends skip views entirely</div>
+                    <p>Server-rendered views (<code>Model</code> + <code>ViewResolver</code> +
+                        Thymeleaf) are still legitimate for admin panels or SEO-sensitive pages,
+                        but the dominant pattern for new backends is <strong>@RestController +
+                            ResponseEntity&lt;T&gt;</strong> — the frontend is a separate SPA consuming
+                        JSON. <code>ResponseEntity</code> gives explicit control over status code,
+                        headers, and body in one object, and is generally preferred over the
+                        static <code>@ResponseStatus</code> annotation when the status genuinely
+                        depends on runtime logic:</p>
+                    <pre><code><span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
+<span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">show</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> productService.findById(id)
+        .map(<span class="class-name">ResponseEntity</span>::ok)
+        .orElseGet(() -&gt; <span class="class-name">ResponseEntity</span>.notFound().build());
+}</code></pre>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Form Handling</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — FORM HANDLING AND VALIDATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Form Handling and Validation</h2>
 
-            <pre><code><span class="comment">// Form backing object</span>
-<span class="keyword">public class</span> <span class="class-name">ProductForm</span> {
-    <span class="annotation">@NotBlank</span>(message = <span class="string">"Name is required"</span>)
+                <pre><code><span class="keyword">public class</span> <span class="class-name">ProductForm</span> {
+    <span class="annotation">@NotBlank</span>
     <span class="keyword">private</span> <span class="class-name">String</span> name;
 
-    <span class="annotation">@Min</span>(value = <span class="number">0</span>, message = <span class="string">"Price must be positive"</span>)
+    <span class="annotation">@Positive</span>
     <span class="keyword">private</span> <span class="class-name">BigDecimal</span> price;
-
-    <span class="annotation">@Size</span>(max = <span class="number">1000</span>)
-    <span class="keyword">private</span> <span class="class-name">String</span> description;
-
     <span class="comment">// getters/setters</span>
 }
 
-<span class="annotation">@Controller</span>
-<span class="annotation">@RequestMapping</span>(<span class="string">"/products"</span>)
-<span class="keyword">public class</span> <span class="class-name">ProductController</span> {
+<span class="annotation">@PostMapping</span>(<span class="string">"/products"</span>)
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">create</span>(<span class="annotation">@Valid</span> <span class="annotation">@ModelAttribute</span>(<span class="string">"product"</span>) <span class="class-name">ProductForm</span> form,
+                     <span class="class-name">BindingResult</span> result,
+                     <span class="class-name">RedirectAttributes</span> redirectAttrs) {
 
-    <span class="annotation">@GetMapping</span>(<span class="string">"/new"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">newForm</span>(<span class="class-name">Model</span> model) {
-        model.addAttribute(<span class="string">"product"</span>, <span class="keyword">new</span> <span class="class-name">ProductForm</span>());
-        <span class="keyword">return</span> <span class="string">"products/form"</span>;
+    <span class="keyword">if</span> (result.hasErrors()) {
+        <span class="keyword">return</span> <span class="string">"products/form"</span>;  <span class="comment">// re-show form with field errors bound automatically</span>
     }
-
-    <span class="annotation">@PostMapping</span>
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">create</span>(
-            <span class="annotation">@Valid</span> <span class="annotation">@ModelAttribute</span>(<span class="string">"product"</span>) <span class="class-name">ProductForm</span> form,
-            <span class="class-name">BindingResult</span> result,
-            <span class="class-name">RedirectAttributes</span> redirectAttrs) {
-
-        <span class="comment">// Check for validation errors</span>
-        <span class="keyword">if</span> (result.hasErrors()) {
-            <span class="keyword">return</span> <span class="string">"products/form"</span>;  <span class="comment">// Show form with errors</span>
-        }
-
-        <span class="class-name">Product</span> product = productService.create(form);
-
-        <span class="comment">// Flash attribute - available after redirect</span>
-        redirectAttrs.addFlashAttribute(<span class="string">"message"</span>, <span class="string">"Product created!"</span>);
-        redirectAttrs.addAttribute(<span class="string">"id"</span>, product.getId());
-
-        <span class="keyword">return</span> <span class="string">"redirect:/products/{id}"</span>;
-    }
+    <span class="class-name">Product</span> product = productService.create(form);
+    redirectAttrs.addFlashAttribute(<span class="string">"message"</span>, <span class="string">"Product created!"</span>);  <span class="comment">// survives exactly one redirect</span>
+    <span class="keyword">return</span> <span class="string">"redirect:/products/"</span> + product.getId();
 }</code></pre>
 
-            <h3>Thymeleaf Form</h3>
-            <pre><code><span class="comment">&lt;!-- products/form.html --&gt;</span>
-&lt;<span class="keyword">form</span> th:action="@{/products}" th:object="${product}" method="post"&gt;
+                <div class="info-box warning">
+                    <div class="info-box-title">@Valid behaves differently depending on what follows it</div>
+                    <p>With <code>@ModelAttribute</code>, a <code>BindingResult</code> parameter
+                        placed <strong>immediately after</strong> the validated argument tells
+                        Spring "I'll handle errors myself" — validation failures populate
+                        <code>result</code> silently, no exception is thrown. With
+                        <code>@RequestBody</code>, there is no equivalent convention: a validation
+                        failure always throws <code>MethodArgumentNotValidException</code>,
+                        caught via <code>@ExceptionHandler</code> — you cannot silently absorb it
+                        the way you can with a form-backing object. Forgetting this is a common
+                        source of "why did my form validation crash the whole request" bugs when
+                        code is copy-pasted between REST and view-based controllers.
+                    </p>
+                </div>
+            </section>
 
-    &lt;<span class="keyword">div</span> th:if="${#fields.hasErrors('*')}" class="errors"&gt;
-        Please correct the errors below.
-    &lt;/<span class="keyword">div</span>&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — EXCEPTION HANDLING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Exception Handling</h2>
 
-    &lt;<span class="keyword">div</span>&gt;
-        &lt;<span class="keyword">label</span>&gt;Name:&lt;/<span class="keyword">label</span>&gt;
-        &lt;<span class="keyword">input</span> type="text" th:field="*{name}" /&gt;
-        &lt;<span class="keyword">span</span> th:if="${#fields.hasErrors('name')}"
-              th:errors="*{name}"
-              class="error"&gt;Name error&lt;/<span class="keyword">span</span>&gt;
-    &lt;/<span class="keyword">div</span>&gt;
-
-    &lt;<span class="keyword">div</span>&gt;
-        &lt;<span class="keyword">label</span>&gt;Price:&lt;/<span class="keyword">label</span>&gt;
-        &lt;<span class="keyword">input</span> type="number" th:field="*{price}" step="0.01" /&gt;
-        &lt;<span class="keyword">span</span> th:if="${#fields.hasErrors('price')}"
-              th:errors="*{price}"
-              class="error"&gt;Price error&lt;/<span class="keyword">span</span>&gt;
-    &lt;/<span class="keyword">div</span>&gt;
-
-    &lt;<span class="keyword">div</span>&gt;
-        &lt;<span class="keyword">label</span>&gt;Description:&lt;/<span class="keyword">label</span>&gt;
-        &lt;<span class="keyword">textarea</span> th:field="*{description}"&gt;&lt;/<span class="keyword">textarea</span>&gt;
-    &lt;/<span class="keyword">div</span>&gt;
-
-    &lt;<span class="keyword">button</span> type="submit"&gt;Save&lt;/<span class="keyword">button</span>&gt;
-&lt;/<span class="keyword">form</span>&gt;</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Exception Handling</h2>
-
-            <pre><code><span class="comment">// Controller-level exception handling</span>
+                <pre><code><span class="comment">// Local — only catches exceptions thrown within THIS controller</span>
 <span class="annotation">@Controller</span>
 <span class="keyword">public class</span> <span class="class-name">ProductController</span> {
-
-    <span class="annotation">@GetMapping</span>(<span class="string">"/products/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">show</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id, <span class="class-name">Model</span> model) {
-        <span class="class-name">Product</span> product = productService.findById(id)
-            .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">ProductNotFoundException</span>(id));
-        model.addAttribute(<span class="string">"product"</span>, product);
-        <span class="keyword">return</span> <span class="string">"products/show"</span>;
-    }
-
-    <span class="comment">// Handle exception in this controller only</span>
     <span class="annotation">@ExceptionHandler</span>(<span class="class-name">ProductNotFoundException</span>.<span class="keyword">class</span>)
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">handleNotFound</span>(<span class="class-name">ProductNotFoundException</span> ex, <span class="class-name">Model</span> model) {
         model.addAttribute(<span class="string">"message"</span>, ex.getMessage());
         <span class="keyword">return</span> <span class="string">"error/404"</span>;
     }
-}
+}</code></pre>
 
-<span class="comment">// Global exception handling</span>
-<span class="annotation">@ControllerAdvice</span>
+                <div class="info-box important">
+                    <div class="info-box-title">Modern REST error responses: ProblemDetail (RFC 9457), not a hand-rolled
+                        DTO</div>
+                    <p>Before Spring Framework 6, every codebase invented its own
+                        <code>ErrorResponse</code> record — inconsistent shape across teams and
+                        clients. Spring 6 / Boot 3 ship <code>ProblemDetail</code>, a built-in
+                        implementation of RFC 9457 ("Problem Details for HTTP APIs"). It is
+                        <strong>opt-in</strong> — set
+                        <code>spring.mvc.problemdetails.enabled=true</code> to have Spring's
+                        default exception resolver produce it automatically for exceptions it
+                        already understands (validation errors, 404s from missing handlers,
+                        etc). For your own exceptions, build one explicitly:
+                    </p>
+                    <pre><code><span class="annotation">@RestControllerAdvice</span>
 <span class="keyword">public class</span> <span class="class-name">GlobalExceptionHandler</span> {
 
-    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">ResourceNotFoundException</span>.<span class="keyword">class</span>)
-    <span class="annotation">@ResponseStatus</span>(HttpStatus.NOT_FOUND)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">handleNotFound</span>(<span class="class-name">ResourceNotFoundException</span> ex, <span class="class-name">Model</span> model) {
-        model.addAttribute(<span class="string">"error"</span>, ex.getMessage());
-        <span class="keyword">return</span> <span class="string">"error/404"</span>;
-    }
-
-    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">Exception</span>.<span class="keyword">class</span>)
-    <span class="annotation">@ResponseStatus</span>(HttpStatus.INTERNAL_SERVER_ERROR)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">handleGeneral</span>(<span class="class-name">Exception</span> ex, <span class="class-name">Model</span> model) {
-        model.addAttribute(<span class="string">"error"</span>, <span class="string">"An error occurred"</span>);
-        <span class="keyword">return</span> <span class="string">"error/500"</span>;
-    }
-}
-
-<span class="comment">// REST API exception handling</span>
-<span class="annotation">@RestControllerAdvice</span>
-<span class="keyword">public class</span> <span class="class-name">RestExceptionHandler</span> {
-
-    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">ResourceNotFoundException</span>.<span class="keyword">class</span>)
-    <span class="annotation">@ResponseStatus</span>(HttpStatus.NOT_FOUND)
-    <span class="keyword">public</span> <span class="class-name">ErrorResponse</span> <span class="function">handleNotFound</span>(<span class="class-name">ResourceNotFoundException</span> ex) {
-        <span class="keyword">return new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"NOT_FOUND"</span>, ex.getMessage());
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">ProductNotFoundException</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ProblemDetail</span> <span class="function">handleNotFound</span>(<span class="class-name">ProductNotFoundException</span> ex) {
+        <span class="class-name">ProblemDetail</span> problem = <span class="class-name">ProblemDetail</span>.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+        problem.setTitle(<span class="string">"Product Not Found"</span>);
+        problem.setProperty(<span class="string">"timestamp"</span>, <span class="class-name">Instant</span>.now());
+        <span class="keyword">return</span> problem;
     }
 
     <span class="annotation">@ExceptionHandler</span>(<span class="class-name">MethodArgumentNotValidException</span>.<span class="keyword">class</span>)
-    <span class="annotation">@ResponseStatus</span>(HttpStatus.BAD_REQUEST)
-    <span class="keyword">public</span> <span class="class-name">ErrorResponse</span> <span class="function">handleValidation</span>(<span class="class-name">MethodArgumentNotValidException</span> ex) {
-        <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; errors = ex.getBindingResult()
-            .getFieldErrors()
-            .stream()
-            .map(e -> e.getField() + <span class="string">": "</span> + e.getDefaultMessage())
-            .toList();
-        <span class="keyword">return new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"VALIDATION_ERROR"</span>, errors);
+    <span class="keyword">public</span> <span class="class-name">ProblemDetail</span> <span class="function">handleValidation</span>(<span class="class-name">MethodArgumentNotValidException</span> ex) {
+        <span class="class-name">ProblemDetail</span> problem = <span class="class-name">ProblemDetail</span>.forStatusAndDetail(HttpStatus.BAD_REQUEST, <span class="string">"Validation failed"</span>);
+        problem.setProperty(<span class="string">"errors"</span>, ex.getBindingResult().getFieldErrors()
+            .stream().map(e -&gt; e.getField() + <span class="string">": "</span> + e.getDefaultMessage()).toList());
+        <span class="keyword">return</span> problem;
     }
 }</code></pre>
-        </section>
+                    <p>A single, consistent JSON shape (<code>type</code>, <code>title</code>,
+                        <code>status</code>, <code>detail</code>, plus your own custom properties)
+                        across every endpoint and every client — instead of every team's own
+                        bespoke error object.
+                    </p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Interceptors</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERCEPTORS VS FILTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interceptors vs Filters — Not the Same Layer</h2>
 
-            <pre><code><span class="comment">// Custom interceptor</span>
-<span class="annotation">@Component</span>
-<span class="keyword">public class</span> <span class="class-name">LoggingInterceptor</span> <span class="keyword">implements</span> <span class="class-name">HandlerInterceptor</span> {
+                <table>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Filter (jakarta.servlet.Filter)</th>
+                        <th>HandlerInterceptor</th>
+                    </tr>
+                    <tr>
+                        <td>Runs at</td>
+                        <td>Servlet container level, <strong>before</strong> DispatcherServlet</td>
+                        <td>Inside DispatcherServlet's own pipeline</td>
+                    </tr>
+                    <tr>
+                        <td>Knows the target handler?</td>
+                        <td>No — has no idea which controller method will run</td>
+                        <td>Yes — receives the resolved <code>HandlerMethod</code></td>
+                    </tr>
+                    <tr>
+                        <td>Can wrap raw streams?</td>
+                        <td>Yes (e.g. <code>GZIPInputStream</code> wrapping)</td>
+                        <td>No — operates on the already-parsed request</td>
+                    </tr>
+                    <tr>
+                        <td>Typical use</td>
+                        <td>CORS, compression, raw auth token checks, request logging</td>
+                        <td>Auth checks needing handler metadata (e.g. a custom <code>@RequiresRole</code> annotation on
+                            the method), timing per-endpoint</td>
+                    </tr>
+                </table>
+
+                <pre><code><span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">TimingInterceptor</span> <span class="keyword">implements</span> <span class="class-name">HandlerInterceptor</span> {
+    <span class="comment">// Since Spring 5.3, all three methods have default implementations —
+    // override only the ones you actually need.</span>
 
     <span class="annotation">@Override</span>
-    <span class="keyword">public boolean</span> <span class="function">preHandle</span>(<span class="class-name">HttpServletRequest</span> request,
-                              <span class="class-name">HttpServletResponse</span> response,
-                              <span class="class-name">Object</span> handler) {
-        <span class="comment">// Before controller method</span>
-        <span class="class-name">System</span>.out.println(<span class="string">"Request: "</span> + request.getRequestURI());
-        request.setAttribute(<span class="string">"startTime"</span>, <span class="class-name">System</span>.currentTimeMillis());
-        <span class="keyword">return true</span>;  <span class="comment">// Continue to controller</span>
+    <span class="keyword">public boolean</span> <span class="function">preHandle</span>(<span class="class-name">HttpServletRequest</span> request, <span class="class-name">HttpServletResponse</span> response, <span class="class-name">Object</span> handler) {
+        request.setAttribute(<span class="string">"startTime"</span>, <span class="class-name">System</span>.nanoTime());
+        <span class="keyword">return true</span>;  <span class="comment">// false would short-circuit — controller never runs</span>
     }
 
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">postHandle</span>(<span class="class-name">HttpServletRequest</span> request,
-                           <span class="class-name">HttpServletResponse</span> response,
-                           <span class="class-name">Object</span> handler,
-                           <span class="class-name">ModelAndView</span> modelAndView) {
-        <span class="comment">// After controller, before view rendering</span>
-    }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">afterCompletion</span>(<span class="class-name">HttpServletRequest</span> request,
-                                 <span class="class-name">HttpServletResponse</span> response,
-                                 <span class="class-name">Object</span> handler,
-                                 <span class="class-name">Exception</span> ex) {
-        <span class="comment">// After view rendering, cleanup</span>
-        <span class="keyword">long</span> startTime = (<span class="class-name">Long</span>) request.getAttribute(<span class="string">"startTime"</span>);
-        <span class="class-name">System</span>.out.println(<span class="string">"Duration: "</span> + (<span class="class-name">System</span>.currentTimeMillis() - startTime) + <span class="string">"ms"</span>);
+    <span class="keyword">public void</span> <span class="function">afterCompletion</span>(<span class="class-name">HttpServletRequest</span> request, <span class="class-name">HttpServletResponse</span> response, <span class="class-name">Object</span> handler, <span class="class-name">Exception</span> ex) {
+        <span class="keyword">long</span> nanos = <span class="class-name">System</span>.nanoTime() - (<span class="keyword">long</span>) request.getAttribute(<span class="string">"startTime"</span>);
+        log.debug(<span class="string">"{} took {}ms"</span>, request.getRequestURI(), nanos / <span class="number">1_000_000</span>);
     }
 }
 
-<span class="comment">// Register interceptor</span>
+<span class="comment">// Single WebConfig — registers both interceptors AND resource handlers.
+// Two classes named WebConfig in the same package is a compile error, not a style choice.</span>
 <span class="annotation">@Configuration</span>
 <span class="keyword">public class</span> <span class="class-name">WebConfig</span> <span class="keyword">implements</span> <span class="class-name">WebMvcConfigurer</span> {
 
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">LoggingInterceptor</span> loggingInterceptor;
+    <span class="keyword">private final</span> <span class="class-name">TimingInterceptor</span> timingInterceptor;
+
+    <span class="keyword">public</span> <span class="function">WebConfig</span>(<span class="class-name">TimingInterceptor</span> timingInterceptor) {
+        <span class="keyword">this</span>.timingInterceptor = timingInterceptor;
+    }
 
     <span class="annotation">@Override</span>
     <span class="keyword">public void</span> <span class="function">addInterceptors</span>(<span class="class-name">InterceptorRegistry</span> registry) {
-        registry.addInterceptor(loggingInterceptor)
-                .addPathPatterns(<span class="string">"/**"</span>)             <span class="comment">// Apply to all paths</span>
-                .excludePathPatterns(<span class="string">"/static/**"</span>); <span class="comment">// Except static resources</span>
+        registry.addInterceptor(timingInterceptor)
+                .addPathPatterns(<span class="string">"/**"</span>)
+                .excludePathPatterns(<span class="string">"/static/**"</span>);
     }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Static Resources</h2>
-
-            <pre><code><span class="comment"># Default static resource locations (in order):</span>
-<span class="comment"># 1. /META-INF/resources/</span>
-<span class="comment"># 2. /resources/</span>
-<span class="comment"># 3. /static/</span>
-<span class="comment"># 4. /public/</span>
-
-<span class="comment"># Customize in application.properties:</span>
-spring.web.resources.static-locations=classpath:/static/,classpath:/custom/
-
-<span class="comment"># Cache control for static resources</span>
-spring.web.resources.cache.period=31536000
-spring.web.resources.chain.strategy.content.enabled=true
-spring.web.resources.chain.strategy.content.paths=/**</code></pre>
-
-            <pre><code><span class="comment">// Custom static resource configuration</span>
-<span class="annotation">@Configuration</span>
-<span class="keyword">public class</span> <span class="class-name">WebConfig</span> <span class="keyword">implements</span> <span class="class-name">WebMvcConfigurer</span> {
 
     <span class="annotation">@Override</span>
     <span class="keyword">public void</span> <span class="function">addResourceHandlers</span>(<span class="class-name">ResourceHandlerRegistry</span> registry) {
         registry.addResourceHandler(<span class="string">"/files/**"</span>)
                 .addResourceLocations(<span class="string">"file:/var/uploads/"</span>)
-                .setCacheControl(<span class="class-name">CacheControl</span>.maxAge(<span class="number">1</span>, <span class="class-name">TimeUnit</span>.HOURS));
+                .setCacheControl(<span class="class-name">CacheControl</span>.maxAge(<span class="class-name">Duration</span>.ofHours(<span class="number">1</span>)));
     }
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Spring MVC:</strong> Model-View-Controller web framework</li>
-                    <li><strong>DispatcherServlet:</strong> Front controller that routes requests</li>
-                    <li><strong>@Controller:</strong> Returns views (HTML pages)</li>
-                    <li><strong>@RestController:</strong> Returns data (JSON/XML)</li>
-                    <li><strong>@RequestMapping:</strong> Maps URLs to handler methods</li>
-                    <li><strong>@PathVariable:</strong> Extracts URL path segments</li>
-                    <li><strong>@RequestParam:</strong> Extracts query parameters</li>
-                    <li><strong>@RequestBody:</strong> Binds JSON/XML to objects</li>
-                    <li><strong>@ModelAttribute:</strong> Binds form data to objects</li>
-                    <li><strong>@Valid:</strong> Triggers bean validation</li>
-                    <li><strong>@ExceptionHandler:</strong> Handles exceptions</li>
-                    <li><strong>@ControllerAdvice:</strong> Global exception handling</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — STATIC RESOURCES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Static Resources</h2>
+                <p>By default, Spring Boot serves anything placed under
+                    <code>src/main/resources/static/</code> (also checked, in order:
+                    <code>/public/</code>, <code>/resources/</code>,
+                    <code>/META-INF/resources/</code>) directly, without a controller.
+                </p>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="boot.html" class="related-link">Spring Boot Basics</a>
-                <a href="rest.html" class="related-link">Spring REST</a>
-                <a href="security.html" class="related-link">Spring Security</a>
-            </div>
-        </section>
-    </main>
+                <pre><code><span class="comment"># application.properties — override the default locations or caching</span>
+spring.web.resources.static-locations=classpath:/static/,classpath:/custom/
+spring.web.resources.cache.period=31536000  <span class="comment"># seconds — 1 year, safe with content-hashed filenames</span></code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">Content-hashed filenames beat a long cache period alone</div>
+                    <p><code>spring.web.resources.chain.strategy.content.enabled=true</code>
+                        appends a content hash to static filenames
+                        (<code>app-8f3a1c.js</code>). Combined with a 1-year
+                        <code>cache.period</code>, this is safe: the browser caches indefinitely,
+                        and a genuinely new file gets a genuinely new URL, forcing a fetch. A long
+                        cache period without content hashing means users can get stuck on stale
+                        JS/CSS until the cache naturally expires.
+                    </p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — TESTING THE WEB LAYER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Testing the Web Layer: @WebMvcTest and MockMvc</h2>
+
+                <pre><code><span class="annotation">@WebMvcTest</span>(<span class="class-name">ProductController</span>.<span class="keyword">class</span>)  <span class="comment">// loads ONLY the web layer — this controller + relevant MVC infra</span>
+<span class="keyword">class</span> <span class="class-name">ProductControllerTest</span> {
+
+    <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">MockMvc</span> mockMvc;
+
+    <span class="annotation">@MockitoBean</span>  <span class="comment">// no real ProductService bean exists in this slice — must be mocked</span>
+    <span class="keyword">private</span> <span class="class-name">ProductService</span> productService;
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">show_returnsProductView</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">when</span>(productService.findById(<span class="number">1L</span>)).thenReturn(<span class="keyword">new</span> <span class="class-name">Product</span>(<span class="number">1L</span>, <span class="string">"Keyboard"</span>));
+
+        mockMvc.perform(get(<span class="string">"/products/1"</span>))
+            .andExpect(status().isOk())
+            .andExpect(view().name(<span class="string">"products/show"</span>))
+            .andExpect(model().attributeExists(<span class="string">"product"</span>));
+    }
+}</code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">The same lesson as @SpringBootTest — a smaller slice, not a smaller
+                        framework</div>
+                    <p>Exactly as covered in <a href="core.html">Spring Core</a>: reach for the
+                        narrowest context that actually tests what you need. A plain unit test
+                        with Mockito needs no Spring at all. <code>@WebMvcTest</code> loads the
+                        web layer only — no repositories, no real database — making it far
+                        faster than a full <code>@SpringBootTest</code> while still exercising
+                        real routing, real argument binding, and real JSON serialisation.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+
+                    <p><strong>Q: What is DispatcherServlet, and why does Spring MVC use a single one instead of a
+                            servlet per URL?</strong><br>
+                        It's the Front Controller — a single entry point for every HTTP request.
+                        Centralising the entry point means cross-cutting concerns (interceptors,
+                        exception handling, content negotiation) are applied consistently once,
+                        instead of being duplicated across many individual servlets.</p>
+
+                    <p><strong>Q: What's the difference between @Controller and @RestController?</strong><br>
+                        <code>@RestController</code> is <code>@Controller</code> +
+                        <code>@ResponseBody</code>. <code>@Controller</code> methods return a view
+                        name to be resolved and rendered; <code>@RestController</code> methods return
+                        data that's written directly to the response body via an
+                        <code>HttpMessageConverter</code> (JSON, typically).
+                    </p>
+
+                    <p><strong>Q: What's the difference between @PathVariable and @RequestParam?</strong><br>
+                        <code>@PathVariable</code> extracts a value from the URL path itself
+                        (<code>/users/{id}</code>). <code>@RequestParam</code> extracts a value from
+                        the query string (<code>?page=2</code>) or form data.
+                    </p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+
+                    <p><strong>Q: When would you choose a Filter over a HandlerInterceptor, or vice versa?</strong><br>
+                        A <code>Filter</code> runs at the servlet container level, before
+                        <code>DispatcherServlet</code> even executes, and has no knowledge of which
+                        controller method will eventually run — appropriate for concerns that must
+                        apply universally and early: CORS, compression, raw token presence checks. A
+                        <code>HandlerInterceptor</code> runs inside the MVC pipeline with access to
+                        the resolved <code>HandlerMethod</code>, making it the right choice when the
+                        logic needs handler-level metadata — e.g. reading a custom annotation on the
+                        target method to decide whether to allow the request through.
+                    </p>
+
+                    <p><strong>Q: What actually happens if @Valid is used on a @RequestBody parameter without a
+                            following BindingResult, versus with @ModelAttribute?</strong><br>
+                        With <code>@RequestBody</code>, there's no convention for absorbing errors —
+                        a validation failure always throws
+                        <code>MethodArgumentNotValidException</code>, which must be caught via
+                        <code>@ExceptionHandler</code>. With <code>@ModelAttribute</code>, placing a
+                        <code>BindingResult</code> parameter immediately after the validated argument
+                        tells Spring to populate it silently instead — no exception, and the code
+                        must explicitly check <code>result.hasErrors()</code>. Copy-pasting a
+                        validation pattern between a REST controller and a form controller without
+                        accounting for this difference is a common source of unhandled-exception
+                        bugs.
+                    </p>
+
+                    <p><strong>Q: How does Spring resolve @PathVariable Long id to the {id} segment without an explicit
+                            name — and what breaks it?</strong><br>
+                        It matches by parameter name, which only survives compilation if the
+                        <code>-parameters</code> javac flag was used to retain parameter names in
+                        the bytecode. Spring Boot's Maven and Gradle plugins enable this by default,
+                        which is why most developers never see the failure mode — but any build
+                        outside those defaults (a raw <code>javac</code> invocation, some IDE run
+                        configurations) silently loses this, and every implicit-name
+                        <code>@PathVariable</code> breaks at runtime. The defensive default in shared
+                        or library code is naming it explicitly: <code>@PathVariable("id")</code>.
+                    </p>
+
+                    <p><strong>Q: What is ProblemDetail and why did Spring Framework 6 introduce it?</strong><br>
+                        It's Spring's built-in implementation of RFC 9457 ("Problem Details for HTTP
+                        APIs"), standardising error response shape (<code>type</code>,
+                        <code>title</code>, <code>status</code>, <code>detail</code>, plus custom
+                        properties) across an entire API surface instead of every team inventing its
+                        own <code>ErrorResponse</code> DTO. It's opt-in via
+                        <code>spring.mvc.problemdetails.enabled=true</code> for Spring's own default
+                        exception handling, but can — and typically should — be returned explicitly
+                        from custom <code>@ExceptionHandler</code> methods regardless of that flag.
+                    </p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="core.html" class="related-link">
+                        <span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)
+                    </a>
+                    <a href="boot.html" class="related-link">
+                        <span class="related-icon">🍃</span>Spring Boot Basics
+                    </a>
+                    <a href="rest.html" class="related-link">
+                        <span class="related-icon">🌐</span>Spring REST
+                    </a>
+                    <a href="security.html" class="related-link">
+                        <span class="related-icon">🔒</span>Spring Security
+                    </a>
+                    <a href="../web-concepts/http.html" class="related-link">
+                        <span class="related-icon">📡</span>HTTP Protocol &amp; Methods
+                    </a>
+                    <a href="../tools/testing.html" class="related-link">
+                        <span class="related-icon">🧪</span>Testing (JUnit, Mockito)
+                    </a>
+                    <a href="../fundamentals/exceptions.html" class="related-link">
+                        <span class="related-icon">⚠️</span>Exception Handling
+                    </a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
+
 </html>

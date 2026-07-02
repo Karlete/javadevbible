@@ -1,161 +1,357 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.spprops.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Application Properties - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#spring">Spring Framework</a> / Application Properties
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#spring" data-i18n="nav.spring">Spring Framework</a> /
+                Application Properties
             </nav>
-            <h1>Application Properties</h1>
-            <p class="topic-subtitle">Configuring Spring Boot applications</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.spprops.h1">Application Properties</h1>
+            <p class="topic-subtitle" data-i18n="topic.spprops.subtitle">How Spring Boot resolves configuration — property sources, precedence, type-safe binding, and what never belongs in a properties file</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>Configuration Files</h2>
+    <div class="topic-layout">
 
-            <h3>application.properties</h3>
-            <pre><code><span class="comment"># Server</span>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THE CONFIGURATION SYSTEM
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>How Spring Boot's Configuration System Works</h2>
+                <p>Spring Boot's configuration system is built on Spring's
+                    <code>Environment</code> abstraction — a unified view over a prioritised
+                    list of <strong>property sources</strong>. When you ask for
+                    <code>server.port</code>, the <code>Environment</code> walks that list from
+                    highest to lowest priority and returns the first value it finds. The
+                    <em>source</em> that provides it (a <code>.properties</code> file, an
+                    environment variable, a command-line argument) is transparent to the code
+                    consuming it.</p>
+
+                <p>This is what makes twelve-factor-style configuration possible: the same
+                    application binary reads from a properties file in development, from
+                    environment variables in a container, and from a secrets manager in
+                    production — no code changes, only the active property sources differ.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — CONFIGURATION FILE FORMATS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Configuration File Formats</h2>
+
+                <pre><code><span class="comment"># application.properties — flat key/value</span>
 server.port=8080
 server.servlet.context-path=/api
 
-<span class="comment"># Database</span>
 spring.datasource.url=jdbc:postgresql://localhost:5432/mydb
-spring.datasource.username=user
-spring.datasource.password=pass
+spring.datasource.username=dbuser
+<span class="comment"># spring.datasource.password — see the secrets note below, NOT here in plain text</span>
 
-<span class="comment"># JPA</span>
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
+spring.jpa.hibernate.ddl-auto=validate   <span class="comment"># NEVER create/update in production</span>
+spring.jpa.open-in-view=false            <span class="comment"># recommended; see Spring Data JPA page</span>
 
-<span class="comment"># Logging</span>
 logging.level.root=INFO
 logging.level.com.example=DEBUG
 
-<span class="comment"># Custom properties</span>
 app.name=My Application
 app.max-connections=100</code></pre>
 
-            <h3>application.yml (Alternative)</h3>
-            <pre><code><span class="keyword">server</span>:
+                <pre><code><span class="comment"># application.yml — YAML format, identical semantics, just hierarchical</span>
+<span class="keyword">server</span>:
   <span class="keyword">port</span>: <span class="number">8080</span>
-  <span class="keyword">servlet</span>:
-    <span class="keyword">context-path</span>: /api
 
 <span class="keyword">spring</span>:
   <span class="keyword">datasource</span>:
     <span class="keyword">url</span>: jdbc:postgresql://localhost:5432/mydb
-    <span class="keyword">username</span>: user
-    <span class="keyword">password</span>: pass
+    <span class="keyword">username</span>: dbuser
   <span class="keyword">jpa</span>:
     <span class="keyword">hibernate</span>:
-      <span class="keyword">ddl-auto</span>: update
+      <span class="keyword">ddl-auto</span>: validate
+    <span class="keyword">open-in-view</span>: <span class="keyword">false</span>
 
 <span class="keyword">app</span>:
   <span class="keyword">name</span>: My Application
   <span class="keyword">max-connections</span>: <span class="number">100</span></code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Accessing Properties</h2>
+                <div class="info-box note">
+                    <div class="info-box-title">properties vs yml — which to choose</div>
+                    <p>They are mechanically equivalent — Spring Boot loads both. YAML is more
+                        readable for deep hierarchies and supports lists naturally, but a YAML
+                        indentation error is a silent parse failure (wrong value, no exception).
+                        Properties files are flat and verbose but harder to break accidentally.
+                        Many teams pick YAML for readability and accept the indentation risk;
+                        the only rule is not using <strong>both</strong> for the same profile in
+                        the same project — when both exist, <code>.properties</code> wins.</p>
+                </div>
+            </section>
 
-            <h3>@Value Annotation</h3>
-            <pre><code><span class="annotation">@Component</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — PROPERTY SOURCE PRIORITY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Property Source Priority — What Overrides What</h2>
+                <p>Spring Boot evaluates property sources in a fixed order. A source higher in
+                    this list (lower number = higher priority) shadows any value for the same
+                    key in a lower-priority source:</p>
+
+                <table>
+                    <tr><th>Priority</th><th>Source</th><th>Typical use</th></tr>
+                    <tr><td>1 — highest</td><td>Command-line arguments (<code>--key=value</code>)</td><td>One-off overrides, debugging</td></tr>
+                    <tr><td>2</td><td><code>SPRING_APPLICATION_JSON</code> env var</td><td>JSON blob of overrides — common in some PaaS platforms</td></tr>
+                    <tr><td>3</td><td>OS environment variables</td><td>Secrets and environment-specific values in containers</td></tr>
+                    <tr><td>4</td><td>Profile-specific outside JAR (<code>application-prod.properties</code> beside the JAR)</td><td>Ops-managed config without rebuilding</td></tr>
+                    <tr><td>5</td><td>Profile-specific inside JAR</td><td>Environment defaults bundled with the artifact</td></tr>
+                    <tr><td>6</td><td><code>application.properties</code> / <code>.yml</code> outside JAR</td><td>Ops override of bundled defaults</td></tr>
+                    <tr><td>7 — lowest useful</td><td><code>application.properties</code> / <code>.yml</code> inside JAR</td><td>Bundled defaults and local dev values</td></tr>
+                </table>
+
+                <pre><code><span class="comment"># Override via command-line — highest priority, wins over everything including env vars</span>
+java -jar app.jar --server.port=9090
+
+<span class="comment"># Override via environment variable — dots become underscores, uppercase</span>
+<span class="comment"># spring.datasource.url → SPRING_DATASOURCE_URL</span>
+export SPRING_DATASOURCE_URL=jdbc:postgresql://prod-host:5432/proddb
+java -jar app.jar</code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">Environment variable naming: dots → underscores, uppercase</div>
+                    <p>Spring's relaxed binding translates <code>spring.datasource.url</code>
+                        to the environment variable <code>SPRING_DATASOURCE_URL</code>
+                        automatically. Hyphens in property names (<code>max-connections</code>)
+                        also become underscores: <code>APP_MAX_CONNECTIONS</code>. This is what
+                        makes containerised deployment work cleanly — no code changes, just
+                        environment variables injected by Kubernetes secrets or your CI/CD
+                        pipeline.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — ACCESSING PROPERTIES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Accessing Properties in Code</h2>
+
+                <h3>@Value — for a single property in any bean</h3>
+                <pre><code><span class="annotation">@Component</span>
 <span class="keyword">public class</span> <span class="class-name">MyService</span> {
 
     <span class="annotation">@Value</span>(<span class="string">"${app.name}"</span>)
     <span class="keyword">private</span> <span class="class-name">String</span> appName;
 
-    <span class="annotation">@Value</span>(<span class="string">"${app.max-connections:50}"</span>)  <span class="comment">// With default</span>
+    <span class="annotation">@Value</span>(<span class="string">"${app.max-connections:50}"</span>)  <span class="comment">// :50 is the default if key is absent</span>
     <span class="keyword">private int</span> maxConnections;
-
-    <span class="annotation">@Value</span>(<span class="string">"${SERVER_PORT:8080}"</span>)  <span class="comment">// Environment variable</span>
-    <span class="keyword">private int</span> port;
 }</code></pre>
 
-            <h3>@ConfigurationProperties (Recommended)</h3>
-            <pre><code><span class="annotation">@Component</span>
+                <div class="info-box warning">
+                    <div class="info-box-title">@Value has two important limitations</div>
+                    <p>First, it cannot be used on <code>static</code> fields — the injection
+                        happens at bean instantiation time, not at class-load time. Second, it
+                        provides zero type safety and no IDE-assisted autocomplete — a typo in
+                        the key string produces an <code>IllegalArgumentException</code> at
+                        startup rather than a compile error. For anything beyond a single
+                        one-off value, <code>@ConfigurationProperties</code> is the better
+                        choice.</p>
+                </div>
+
+                <h3>@ConfigurationProperties — type-safe binding for a group of related properties</h3>
+                <pre><code><span class="comment">// Modern idiom: a record with @ConfigurationProperties + @Validated</span>
 <span class="annotation">@ConfigurationProperties</span>(prefix = <span class="string">"app"</span>)
-<span class="keyword">public class</span> <span class="class-name">AppProperties</span> {
+<span class="annotation">@Validated</span>  <span class="comment">// fails at startup with a clear message if any constraint is violated</span>
+<span class="keyword">public record</span> <span class="class-name">AppProperties</span>(
+    <span class="annotation">@NotBlank</span> <span class="class-name">String</span> name,
+    <span class="annotation">@Min</span>(<span class="number">1</span>) <span class="annotation">@Max</span>(<span class="number">1000</span>) <span class="keyword">int</span> maxConnections,
+    <span class="annotation">@NotNull</span> <span class="class-name">Security</span> security
+) {
+    <span class="keyword">public record</span> <span class="class-name">Security</span>(
+        <span class="annotation">@NotBlank</span> <span class="class-name">String</span> secretKey,
+        <span class="annotation">@Positive</span> <span class="keyword">long</span> tokenExpiry
+    ) {}
+}</code></pre>
 
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
-    <span class="keyword">private int</span> maxConnections;
-    <span class="keyword">private</span> <span class="class-name">Security</span> security = <span class="keyword">new</span> <span class="class-name">Security</span>();
-
-    <span class="keyword">public static class</span> <span class="class-name">Security</span> {
-        <span class="keyword">private</span> <span class="class-name">String</span> secretKey;
-        <span class="keyword">private long</span> tokenExpiry;
-        <span class="comment">// getters/setters</span>
-    }
-
-    <span class="comment">// getters/setters</span>
-}
-
-<span class="comment">// application.yml</span>
+                <pre><code><span class="comment"># application.yml — maps directly to the record above</span>
 <span class="keyword">app</span>:
-  <span class="keyword">name</span>: My App
+  <span class="keyword">name</span>: My Application
   <span class="keyword">max-connections</span>: <span class="number">100</span>
   <span class="keyword">security</span>:
-    <span class="keyword">secret-key</span>: mySecretKey
+    <span class="keyword">secret-key</span>: <span class="string">"${APP_SECRET_KEY}"</span>   <span class="comment"># resolved from env var — NOT hardcoded here</span>
     <span class="keyword">token-expiry</span>: <span class="number">3600000</span></code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Property Sources Priority</h2>
+                <pre><code><span class="comment">// Enable scanning for @ConfigurationProperties records</span>
+<span class="annotation">@SpringBootApplication</span>
+<span class="annotation">@ConfigurationPropertiesScan</span>
+<span class="keyword">public class</span> <span class="class-name">MyApp</span> {
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+        <span class="class-name">SpringApplication</span>.run(<span class="class-name">MyApp</span>.<span class="keyword">class</span>, args);
+    }
+}
 
-            <p>Spring Boot loads properties in this order (later overrides earlier):</p>
-            <ol>
-                <li>Default properties</li>
-                <li>application.properties/yml in classpath</li>
-                <li>application.properties/yml outside JAR</li>
-                <li>Profile-specific properties</li>
-                <li>Command line arguments</li>
-                <li>Environment variables</li>
-            </ol>
+<span class="comment">// Inject as any other bean</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">TokenService</span> {
+    <span class="keyword">private final</span> <span class="class-name">AppProperties</span> props;
 
-            <pre><code><span class="comment"># Override via command line</span>
-java -jar app.jar --server.port=9090
+    <span class="keyword">public</span> <span class="function">TokenService</span>(<span class="class-name">AppProperties</span> props) { <span class="keyword">this</span>.props = props; }
 
-<span class="comment"># Override via environment variable</span>
-export SERVER_PORT=9090
-java -jar app.jar</code></pre>
-        </section>
+    <span class="keyword">public long</span> <span class="function">tokenExpiry</span>() { <span class="keyword">return</span> props.security().tokenExpiry(); }
+}</code></pre>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>application.properties:</strong> Key=value configuration</li>
-                    <li><strong>application.yml:</strong> YAML format (hierarchical)</li>
-                    <li><strong>@Value:</strong> Inject single properties</li>
-                    <li><strong>@ConfigurationProperties:</strong> Type-safe configuration</li>
-                    <li><strong>Environment variables:</strong> Override any property</li>
-                </ul>
-            </div>
-        </section>
+                <div class="info-box tip">
+                    <div class="info-box-title">Add the annotation processor for IDE autocomplete on your own properties</div>
+                    <pre><code><span class="comment">&lt;!-- pom.xml — optional but highly recommended --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-configuration-processor&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">optional</span>&gt;true&lt;/<span class="keyword">optional</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                    <p>At compile time this generates
+                        <code>META-INF/spring-configuration-metadata.json</code>, which IntelliJ
+                        and VS Code read to provide autocomplete, type hints, and documentation
+                        pop-ups for your own <code>app.*</code> keys in
+                        <code>application.properties</code>/<code>.yml</code>. Without it, only
+                        Spring Boot's own properties get autocomplete — yours don't.
+                        <code>&lt;optional&gt;true&lt;/optional&gt;</code> ensures it's a
+                        compile-only tool that doesn't end up in downstream dependencies or the
+                        final JAR.</p>
+                </div>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="boot.html" class="related-link">Spring Boot</a>
-                <a href="profiles.html" class="related-link">Profiles</a>
-            </div>
-        </section>
-    </main>
+                <div class="info-box important">
+                    <div class="info-box-title">Why records beat the mutable class approach</div>
+                    <p>The classic approach — a <code>@Component @ConfigurationProperties</code>
+                        mutable class with getters and setters — works, but gives you a mutable
+                        configuration object that any bean can accidentally modify at runtime.
+                        A <code>record</code> is immutable by construction: fields are set once
+                        during binding and cannot change. Additionally,
+                        <code>@Validated</code> on a <code>@ConfigurationProperties</code> bean
+                        fails the application <strong>at startup</strong> with a readable
+                        message if a required value is absent or out of range — rather than
+                        failing at the first runtime call that hits the missing config,
+                        potentially hours into a production deployment.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — SECRETS: WHAT NEVER GOES IN A PROPERTIES FILE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Secrets — What Never Goes in a Properties File</h2>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">A properties file committed to git is a public secret — even in a private repo</div>
+                    <p>Database passwords, API keys, JWT signing keys, and any other credential
+                        in a <code>.properties</code> or <code>.yml</code> file that reaches
+                        version control are compromised — not "at risk of being compromised."
+                        Git history is permanent and often broader in access than the running
+                        application. This is one of the most frequent findings in security
+                        audits of Java applications.</p>
+                </div>
+
+                <p>The correct pattern at each environment level:</p>
+                <table>
+                    <tr><th>Environment</th><th>Correct approach</th></tr>
+                    <tr><td>Local dev</td><td><code>.env</code> file or IDE run configuration env vars — file added to <code>.gitignore</code>, never committed</td></tr>
+                    <tr><td>CI/CD pipeline</td><td>CI platform secret variables (GitHub Actions secrets, GitLab CI variables) injected as env vars at runtime</td></tr>
+                    <tr><td>Container / Kubernetes</td><td>Kubernetes <code>Secret</code> objects mounted as env vars or volume files — never baked into the image</td></tr>
+                    <tr><td>Production</td><td>HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, or similar — Spring Cloud Vault integrates directly with Spring's <code>Environment</code></td></tr>
+                </table>
+
+                <pre><code><span class="comment"># What a properties file SHOULD contain for a secret:</span>
+spring.datasource.password=${DB_PASSWORD}
+
+<span class="comment"># The actual value lives in an environment variable, a Kubernetes Secret,
+# or a secrets manager — never in this file.</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's the difference between @Value and @ConfigurationProperties?</strong><br>
+                    <code>@Value</code> injects a single property by key string — convenient for
+                    one-off values, no compile-time safety. <code>@ConfigurationProperties</code>
+                    binds a whole group of related properties to a typed class or record, with
+                    IDE autocomplete, refactoring support, and optional validation at startup.</p>
+
+                    <p><strong>Q: If the same property is set in application.properties and as an environment variable, which wins?</strong><br>
+                    The environment variable — it sits higher in the property source priority
+                    order than the bundled properties file. Command-line arguments
+                    (<code>--key=value</code>) are higher still and override both.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Why is @Validated on @ConfigurationProperties preferable to validating config values at first use?</strong><br>
+                    Startup-time validation fails the application immediately, before any traffic
+                    is served, with a clear message naming the missing or invalid property.
+                    Validating at first use means a misconfigured production deployment can start
+                    successfully, pass health checks, and then fail mid-flight on the first
+                    request that hits the code path needing the bad value — potentially after
+                    the deployment is considered "done" and the previous version has been
+                    terminated.</p>
+
+                    <p><strong>Q: How does Spring Boot's relaxed binding work, and why does it matter for containerised deployments?</strong><br>
+                    Spring accepts a property value under multiple naming conventions
+                    simultaneously: <code>app.maxConnections</code>,
+                    <code>app.max-connections</code>, and the environment variable
+                    <code>APP_MAX_CONNECTIONS</code> all resolve to the same binding target.
+                    This matters for containers because OS environment variables cannot contain
+                    dots or hyphens — relaxed binding means the same property the application
+                    reads as <code>app.max-connections</code> in a YAML file is trivially
+                    injectable as <code>APP_MAX_CONNECTIONS</code> in a Kubernetes secret or
+                    Docker run command, with no application code changes.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="boot.html" class="related-link"><span class="related-icon">🍃</span>Spring Boot Basics</a>
+                    <a href="profiles.html" class="related-link"><span class="related-icon">🌍</span>Profiles &amp; Environments</a>
+                    <a href="core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
+                    <a href="../security/https-ssl.html" class="related-link"><span class="related-icon">🔒</span>HTTPS &amp; SSL/TLS</a>
+                    <a href="../best-practices/security-best-practices.html" class="related-link"><span class="related-icon">⭐</span>Security Best Practices</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

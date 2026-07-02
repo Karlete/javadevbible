@@ -1,85 +1,168 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.spsecurity.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spring Security - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#spring">Spring Framework</a> / Spring Security
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#spring" data-i18n="nav.spring">Spring Framework</a> /
+                Spring Security
             </nav>
-            <h1>Spring Security</h1>
-            <p class="topic-subtitle">Authentication and authorization for Spring applications</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.spsecurity.h1">Spring Security</h1>
+            <p class="topic-subtitle" data-i18n="topic.spsecurity.subtitle">The filter chain architecture behind authentication and authorization — and where session-based and stateless (JWT) configuration genuinely diverge</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is Spring Security?</h2>
-            <p><strong>Think of Spring Security as a building's security system:</strong></p>
-            <ul>
-                <li><strong>Authentication:</strong> ID check at entrance (Who are you?)</li>
-                <li><strong>Authorization:</strong> Access badges for different areas (What can you access?)</li>
-                <li><strong>Filters:</strong> Security guards checking each person</li>
-            </ul>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>Spring Security</strong> is a powerful, highly customizable authentication and access-control framework for Java applications.</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Setup</h2>
+        <main class="topic-content">
 
-            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS SPRING SECURITY AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Spring Security, Architecturally?</h2>
+                <p>Spring Security is a chain of <code>Filter</code>s — plain Servlet filters,
+                    the same mechanism covered in
+                    <a href="../web-concepts/http.html">HTTP Protocol &amp; Methods</a> and
+                    contrasted with Spring's own interceptors in
+                    <a href="mvc.html">Spring MVC</a> — inserted in front of your application via
+                    a single <code>DelegatingFilterProxy</code>. That proxy delegates to a
+                    <code>FilterChainProxy</code>, which holds an <strong>ordered list</strong> of
+                    <code>SecurityFilterChain</code> beans, each guarding a set of URL patterns.
+                    The first chain whose pattern matches the request wins — everything inside it
+                    (authentication, CSRF, authorization decisions) runs before the request ever
+                    reaches <code>DispatcherServlet</code>.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">This page is about Spring Security's mechanics — not "what is authentication"</div>
+                    <p>The conceptual distinction between authentication and authorization is
+                        covered on its own dedicated page:
+                        <a href="../security/auth-vs-authz.html">Authentication vs
+                        Authorization</a>. This page assumes that distinction and focuses on how
+                        Spring Security specifically implements it — the filter chain, the
+                        <code>AuthenticationManager</code>, and the two fundamentally different
+                        configuration shapes (session-based vs stateless) that follow from it.</p>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">If a tutorial uses WebSecurityConfigurerAdapter, it's outdated</div>
+                    <p><code>WebSecurityConfigurerAdapter</code> — extending a base class and
+                        overriding <code>configure(HttpSecurity)</code> — was deprecated in
+                        Spring Security 5.7 and <strong>removed entirely in Spring Security 6</strong>
+                        (Spring Boot 3+). The current, and only, approach is exposing a
+                        <code>SecurityFilterChain</code> as a <code>@Bean</code>, using the lambda
+                        DSL shown throughout this page. A huge amount of security tutorials online
+                        still teach the removed API — treat that as a strong signal the content
+                        predates Boot 3.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — SETUP AND DEFAULT BEHAVIOUR
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Setup and the Default Behaviour</h2>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
 &lt;<span class="keyword">dependency</span>&gt;
     &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
     &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-security&lt;/<span class="keyword">artifactId</span>&gt;
 &lt;/<span class="keyword">dependency</span>&gt;</code></pre>
 
-            <p>Just adding this dependency enables:</p>
-            <ul>
-                <li>All endpoints require authentication</li>
-                <li>Default login form at /login</li>
-                <li>Default user: "user", password in console logs</li>
-            </ul>
-        </section>
+                <div class="info-box important">
+                    <div class="info-box-title">The dependency alone changes your app's behaviour — before you write a line of config</div>
+                    <p>Auto-configuration registers a default <code>SecurityFilterChain</code>
+                        that requires authentication for <strong>every</strong> endpoint, serves a
+                        default login form at <code>/login</code>, and generates a random
+                        password for an in-memory user named <code>user</code>, printed once to
+                        the console at startup. This is a deliberately restrictive default — the
+                        framework assumes an unconfigured app should fail closed, not open.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Basic Configuration</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — THE AUTHENTICATION FLOW
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Authentication Flow — What Actually Happens</h2>
 
-            <pre><code><span class="annotation">@Configuration</span>
+                <pre><code><span class="comment">/*
+ *  Login request ──▶ UsernamePasswordAuthenticationFilter
+ *                              │  builds an unauthenticated Authentication (username + password)
+ *                              ▼
+ *                    AuthenticationManager
+ *                              │  delegates to the first AuthenticationProvider that supports it
+ *                              ▼
+ *                    DaoAuthenticationProvider
+ *                              │  1. UserDetailsService.loadUserByUsername(username)
+ *                              │  2. PasswordEncoder.matches(rawPassword, storedHash)
+ *                              ▼
+ *                    Authenticated Authentication object
+ *                              │  (principal + authorities, password discarded)
+ *                              ▼
+ *                    SecurityContextHolder.getContext().setAuthentication(...)
+ *                              │  stored for the rest of THIS request (and the session, if any)
+ */</span></code></pre>
+
+                <p>Every piece here is replaceable independently. Provide your own
+                    <code>UserDetailsService</code> to load users from a database instead of
+                    memory; the <code>AuthenticationManager</code>/<code>DaoAuthenticationProvider</code>
+                    machinery around it stays exactly the same. This is why a
+                    <a href="#user-details-service">custom database-backed UserDetailsService</a>,
+                    further down, plugs in without touching anything else in the configuration.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — SESSION-BASED CONFIGURATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Session-Based Configuration (Form Login)</h2>
+
+                <pre><code><span class="annotation">@Configuration</span>
 <span class="annotation">@EnableWebSecurity</span>
 <span class="keyword">public class</span> <span class="class-name">SecurityConfig</span> {
 
     <span class="annotation">@Bean</span>
     <span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
         http
-            <span class="comment">// Authorization rules</span>
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(<span class="string">"/public/**"</span>, <span class="string">"/login"</span>, <span class="string">"/register"</span>).permitAll()
+                <span class="comment">// Order matters: rules are evaluated top to bottom, first match wins.
+                // A specific /admin/** rule AFTER a catch-all anyRequest() would never run.</span>
+                .requestMatchers(<span class="string">"/public/**"</span>, <span class="string">"/login"</span>).permitAll()
                 .requestMatchers(<span class="string">"/admin/**"</span>).hasRole(<span class="string">"ADMIN"</span>)
                 .requestMatchers(<span class="string">"/user/**"</span>).hasAnyRole(<span class="string">"USER"</span>, <span class="string">"ADMIN"</span>)
                 .anyRequest().authenticated()
             )
-            <span class="comment">// Form login</span>
             .formLogin(form -> form
                 .loginPage(<span class="string">"/login"</span>)
                 .defaultSuccessUrl(<span class="string">"/dashboard"</span>)
                 .permitAll()
             )
-            <span class="comment">// Logout</span>
             .logout(logout -> logout
-                .logoutUrl(<span class="string">"/logout"</span>)
                 .logoutSuccessUrl(<span class="string">"/login?logout"</span>)
                 .permitAll()
             );
+            <span class="comment">// CSRF stays ENABLED here — the default, and correct, for a session-based app</span>
 
         <span class="keyword">return</span> http.build();
     }
@@ -89,110 +172,165 @@
         <span class="keyword">return new</span> <span class="class-name">BCryptPasswordEncoder</span>();
     }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>User Details Service</h2>
+                <div class="info-box warning">
+                    <div class="info-box-title">hasRole("ADMIN") vs hasAuthority("ROLE_ADMIN") — a silent authorization bug waiting to happen</div>
+                    <p><code>hasRole("ADMIN")</code> automatically prefixes <code>ROLE_</code>
+                        under the hood — it actually checks for the authority
+                        <code>"ROLE_ADMIN"</code>. If your <code>UserDetailsService</code> already
+                        stores authorities <em>with</em> the prefix baked in and a rule elsewhere
+                        uses <code>hasAuthority("ROLE_ADMIN")</code> (no auto-prefixing), both
+                        happen to work — but mixing conventions across a codebase, or double-
+                        prefixing to <code>"ROLE_ROLE_ADMIN"</code>, produces an authorization
+                        check that silently never matches. No exception, no log — the user is
+                        just always denied. Pick one convention (<code>hasRole</code> +
+                        unprefixed stored authorities is the idiomatic default) and stay
+                        consistent.</p>
+                </div>
+            </section>
 
-            <h3>In-Memory Users (for testing)</h3>
-            <pre><code><span class="annotation">@Bean</span>
-<span class="keyword">public</span> <span class="class-name">UserDetailsService</span> <span class="function">userDetailsService</span>() {
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — USERDETAILSSERVICE
+            ════════════════════════════════════════════ -->
+            <section class="content-section" id="user-details-service">
+                <h2>UserDetailsService — Where Users Actually Come From</h2>
+
+                <h3>In-memory (testing only)</h3>
+                <pre><code><span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">UserDetailsService</span> <span class="function">userDetailsService</span>(<span class="class-name">PasswordEncoder</span> passwordEncoder) {
     <span class="class-name">UserDetails</span> user = <span class="class-name">User</span>.builder()
         .username(<span class="string">"user"</span>)
-        .password(passwordEncoder().encode(<span class="string">"password"</span>))
+        .password(passwordEncoder.encode(<span class="string">"password"</span>))
         .roles(<span class="string">"USER"</span>)
         .build();
 
-    <span class="class-name">UserDetails</span> admin = <span class="class-name">User</span>.builder()
-        .username(<span class="string">"admin"</span>)
-        .password(passwordEncoder().encode(<span class="string">"admin"</span>))
-        .roles(<span class="string">"ADMIN"</span>, <span class="string">"USER"</span>)
-        .build();
-
-    <span class="keyword">return new</span> <span class="class-name">InMemoryUserDetailsManager</span>(user, admin);
+    <span class="keyword">return new</span> <span class="class-name">InMemoryUserDetailsManager</span>(user);
 }</code></pre>
 
-            <h3>Database Users</h3>
-            <pre><code><span class="comment">// Entity</span>
-<span class="annotation">@Entity</span>
-<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)
-<span class="keyword">public class</span> <span class="class-name">User</span> {
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>
-    <span class="keyword">private</span> <span class="class-name">Long</span> id;
-    <span class="keyword">private</span> <span class="class-name">String</span> username;
-    <span class="keyword">private</span> <span class="class-name">String</span> password;
-    <span class="keyword">private</span> <span class="keyword">boolean</span> enabled = <span class="keyword">true</span>;
+                <div class="info-box tip">
+                    <div class="info-box-title">Injecting PasswordEncoder as a parameter, not calling the @Bean method directly</div>
+                    <p>Calling <code>passwordEncoder()</code> directly from inside another
+                        <code>@Bean</code> method in the <strong>same</strong>
+                        <code>@Configuration</code> class does still return the singleton — Spring
+                        CGLIB-proxies full <code>@Configuration</code> classes precisely so
+                        internal <code>@Bean</code>-to-<code>@Bean</code> calls resolve correctly.
+                        Declaring it as a method <strong>parameter</strong> instead, as above, is
+                        preferred style regardless — it works identically if the encoder bean ever
+                        moves to a different configuration class, and it doesn't rely on the
+                        reader knowing about CGLIB proxying to trust it's correct.</p>
+                </div>
 
-    <span class="annotation">@ManyToMany</span>(fetch = <span class="class-name">FetchType</span>.EAGER)
-    <span class="keyword">private</span> <span class="class-name">Set</span>&lt;<span class="class-name">Role</span>&gt; roles = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();
-}
-
-<span class="comment">// Custom UserDetailsService</span>
-<span class="annotation">@Service</span>
+                <h3>Database-backed (real applications)</h3>
+                <pre><code><span class="annotation">@Service</span>
 <span class="keyword">public class</span> <span class="class-name">CustomUserDetailsService</span> <span class="keyword">implements</span> <span class="class-name">UserDetailsService</span> {
 
     <span class="keyword">private final</span> <span class="class-name">UserRepository</span> userRepository;
 
+    <span class="keyword">public</span> <span class="function">CustomUserDetailsService</span>(<span class="class-name">UserRepository</span> userRepository) {
+        <span class="keyword">this</span>.userRepository = userRepository;
+    }
+
     <span class="annotation">@Override</span>
     <span class="keyword">public</span> <span class="class-name">UserDetails</span> <span class="function">loadUserByUsername</span>(<span class="class-name">String</span> username) {
-        <span class="class-name">User</span> user = userRepository.findByUsername(username)
-            .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">UsernameNotFoundException</span>(<span class="string">"User not found"</span>));
+        <span class="class-name">AppUser</span> appUser = userRepository.findByUsername(username)
+            .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">UsernameNotFoundException</span>(<span class="string">"User not found: "</span> + username));
 
+        <span class="comment">// stored password is ALREADY a BCrypt hash — never re-encode it here</span>
         <span class="keyword">return</span> org.springframework.security.core.userdetails.<span class="class-name">User</span>.builder()
-            .username(user.getUsername())
-            .password(user.getPassword())
-            .authorities(user.getRoles().stream()
+            .username(appUser.getUsername())
+            .password(appUser.getPassword())
+            .authorities(appUser.getRoles().stream()
                 .map(r -> <span class="keyword">new</span> <span class="class-name">SimpleGrantedAuthority</span>(<span class="string">"ROLE_"</span> + r.getName()))
                 .toList())
-            .disabled(!user.isEnabled())
+            .disabled(!appUser.isEnabled())
             .build();
     }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>JWT Authentication</h2>
+                <div class="info-box note">
+                    <div class="info-box-title">Password hashing itself is covered on its own page</div>
+                    <p>Spring Security's default, <code>BCryptPasswordEncoder</code>, remains a
+                        solid choice and needs no configuration to use correctly. For the
+                        reasoning behind salted hashing, work-factor tuning, and where Argon2 fits
+                        in, see <a href="../security/password-hashing.html">Password Hashing</a> —
+                        this page only covers how the encoder plugs into Spring Security's
+                        authentication flow.</p>
+                </div>
+            </section>
 
-            <pre><code><span class="comment">// JWT Configuration for REST APIs</span>
-<span class="annotation">@Configuration</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — STATELESS CONFIGURATION (JWT)
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Stateless Configuration (JWT) — a Genuinely Different Shape, Not a Variant</h2>
+                <p>A REST API with no server-side session needs a different
+                    <code>SecurityFilterChain</code> altogether — not the form-login one from
+                    Section 3 with a filter bolted on. Pick <strong>one</strong> shape per
+                    application, not both.</p>
+
+                <pre><code><span class="annotation">@Configuration</span>
 <span class="annotation">@EnableWebSecurity</span>
 <span class="keyword">public class</span> <span class="class-name">JwtSecurityConfig</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">JwtAuthenticationFilter</span> jwtAuthFilter;
+
+    <span class="keyword">public</span> <span class="function">JwtSecurityConfig</span>(<span class="class-name">JwtAuthenticationFilter</span> jwtAuthFilter) {
+        <span class="keyword">this</span>.jwtAuthFilter = jwtAuthFilter;
+    }
 
     <span class="annotation">@Bean</span>
     <span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
         http
-            <span class="comment">// Disable CSRF for stateless APIs</span>
-            .csrf(csrf -> csrf.disable())
-            <span class="comment">// Stateless session</span>
+            .csrf(<span class="class-name">AbstractHttpConfigurer</span>::disable)  <span class="comment">// see the warning below BEFORE copying this line</span>
             .sessionManagement(session -> session
-                .sessionCreationPolicy(<span class="class-name">SessionCreationPolicy</span>.STATELESS))
-            <span class="comment">// Authorization</span>
+                .sessionCreationPolicy(<span class="class-name">SessionCreationPolicy</span>.STATELESS))  <span class="comment">// no HttpSession is ever created</span>
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(<span class="string">"/api/auth/**"</span>).permitAll()
                 .anyRequest().authenticated()
             )
-            <span class="comment">// Add JWT filter before UsernamePasswordAuthenticationFilter</span>
-            .addFilterBefore(jwtAuthFilter(), <span class="class-name">UsernamePasswordAuthenticationFilter</span>.<span class="keyword">class</span>);
+            .addFilterBefore(jwtAuthFilter, <span class="class-name">UsernamePasswordAuthenticationFilter</span>.<span class="keyword">class</span>);
 
         <span class="keyword">return</span> http.build();
     }
-}
+}</code></pre>
 
-<span class="comment">// JWT Filter</span>
+                <div class="info-box important">
+                    <div class="info-box-title">Why CSRF is disabled here — and the exact condition under which that's wrong</div>
+                    <p>CSRF exploits the browser's behaviour of <strong>automatically</strong>
+                        attaching cookies to any request to the site that set them — a malicious
+                        page can trigger a request your browser silently authenticates via the
+                        session cookie. A bearer token sent in an <code>Authorization</code>
+                        header must be attached <strong>explicitly</strong> by your own
+                        JavaScript; a forged cross-site request has no way to add that header, so
+                        the attack vector genuinely doesn't apply — disabling CSRF here is
+                        correct, not a shortcut.</p>
+                    <p><strong>This reasoning breaks entirely if the JWT is instead stored in a
+                        cookie</strong> (common for XSS-mitigation reasons, using
+                        <code>HttpOnly</code>). A cookie-stored token <em>is</em> attached
+                        automatically by the browser, exactly like a session cookie — CSRF
+                        protection is still required in that case, disabling it re-opens the exact
+                        vulnerability this section just explained why it was safe to skip.</p>
+                </div>
+
+                <pre><code><span class="comment">// The filter's only job: read the header, validate the token, populate SecurityContext.
+// Token issuing/validation logic (JwtService) is covered on the dedicated JWT page.</span>
 <span class="annotation">@Component</span>
 <span class="keyword">public class</span> <span class="class-name">JwtAuthenticationFilter</span> <span class="keyword">extends</span> <span class="class-name">OncePerRequestFilter</span> {
 
     <span class="keyword">private final</span> <span class="class-name">JwtService</span> jwtService;
     <span class="keyword">private final</span> <span class="class-name">UserDetailsService</span> userDetailsService;
 
+    <span class="keyword">public</span> <span class="function">JwtAuthenticationFilter</span>(<span class="class-name">JwtService</span> jwtService, <span class="class-name">UserDetailsService</span> userDetailsService) {
+        <span class="keyword">this</span>.jwtService = jwtService;
+        <span class="keyword">this</span>.userDetailsService = userDetailsService;
+    }
+
     <span class="annotation">@Override</span>
     <span class="keyword">protected void</span> <span class="function">doFilterInternal</span>(<span class="class-name">HttpServletRequest</span> request,
                                      <span class="class-name">HttpServletResponse</span> response,
-                                     <span class="class-name">FilterChain</span> filterChain) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+                                     <span class="class-name">FilterChain</span> filterChain) <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
 
         <span class="class-name">String</span> authHeader = request.getHeader(<span class="string">"Authorization"</span>);
-
         <span class="keyword">if</span> (authHeader == <span class="keyword">null</span> || !authHeader.startsWith(<span class="string">"Bearer "</span>)) {
             filterChain.doFilter(request, response);
             <span class="keyword">return</span>;
@@ -203,149 +341,296 @@
 
         <span class="keyword">if</span> (username != <span class="keyword">null</span> && <span class="class-name">SecurityContextHolder</span>.getContext().getAuthentication() == <span class="keyword">null</span>) {
             <span class="class-name">UserDetails</span> userDetails = userDetailsService.loadUserByUsername(username);
-
             <span class="keyword">if</span> (jwtService.isTokenValid(jwt, userDetails)) {
-                <span class="class-name">UsernamePasswordAuthenticationToken</span> authToken =
-                    <span class="keyword">new</span> <span class="class-name">UsernamePasswordAuthenticationToken</span>(
-                        userDetails, <span class="keyword">null</span>, userDetails.getAuthorities());
-
-                authToken.setDetails(<span class="keyword">new</span> <span class="class-name">WebAuthenticationDetailsSource</span>()
-                    .buildDetails(request));
-
+                <span class="keyword">var</span> authToken = <span class="keyword">new</span> <span class="class-name">UsernamePasswordAuthenticationToken</span>(
+                    userDetails, <span class="keyword">null</span>, userDetails.getAuthorities());
                 <span class="class-name">SecurityContextHolder</span>.getContext().setAuthentication(authToken);
             }
         }
-
         filterChain.doFilter(request, response);
     }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Method Security</h2>
+                <div class="info-box warning">
+                    <div class="info-box-title">throws ServletException, IOException — not throws Exception</div>
+                    <p>The overridden method is declared by <code>OncePerRequestFilter</code> as
+                        <code>throws ServletException, IOException</code>. Java does not permit an
+                        overriding method to declare a <strong>broader</strong> checked exception
+                        than the method it overrides — declaring <code>throws Exception</code>
+                        here, as some tutorials do, is a genuine compile error, not a style
+                        preference.</p>
+                </div>
 
-            <pre><code><span class="annotation">@Configuration</span>
-<span class="annotation">@EnableMethodSecurity</span>  <span class="comment">// Enable method-level security</span>
-<span class="keyword">public class</span> <span class="class-name">MethodSecurityConfig</span> {
-}
+                <div class="info-box note">
+                    <div class="info-box-title">Full token issuing and validation: see the JWT page</div>
+                    <p><code>JwtService</code>'s internals — signing algorithm, expiry handling,
+                        refresh tokens, secret/key management — are covered in depth on
+                        <a href="../security/jwt.html">JWT (JSON Web Tokens)</a>. This section
+                        only covers how a token, once validated, gets plugged into Spring
+                        Security's <code>SecurityContext</code> via a custom filter.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — METHOD-LEVEL SECURITY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Method-Level Security</h2>
+
+                <pre><code><span class="annotation">@Configuration</span>
+<span class="annotation">@EnableMethodSecurity</span>
+<span class="keyword">public class</span> <span class="class-name">MethodSecurityConfig</span> {}
 
 <span class="annotation">@Service</span>
 <span class="keyword">public class</span> <span class="class-name">UserService</span> {
 
-    <span class="comment">// Role-based access</span>
-    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)                              <span class="comment">// checked BEFORE the method body runs</span>
     <span class="keyword">public void</span> <span class="function">deleteUser</span>(<span class="class-name">Long</span> id) { }
 
-    <span class="comment">// Multiple roles</span>
-    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasAnyRole('ADMIN', 'MANAGER')"</span>)
-    <span class="keyword">public void</span> <span class="function">updateUser</span>(<span class="class-name">User</span> user) { }
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"#userId == authentication.principal.id"</span>)          <span class="comment">// can reference method parameters directly</span>
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getProfile</span>(<span class="class-name">Long</span> userId) { ... }
 
-    <span class="comment">// Permission-based</span>
-    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasAuthority('user:write')"</span>)
-    <span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">User</span> user) { }
+    <span class="annotation">@PostAuthorize</span>(<span class="string">"returnObject.owner == authentication.name"</span>)        <span class="comment">// checked AFTER — needs the return value to decide</span>
+    <span class="keyword">public</span> <span class="class-name">Document</span> <span class="function">getDocument</span>(<span class="class-name">Long</span> id) { ... }
 
-    <span class="comment">// Access method parameters</span>
-    <span class="annotation">@PreAuthorize</span>(<span class="string">"#userId == authentication.principal.id"</span>)
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getProfile</span>(<span class="class-name">Long</span> userId) { }
-
-    <span class="comment">// Check return value</span>
-    <span class="annotation">@PostAuthorize</span>(<span class="string">"returnObject.owner == authentication.name"</span>)
-    <span class="keyword">public</span> <span class="class-name">Document</span> <span class="function">getDocument</span>(<span class="class-name">Long</span> id) { }
-
-    <span class="comment">// Filter collections</span>
-    <span class="annotation">@PostFilter</span>(<span class="string">"filterObject.owner == authentication.name"</span>)
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Document</span>&gt; <span class="function">getAllDocuments</span>() { }
+    <span class="annotation">@PostFilter</span>(<span class="string">"filterObject.owner == authentication.name"</span>)         <span class="comment">// filters the returned collection element-by-element</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Document</span>&gt; <span class="function">getAllDocuments</span>() {
+        <span class="keyword">return</span> documentRepository.findAll();
+    }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Accessing Current User</h2>
+                <div class="info-box warning">
+                    <div class="info-box-title">@PostFilter is an in-memory filter, not a WHERE clause — the same lesson as N+1</div>
+                    <p><code>getAllDocuments()</code> above calls
+                        <code>documentRepository.findAll()</code> — <strong>every</strong> document
+                        row is fetched from the database first. <code>@PostFilter</code> then
+                        discards the ones that don't match the SpEL expression, entirely in Java,
+                        after the fact. On a table with a million documents belonging to
+                        thousands of users, this fetches all of them to return maybe a dozen. As
+                        with the N+1 problem covered in
+                        <a href="data-jpa.html">Spring Data JPA</a>, the fix is pushing the
+                        condition down into the query itself — a
+                        <code>findByOwner(owner)</code> derived method or a
+                        <code>Specification</code> — and reserving <code>@PostFilter</code> for
+                        collections that are already small by the time they reach this layer.</p>
+                </div>
+            </section>
 
-            <pre><code><span class="annotation">@RestController</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — ACCESSING THE CURRENT USER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Accessing the Current User</h2>
+
+                <pre><code><span class="annotation">@RestController</span>
 <span class="keyword">public class</span> <span class="class-name">ProfileController</span> {
 
-    <span class="comment">// Method 1: Principal parameter</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/profile1"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getProfile</span>(<span class="class-name">Principal</span> principal) {
-        <span class="keyword">return</span> <span class="string">"Hello, "</span> + principal.getName();
-    }
-
-    <span class="comment">// Method 2: @AuthenticationPrincipal</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/profile2"</span>)
+    <span class="comment">// Preferred — resolved directly from SecurityContext by an argument resolver,
+    // no manual lookup, works with your own UserDetails implementation too</span>
+    <span class="annotation">@GetMapping</span>(<span class="string">"/profile"</span>)
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getProfile</span>(<span class="annotation">@AuthenticationPrincipal</span> <span class="class-name">UserDetails</span> user) {
         <span class="keyword">return</span> <span class="string">"Hello, "</span> + user.getUsername();
     }
 
-    <span class="comment">// Method 3: SecurityContextHolder</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/profile3"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getProfile</span>() {
-        <span class="class-name">Authentication</span> auth = <span class="class-name">SecurityContextHolder</span>.getContext().getAuthentication();
-        <span class="keyword">return</span> <span class="string">"Hello, "</span> + auth.getName();
-    }
-
-    <span class="comment">// Method 4: Custom user object</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/profile4"</span>)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getProfile</span>(<span class="annotation">@AuthenticationPrincipal</span> <span class="class-name">CustomUser</span> user) {
-        <span class="keyword">return</span> <span class="string">"Hello, "</span> + user.getFullName();
+    <span class="comment">// Equivalent, framework-agnostic — Authentication implements java.security.Principal</span>
+    <span class="annotation">@GetMapping</span>(<span class="string">"/profile-principal"</span>)
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getProfileViaPrincipal</span>(<span class="class-name">Principal</span> principal) {
+        <span class="keyword">return</span> <span class="string">"Hello, "</span> + principal.getName();
     }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>CORS Configuration</h2>
+                <div class="info-box tip">
+                    <div class="info-box-title">Reach for SecurityContextHolder directly only outside a request-scoped bean</div>
+                    <p><code>@AuthenticationPrincipal</code> is resolved through the exact same
+                        <code>SecurityContextHolder</code> both alternatives ultimately read from,
+                        so inside a controller there's no functional difference — just less
+                        boilerplate. Calling
+                        <code>SecurityContextHolder.getContext().getAuthentication()</code>
+                        directly remains necessary in code that has no access to the request at
+                        all, such as a scheduled batch job or a domain service several layers
+                        away from any controller parameter.</p>
+                </div>
+            </section>
 
-            <pre><code><span class="annotation">@Bean</span>
-<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-    http
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        <span class="comment">// ... other config</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — CORS VS CSRF
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>CORS vs CSRF — Not the Same Problem</h2>
+                <p>These get confused because both are three-letter acronyms about cross-origin
+                    requests, but they solve opposite problems. <strong>CORS</strong> is the
+                    browser <em>relaxing</em> its same-origin policy so your own frontend, on a
+                    different origin, is <em>allowed</em> to call your API.
+                    <strong>CSRF</strong> is a defence against a request the browser sends
+                    <em>without the user's intent</em>, triggered by a malicious third-party page.
+                    Configuring one has no effect on the other.</p>
 
-    <span class="keyword">return</span> http.build();
-}
-
-<span class="annotation">@Bean</span>
+                <pre><code><span class="annotation">@Bean</span>
 <span class="keyword">public</span> <span class="class-name">CorsConfigurationSource</span> <span class="function">corsConfigurationSource</span>() {
     <span class="class-name">CorsConfiguration</span> config = <span class="keyword">new</span> <span class="class-name">CorsConfiguration</span>();
-    config.setAllowedOrigins(<span class="class-name">List</span>.of(<span class="string">"http://localhost:3000"</span>));
+    config.setAllowedOrigins(<span class="class-name">List</span>.of(<span class="string">"https://app.example.com"</span>));  <span class="comment">// never "*" if allowCredentials is true</span>
     config.setAllowedMethods(<span class="class-name">List</span>.of(<span class="string">"GET"</span>, <span class="string">"POST"</span>, <span class="string">"PUT"</span>, <span class="string">"DELETE"</span>));
-    config.setAllowedHeaders(<span class="class-name">List</span>.of(<span class="string">"*"</span>));
     config.setAllowCredentials(<span class="keyword">true</span>);
 
     <span class="class-name">UrlBasedCorsConfigurationSource</span> source = <span class="keyword">new</span> <span class="class-name">UrlBasedCorsConfigurationSource</span>();
     source.registerCorsConfiguration(<span class="string">"/**"</span>, config);
     <span class="keyword">return</span> source;
+}
+<span class="comment">// Wired in: http.cors(cors -> cors.configurationSource(corsConfigurationSource()))</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — TESTING SECURED ENDPOINTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Testing Secured Endpoints</h2>
+
+                <pre><code><span class="annotation">@WebMvcTest</span>(<span class="class-name">UserController</span>.<span class="keyword">class</span>)
+<span class="keyword">class</span> <span class="class-name">UserControllerSecurityTest</span> {
+
+    <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">MockMvc</span> mockMvc;
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">deleteUser_asAdmin_succeeds</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        mockMvc.perform(delete(<span class="string">"/admin/users/1"</span>).with(csrf()))
+            .andExpect(status().isNoContent());
+    }
+
+    <span class="annotation">@Test</span>
+    <span class="annotation">@WithMockUser</span>(roles = <span class="string">"USER"</span>)  <span class="comment">// simulates an authenticated USER — no real login flow needed</span>
+    <span class="keyword">void</span> <span class="function">deleteUser_asRegularUser_isForbidden</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        mockMvc.perform(delete(<span class="string">"/admin/users/1"</span>).with(csrf()))
+            .andExpect(status().isForbidden());
+    }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Spring Security:</strong> Authentication and authorization framework</li>
-                    <li><strong>SecurityFilterChain:</strong> Configures security rules</li>
-                    <li><strong>UserDetailsService:</strong> Loads user data</li>
-                    <li><strong>PasswordEncoder:</strong> Hashes passwords (BCrypt)</li>
-                    <li><strong>@PreAuthorize:</strong> Method-level security</li>
-                    <li><strong>JWT:</strong> Stateless token-based authentication</li>
-                    <li><strong>CORS:</strong> Cross-origin resource sharing</li>
-                </ul>
-            </div>
-        </section>
+                <div class="info-box tip">
+                    <div class="info-box-title">@WithMockUser sidesteps the entire authentication flow — deliberately</div>
+                    <p>It injects a pre-built <code>Authentication</code> straight into the test's
+                        <code>SecurityContext</code>, skipping <code>UserDetailsService</code> and
+                        <code>PasswordEncoder</code> entirely. That's correct for testing
+                        <em>authorization</em> rules — which roles can reach which endpoint. It
+                        deliberately does not exercise the login flow itself; a real
+                        <code>@SpringBootTest</code> hitting <code>/login</code> is what verifies
+                        that part.</p>
+                </div>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="boot.html" class="related-link">Spring Boot</a>
-                <a href="rest.html" class="related-link">Spring REST</a>
-                <a href="../security/jwt.html" class="related-link">JWT</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+
+                    <p><strong>Q: What does adding spring-boot-starter-security alone do to an app?</strong><br>
+                    It secures every endpoint by default, requiring authentication, and serves a
+                    default login form with a single generated in-memory user — a deliberately
+                    restrictive default rather than an opt-in one.</p>
+
+                    <p><strong>Q: What is the role of PasswordEncoder, and why can't you compare passwords with .equals()?</strong><br>
+                    Passwords are stored as a one-way hash, never in plain text.
+                    <code>PasswordEncoder.matches(raw, hash)</code> re-hashes the raw input with
+                    the same algorithm and salt and compares the result — you cannot reverse a
+                    hash back to plain text to compare it directly.</p>
+
+                    <p><strong>Q: What's the difference between @AuthenticationPrincipal and Principal in a controller?</strong><br>
+                    Both ultimately read from the same <code>SecurityContext</code>.
+                    <code>Principal</code> is the generic <code>java.security</code> interface;
+                    <code>@AuthenticationPrincipal</code> can be typed as your actual
+                    <code>UserDetails</code> implementation, giving direct access to custom
+                    fields without an extra cast.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+
+                    <p><strong>Q: Walk through what happens, component by component, from a login POST to an authenticated SecurityContext.</strong><br>
+                    <code>UsernamePasswordAuthenticationFilter</code> builds an unauthenticated
+                    <code>Authentication</code> from the submitted credentials and hands it to the
+                    <code>AuthenticationManager</code>, which delegates to the first
+                    <code>AuthenticationProvider</code> that supports it — typically
+                    <code>DaoAuthenticationProvider</code>, which calls
+                    <code>UserDetailsService.loadUserByUsername</code> and then
+                    <code>PasswordEncoder.matches</code>. On success, a fully authenticated
+                    <code>Authentication</code> (principal + authorities, password discarded) is
+                    stored in <code>SecurityContextHolder</code> for the remainder of the
+                    request — and the session, if one exists.</p>
+
+                    <p><strong>Q: Why is CSRF disabled for a JWT-based API, and under what condition does that reasoning stop applying?</strong><br>
+                    CSRF exploits the browser automatically attaching cookies to cross-site
+                    requests; a bearer token in an <code>Authorization</code> header must be
+                    added explicitly by application JavaScript, so a forged cross-site request
+                    has no way to include it — the attack vector doesn't apply. This reasoning
+                    fails the moment the token is instead stored in a cookie (even
+                    <code>HttpOnly</code>): a cookie is attached automatically regardless of
+                    where the token lives, restoring exactly the vulnerability CSRF protection
+                    exists to prevent.</p>
+
+                    <p><strong>Q: Why can hasRole("ADMIN") and hasAuthority("ROLE_ADMIN") produce inconsistent results across a codebase?</strong><br>
+                    <code>hasRole</code> silently prepends <code>ROLE_</code> before checking;
+                    <code>hasAuthority</code> checks the literal string given. If authorities are
+                    stored with the prefix already included, mixing the two conventions — or
+                    double-prefixing — produces an authorization check that never matches for
+                    that user, with no exception and no log line, since "not authorized" and
+                    "misconfigured comparison" look identical from the outside.</p>
+
+                    <p><strong>Q: Why is @PostFilter potentially dangerous on a large dataset, and what's the correct fix?</strong><br>
+                    <code>@PostFilter</code> evaluates its SpEL expression against a collection
+                    that has <strong>already been fully loaded</strong> — typically by a
+                    repository's <code>findAll()</code> — discarding non-matching elements in
+                    Java afterward. It never becomes a <code>WHERE</code> clause. On any
+                    non-trivial dataset, the fix is pushing the ownership condition into the query
+                    itself (a derived method or <code>Specification</code>), the same principle
+                    as fixing an N+1 query: filter where the database can use an index, not after
+                    every row has already been fetched.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../security/auth-vs-authz.html" class="related-link">
+                        <span class="related-icon">🔑</span>Authentication vs Authorization
+                    </a>
+                    <a href="../security/jwt.html" class="related-link">
+                        <span class="related-icon">🎫</span>JWT (JSON Web Tokens)
+                    </a>
+                    <a href="../security/password-hashing.html" class="related-link">
+                        <span class="related-icon">🔐</span>Password Hashing
+                    </a>
+                    <a href="../security/oauth.html" class="related-link">
+                        <span class="related-icon">🌐</span>OAuth 2.0
+                    </a>
+                    <a href="../security/session-mgmt.html" class="related-link">
+                        <span class="related-icon">🗂️</span>Session Management
+                    </a>
+                    <a href="mvc.html" class="related-link">
+                        <span class="related-icon">🌐</span>Spring MVC Architecture
+                    </a>
+                    <a href="data-jpa.html" class="related-link">
+                        <span class="related-icon">💾</span>Spring Data JPA
+                    </a>
+                    <a href="../tools/testing.html" class="related-link">
+                        <span class="related-icon">🧪</span>Testing (JUnit, Mockito)
+                    </a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
