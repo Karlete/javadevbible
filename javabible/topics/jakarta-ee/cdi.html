@@ -1,590 +1,639 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.cdi.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CDI (Contexts & Dependency Injection) - JavaDev Bible</title>
+    <title>CDI — Contexts &amp; Dependency Injection - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / CDI
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#jakarta-ee" data-i18n="nav.jakarta">Jakarta EE</a> /
+                CDI
             </nav>
-            <h1>CDI (Contexts & Dependency Injection)</h1>
-            <p class="topic-subtitle">The Backbone of Jakarta EE Applications</p>
-            <a href="../../index.html" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.cdi.h1">CDI — Contexts &amp; Dependency Injection</h1>
+            <p class="topic-subtitle" data-i18n="topic.cdi.subtitle">The Jakarta EE standard for DI — how it compares to Spring, why proxies exist, and what bean-discovery-mode controls</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is CDI?</h2>
-            <p><strong>Think of CDI like a restaurant with an automated service system:</strong></p>
-            <ul>
-                <li>🍽️ You (code) don't go to the kitchen to get ingredients</li>
-                <li>🤖 A service system (CDI container) automatically brings what you need</li>
-                <li>📦 You just declare "I need a chef" and the system provides one</li>
-                <li>♻️ The system manages when to create/destroy resources</li>
-            </ul>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>CDI (Contexts and Dependency Injection)</strong> is a framework that automatically creates objects and injects dependencies for you. It's the core of Jakarta EE that ties everything together.</p>
-                <p><strong>Key Benefits:</strong> No manual object creation (no 'new'), loose coupling, easier testing, lifecycle management</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>The Problem CDI Solves</h3>
-            <pre><code><span class="comment">// Without CDI - Manual creation (tight coupling)</span>
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS CDI AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is CDI, and How Does it Relate to Spring DI?</h2>
+                <p><strong>CDI (Contexts and Dependency Injection)</strong> is the Jakarta EE
+                    standard specification for dependency injection and contextual lifecycle
+                    management. Like Spring IoC, it solves the same core problem: instead of
+                    your code manually constructing dependencies with <code>new</code>, a
+                    container creates, wires, and manages the lifecycle of your objects.</p>
+
+                <p>The key distinction: CDI is a <strong>specification</strong> (defined in
+                    <code>jakarta.inject.*</code> and <code>jakarta.enterprise.context.*</code>),
+                    implemented by containers like Weld (the reference implementation, used in
+                    WildFly) and OpenWebBeans (used in TomEE). Spring DI is a
+                    <strong>framework implementation</strong> — it predates CDI and inspired
+                    parts of it, but follows its own model. When you use Quarkus, you're using
+                    CDI directly (via ArC, Quarkus's CDI implementation). When you use Spring
+                    Boot, you're using Spring DI — though Spring also honours
+                    <code>@Inject</code> from <code>jakarta.inject</code> as an alternative to
+                    <code>@Autowired</code>.</p>
+
+                <pre><code><span class="comment">// BEFORE: tight coupling — impossible to test without a real Database</span>
 <span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-    <span class="keyword">private</span> <span class="class-name">PaymentService</span> paymentService = <span class="keyword">new</span> <span class="class-name">PaymentService</span>();
-    <span class="keyword">private</span> <span class="class-name">EmailService</span> emailService = <span class="keyword">new</span> <span class="class-name">EmailService</span>();
-
-    <span class="comment">// Hard to test, hard to change implementation</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentService</span> payment = <span class="keyword">new</span> <span class="class-name">PaymentService</span>();  <span class="comment">// hard dependency</span>
+    <span class="keyword">private</span> <span class="class-name">EmailService</span>   email   = <span class="keyword">new</span> <span class="class-name">EmailService</span>();    <span class="comment">// another hard dependency</span>
 }
 
-<span class="comment">// With CDI - Automatic injection (loose coupling)</span>
+<span class="comment">// AFTER CDI: loose coupling — container injects; test can inject mocks</span>
+<span class="annotation">@ApplicationScoped</span>
 <span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-    <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">PaymentService</span> paymentService;
 
-    <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">EmailService</span> emailService;
+    <span class="keyword">private final</span> <span class="class-name">PaymentService</span> payment;
+    <span class="keyword">private final</span> <span class="class-name">EmailService</span>   email;
 
-    <span class="comment">// CDI provides instances automatically!</span>
-    <span class="comment">// Easy to test, easy to swap implementations</span>
+    <span class="annotation">@Inject</span>  <span class="comment">// constructor injection — preferred, same as Spring</span>
+    <span class="keyword">public</span> <span class="function">OrderService</span>(<span class="class-name">PaymentService</span> payment, <span class="class-name">EmailService</span> email) {
+        <span class="keyword">this</span>.payment = payment;
+        <span class="keyword">this</span>.email   = email;
+    }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Basic Dependency Injection with @Inject</h2>
+                <div class="info-box note">
+                    <div class="info-box-title">CDI vs Spring DI — the real differences, not the surface ones</div>
+                    <table>
+                        <tr><th>Aspect</th><th>CDI (Jakarta EE)</th><th>Spring DI</th></tr>
+                        <tr>
+                            <td>Nature</td>
+                            <td>Specification — multiple implementations</td>
+                            <td>Framework — one implementation</td>
+                        </tr>
+                        <tr>
+                            <td>Core inject annotation</td>
+                            <td><code>@Inject</code> (jakarta.inject)</td>
+                            <td><code>@Autowired</code> (Spring-specific); also supports <code>@Inject</code></td>
+                        </tr>
+                        <tr>
+                            <td>Scope model</td>
+                            <td>Contextual — beans are contextual instances tied to a lifecycle</td>
+                            <td>Bean definition — prototype, singleton, request, session</td>
+                        </tr>
+                        <tr>
+                            <td>Disambiguation</td>
+                            <td><code>@Qualifier</code> (custom annotation)</td>
+                            <td><code>@Qualifier</code> (string-based) or <code>@Primary</code></td>
+                        </tr>
+                        <tr>
+                            <td>Proxy model</td>
+                            <td>Client proxies always — even for <code>@ApplicationScoped</code></td>
+                            <td>CGLIB proxies only when AOP is involved</td>
+                        </tr>
+                        <tr>
+                            <td>Used by</td>
+                            <td>Quarkus, WildFly, Payara, TomEE</td>
+                            <td>Spring Boot, Spring Framework</td>
+                        </tr>
+                    </table>
+                </div>
+            </section>
 
-            <h3>Simple Example</h3>
-            <pre><code><span class="comment">// 1. Create a bean (just a regular class)</span>
-<span class="keyword">public class</span> <span class="class-name">GreetingService</span> {
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">greet</span>(<span class="class-name">String</span> name) {
-        <span class="keyword">return</span> <span class="string">"Hello, "</span> + name + <span class="string">"!"</span>;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — INJECTION STYLES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Injection Styles — and Why Constructor Is the Right Default</h2>
+
+                <pre><code><span class="comment">// ✅ Constructor injection — preferred in CDI and Spring alike</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">ReportService</span> {
+    <span class="keyword">private final</span> <span class="class-name">UserRepository</span> users;
+    <span class="keyword">private final</span> <span class="class-name">PdfGenerator</span>   pdf;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">public</span> <span class="function">ReportService</span>(<span class="class-name">UserRepository</span> users, <span class="class-name">PdfGenerator</span> pdf) {
+        <span class="keyword">this</span>.users = users;
+        <span class="keyword">this</span>.pdf   = pdf;
+        <span class="comment">// fields are final — can't accidentally be null or reassigned</span>
     }
 }
 
-<span class="comment">// 2. Inject it wherever needed</span>
-<span class="keyword">public class</span> <span class="class-name">WelcomeController</span> {
-    <span class="annotation">@Inject</span>  <span class="comment">// CDI injects GreetingService automatically</span>
-    <span class="keyword">private</span> <span class="class-name">GreetingService</span> greetingService;
-
-    <span class="keyword">public void</span> <span class="function">welcome</span>() {
-        <span class="class-name">String</span> message = greetingService.greet(<span class="string">"Alice"</span>);
-        <span class="class-name">System</span>.out.println(message);  <span class="comment">// Hello, Alice!</span>
-    }
+<span class="comment">// ⚠️  Field injection — tempting but problematic</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">ReportService</span> {
+    <span class="annotation">@Inject</span> <span class="keyword">private</span> <span class="class-name">UserRepository</span> users;  <span class="comment">// can't be final</span>
+    <span class="annotation">@Inject</span> <span class="keyword">private</span> <span class="class-name">PdfGenerator</span>   pdf;    <span class="comment">// invisible dependencies in unit tests</span>
+    <span class="comment">// to unit test, you need a CDI container or reflection-based injection</span>
 }</code></pre>
 
-            <p><strong>What happened?</strong></p>
-            <ol>
-                <li>You marked a field with @Inject</li>
-                <li>CDI container creates a GreetingService instance</li>
-                <li>CDI automatically assigns it to your field</li>
-                <li>You use it without calling 'new'!</li>
-            </ol>
+                <div class="info-box warning">
+                    <div class="info-box-title">Field injection makes unit testing genuinely harder</div>
+                    <p>With constructor injection you can test without any container at all:
+                        <code>new ReportService(mockUsers, mockPdf)</code>. With field
+                        injection, the fields are private and injected by the container —
+                        in a plain unit test they remain <code>null</code>. You either need a
+                        CDI test runner (slow), or you resort to reflection-based injection
+                        in tests (fragile). Constructor injection is not just style; it's a
+                        testability constraint. This is identical to the argument Spring
+                        makes for constructor injection over <code>@Autowired</code> on
+                        fields.</p>
+                </div>
 
-            <h3>Three Ways to Inject</h3>
-            <pre><code><span class="comment">// 1. Field Injection (simplest, most common)</span>
-<span class="keyword">public class</span> <span class="class-name">ServiceA</span> {
+                <pre><code><span class="comment">// Setter injection — for optional dependencies only</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">NotificationService</span> {
+    <span class="keyword">private</span> <span class="class-name">SmsGateway</span> smsGateway;  <span class="comment">// optional — may not be configured in all envs</span>
+
     <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">Database</span> database;
+    <span class="keyword">public void</span> <span class="function">setSmsGateway</span>(<span class="annotation">@Any</span> <span class="class-name">Instance</span>&lt;<span class="class-name">SmsGateway</span>&gt; gateway) {
+        <span class="keyword">if</span> (gateway.isResolvable()) {
+            <span class="keyword">this</span>.smsGateway = gateway.get();
+        }
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SCOPES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>CDI Scopes — How Long a Bean Lives</h2>
+
+                <pre><code><span class="annotation">@RequestScoped</span>      <span class="comment">// one instance per HTTP request — destroyed when the request ends</span>
+<span class="annotation">@SessionScoped</span>      <span class="comment">// one instance per HTTP session — must implement Serializable</span>
+<span class="annotation">@ApplicationScoped</span>  <span class="comment">// one instance for the app lifetime — effectively a singleton</span>
+<span class="annotation">@ConversationScoped</span> <span class="comment">// developer-controlled: spans multiple requests when explicitly kept alive</span>
+<span class="annotation">@Dependent</span>          <span class="comment">// default: one instance per injection point — no shared state</span></code></pre>
+
+                <pre><code><span class="comment">// @RequestScoped — data that belongs to exactly one request</span>
+<span class="annotation">@RequestScoped</span>
+<span class="keyword">public class</span> <span class="class-name">RequestContext</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> correlationId = <span class="class-name">UUID</span>.randomUUID().toString();
+    <span class="keyword">private</span> <span class="class-name">Instant</span> requestStart = <span class="class-name">Instant</span>.now();
+    <span class="comment">// getters, no setters — this data doesn't change within one request</span>
 }
 
-<span class="comment">// 2. Constructor Injection (best for testing)</span>
-<span class="keyword">public class</span> <span class="class-name">ServiceB</span> {
-    <span class="keyword">private final</span> <span class="class-name">Database</span> database;
-
-    <span class="annotation">@Inject</span>
-    <span class="keyword">public</span> <span class="function">ServiceB</span>(<span class="class-name">Database</span> database) {
-        <span class="keyword">this</span>.database = database;
-    }
-}
-
-<span class="comment">// 3. Setter Injection (optional dependencies)</span>
-<span class="keyword">public class</span> <span class="class-name">ServiceC</span> {
-    <span class="keyword">private</span> <span class="class-name">Database</span> database;
-
-    <span class="annotation">@Inject</span>
-    <span class="keyword">public void</span> <span class="function">setDatabase</span>(<span class="class-name">Database</span> database) {
-        <span class="keyword">this</span>.database = database;
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>CDI Scopes - Bean Lifecycles</h2>
-            <p><strong>Scopes control how long a bean lives and how many instances exist</strong></p>
-
-            <h3>1. @RequestScoped - One Instance Per HTTP Request</h3>
-            <pre><code><span class="keyword">import</span> jakarta.enterprise.context.RequestScoped;
-<span class="keyword">import</span> jakarta.inject.Named;
-
-<span class="annotation">@Named</span>  <span class="comment">// Makes it accessible from JSP/JSF</span>
-<span class="annotation">@RequestScoped</span>  <span class="comment">// New instance for each HTTP request</span>
-<span class="keyword">public class</span> <span class="class-name">ShoppingCartBean</span> {
-    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-
-    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">Product</span> product) {
-        items.add(product);
-    }
-
-    <span class="comment">// Destroyed after request completes</span>
-}</code></pre>
-
-            <h3>2. @SessionScoped - One Instance Per User Session</h3>
-            <pre><code><span class="keyword">import</span> jakarta.enterprise.context.SessionScoped;
-<span class="keyword">import</span> java.io.Serializable;
-
-<span class="annotation">@Named</span>
-<span class="annotation">@SessionScoped</span>  <span class="comment">// Lives across multiple requests from same user</span>
-<span class="keyword">public class</span> <span class="class-name">UserSessionBean</span> <span class="keyword">implements</span> <span class="class-name">Serializable</span> {
+<span class="comment">// @SessionScoped — user state across multiple requests</span>
+<span class="annotation">@SessionScoped</span>
+<span class="keyword">public class</span> <span class="class-name">UserSession</span> <span class="keyword">implements</span> <span class="class-name">Serializable</span> {  <span class="comment">// Serializable required for clustering</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> userId;
     <span class="keyword">private</span> <span class="class-name">String</span> username;
-    <span class="keyword">private</span> <span class="class-name">boolean</span> loggedIn;
+    <span class="keyword">private</span> <span class="class-name">Set</span>&lt;<span class="class-name">String</span>&gt; roles = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();
+    <span class="comment">// keep small — sessions are replicated across cluster nodes</span>
+}
 
-    <span class="keyword">public void</span> <span class="function">login</span>(<span class="class-name">String</span> username) {
-        <span class="keyword">this</span>.username = username;
-        <span class="keyword">this</span>.loggedIn = <span class="keyword">true</span>;
-    }
-
-    <span class="comment">// Destroyed when session expires or user logs out</span>
-}</code></pre>
-
-            <h3>3. @ApplicationScoped - One Instance for Entire App</h3>
-            <pre><code><span class="keyword">import</span> jakarta.enterprise.context.ApplicationScoped;
-
-<span class="annotation">@ApplicationScoped</span>  <span class="comment">// Singleton - shared by all users</span>
+<span class="comment">// @ApplicationScoped — shared state or heavyweight resources, initialised once</span>
+<span class="annotation">@ApplicationScoped</span>
 <span class="keyword">public class</span> <span class="class-name">ConfigService</span> {
-    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">String</span>&gt; config = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
+    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">String</span>&gt; config;
 
     <span class="annotation">@PostConstruct</span>
-    <span class="keyword">public void</span> <span class="function">init</span>() {
-        <span class="comment">// Load config once when app starts</span>
-        config.put(<span class="string">"app.name"</span>, <span class="string">"My App"</span>);
-    }
-
-    <span class="comment">// Lives until application stops</span>
-}</code></pre>
-
-            <h3>4. @Dependent - New Instance Every Time (Default)</h3>
-            <pre><code><span class="keyword">import</span> jakarta.enterprise.context.Dependent;
-
-<span class="annotation">@Dependent</span>  <span class="comment">// Default scope if no annotation</span>
-<span class="keyword">public class</span> <span class="class-name">Calculator</span> {
-    <span class="keyword">public int</span> <span class="function">add</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) {
-        <span class="keyword">return</span> a + b;
-    }
-
-    <span class="comment">// New instance created every time it's injected</span>
-    <span class="comment">// Destroyed with the bean that owns it</span>
-}</code></pre>
-
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Scope</th>
-                        <th>Lifetime</th>
-                        <th>Instances</th>
-                        <th>Use Case</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>@Dependent</strong></td>
-                        <td>Same as parent</td>
-                        <td>New every injection</td>
-                        <td>Stateless utilities</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@RequestScoped</strong></td>
-                        <td>One HTTP request</td>
-                        <td>One per request</td>
-                        <td>Form data, request processing</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@SessionScoped</strong></td>
-                        <td>User session</td>
-                        <td>One per user</td>
-                        <td>User login, shopping cart</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@ApplicationScoped</strong></td>
-                        <td>Entire app</td>
-                        <td>One (singleton)</td>
-                        <td>Config, caches, shared data</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@ConversationScoped</strong></td>
-                        <td>Multi-step flow</td>
-                        <td>One per conversation</td>
-                        <td>Wizards, multi-page forms</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2>Qualifiers - Choosing Between Implementations</h2>
-            <p><strong>Problem:</strong> What if you have multiple implementations of an interface?</p>
-
-            <h3>Define Qualifiers</h3>
-            <pre><code><span class="keyword">import</span> jakarta.inject.Qualifier;
-<span class="keyword">import</span> java.lang.annotation.*;
-
-<span class="annotation">@Qualifier</span>
-<span class="annotation">@Retention</span>(RetentionPolicy.RUNTIME)
-<span class="annotation">@Target</span>({ElementType.FIELD, ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
-<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">CreditCard</span> { }
-
-<span class="annotation">@Qualifier</span>
-<span class="annotation">@Retention</span>(RetentionPolicy.RUNTIME)
-<span class="annotation">@Target</span>({ElementType.FIELD, ElementType.TYPE, ElementType.METHOD, ElementType.PARAMETER})
-<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">PayPal</span> { }</code></pre>
-
-            <h3>Use Qualifiers on Implementations</h3>
-            <pre><code><span class="comment">// Interface</span>
-<span class="keyword">public interface</span> <span class="class-name">PaymentProcessor</span> {
-    <span class="keyword">void</span> <span class="function">processPayment</span>(<span class="keyword">double</span> amount);
-}
-
-<span class="comment">// Implementation 1</span>
-<span class="annotation">@CreditCard</span>  <span class="comment">// Qualifier</span>
-<span class="keyword">public class</span> <span class="class-name">CreditCardProcessor</span> <span class="keyword">implements</span> <span class="class-name">PaymentProcessor</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="keyword">double</span> amount) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Processing $"</span> + amount + <span class="string">" via Credit Card"</span>);
-    }
-}
-
-<span class="comment">// Implementation 2</span>
-<span class="annotation">@PayPal</span>  <span class="comment">// Qualifier</span>
-<span class="keyword">public class</span> <span class="class-name">PayPalProcessor</span> <span class="keyword">implements</span> <span class="class-name">PaymentProcessor</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="keyword">double</span> amount) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Processing $"</span> + amount + <span class="string">" via PayPal"</span>);
+    <span class="keyword">public void</span> <span class="function">load</span>() {
+        config = loadConfigFromDatabase();  <span class="comment">// runs once — result cached for app lifetime</span>
     }
 }</code></pre>
 
-            <h3>Inject Specific Implementation</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">CheckoutService</span> {
-    <span class="annotation">@Inject</span>
-    <span class="annotation">@CreditCard</span>  <span class="comment">// Inject CreditCardProcessor</span>
-    <span class="keyword">private</span> <span class="class-name">PaymentProcessor</span> creditCardProcessor;
+                <div class="info-box important">
+                    <div class="info-box-title">Scope mismatch — the #1 CDI runtime bug</div>
+                    <p>Injecting a <strong>shorter-lived</strong> bean into a
+                        <strong>longer-lived</strong> one is a scope mismatch. The most common
+                        case: injecting <code>@RequestScoped</code> directly into
+                        <code>@ApplicationScoped</code>. The application-scoped bean is created
+                        once; the request-scoped bean changes per request. If CDI injected the
+                        real <code>@RequestScoped</code> instance, the application-scoped bean
+                        would hold a stale reference after the first request ends. CDI solves
+                        this with a client proxy — see the next section. The bug manifests when
+                        a class is <code>final</code> or has no no-arg constructor, making it
+                        impossible to proxy, and CDI throws a deployment exception at startup.</p>
+                </div>
+            </section>
 
-    <span class="annotation">@Inject</span>
-    <span class="annotation">@PayPal</span>  <span class="comment">// Inject PayPalProcessor</span>
-    <span class="keyword">private</span> <span class="class-name">PaymentProcessor</span> payPalProcessor;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — CLIENT PROXIES (from beans.html)
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Client Proxies — How CDI Handles Scope Differences</h2>
+                <p>CDI almost never injects the <em>real</em> bean instance into another bean.
+                    It injects a <strong>client proxy</strong> — a generated subclass that
+                    intercepts every method call and forwards it to the correct real instance
+                    for the current context. This is what makes scope mismatches safe and what
+                    enables interceptors to work transparently.</p>
 
-    <span class="keyword">public void</span> <span class="function">checkout</span>(<span class="class-name">String</span> paymentMethod, <span class="keyword">double</span> amount) {
-        <span class="keyword">if</span> (<span class="string">"credit"</span>.equals(paymentMethod)) {
-            creditCardProcessor.processPayment(amount);
-        } <span class="keyword">else</span> {
-            payPalProcessor.processPayment(amount);
-        }
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Producers - Custom Bean Creation</h2>
-            <p><strong>Sometimes you need more control over how beans are created</strong></p>
-
-            <h3>@Produces Methods</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">DatabaseProducer</span> {
-
-    <span class="annotation">@Produces</span>
-    <span class="annotation">@ApplicationScoped</span>
-    <span class="keyword">public</span> <span class="class-name">DataSource</span> <span class="function">createDataSource</span>() {
-        <span class="comment">// Custom creation logic</span>
-        <span class="class-name">DataSource</span> ds = <span class="keyword">new</span> <span class="class-name">DataSource</span>();
-        ds.setUrl(<span class="string">"jdbc:postgresql://localhost/mydb"</span>);
-        ds.setUsername(<span class="string">"admin"</span>);
-        ds.setPassword(<span class="string">"secret"</span>);
-        <span class="keyword">return</span> ds;
-    }
-
-    <span class="annotation">@Produces</span>
-    <span class="annotation">@Named</span>(<span class="string">"maxConnections"</span>)
-    <span class="keyword">public int</span> <span class="function">getMaxConnections</span>() {
-        <span class="keyword">return</span> <span class="number">100</span>;
-    }
-}
-
-<span class="comment">// Now you can inject them</span>
-<span class="keyword">public class</span> <span class="class-name">UserRepository</span> {
-    <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">DataSource</span> dataSource;  <span class="comment">// Injected from producer</span>
-
-    <span class="annotation">@Inject</span>
-    <span class="annotation">@Named</span>(<span class="string">"maxConnections"</span>)
-    <span class="keyword">private int</span> maxConnections;
-}</code></pre>
-
-            <h3>@Produces with Qualifiers</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">LoggerProducer</span> {
-
-    <span class="annotation">@Produces</span>
-    <span class="annotation">@Dependent</span>
-    <span class="keyword">public</span> <span class="class-name">Logger</span> <span class="function">createLogger</span>(<span class="class-name">InjectionPoint</span> injectionPoint) {
-        <span class="comment">// Automatically get logger for each class</span>
-        <span class="class-name">Class</span>&lt;?&gt; targetClass = injectionPoint.getMember().getDeclaringClass();
-        <span class="keyword">return</span> <span class="class-name">Logger</span>.getLogger(targetClass.getName());
-    }
-}
-
-<span class="comment">// Usage - each class gets its own logger</span>
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
-    <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">Logger</span> logger;  <span class="comment">// Logger for UserService</span>
-
-    <span class="keyword">public void</span> <span class="function">doSomething</span>() {
-        logger.info(<span class="string">"UserService.doSomething called"</span>);
-    }
-}</code></pre>
-
-            <h3>@Disposes - Cleanup Resources</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">ResourceManager</span> {
-
-    <span class="annotation">@Produces</span>
-    <span class="annotation">@RequestScoped</span>
-    <span class="keyword">public</span> <span class="class-name">Connection</span> <span class="function">createConnection</span>() <span class="keyword">throws</span> <span class="class-name">SQLException</span> {
-        <span class="keyword">return</span> DriverManager.getConnection(<span class="string">"jdbc:..."</span>);
-    }
-
-    <span class="keyword">public void</span> <span class="function">closeConnection</span>(<span class="annotation">@Disposes</span> <span class="class-name">Connection</span> connection) {
-        <span class="keyword">try</span> {
-            <span class="keyword">if</span> (connection != <span class="keyword">null</span> && !connection.isClosed()) {
-                connection.close();
-            }
-        } <span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
-            e.printStackTrace();
-        }
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Lifecycle Callbacks</h2>
-
-            <h3>@PostConstruct and @PreDestroy</h3>
-            <pre><code><span class="keyword">import</span> jakarta.annotation.*;
+                <pre><code><span class="comment">/*
+ *  @ApplicationScoped bean holds a reference to a @RequestScoped bean:
+ *
+ *  ┌─────────────────────────────────┐
+ *  │ ConfigService (@ApplicationScoped) │
+ *  │                                  │
+ *  │  @Inject                         │
+ *  │  RequestContext ctx;             │ ← this is NOT a real RequestContext
+ *  │                                  │   it's a CLIENT PROXY
+ *  └─────────────────────────────────┘
+ *              │
+ *              │  every method call is forwarded by the proxy
+ *              ▼
+ *  ┌──────────────────────────────────────────────────────┐
+ *  │  Proxy looks up the correct RequestContext instance  │
+ *  │  for the CURRENT thread / HTTP request               │
+ *  │  and delegates the call there                        │
+ *  └──────────────────────────────────────────────────────┘
+ *
+ *  Request 1 → proxy resolves to RequestContext instance A
+ *  Request 2 → proxy resolves to RequestContext instance B
+ *  The proxy reference in ConfigService never changes.
+ */</span>
 
 <span class="annotation">@ApplicationScoped</span>
-<span class="keyword">public class</span> <span class="class-name">CacheService</span> {
-    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; cache;
+<span class="keyword">public class</span> <span class="class-name">AuditService</span> {
 
-    <span class="annotation">@PostConstruct</span>  <span class="comment">// Called AFTER bean creation and injection</span>
-    <span class="keyword">public void</span> <span class="function">init</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Initializing cache..."</span>);
-        cache = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
-        <span class="comment">// Load initial data</span>
-        cache.put(<span class="string">"key1"</span>, <span class="string">"value1"</span>);
-    }
-
-    <span class="annotation">@PreDestroy</span>  <span class="comment">// Called BEFORE bean destruction</span>
-    <span class="keyword">public void</span> <span class="function">cleanup</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Cleaning up cache..."</span>);
-        <span class="keyword">if</span> (cache != <span class="keyword">null</span>) {
-            cache.clear();
-        }
-        <span class="comment">// Save data, close connections, etc.</span>
-    }
-
-    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">get</span>(<span class="class-name">String</span> key) {
-        <span class="keyword">return</span> cache.get(key);
-    }
-}</code></pre>
-
-            <p><strong>Order of execution:</strong></p>
-            <pre><code>1. Constructor called
-2. Dependencies injected (@Inject)
-3. @PostConstruct method called ← Initialize here
-4. Bean ready to use
-   ... bean used by application ...
-5. @PreDestroy method called ← Cleanup here
-6. Bean destroyed</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Events - Publish/Subscribe Pattern</h2>
-
-            <h3>Fire and Observe Events</h3>
-            <pre><code><span class="comment">// 1. Event class (just a POJO)</span>
-<span class="keyword">public class</span> <span class="class-name">UserRegisteredEvent</span> {
-    <span class="keyword">private final</span> <span class="class-name">String</span> username;
-    <span class="keyword">private final</span> <span class="class-name">String</span> email;
-
-    <span class="keyword">public</span> <span class="function">UserRegisteredEvent</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) {
-        <span class="keyword">this</span>.username = username;
-        <span class="keyword">this</span>.email = email;
-    }
-
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getUsername</span>() { <span class="keyword">return</span> username; }
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getEmail</span>() { <span class="keyword">return</span> email; }
-}
-
-<span class="comment">// 2. Fire event (publisher)</span>
-<span class="keyword">public class</span> <span class="class-name">RegistrationService</span> {
     <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">Event</span>&lt;<span class="class-name">UserRegisteredEvent</span>&gt; userRegisteredEvent;
+    <span class="keyword">private</span> <span class="class-name">RequestContext</span> ctx;  <span class="comment">// a proxy — safe to hold in @ApplicationScoped</span>
 
-    <span class="keyword">public void</span> <span class="function">register</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) {
-        <span class="comment">// Register user in database...</span>
-
-        <span class="comment">// Fire event</span>
-        userRegisteredEvent.fire(<span class="keyword">new</span> <span class="class-name">UserRegisteredEvent</span>(username, email));
-    }
-}
-
-<span class="comment">// 3. Observe event (subscribers)</span>
-<span class="keyword">public class</span> <span class="class-name">EmailNotificationService</span> {
-    <span class="keyword">public void</span> <span class="function">onUserRegistered</span>(<span class="annotation">@Observes</span> <span class="class-name">UserRegisteredEvent</span> event) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Sending welcome email to "</span> + event.getEmail());
-        <span class="comment">// Send email...</span>
-    }
-}
-
-<span class="keyword">public class</span> <span class="class-name">AnalyticsService</span> {
-    <span class="keyword">public void</span> <span class="function">onUserRegistered</span>(<span class="annotation">@Observes</span> <span class="class-name">UserRegisteredEvent</span> event) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Tracking registration for "</span> + event.getUsername());
-        <span class="comment">// Track analytics...</span>
+    <span class="keyword">public void</span> <span class="function">log</span>(<span class="class-name">String</span> action) {
+        <span class="comment">// ctx.getCorrelationId() calls through the proxy → correct per-request instance</span>
+        log.info(<span class="string">"[{}] {}"</span>, ctx.getCorrelationId(), action);
     }
 }</code></pre>
 
-            <p><strong>What happens:</strong></p>
-            <ol>
-                <li>User registers → RegistrationService.register() called</li>
-                <li>Event fired → <code>userRegisteredEvent.fire(event)</code></li>
-                <li>All @Observes methods automatically called</li>
-                <li>EmailNotificationService sends email</li>
-                <li>AnalyticsService tracks data</li>
-                <li>Completely decoupled!</li>
-            </ol>
-        </section>
+                <div class="info-box warning">
+                    <div class="info-box-title">Three constraints the proxy mechanism imposes — violating any causes a deployment error</div>
+                    <p>Because CDI generates a subclass as the proxy, the proxied class must
+                        satisfy three requirements:</p>
+                    <ul>
+                        <li>The class must <strong>not be <code>final</code></strong> — a
+                            <code>final</code> class cannot be subclassed</li>
+                        <li>No method must be <strong><code>final</code></strong> — final
+                            methods cannot be overridden in the subclass</li>
+                        <li>There must be a <strong>no-arg constructor</strong> (can be
+                            package-private or protected) — the proxy needs to instantiate
+                            without arguments</li>
+                    </ul>
+                    <p>Violation is a deployment error at startup — a
+                        <code>javax.enterprise.inject.spi.DeploymentException</code> — not a
+                        <code>NullPointerException</code> at runtime. This is better than it
+                        sounds: it fails fast and loudly, before any request is served. The
+                        same three constraints apply to Spring's CGLIB proxies (used for
+                        <code>@Transactional</code>, <code>@Async</code>, etc.) — if you've
+                        ever hit "cannot subclass final class" from Spring AOP, this is the
+                        exact same mechanism.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Interceptors - Cross-Cutting Concerns</h2>
-            <p><strong>Add behavior to methods without changing the code</strong></p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — QUALIFIERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Qualifiers — Resolving Multiple Implementations</h2>
+                <p>When two or more beans implement the same type, CDI can't choose
+                    automatically — injecting without a qualifier is an ambiguous dependency
+                    and fails at deployment. <code>@Qualifier</code> annotations are the
+                    disambiguation mechanism.</p>
 
-            <h3>Create Interceptor Binding</h3>
-            <pre><code><span class="keyword">import</span> jakarta.interceptor.InterceptorBinding;
+                <pre><code><span class="comment">// Define qualifier annotations</span>
+<span class="annotation">@Qualifier</span>
+<span class="annotation">@Retention</span>(<span class="class-name">RetentionPolicy</span>.RUNTIME)
+<span class="annotation">@Target</span>({<span class="class-name">ElementType</span>.FIELD, <span class="class-name">ElementType</span>.TYPE, <span class="class-name">ElementType</span>.PARAMETER})
+<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">Smtp</span> {}
 
+<span class="annotation">@Qualifier</span>
+<span class="annotation">@Retention</span>(<span class="class-name">RetentionPolicy</span>.RUNTIME)
+<span class="annotation">@Target</span>({<span class="class-name">ElementType</span>.FIELD, <span class="class-name">ElementType</span>.TYPE, <span class="class-name">ElementType</span>.PARAMETER})
+<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">Mock</span> {}
+
+<span class="comment">// Two implementations</span>
+<span class="annotation">@Smtp</span> <span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">SmtpEmailService</span> <span class="keyword">implements</span> <span class="class-name">EmailService</span> {
+    <span class="keyword">public void</span> <span class="function">send</span>(<span class="class-name">String</span> to, <span class="class-name">String</span> body) { <span class="comment">/* real SMTP */</span> }
+}
+
+<span class="annotation">@Mock</span> <span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">MockEmailService</span> <span class="keyword">implements</span> <span class="class-name">EmailService</span> {
+    <span class="keyword">public void</span> <span class="function">send</span>(<span class="class-name">String</span> to, <span class="class-name">String</span> body) {
+        log.info(<span class="string">"[MOCK] Email to {}: {}"</span>, to, body);
+    }
+}
+
+<span class="comment">// Inject the one you need</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">NotificationService</span> {
+    <span class="keyword">private final</span> <span class="class-name">EmailService</span> emailService;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">public</span> <span class="function">NotificationService</span>(<span class="annotation">@Smtp</span> <span class="class-name">EmailService</span> emailService) {
+        <span class="keyword">this</span>.emailService = emailService;
+    }
+}</code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">CDI @Qualifier vs Spring @Qualifier — type-safe vs string-based</div>
+                    <p>CDI qualifiers are custom annotations — compile-time type-safe, refactoring-friendly. Spring's <code>@Qualifier("smtp")</code> takes a string — a typo silently fails at runtime. Spring also offers <code>@Primary</code> for "this is the default when nothing else is specified," which CDI achieves with the built-in <code>@Default</code> qualifier. Both models work; CDI's is strictly safer.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — PRODUCERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Producers — Creating Beans With Custom Logic</h2>
+                <p>Not every object can be annotated with a CDI scope — third-party classes,
+                    objects that require runtime parameters to construct, or objects that need
+                    a factory method. <code>@Produces</code> turns a method or field into a
+                    bean factory that CDI manages.</p>
+
+                <pre><code><span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">Infrastructure</span> {
+
+    <span class="comment">// Produce a configured ObjectMapper as a CDI bean</span>
+    <span class="annotation">@Produces</span>
+    <span class="annotation">@ApplicationScoped</span>
+    <span class="keyword">public</span> <span class="class-name">ObjectMapper</span> <span class="function">objectMapper</span>() {
+        <span class="keyword">return new</span> <span class="class-name">ObjectMapper</span>()
+            .registerModule(<span class="keyword">new</span> <span class="class-name">JavaTimeModule</span>())
+            .disable(<span class="class-name">SerializationFeature</span>.WRITE_DATES_AS_TIMESTAMPS);
+    }
+
+    <span class="comment">// Produce a config value from a property file</span>
+    <span class="annotation">@Produces</span>
+    <span class="annotation">@Named</span>(<span class="string">"apiBaseUrl"</span>)
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">apiBaseUrl</span>() {
+        <span class="keyword">return</span> <span class="class-name">System</span>.getenv().getOrDefault(<span class="string">"API_BASE_URL"</span>, <span class="string">"http://localhost:8080"</span>);
+    }
+}
+
+<span class="comment">// Now ObjectMapper is injectable anywhere as a CDI bean</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">JsonConverter</span> {
+    <span class="keyword">private final</span> <span class="class-name">ObjectMapper</span> mapper;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">public</span> <span class="function">JsonConverter</span>(<span class="class-name">ObjectMapper</span> mapper) { <span class="keyword">this</span>.mapper = mapper; }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — EVENTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>CDI Events — Decoupled Publish/Subscribe</h2>
+                <p>CDI's event system allows beans to communicate without knowing about each
+                    other. The publisher fires an event object; any bean with an
+                    <code>@Observes</code> method for that type receives it. No wiring, no
+                    interface contract — pure type-based dispatch.</p>
+
+                <pre><code><span class="comment">// Event payload — a plain class, no CDI annotation needed</span>
+<span class="keyword">public record</span> <span class="class-name">UserRegisteredEvent</span>(<span class="class-name">Long</span> userId, <span class="class-name">String</span> email) {}
+
+<span class="comment">// Publisher — injects Event&lt;T&gt; and fires it</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">RegistrationService</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">Event</span>&lt;<span class="class-name">UserRegisteredEvent</span>&gt; registrationEvent;
+
+    <span class="keyword">public void</span> <span class="function">register</span>(<span class="class-name">String</span> email) {
+        <span class="class-name">User</span> user = createUser(email);
+        registrationEvent.fire(<span class="keyword">new</span> <span class="class-name">UserRegisteredEvent</span>(user.getId(), email));
+        <span class="comment">// all @Observes methods run synchronously before this line returns</span>
+    }
+}
+
+<span class="comment">// Observers — registered automatically, no explicit subscription needed</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">WelcomeEmailSender</span> {
+    <span class="keyword">public void</span> <span class="function">onRegistration</span>(<span class="annotation">@Observes</span> <span class="class-name">UserRegisteredEvent</span> event) {
+        sendWelcomeEmail(event.email());
+    }
+}
+
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">AnalyticsTracker</span> {
+    <span class="keyword">public void</span> <span class="function">onRegistration</span>(<span class="annotation">@Observes</span> <span class="class-name">UserRegisteredEvent</span> event) {
+        track(<span class="string">"user_registered"</span>, event.userId());
+    }
+}
+
+<span class="comment">// Async event — fire and continue, observer runs in a separate thread</span>
+<span class="keyword">public void</span> <span class="function">registerAsync</span>(<span class="class-name">String</span> email) {
+    <span class="class-name">User</span> user = createUser(email);
+    registrationEvent.fireAsync(<span class="keyword">new</span> <span class="class-name">UserRegisteredEvent</span>(user.getId(), email));
+    <span class="comment">// returns immediately — observers run concurrently</span>
+}</code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">CDI events vs Spring ApplicationEvent</div>
+                    <p>Spring's equivalent is <code>ApplicationEventPublisher</code> +
+                        <code>@EventListener</code>. The model is identical — publisher fires,
+                        observers react, no direct coupling. CDI's version is arguably cleaner:
+                        <code>Event&lt;T&gt;</code> is injected as a typed dependency, and the
+                        observer method signature is the only "contract." Spring's
+                        <code>@EventListener</code> requires the event class to extend
+                        <code>ApplicationEvent</code> or be a plain object (since Spring 4.2).
+                        Both work; CDI's doesn't require any base class at all.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERCEPTORS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interceptors — Cross-Cutting Concerns Without Inheritance</h2>
+
+                <pre><code><span class="comment">// Step 1: define an interceptor binding annotation</span>
 <span class="annotation">@InterceptorBinding</span>
-<span class="annotation">@Target</span>({ElementType.TYPE, ElementType.METHOD})
-<span class="annotation">@Retention</span>(RetentionPolicy.RUNTIME)
-<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">Logged</span> { }</code></pre>
+<span class="annotation">@Retention</span>(<span class="class-name">RetentionPolicy</span>.RUNTIME)
+<span class="annotation">@Target</span>({<span class="class-name">ElementType</span>.TYPE, <span class="class-name">ElementType</span>.METHOD})
+<span class="keyword">public</span> <span class="annotation">@interface</span> <span class="class-name">Timed</span> {}
 
-            <h3>Create Interceptor</h3>
-            <pre><code><span class="keyword">import</span> jakarta.interceptor.*;
-
-<span class="annotation">@Logged</span>
+<span class="comment">// Step 2: implement the interceptor</span>
+<span class="annotation">@Timed</span>
 <span class="annotation">@Interceptor</span>
-<span class="annotation">@Priority</span>(Interceptor.Priority.APPLICATION)
-<span class="keyword">public class</span> <span class="class-name">LoggingInterceptor</span> {
+<span class="annotation">@Priority</span>(<span class="class-name">Interceptor</span>.<span class="class-name">Priority</span>.APPLICATION)
+<span class="keyword">public class</span> <span class="class-name">TimingInterceptor</span> {
 
     <span class="annotation">@AroundInvoke</span>
-    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">logMethod</span>(<span class="class-name">InvocationContext</span> context) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="class-name">String</span> methodName = context.getMethod().getName();
-
-        <span class="class-name">System</span>.out.println(<span class="string">"[LOG] Entering: "</span> + methodName);
-        <span class="keyword">long</span> start = <span class="class-name">System</span>.currentTimeMillis();
-
+    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">measure</span>(<span class="class-name">InvocationContext</span> ctx) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">long</span> start = <span class="class-name">System</span>.nanoTime();
         <span class="keyword">try</span> {
-            <span class="comment">// Proceed with the actual method call</span>
-            <span class="keyword">return</span> context.proceed();
+            <span class="keyword">return</span> ctx.proceed();  <span class="comment">// invoke the actual method</span>
         } <span class="keyword">finally</span> {
-            <span class="keyword">long</span> duration = <span class="class-name">System</span>.currentTimeMillis() - start;
-            <span class="class-name">System</span>.out.println(<span class="string">"[LOG] Exiting: "</span> + methodName + <span class="string">" ("</span> + duration + <span class="string">"ms)"</span>);
+            <span class="keyword">long</span> ms = (<span class="class-name">System</span>.nanoTime() - start) / <span class="number">1_000_000</span>;
+            log.debug(<span class="string">"{}.{}() took {}ms"</span>,
+                ctx.getTarget().getClass().getSimpleName(),
+                ctx.getMethod().getName(), ms);
         }
     }
+}
+
+<span class="comment">// Step 3: apply it with just one annotation</span>
+<span class="annotation">@ApplicationScoped</span>
+<span class="keyword">public class</span> <span class="class-name">ReportService</span> {
+
+    <span class="annotation">@Timed</span>  <span class="comment">// interceptor runs transparently — zero change to business logic</span>
+    <span class="keyword">public</span> <span class="class-name">Report</span> <span class="function">generate</span>(<span class="class-name">Long</span> userId) { ... }
 }</code></pre>
 
-            <h3>Use Interceptor</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">UserService</span> {
+                <div class="info-box tip">
+                    <div class="info-box-title">CDI interceptors vs Spring AOP — different mechanism, same outcome</div>
+                    <p>Spring <code>@Transactional</code>, <code>@Async</code>, and
+                        <code>@Cacheable</code> are all implemented via Spring AOP, which uses
+                        CGLIB proxies — mechanically identical to CDI's client proxy model.
+                        CDI interceptors are the Jakarta standard for the same pattern. The
+                        practical difference: Spring AOP integrates with Spring's own
+                        annotations; CDI interceptors are portable across any CDI container
+                        (Quarkus, WildFly, TomEE) without Spring.</p>
+                </div>
+            </section>
 
-    <span class="annotation">@Logged</span>  <span class="comment">// This method will be logged</span>
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
-        <span class="comment">// Your business logic</span>
-        <span class="keyword">return</span> database.find(id);
-    }
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — BEAN DISCOVERY (from beans.html)
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Bean Discovery — What CDI Scans and What It Ignores</h2>
+                <p>CDI needs to know which classes to consider as beans. This is controlled by
+                    <code>bean-discovery-mode</code> in <code>beans.xml</code>, or by the
+                    absence of that file entirely.</p>
 
-    <span class="annotation">@Logged</span>
-    <span class="keyword">public void</span> <span class="function">saveUser</span>(<span class="class-name">User</span> user) {
-        database.save(user);
-    }
-}</code></pre>
+                <pre><code><span class="comment">&lt;!-- src/main/resources/META-INF/beans.xml (or WEB-INF/beans.xml in a WAR) --&gt;</span>
 
-            <p><strong>Output:</strong></p>
-            <pre><code>[LOG] Entering: findUser
-[LOG] Exiting: findUser (23ms)
-[LOG] Entering: saveUser
-[LOG] Exiting: saveUser (45ms)</code></pre>
+<span class="comment">&lt;!-- annotated (recommended since CDI 1.1 / EE 7) --&gt;</span>
+<span class="comment">&lt;!-- Only classes with a bean-defining annotation are considered beans --&gt;</span>
+&lt;<span class="keyword">beans</span> <span class="attribute">xmlns</span>=<span class="string">"https://jakarta.ee/xml/ns/jakartaee"</span>
+       <span class="attribute">version</span>=<span class="string">"4.0"</span>
+       <span class="attribute">bean-discovery-mode</span>=<span class="string">"annotated"</span>&gt;
+&lt;/<span class="keyword">beans</span>&gt;
 
-            <p><strong>Common use cases:</strong> Logging, transactions, security, caching, performance monitoring</p>
-        </section>
+<span class="comment">&lt;!-- all — every class in the archive is a potential bean, even without annotations --&gt;</span>
+<span class="comment">&lt;!-- Only use this for legacy compatibility; slow startup, unexpected beans --&gt;</span>
+&lt;<span class="keyword">beans</span> <span class="attribute">bean-discovery-mode</span>=<span class="string">"all"</span>&gt;&lt;/<span class="keyword">beans</span>&gt;
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+<span class="comment">&lt;!-- none — CDI disabled for this archive entirely --&gt;</span>
+&lt;<span class="keyword">beans</span> <span class="attribute">bean-discovery-mode</span>=<span class="string">"none"</span>&gt;&lt;/<span class="keyword">beans</span>&gt;</code></pre>
 
-            <div class="best-practices">
-                <h3>✅ DO:</h3>
-                <ul>
-                    <li><strong>Use constructor injection for required dependencies</strong> - Makes testing easier</li>
-                    <li><strong>Choose the right scope</strong> - @RequestScoped for request data, @ApplicationScoped for singletons</li>
-                    <li><strong>Use qualifiers for multiple implementations</strong> - Clear and explicit</li>
-                    <li><strong>Implement Serializable for @SessionScoped</strong> - Required for session replication</li>
-                    <li><strong>Use @PostConstruct for initialization</strong> - Not the constructor</li>
-                    <li><strong>Use events for loose coupling</strong> - Modules don't know about each other</li>
-                    <li><strong>Keep beans stateless when possible</strong> - Thread-safe and scalable</li>
-                </ul>
+                <p><strong>Bean-defining annotations</strong> (the ones that make a class
+                    discoverable in <code>annotated</code> mode):</p>
+                <table>
+                    <tr><th>Annotation</th><th>Source</th></tr>
+                    <tr><td><code>@ApplicationScoped</code>, <code>@RequestScoped</code>, <code>@SessionScoped</code>, <code>@ConversationScoped</code></td><td><code>jakarta.enterprise.context</code></td></tr>
+                    <tr><td><code>@Dependent</code></td><td><code>jakarta.enterprise.context</code></td></tr>
+                    <tr><td><code>@Singleton</code></td><td><code>jakarta.inject</code></td></tr>
+                    <tr><td><code>@Interceptor</code>, <code>@Decorator</code></td><td><code>jakarta.interceptor</code></td></tr>
+                    <tr><td>Any custom <code>@NormalScope</code> or <code>@Stereotype</code></td><td>User-defined</td></tr>
+                </table>
 
-                <h3>❌ DON'T:</h3>
-                <ul>
-                    <li><strong>Don't inject @RequestScoped into @ApplicationScoped</strong> - Scope mismatch!</li>
-                    <li><strong>Don't create beans with 'new'</strong> - CDI won't manage them</li>
-                    <li><strong>Don't forget @Named for JSF access</strong> - Required for view binding</li>
-                    <li><strong>Don't store heavy objects in @SessionScoped</strong> - Memory issues</li>
-                    <li><strong>Don't use field injection for testing</strong> - Use constructor injection</li>
-                    <li><strong>Don't put business logic in producers</strong> - Keep them simple</li>
-                </ul>
-            </div>
-        </section>
+                <div class="info-box note">
+                    <div class="info-box-title">No beans.xml at all — implicit bean archive in CDI 4.0+</div>
+                    <p>In CDI 4.0 (Jakarta EE 11), the absence of <code>beans.xml</code>
+                        means the archive is treated as an <em>implicit bean archive</em> with
+                        <code>annotated</code> discovery mode — same as having an empty
+                        <code>beans.xml</code> with <code>bean-discovery-mode="annotated"</code>.
+                        An explicit <code>beans.xml</code> is only required when you need
+                        <code>all</code> mode or <code>none</code>, or when you need to include
+                        portable extensions and interceptors via XML.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>CDI</strong> is the dependency injection framework at the heart of Jakarta EE</li>
-                    <li><strong>@Inject</strong> automatically provides dependencies (no 'new' needed)</li>
-                    <li><strong>Scopes</strong> control bean lifecycle: @Dependent, @RequestScoped, @SessionScoped, @ApplicationScoped</li>
-                    <li><strong>@Qualifier</strong> distinguishes between multiple implementations</li>
-                    <li><strong>@Produces</strong> creates beans with custom logic</li>
-                    <li><strong>@PostConstruct/@PreDestroy</strong> lifecycle callbacks for init/cleanup</li>
-                    <li><strong>Events</strong> enable publish-subscribe pattern with @Observes</li>
-                    <li><strong>Interceptors</strong> add cross-cutting concerns (logging, security, etc.)</li>
-                    <li><strong>Benefits:</strong> Loose coupling, easier testing, automatic lifecycle management</li>
-                    <li><strong>Similar to:</strong> Spring's @Autowired but standards-based</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="beans.html" class="related-link">What is a Bean?</a>
-                <a href="ejb.html" class="related-link">EJB (Enterprise JavaBeans)</a>
-                <a href="overview.html" class="related-link">Jakarta EE Overview</a>
-            </div>
-        </section>
-    </main>
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What problem does CDI solve, and what is the difference between @Inject and new?</strong><br>
+                    CDI solves tight coupling — when you use <code>new</code> to create a
+                    dependency, your class controls its creation and you can't swap it without
+                    modifying the class. With <code>@Inject</code>, the CDI container provides
+                    the instance, allowing you to change the implementation, apply interceptors,
+                    and inject mocks in tests — none of which require changing the class that
+                    depends on it.</p>
+
+                    <p><strong>Q: What is the difference between @ApplicationScoped and @RequestScoped?</strong><br>
+                    <code>@ApplicationScoped</code> creates one instance for the entire
+                    application lifetime — effectively a singleton. <code>@RequestScoped</code>
+                    creates one instance per HTTP request and destroys it when the request ends.
+                    Data that belongs to one user request goes in <code>@RequestScoped</code>
+                    beans; shared configuration or caches go in <code>@ApplicationScoped</code>
+                    beans.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: What is a CDI client proxy and what three constraints does it impose on proxied classes?</strong><br>
+                    When a longer-lived bean injects a shorter-lived one, CDI injects a
+                    generated subclass (client proxy) that forwards every method call to the
+                    correct real instance for the current context — e.g. the right
+                    <code>@RequestScoped</code> instance for the current HTTP thread. Because
+                    the proxy is a subclass, the target class must not be <code>final</code>,
+                    none of its methods must be <code>final</code>, and it must have a no-arg
+                    constructor. Violating any of these produces a deployment exception at
+                    startup — the same constraints Spring's CGLIB proxies impose for
+                    <code>@Transactional</code> and <code>@Async</code>.</p>
+
+                    <p><strong>Q: How do CDI qualifiers differ from Spring's @Qualifier, and why does the difference matter?</strong><br>
+                    CDI qualifiers are custom annotations — compile-time type-safe, IDE-
+                    refactorable, and can carry members (attributes) for fine-grained
+                    disambiguation. Spring's <code>@Qualifier("smtpEmail")</code> takes a
+                    string — a typo produces an <code>UnsatisfiedDependencyException</code> at
+                    startup (or worse, silently picks the wrong bean if names overlap). CDI's
+                    model eliminates the string entirely: if you rename the qualifier
+                    annotation, the compiler catches every usage site.</p>
+
+                    <p><strong>Q: What is bean-discovery-mode="annotated" and why is it preferred over "all"?</strong><br>
+                    In <code>annotated</code> mode, only classes carrying a bean-defining
+                    annotation (<code>@ApplicationScoped</code>, <code>@RequestScoped</code>,
+                    etc.) are eligible as CDI beans. In <code>all</code> mode, every class in
+                    the archive is a potential bean — including third-party library classes,
+                    utility classes, and value objects — which causes slower startup, unexpected
+                    bean resolution conflicts, and proxying attempts on classes that can't be
+                    proxied. <code>annotated</code> is the explicit, predictable default and
+                    is the CDI 4.0 implicit mode when no <code>beans.xml</code> exists.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="overview.html" class="related-link"><span class="related-icon">🏢</span>Jakarta EE Overview</a>
+                    <a href="ejb.html" class="related-link"><span class="related-icon">🏢</span>EJB (Enterprise JavaBeans)</a>
+                    <a href="jpa.html" class="related-link"><span class="related-icon">💾</span>JPA (Java Persistence API)</a>
+                    <a href="../spring/core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
+                    <a href="../spring/security.html" class="related-link"><span class="related-icon">🔒</span>Spring Security</a>
+                    <a href="../fundamentals/interfaces-abstract.html" class="related-link"><span class="related-icon">📚</span>Interfaces vs Abstract Classes</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

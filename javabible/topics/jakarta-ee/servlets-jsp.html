@@ -1,548 +1,572 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.servletsjsp.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Servlets & JSP - JavaDev Bible</title>
+    <title>Servlets &amp; JSP - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / Servlets & JSP
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#jakarta-ee" data-i18n="nav.jakarta">Jakarta EE</a> /
+                Servlets &amp; JSP
             </nav>
-            <h1>Servlets & JSP</h1>
-            <p class="topic-subtitle">Building Web Applications with Jakarta EE</p>
-            <a href="../../index.html" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.servletsjsp.h1">Servlets &amp; JSP</h1>
+            <p class="topic-subtitle" data-i18n="topic.servletsjsp.subtitle">The foundation of Java web development — what Spring MVC is built on, and why understanding it matters even if you never write one directly</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What are Servlets?</h2>
-            <p><strong>Think of a servlet like a restaurant waiter:</strong></p>
-            <ul>
-                <li>🍽️ Customer (Browser) makes a request: "I want spaghetti"</li>
-                <li>📝 Waiter (Servlet) takes the order, sends it to the kitchen</li>
-                <li>🍝 Kitchen prepares the food (business logic)</li>
-                <li>✅ Waiter brings the food back to customer (HTTP response)</li>
-            </ul>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>A Servlet</strong> is a Java class that handles HTTP requests and generates HTTP responses. It's the foundation of web applications in Jakarta EE.</p>
-                <p><strong>Servlet = Server + Applet</strong> (small application that runs on the server)</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>How Servlets Work</h3>
-            <pre><code>Browser sends request → Web Server (Tomcat/Payara) → Servlet Container
-                                                                    ↓
-                                                          Servlet processes request
-                                                                    ↓
-                                                          Generates HTML response
-                                                                    ↓
-Browser displays page ← Web Server ← Response sent back</code></pre>
-        </section>
+        <main class="topic-content">
 
-        <section class="content-section">
-            <h2>Creating Your First Servlet</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS A SERVLET AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is a Servlet — and Why Does a Spring Developer Need to Know?</h2>
+                <p>A <strong>Servlet</strong> is a Java class that receives an HTTP request
+                    and produces an HTTP response. That's the entire contract —
+                    <code>HttpServletRequest</code> in, <code>HttpServletResponse</code> out.
+                    The Servlet specification (now <code>jakarta.servlet.*</code>) defines this
+                    contract; Tomcat, Jetty, and Undertow are implementations that run servlets
+                    inside a <strong>Servlet Container</strong>.</p>
 
-            <h3>Simple Servlet Example</h3>
-            <pre><code><span class="keyword">package</span> com.example;
+                <p>The reason a Spring developer needs to understand this: <strong>Spring MVC's
+                    <code>DispatcherServlet</code> is itself a Servlet</strong> — it implements
+                    <code>HttpServlet</code> and is registered in a Servlet Container exactly
+                    like any other servlet. Every HTTP request your Spring Boot application
+                    handles goes through this chain:</p>
 
-<span class="keyword">import</span> jakarta.servlet.*;
+                <pre><code><span class="comment">/*
+ *  Browser
+ *      │ HTTP request
+ *      ▼
+ *  Tomcat (Servlet Container)
+ *      │ invokes the registered Servlet for this URL
+ *      ▼
+ *  DispatcherServlet  ←  this IS a Servlet (extends HttpServlet)
+ *      │ Spring's own routing logic
+ *      ▼
+ *  @RestController / @Controller method
+ *      │ your code
+ *      ▼
+ *  HTTP response back to browser
+ *
+ * Understanding Servlets = understanding what's running underneath Spring.
+ */</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">When you actually write a raw Servlet today</div>
+                    <p>In new Spring Boot projects, you almost never write a raw
+                        <code>HttpServlet</code> subclass — Spring MVC handles all routing.
+                        The cases where raw Servlets still appear: integrating a third-party
+                        library that registers its own servlet (e.g. H2 Console,
+                        Swagger UI embeds), legacy codebases pre-Spring MVC, and Jakarta EE
+                        projects on WildFly or Payara that don't use Spring at all. The
+                        concepts transfer directly — request/response, lifecycle, filters —
+                        even if you write them through Spring abstractions.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE SERVLET LIFECYCLE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Servlet Lifecycle</h2>
+
+                <pre><code><span class="comment">/*
+ *  Container startup
+ *      │
+ *      ▼
+ *  new HelloServlet()          ← container calls the no-arg constructor
+ *      │
+ *      ▼
+ *  init(ServletConfig config)  ← called ONCE, before any request is handled
+ *      │                          override to set up resources (DB connections, etc.)
+ *      ▼
+ *  ┌──────────────────────────────────────────────┐
+ *  │  For each incoming request (concurrent):      │
+ *  │                                              │
+ *  │  service(request, response)                   │
+ *  │      ├── doGet()    ← GET requests            │
+ *  │      ├── doPost()   ← POST requests           │
+ *  │      ├── doPut()    ← PUT requests            │
+ *  │      ├── doDelete() ← DELETE requests         │
+ *  │      └── ...                                  │
+ *  └──────────────────────────────────────────────┘
+ *      │
+ *      ▼
+ *  destroy()                   ← called ONCE when container shuts down
+ *                                 override to release resources
+ */</span></code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Servlets are singletons — instance variables are a race condition</div>
+                    <p>The container creates <strong>one</strong> servlet instance and routes
+                        all concurrent requests to it across multiple threads simultaneously.
+                        Any instance variable on a servlet is shared across all requests — a
+                        classic race condition waiting to happen. The rule: servlets must have
+                        <strong>no mutable instance state</strong>. Everything request-specific
+                        lives in local variables inside the handler method, or in the
+                        <code>HttpSession</code>. This is the same reason Spring's
+                        <code>@Controller</code> beans are singletons by default and must also
+                        be stateless.</p>
+                </div>
+
+                <pre><code><span class="keyword">import</span> jakarta.servlet.*;
 <span class="keyword">import</span> jakarta.servlet.http.*;
 <span class="keyword">import</span> jakarta.servlet.annotation.*;
 <span class="keyword">import</span> java.io.*;
 
-<span class="annotation">@WebServlet</span>(<span class="string">"/hello"</span>)  <span class="comment">// URL mapping: /hello</span>
+<span class="annotation">@WebServlet</span>(<span class="string">"/hello"</span>)
 <span class="keyword">public class</span> <span class="class-name">HelloServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
 
+    <span class="comment">// ✅ Safe: set once in init(), never changed — effectively final</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> greeting;
+
+    <span class="comment">// ❌ WRONG: mutable instance variable — race condition under concurrent requests</span>
+    <span class="comment">// private int requestCount = 0;</span>
+
     <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> request,
-                             <span class="class-name">HttpServletResponse</span> response)
+    <span class="keyword">public void</span> <span class="function">init</span>() {
+        greeting = getServletConfig().getInitParameter(<span class="string">"greeting"</span>);  <span class="comment">// read-only after init</span>
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> request, <span class="class-name">HttpServletResponse</span> response)
             <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
 
-        <span class="comment">// Set response content type</span>
-        response.setContentType(<span class="string">"text/html"</span>);
+        <span class="class-name">String</span> name = request.getParameter(<span class="string">"name"</span>);  <span class="comment">// ✅ Safe: local variable, per-request</span>
 
-        <span class="comment">// Get output writer</span>
-        <span class="class-name">PrintWriter</span> out = response.getWriter();
-
-        <span class="comment">// Generate HTML response</span>
-        out.println(<span class="string">"&lt;html&gt;"</span>);
-        out.println(<span class="string">"&lt;head&gt;&lt;title&gt;Hello Servlet&lt;/title&gt;&lt;/head&gt;"</span>);
-        out.println(<span class="string">"&lt;body&gt;"</span>);
-        out.println(<span class="string">"&lt;h1&gt;Hello from Servlet!&lt;/h1&gt;"</span>);
-        out.println(<span class="string">"&lt;p&gt;Current time: "</span> + <span class="keyword">new</span> <span class="class-name">java.util.Date</span>() + <span class="string">"&lt;/p&gt;"</span>);
-        out.println(<span class="string">"&lt;/body&gt;&lt;/html&gt;"</span>);
-    }
-}</code></pre>
-
-            <p><strong>Access it:</strong> <code>http://localhost:8080/myapp/hello</code></p>
-
-            <h3>What's Happening?</h3>
-            <ol>
-                <li><code>@WebServlet("/hello")</code> - Maps URL /hello to this servlet</li>
-                <li><code>extends HttpServlet</code> - Inherit servlet functionality</li>
-                <li><code>doGet()</code> - Handle GET requests (browser visits URL)</li>
-                <li><code>HttpServletRequest</code> - Data from client (parameters, headers)</li>
-                <li><code>HttpServletResponse</code> - Data to send back (HTML, JSON, etc.)</li>
-            </ol>
-        </section>
-
-        <section class="content-section">
-            <h2>HTTP Methods: doGet vs doPost</h2>
-
-            <h3>doGet() - Reading Data</h3>
-            <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/users"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> request,
-                             <span class="class-name">HttpServletResponse</span> response)
-            <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
-
-        <span class="comment">// Get query parameter: /users?id=123</span>
-        <span class="class-name">String</span> userId = request.getParameter(<span class="string">"id"</span>);
-
-        response.setContentType(<span class="string">"text/html"</span>);
-        <span class="class-name">PrintWriter</span> out = response.getWriter();
-
-        out.println(<span class="string">"&lt;h1&gt;User ID: "</span> + userId + <span class="string">"&lt;/h1&gt;"</span>);
-    }
-}</code></pre>
-
-            <h3>doPost() - Submitting Data</h3>
-            <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/register"</span>)
-<span class="keyword">public class</span> <span class="class-name">RegisterServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> <span class="function">doPost</span>(<span class="class-name">HttpServletRequest</span> request,
-                              <span class="class-name">HttpServletResponse</span> response)
-            <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
-
-        <span class="comment">// Get form data</span>
-        <span class="class-name">String</span> username = request.getParameter(<span class="string">"username"</span>);
-        <span class="class-name">String</span> email = request.getParameter(<span class="string">"email"</span>);
-        <span class="class-name">String</span> password = request.getParameter(<span class="string">"password"</span>);
-
-        <span class="comment">// Process registration (save to database)</span>
-        <span class="comment">// ...</span>
-
-        response.setContentType(<span class="string">"text/html"</span>);
-        <span class="class-name">PrintWriter</span> out = response.getWriter();
-        out.println(<span class="string">"&lt;h1&gt;Registration Successful!&lt;/h1&gt;"</span>);
-        out.println(<span class="string">"&lt;p&gt;Welcome, "</span> + username + <span class="string">"!&lt;/p&gt;"</span>);
-    }
-}</code></pre>
-
-            <h3>HTML Form for POST</h3>
-            <pre><code><span class="tag">&lt;form</span> <span class="attribute">action</span>=<span class="string">"/myapp/register"</span> <span class="attribute">method</span>=<span class="string">"POST"</span><span class="tag">&gt;</span>
-    <span class="tag">&lt;input</span> <span class="attribute">type</span>=<span class="string">"text"</span> <span class="attribute">name</span>=<span class="string">"username"</span> <span class="attribute">placeholder</span>=<span class="string">"Username"</span><span class="tag">&gt;</span>
-    <span class="tag">&lt;input</span> <span class="attribute">type</span>=<span class="string">"email"</span> <span class="attribute">name</span>=<span class="string">"email"</span> <span class="attribute">placeholder</span>=<span class="string">"Email"</span><span class="tag">&gt;</span>
-    <span class="tag">&lt;input</span> <span class="attribute">type</span>=<span class="string">"password"</span> <span class="attribute">name</span>=<span class="string">"password"</span> <span class="attribute">placeholder</span>=<span class="string">"Password"</span><span class="tag">&gt;</span>
-    <span class="tag">&lt;button</span> <span class="attribute">type</span>=<span class="string">"submit"</span><span class="tag">&gt;</span>Register<span class="tag">&lt;/button&gt;</span>
-<span class="tag">&lt;/form&gt;</span></code></pre>
-
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Method</th>
-                        <th>Purpose</th>
-                        <th>Data in URL</th>
-                        <th>Use Case</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>GET</strong></td>
-                        <td>Retrieve data</td>
-                        <td>Yes (visible)</td>
-                        <td>View pages, search, read</td>
-                    </tr>
-                    <tr>
-                        <td><strong>POST</strong></td>
-                        <td>Submit data</td>
-                        <td>No (in body)</td>
-                        <td>Forms, login, create data</td>
-                    </tr>
-                    <tr>
-                        <td><strong>PUT</strong></td>
-                        <td>Update data</td>
-                        <td>No (in body)</td>
-                        <td>Update existing records</td>
-                    </tr>
-                    <tr>
-                        <td><strong>DELETE</strong></td>
-                        <td>Delete data</td>
-                        <td>Optional</td>
-                        <td>Remove records</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2>Servlet Lifecycle</h2>
-
-            <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/lifecycle"</span>)
-<span class="keyword">public class</span> <span class="class-name">LifecycleServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
-
-    <span class="comment">// 1. Called ONCE when servlet is first created</span>
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">init</span>() <span class="keyword">throws</span> <span class="class-name">ServletException</span> {
-        <span class="class-name">System</span>.out.println(<span class="string">"Servlet initialized!"</span>);
-        <span class="comment">// Load config, connect to database, etc.</span>
+        response.setContentType(<span class="string">"text/plain;charset=UTF-8"</span>);
+        response.getWriter().println(greeting + <span class="string">", "</span> + name);
     }
 
-    <span class="comment">// 2. Called for EVERY request</span>
-    <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> request,
-                             <span class="class-name">HttpServletResponse</span> response)
-            <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
-        <span class="class-name">System</span>.out.println(<span class="string">"Handling request..."</span>);
-        response.getWriter().println(<span class="string">"Hello!"</span>);
-    }
-
-    <span class="comment">// 3. Called ONCE when servlet is destroyed (server shutdown)</span>
     <span class="annotation">@Override</span>
     <span class="keyword">public void</span> <span class="function">destroy</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Servlet destroyed!"</span>);
-        <span class="comment">// Close connections, cleanup resources</span>
+        <span class="comment">// release any resources opened in init()</span>
     }
 }</code></pre>
+            </section>
 
-            <p><strong>Lifecycle Flow:</strong></p>
-            <pre><code>Server starts → init() called → Servlet ready
-                                          ↓
-            Request 1 → service() → doGet()/doPost()
-            Request 2 → service() → doGet()/doPost()
-            Request 3 → service() → doGet()/doPost()
-                      ... many requests ...
-                                          ↓
-Server stops → destroy() called → Servlet removed</code></pre>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — REQUEST AND RESPONSE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>HttpServletRequest and HttpServletResponse</h2>
 
-        <section class="content-section">
-            <h2>What is JSP (JavaServer Pages)?</h2>
-            <p><strong>Problem with Servlets:</strong> Writing HTML with <code>out.println()</code> is painful!</p>
+                <pre><code><span class="annotation">@Override</span>
+<span class="keyword">protected void</span> <span class="function">doPost</span>(<span class="class-name">HttpServletRequest</span> request, <span class="class-name">HttpServletResponse</span> response)
+        <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
 
-            <pre><code><span class="comment">// Servlet - HTML in Java (hard to maintain!)</span>
-out.println(<span class="string">"&lt;html&gt;"</span>);
-out.println(<span class="string">"&lt;body&gt;"</span>);
-out.println(<span class="string">"&lt;h1&gt;Hello "</span> + name + <span class="string">"&lt;/h1&gt;"</span>);
-out.println(<span class="string">"&lt;/body&gt;&lt;/html&gt;"</span>);</code></pre>
+    <span class="comment">// ── Reading the request ───────────────────────────────────────────────</span>
+    <span class="class-name">String</span> name   = request.getParameter(<span class="string">"name"</span>);        <span class="comment">// query param or form field</span>
+    <span class="class-name">String</span> auth   = request.getHeader(<span class="string">"Authorization"</span>);  <span class="comment">// request header</span>
+    <span class="class-name">String</span> method = request.getMethod();                  <span class="comment">// "GET", "POST", etc.</span>
+    <span class="class-name">String</span> uri    = request.getRequestURI();              <span class="comment">// "/myapp/users"</span>
+    <span class="class-name">String</span> body   = request.getReader().lines()           <span class="comment">// raw body as string</span>
+        .collect(java.util.stream.Collectors.joining());
 
-            <p><strong>Solution: JSP - Java in HTML (easy to maintain!)</strong></p>
+    <span class="comment">// Attributes (server-side data attached to THIS request, not from client)</span>
+    request.setAttribute(<span class="string">"user"</span>, currentUser);
+    <span class="class-name">Object</span> user = request.getAttribute(<span class="string">"user"</span>);
 
-            <div class="info-box">
-                <p><strong>JSP (JavaServer Pages)</strong> allows you to embed Java code directly in HTML files. Behind the scenes, JSP files are converted to servlets by the server.</p>
-            </div>
+    <span class="comment">// ── Building the response ─────────────────────────────────────────────</span>
+    response.setStatus(<span class="class-name">HttpServletResponse</span>.SC_CREATED);         <span class="comment">// 201</span>
+    response.setContentType(<span class="string">"application/json;charset=UTF-8"</span>);
+    response.setHeader(<span class="string">"Location"</span>, <span class="string">"/api/users/123"</span>);
 
-            <h3>Simple JSP Example (hello.jsp)</h3>
-            <pre><code><span class="tag">&lt;!DOCTYPE html&gt;</span>
-<span class="tag">&lt;html&gt;</span>
-<span class="tag">&lt;head&gt;</span>
-    <span class="tag">&lt;title&gt;</span>Hello JSP<span class="tag">&lt;/title&gt;</span>
-<span class="tag">&lt;/head&gt;</span>
-<span class="tag">&lt;body&gt;</span>
-    <span class="tag">&lt;h1&gt;</span>Hello from JSP!<span class="tag">&lt;/h1&gt;</span>
+    response.getWriter().println(<span class="string">"{\"id\":123,\"name\":\""</span> + name + <span class="string">"\"}"</span>);
 
-    <span class="comment">&lt;!-- Embed Java code with &lt;% %&gt; --&gt;</span>
-    <span class="tag">&lt;p&gt;</span>Current time: <span class="jsp">&lt;%= new java.util.Date() %&gt;</span><span class="tag">&lt;/p&gt;</span>
+    <span class="comment">// Forward vs Redirect — different things, different use cases</span>
+    request.getRequestDispatcher(<span class="string">"/WEB-INF/views/success.jsp"</span>)
+           .forward(request, response);   <span class="comment">// server-side: same request, same URL in browser</span>
 
-    <span class="jsp">&lt;%
-        // Java code block
-        String name = "Alice";
-        int age = 25;
-    %&gt;</span>
-
-    <span class="tag">&lt;p&gt;</span>Name: <span class="jsp">&lt;%= name %&gt;</span><span class="tag">&lt;/p&gt;</span>
-    <span class="tag">&lt;p&gt;</span>Age: <span class="jsp">&lt;%= age %&gt;</span><span class="tag">&lt;/p&gt;</span>
-
-    <span class="jsp">&lt;%
-        // Conditional logic
-        if (age >= 18) {
-    %&gt;</span>
-        <span class="tag">&lt;p&gt;</span>You are an adult!<span class="tag">&lt;/p&gt;</span>
-    <span class="jsp">&lt;% } else { %&gt;</span>
-        <span class="tag">&lt;p&gt;</span>You are a minor!<span class="tag">&lt;/p&gt;</span>
-    <span class="jsp">&lt;% } %&gt;</span>
-
-<span class="tag">&lt;/body&gt;</span>
-<span class="tag">&lt;/html&gt;</span></code></pre>
-
-            <p><strong>Access it:</strong> <code>http://localhost:8080/myapp/hello.jsp</code></p>
-        </section>
-
-        <section class="content-section">
-            <h2>JSP Syntax Elements</h2>
-
-            <h3>1. Scriptlets <code>&lt;% ... %&gt;</code> - Java Code</h3>
-            <pre><code><span class="jsp">&lt;%
-    int x = 10;
-    int y = 20;
-    int sum = x + y;
-%&gt;</span></code></pre>
-
-            <h3>2. Expressions <code>&lt;%= ... %&gt;</code> - Print Value</h3>
-            <pre><code><span class="tag">&lt;p&gt;</span>Sum: <span class="jsp">&lt;%= sum %&gt;</span><span class="tag">&lt;/p&gt;</span>
-<span class="tag">&lt;p&gt;</span>Random: <span class="jsp">&lt;%= Math.random() %&gt;</span><span class="tag">&lt;/p&gt;</span></code></pre>
-
-            <h3>3. Declarations <code>&lt;%! ... %&gt;</code> - Class-level Variables/Methods</h3>
-            <pre><code><span class="jsp">&lt;%!
-    // This becomes a class member
-    private int counter = 0;
-
-    public String greet(String name) {
-        return "Hello, " + name + "!";
-    }
-%&gt;</span>
-
-<span class="tag">&lt;p&gt;</span>Counter: <span class="jsp">&lt;%= ++counter %&gt;</span><span class="tag">&lt;/p&gt;</span>
-<span class="tag">&lt;p&gt;</span><span class="jsp">&lt;%= greet("Bob") %&gt;</span><span class="tag">&lt;/p&gt;</span></code></pre>
-
-            <h3>4. Directives <code>&lt;%@ ... %&gt;</code> - Page Configuration</h3>
-            <pre><code><span class="jsp">&lt;%@ page language="java" contentType="text/html; charset=UTF-8" %&gt;</span>
-<span class="jsp">&lt;%@ page import="java.util.*, java.text.*" %&gt;</span>
-<span class="jsp">&lt;%@ include file="header.jsp" %&gt;</span></code></pre>
-
-            <h3>5. Comments</h3>
-            <pre><code><span class="comment">&lt;!-- HTML comment (visible in source) --&gt;</span>
-<span class="jsp">&lt;%-- JSP comment (not sent to browser) --%&gt;</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Servlet + JSP Working Together</h2>
-            <p><strong>Best Practice:</strong> Servlet handles logic, JSP handles presentation</p>
-
-            <h3>Servlet (Controller)</h3>
-            <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/user-profile"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserProfileServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> request,
-                             <span class="class-name">HttpServletResponse</span> response)
-            <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
-
-        <span class="comment">// 1. Get data from database</span>
-        <span class="class-name">String</span> userId = request.getParameter(<span class="string">"id"</span>);
-        <span class="class-name">User</span> user = database.findUserById(userId);
-
-        <span class="comment">// 2. Put data in request scope</span>
-        request.setAttribute(<span class="string">"user"</span>, user);
-
-        <span class="comment">// 3. Forward to JSP for display</span>
-        request.getRequestDispatcher(<span class="string">"/WEB-INF/profile.jsp"</span>)
-               .forward(request, response);
-    }
+    response.sendRedirect(<span class="string">"/dashboard"</span>);  <span class="comment">// client-side: new GET request, URL changes</span>
 }</code></pre>
 
-            <h3>JSP (View) - profile.jsp</h3>
-            <pre><code><span class="tag">&lt;!DOCTYPE html&gt;</span>
-<span class="tag">&lt;html&gt;</span>
-<span class="tag">&lt;head&gt;</span>
-    <span class="tag">&lt;title&gt;</span>User Profile<span class="tag">&lt;/title&gt;</span>
-<span class="tag">&lt;/head&gt;</span>
-<span class="tag">&lt;body&gt;</span>
-    <span class="jsp">&lt;%
-        // Get data from request
-        User user = (User) request.getAttribute("user");
-    %&gt;</span>
+                <div class="info-box note">
+                    <div class="info-box-title">forward() vs sendRedirect() — the difference that matters for POST/Redirect/GET</div>
+                    <p><code>forward()</code> transfers control to another resource
+                        (another servlet or JSP) <em>inside the server</em> — the browser's
+                        URL bar never changes, and the original request object is passed along.
+                        <code>sendRedirect()</code> sends a 302 response to the browser, which
+                        then makes a brand-new GET request to the given URL. The classic
+                        pattern for form submissions is POST → process → redirect → GET (the
+                        "Post/Redirect/Get" pattern), specifically to prevent the browser from
+                        resubmitting the form on refresh. Spring MVC's
+                        <code>"redirect:/path"</code> return value does exactly this.</p>
+                </div>
+            </section>
 
-    <span class="tag">&lt;h1&gt;</span>Profile: <span class="jsp">&lt;%= user.getName() %&gt;</span><span class="tag">&lt;/h1&gt;</span>
-    <span class="tag">&lt;p&gt;</span>Email: <span class="jsp">&lt;%= user.getEmail() %&gt;</span><span class="tag">&lt;/p&gt;</span>
-    <span class="tag">&lt;p&gt;</span>Age: <span class="jsp">&lt;%= user.getAge() %&gt;</span><span class="tag">&lt;/p&gt;</span>
-<span class="tag">&lt;/body&gt;</span>
-<span class="tag">&lt;/html&gt;</span></code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — FILTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Filters — Cross-Cutting Concerns Before the Servlet</h2>
+                <p>A <code>Filter</code> intercepts requests <em>before</em> they reach any
+                    servlet — and responses on the way back out. The filter chain runs in
+                    declared order; each filter calls <code>chain.doFilter()</code> to pass
+                    control to the next filter or the servlet, or it can short-circuit by
+                    writing directly to the response without calling
+                    <code>chain.doFilter()</code>.</p>
 
-            <p><strong>Flow:</strong></p>
-            <pre><code>Browser → /user-profile?id=123 → UserProfileServlet
-                                           ↓
-                                  1. Fetch user from DB
-                                  2. Store in request
-                                  3. Forward to JSP
-                                           ↓
-                                      profile.jsp
-                                           ↓
-                                  Display HTML to browser</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>JSP Standard Tag Library (JSTL)</h2>
-            <p><strong>Problem:</strong> Java code in JSP is still messy!</p>
-            <p><strong>Solution:</strong> JSTL provides clean tags instead of Java code</p>
-
-            <h3>Without JSTL (ugly)</h3>
-            <pre><code><span class="jsp">&lt;%
-    List&lt;String&gt; items = (List&lt;String&gt;) request.getAttribute("items");
-    for (String item : items) {
-%&gt;</span>
-    <span class="tag">&lt;li&gt;</span><span class="jsp">&lt;%= item %&gt;</span><span class="tag">&lt;/li&gt;</span>
-<span class="jsp">&lt;% } %&gt;</span></code></pre>
-
-            <h3>With JSTL (clean)</h3>
-            <pre><code><span class="jsp">&lt;%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %&gt;</span>
-
-<span class="tag">&lt;c:forEach</span> <span class="attribute">var</span>=<span class="string">"item"</span> <span class="attribute">items</span>=<span class="string">"${items}"</span><span class="tag">&gt;</span>
-    <span class="tag">&lt;li&gt;</span>${item}<span class="tag">&lt;/li&gt;</span>
-<span class="tag">&lt;/c:forEach&gt;</span></code></pre>
-
-            <h3>Common JSTL Tags</h3>
-            <pre><code><span class="comment">&lt;!-- Variables --&gt;</span>
-<span class="tag">&lt;c:set</span> <span class="attribute">var</span>=<span class="string">"name"</span> <span class="attribute">value</span>=<span class="string">"Alice"</span> <span class="tag">/&gt;</span>
-<span class="tag">&lt;p&gt;</span>${name}<span class="tag">&lt;/p&gt;</span>
-
-<span class="comment">&lt;!-- Conditionals --&gt;</span>
-<span class="tag">&lt;c:if</span> <span class="attribute">test</span>=<span class="string">"${user.age >= 18}"</span><span class="tag">&gt;</span>
-    <span class="tag">&lt;p&gt;</span>Adult<span class="tag">&lt;/p&gt;</span>
-<span class="tag">&lt;/c:if&gt;</span>
-
-<span class="tag">&lt;c:choose&gt;</span>
-    <span class="tag">&lt;c:when</span> <span class="attribute">test</span>=<span class="string">"${score >= 90}"</span><span class="tag">&gt;</span>Grade: A<span class="tag">&lt;/c:when&gt;</span>
-    <span class="tag">&lt;c:when</span> <span class="attribute">test</span>=<span class="string">"${score >= 80}"</span><span class="tag">&gt;</span>Grade: B<span class="tag">&lt;/c:when&gt;</span>
-    <span class="tag">&lt;c:otherwise&gt;</span>Grade: C<span class="tag">&lt;/c:otherwise&gt;</span>
-<span class="tag">&lt;/c:choose&gt;</span>
-
-<span class="comment">&lt;!-- Loops --&gt;</span>
-<span class="tag">&lt;c:forEach</span> <span class="attribute">var</span>=<span class="string">"user"</span> <span class="attribute">items</span>=<span class="string">"${users}"</span><span class="tag">&gt;</span>
-    <span class="tag">&lt;p&gt;</span>${user.name}<span class="tag">&lt;/p&gt;</span>
-<span class="tag">&lt;/c:forEach&gt;</span>
-
-<span class="comment">&lt;!-- URL building --&gt;</span>
-<span class="tag">&lt;c:url</span> <span class="attribute">value</span>=<span class="string">"/user-profile"</span> <span class="attribute">var</span>=<span class="string">"profileUrl"</span><span class="tag">&gt;</span>
-    <span class="tag">&lt;c:param</span> <span class="attribute">name</span>=<span class="string">"id"</span> <span class="attribute">value</span>=<span class="string">"123"</span> <span class="tag">/&gt;</span>
-<span class="tag">&lt;/c:url&gt;</span>
-<span class="tag">&lt;a</span> <span class="attribute">href</span>=<span class="string">"${profileUrl}"</span><span class="tag">&gt;</span>View Profile<span class="tag">&lt;/a&gt;</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Session Management</h2>
-
-            <h3>Storing User Data Across Requests</h3>
-            <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/login"</span>)
-<span class="keyword">public class</span> <span class="class-name">LoginServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
+                <pre><code><span class="annotation">@WebFilter</span>(<span class="string">"/*"</span>)  <span class="comment">// applies to every URL</span>
+<span class="keyword">public class</span> <span class="class-name">RequestLoggingFilter</span> <span class="keyword">implements</span> <span class="class-name">Filter</span> {
 
     <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> <span class="function">doPost</span>(<span class="class-name">HttpServletRequest</span> request,
-                              <span class="class-name">HttpServletResponse</span> response)
-            <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
+    <span class="keyword">public void</span> <span class="function">doFilter</span>(<span class="class-name">ServletRequest</span> req, <span class="class-name">ServletResponse</span> res,
+                          <span class="class-name">FilterChain</span> chain)
+            <span class="keyword">throws</span> <span class="class-name">IOException</span>, <span class="class-name">ServletException</span> {
 
-        <span class="class-name">String</span> username = request.getParameter(<span class="string">"username"</span>);
-        <span class="class-name">String</span> password = request.getParameter(<span class="string">"password"</span>);
+        <span class="class-name">HttpServletRequest</span> httpReq = (<span class="class-name">HttpServletRequest</span>) req;
+        <span class="keyword">long</span> start = <span class="class-name">System</span>.currentTimeMillis();
 
-        <span class="comment">// Validate credentials</span>
-        <span class="keyword">if</span> (authenticate(username, password)) {
-            <span class="comment">// Get or create session</span>
-            <span class="class-name">HttpSession</span> session = request.getSession();
+        chain.doFilter(req, res);   <span class="comment">// ← hand off to the next filter or the servlet</span>
 
-            <span class="comment">// Store user in session</span>
-            session.setAttribute(<span class="string">"username"</span>, username);
-            session.setAttribute(<span class="string">"loggedIn"</span>, <span class="keyword">true</span>);
-
-            response.sendRedirect(<span class="string">"dashboard.jsp"</span>);
-        } <span class="keyword">else</span> {
-            response.sendRedirect(<span class="string">"login.jsp?error=invalid"</span>);
-        }
+        <span class="keyword">long</span> elapsed = <span class="class-name">System</span>.currentTimeMillis() - start;
+        log.info(<span class="string">"{} {} → {}ms"</span>, httpReq.getMethod(), httpReq.getRequestURI(), elapsed);
     }
 }
 
-<span class="annotation">@WebServlet</span>(<span class="string">"/logout"</span>)
-<span class="keyword">public class</span> <span class="class-name">LogoutServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
+<span class="comment">// Auth filter — short-circuits if token is missing, never calls chain.doFilter()</span>
+<span class="annotation">@WebFilter</span>(<span class="string">"/api/*"</span>)
+<span class="keyword">public class</span> <span class="class-name">AuthFilter</span> <span class="keyword">implements</span> <span class="class-name">Filter</span> {
 
     <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> request,
-                             <span class="class-name">HttpServletResponse</span> response)
-            <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
+    <span class="keyword">public void</span> <span class="function">doFilter</span>(<span class="class-name">ServletRequest</span> req, <span class="class-name">ServletResponse</span> res,
+                          <span class="class-name">FilterChain</span> chain)
+            <span class="keyword">throws</span> <span class="class-name">IOException</span>, <span class="class-name">ServletException</span> {
 
-        <span class="comment">// Invalidate session</span>
-        <span class="class-name">HttpSession</span> session = request.getSession(<span class="keyword">false</span>);
-        <span class="keyword">if</span> (session != <span class="keyword">null</span>) {
-            session.invalidate();
+        <span class="class-name">String</span> auth = ((<span class="class-name">HttpServletRequest</span>) req).getHeader(<span class="string">"Authorization"</span>);
+        <span class="keyword">if</span> (auth == <span class="keyword">null</span> || !auth.startsWith(<span class="string">"Bearer "</span>)) {
+            ((<span class="class-name">HttpServletResponse</span>) res).sendError(<span class="class-name">HttpServletResponse</span>.SC_UNAUTHORIZED);
+            <span class="keyword">return</span>;  <span class="comment">// short-circuit — servlet never runs</span>
         }
-
-        response.sendRedirect(<span class="string">"login.jsp"</span>);
+        chain.doFilter(req, res);
     }
 }</code></pre>
 
-            <h3>Accessing Session in JSP</h3>
-            <pre><code><span class="comment">&lt;!-- dashboard.jsp --&gt;</span>
-<span class="jsp">&lt;%
-    String username = (String) session.getAttribute("username");
-    Boolean loggedIn = (Boolean) session.getAttribute("loggedIn");
+                <div class="info-box tip">
+                    <div class="info-box-title">This is exactly how Spring Security's filter chain works</div>
+                    <p>Spring Security's entire mechanism — covered in
+                        <a href="../spring/security.html">Spring Security</a> — is a chain
+                        of <code>Filter</code> implementations registered in front of
+                        <code>DispatcherServlet</code>. <code>DelegatingFilterProxy</code>
+                        bridges the Servlet API and the Spring container so that Spring-managed
+                        beans can participate in the filter chain. Understanding raw
+                        <code>Filter</code> here makes the Security filter chain architecture
+                        immediately readable.</p>
+                </div>
+            </section>
 
-    if (loggedIn == null || !loggedIn) {
-        response.sendRedirect("login.jsp");
-        return;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — JSP: HISTORICAL CONTEXT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JSP — Historical Context, Not a Recommendation</h2>
+                <p><strong>JSP (JavaServer Pages)</strong> allowed embedding Java code
+                    directly inside HTML, so the server could render dynamic content without
+                    routing through a servlet for every page. It was the dominant server-side
+                    rendering technology in Java from the late 1990s through the mid-2000s.</p>
+
+                <pre><code><span class="comment">&lt;!-- users.jsp — a realistic example showing WHY JSP fell out of favour --&gt;</span>
+&lt;%@ page import="java.util.List" %&gt;
+&lt;%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %&gt;
+
+&lt;html&gt;&lt;body&gt;
+&lt;h1&gt;Users&lt;/h1&gt;
+
+&lt;%-- Scriptlet (avoid) — mixes Java and HTML, untestable, unmaintainable --%&gt;
+&lt;%
+    List users = (List) request.getAttribute("users");
+    for (Object u : users) {
+        out.println("&lt;p&gt;" + u + "&lt;/p&gt;");  // XSS risk: no escaping
     }
-%&gt;</span>
+%&gt;
 
-<span class="tag">&lt;h1&gt;</span>Welcome, <span class="jsp">&lt;%= username %&gt;</span>!<span class="tag">&lt;/h1&gt;</span>
-<span class="tag">&lt;a</span> <span class="attribute">href</span>=<span class="string">"logout"</span><span class="tag">&gt;</span>Logout<span class="tag">&lt;/a&gt;</span></code></pre>
-        </section>
+&lt;%-- JSTL (the "clean" JSP way) — still JSP, but at least no scriptlets --%&gt;
+&lt;c:forEach var="user" items="${users}"&gt;
+    &lt;p&gt;&lt;c:out value="${user.name}"/&gt;&lt;/p&gt;  &lt;%-- c:out escapes HTML --%&gt;
+&lt;/c:forEach&gt;
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+&lt;/body&gt;&lt;/html&gt;</code></pre>
 
-            <div class="best-practices">
-                <h3>✅ DO:</h3>
-                <ul>
-                    <li><strong>Use MVC pattern</strong> - Servlet (Controller) + JSP (View)</li>
-                    <li><strong>Put JSP in WEB-INF</strong> - Prevents direct access, must go through servlet</li>
-                    <li><strong>Use JSTL and EL</strong> - Avoid Java code in JSP</li>
-                    <li><strong>Validate input</strong> - Check all user input for security</li>
-                    <li><strong>Use POST for forms</strong> - Especially for sensitive data</li>
-                    <li><strong>Manage sessions properly</strong> - Set timeouts, invalidate on logout</li>
-                    <li><strong>Use forward() for internal</strong> - Stays on server, efficient</li>
-                    <li><strong>Use sendRedirect() for external</strong> - Goes to client, new request</li>
-                </ul>
+                <div class="info-box important">
+                    <div class="info-box-title">Why JSP lost — and what replaced it</div>
+                    <p>JSP's fundamental problem is mixing concerns that don't belong together:
+                        presentation logic (HTML structure) and Java code in the same file.
+                        This made pages hard to test (no unit testing of JSP), hard to maintain
+                        (designers couldn't touch files with Java in them), and prone to XSS
+                        when developers forgot to escape output. Three things killed it in
+                        practice:</p>
+                    <ul>
+                        <li><strong>Thymeleaf</strong> (Spring's default today) — pure HTML
+                            templates that work in a browser directly, no Java code in the
+                            template, natural templating syntax with <code>th:*</code>
+                            attributes</li>
+                        <li><strong>Single-Page Applications</strong> (React, Vue, Angular) —
+                            the server returns JSON, the browser renders HTML entirely
+                            client-side; JSP becomes irrelevant</li>
+                        <li><strong>Freemarker / Mustache</strong> — logic-less templating
+                            that enforces separation of concerns at the language level</li>
+                    </ul>
+                    <p>You will encounter JSP in legacy systems. You should understand how it
+                        works, recognise the XSS risks of raw scriptlets, and know how to
+                        migrate it — not write new JSP in 2025.</p>
+                </div>
 
-                <h3>❌ DON'T:</h3>
-                <ul>
-                    <li><strong>Don't put business logic in JSP</strong> - Keep it in servlets/services</li>
-                    <li><strong>Don't use scriptlets</strong> - Use JSTL and EL instead</li>
-                    <li><strong>Don't store sensitive data in session</strong> - Minimize stored data</li>
-                    <li><strong>Don't forget to close resources</strong> - Use try-with-resources</li>
-                    <li><strong>Don't ignore XSS attacks</strong> - Escape user input</li>
-                    <li><strong>Don't use GET for sensitive operations</strong> - Use POST instead</li>
-                </ul>
-            </div>
-        </section>
+                <h3>The MVC Pattern with Servlets + JSP</h3>
+                <pre><code><span class="comment">/*
+ * Classic Servlet + JSP MVC — the pattern that Spring MVC formalized:
+ *
+ *  Browser → GET /users
+ *                │
+ *                ▼
+ *  UserListServlet.doGet()          ← Controller: fetch data, put in request scope
+ *      userService.findAll()
+ *      request.setAttribute("users", users)
+ *      request.getRequestDispatcher("/WEB-INF/views/users.jsp").forward(req, res)
+ *                │
+ *                ▼
+ *  users.jsp                        ← View: render the data, no business logic
+ *      ${users} — display the list
+ *
+ * Spring MVC is exactly this pattern, with DispatcherServlet as the single
+ * front controller instead of one servlet per URL, and Thymeleaf instead of JSP.
+ */</span>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Servlets</strong> are Java classes that handle HTTP requests/responses</li>
-                    <li><strong>@WebServlet</strong> annotation maps URLs to servlets</li>
-                    <li><strong>doGet()</strong> handles GET requests, <strong>doPost()</strong> handles POST requests</li>
-                    <li><strong>Lifecycle:</strong> init() → service() (doGet/doPost) → destroy()</li>
-                    <li><strong>JSP</strong> embeds Java code in HTML for easier view creation</li>
-                    <li><strong>JSP Syntax:</strong> &lt;% code %&gt;, &lt;%= expression %&gt;, &lt;%! declaration %&gt;</li>
-                    <li><strong>JSTL</strong> provides clean tags to avoid Java code in JSP</li>
-                    <li><strong>MVC Pattern:</strong> Servlet handles logic, JSP displays results</li>
-                    <li><strong>Sessions</strong> maintain user state across multiple requests</li>
-                    <li><strong>Modern alternative:</strong> Use JAX-RS for REST APIs instead of servlets</li>
-                </ul>
-            </div>
-        </section>
+<span class="annotation">@WebServlet</span>(<span class="string">"/users"</span>)
+<span class="keyword">public class</span> <span class="class-name">UserListServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="overview.html" class="related-link">Jakarta EE Overview</a>
-                <a href="jax-rs.html" class="related-link">JAX-RS (REST APIs)</a>
-                <a href="cdi.html" class="related-link">CDI (Dependency Injection)</a>
-            </div>
-        </section>
-    </main>
+    <span class="keyword">private</span> <span class="class-name">UserService</span> userService;  <span class="comment">// can't @Inject here without CDI — see CDI page</span>
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">init</span>() {
+        userService = <span class="keyword">new</span> <span class="class-name">UserService</span>();  <span class="comment">// manual wiring without a DI container</span>
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> res)
+            <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
+        req.setAttribute(<span class="string">"users"</span>, userService.findAll());
+        req.getRequestDispatcher(<span class="string">"/WEB-INF/views/users.jsp"</span>).forward(req, res);
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SESSION MANAGEMENT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Session Management</h2>
+                <p>HTTP is stateless — each request carries no memory of previous ones. The
+                    Servlet API's <code>HttpSession</code> is the container-managed mechanism
+                    for maintaining state across requests for the same user, backed by a session
+                    ID stored in a cookie (<code>JSESSIONID</code> by default).</p>
+
+                <pre><code><span class="annotation">@Override</span>
+<span class="keyword">protected void</span> <span class="function">doPost</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> res)
+        <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
+
+    <span class="keyword">if</span> (authenticate(req.getParameter(<span class="string">"username"</span>), req.getParameter(<span class="string">"password"</span>))) {
+        <span class="comment">// getSession(true) = create if absent; getSession(false) = return null if absent</span>
+        <span class="class-name">HttpSession</span> session = req.getSession(<span class="keyword">true</span>);
+        session.setAttribute(<span class="string">"username"</span>, req.getParameter(<span class="string">"username"</span>));
+        session.setMaxInactiveInterval(<span class="number">30</span> * <span class="number">60</span>);  <span class="comment">// 30 minutes; -1 = never expire</span>
+        res.sendRedirect(<span class="string">"/dashboard"</span>);           <span class="comment">// PRG pattern — prevents form resubmission</span>
+    } <span class="keyword">else</span> {
+        res.sendRedirect(<span class="string">"/login?error=invalid"</span>);
+    }
+}
+
+<span class="comment">// Logout — always invalidate, never just remove attributes</span>
+<span class="annotation">@Override</span>
+<span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> res)
+        <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
+
+    <span class="class-name">HttpSession</span> session = req.getSession(<span class="keyword">false</span>);  <span class="comment">// false = don't create if absent</span>
+    <span class="keyword">if</span> (session != <span class="keyword">null</span>) {
+        session.invalidate();  <span class="comment">// destroys the session — all attributes gone, ID invalidated</span>
+    }
+    res.sendRedirect(<span class="string">"/login"</span>);
+}</code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Sessions and stateless REST APIs don't mix</div>
+                    <p><code>HttpSession</code> is a server-side state store — it breaks
+                        horizontal scaling without sticky sessions or a shared session store
+                        (Redis, Hazelcast). This is precisely why REST APIs prefer stateless
+                        authentication (JWT bearer tokens) over session-based auth. The
+                        Spring Security page covers both approaches and explains exactly when
+                        to use each. Sessions remain appropriate for traditional server-rendered
+                        web applications; they are an anti-pattern in REST APIs.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — WEBSOCKET
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>WebSocket — Bidirectional Communication from the Servlet Container</h2>
+                <p>The WebSocket spec (<code>jakarta.websocket.*</code>) is part of the same
+                    Servlet container infrastructure. A WebSocket endpoint is deployed
+                    alongside servlets in the same WAR and managed by the same container —
+                    which is why it belongs in this section rather than a separate page.</p>
+
+                <pre><code><span class="keyword">import</span> jakarta.websocket.*;
+<span class="keyword">import</span> jakarta.websocket.server.ServerEndpoint;
+
+<span class="annotation">@ServerEndpoint</span>(<span class="string">"/ws/chat"</span>)  <span class="comment">// URL: ws://host/app/ws/chat</span>
+<span class="keyword">public class</span> <span class="class-name">ChatEndpoint</span> {
+
+    <span class="annotation">@OnOpen</span>
+    <span class="keyword">public void</span> <span class="function">onOpen</span>(<span class="class-name">Session</span> session) {
+        log.info(<span class="string">"Client connected: {}"</span>, session.getId());
+    }
+
+    <span class="annotation">@OnMessage</span>
+    <span class="keyword">public void</span> <span class="function">onMessage</span>(<span class="class-name">String</span> message, <span class="class-name">Session</span> session)
+            <span class="keyword">throws</span> <span class="class-name">IOException</span> {
+        <span class="comment">// Echo back to the same client</span>
+        session.getBasicRemote().sendText(<span class="string">"Echo: "</span> + message);
+    }
+
+    <span class="annotation">@OnError</span>
+    <span class="keyword">public void</span> <span class="function">onError</span>(<span class="class-name">Throwable</span> error, <span class="class-name">Session</span> session) {
+        log.error(<span class="string">"WebSocket error on session {}"</span>, session.getId(), error);
+    }
+
+    <span class="annotation">@OnClose</span>
+    <span class="keyword">public void</span> <span class="function">onClose</span>(<span class="class-name">Session</span> session, <span class="class-name">CloseReason</span> reason) {
+        log.info(<span class="string">"Connection closed: {} — {}"</span>, session.getId(), reason.getReasonPhrase());
+    }
+}</code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">WebSocket in Spring Boot uses the same @ServerEndpoint, differently wired</div>
+                    <p>Spring Boot supports <code>@ServerEndpoint</code> directly — just
+                        declare a <code>ServerEndpointExporter</code> bean to register
+                        Jakarta WebSocket endpoints with the embedded container. Spring also
+                        provides its own higher-level WebSocket + STOMP abstraction
+                        (<code>@MessageMapping</code>) for publish-subscribe messaging patterns.
+                        Both approaches ultimately use the same Servlet container WebSocket
+                        infrastructure covered here.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is a Servlet, and what is its relationship with Spring MVC?</strong><br>
+                    A Servlet is a Java class that receives an HTTP request and produces an
+                    HTTP response. Spring MVC's <code>DispatcherServlet</code> is itself a
+                    Servlet — it implements <code>HttpServlet</code> and is registered in a
+                    Servlet Container (Tomcat, Jetty). Every HTTP request in a Spring Boot
+                    application flows through <code>DispatcherServlet</code> before reaching
+                    any <code>@Controller</code> method.</p>
+
+                    <p><strong>Q: What is the difference between forward() and sendRedirect()?</strong><br>
+                    <code>forward()</code> transfers control to another server-side resource
+                    without the browser knowing — the URL in the address bar doesn't change,
+                    and the original request object is reused. <code>sendRedirect()</code>
+                    sends a 302 to the browser, which makes a brand-new GET request —
+                    the URL changes. The Post/Redirect/Get pattern uses
+                    <code>sendRedirect()</code> after a POST to prevent form resubmission on
+                    browser refresh.</p>
+
+                    <p><strong>Q: Why shouldn't servlets have mutable instance variables?</strong><br>
+                    The container creates one servlet instance and routes all concurrent
+                    requests to it across multiple threads simultaneously. A mutable instance
+                    variable is shared across all those threads without synchronisation —
+                    a race condition. Request-specific data must live in local variables inside
+                    the handler method, never in fields.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Where does a Servlet Filter run relative to DispatcherServlet, and why does that matter for Spring Security?</strong><br>
+                    A <code>Filter</code> runs at the Servlet Container level, before
+                    <code>DispatcherServlet</code> ever executes. Spring Security registers
+                    its entire security mechanism as a filter chain
+                    (<code>DelegatingFilterProxy</code> → <code>FilterChainProxy</code>)
+                    precisely because it needs to intercept requests before Spring's routing
+                    logic runs — so that unauthenticated requests never reach
+                    <code>DispatcherServlet</code> at all. A Spring
+                    <code>HandlerInterceptor</code>, by contrast, runs inside
+                    <code>DispatcherServlet</code>'s pipeline and can't prevent the request
+                    from reaching the dispatcher.</p>
+
+                    <p><strong>Q: Why is HttpSession an anti-pattern for REST APIs, and what's the correct alternative?</strong><br>
+                    <code>HttpSession</code> is server-side state — it exists on one JVM
+                    instance. Under horizontal scaling, a request hitting a different server
+                    finds no session unless you use sticky sessions (which defeats the purpose
+                    of load balancing) or a shared external session store (Redis, adding
+                    operational complexity). REST's statelessness constraint says each request
+                    must carry all the context the server needs — which is exactly what JWT
+                    bearer tokens provide: the user's identity and claims travel in the
+                    <code>Authorization</code> header on every request, no server-side
+                    state required.</p>
+
+                    <p><strong>Q: Why did JSP fall out of favour, and what replaced it?</strong><br>
+                    JSP mixed presentation (HTML) with Java code in the same file, making it
+                    untestable, unmaintainable for UI designers, and prone to XSS when
+                    developers forgot to escape output. Three things replaced it: Thymeleaf
+                    (pure HTML templates, no Java in the file), Single-Page Applications
+                    (server returns JSON, browser renders HTML — JSP irrelevant), and
+                    logic-less templating engines (Freemarker, Mustache) that enforce
+                    separation of concerns at the language level.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="overview.html" class="related-link"><span class="related-icon">🏢</span>Jakarta EE Overview</a>
+                    <a href="cdi.html" class="related-link"><span class="related-icon">💉</span>CDI (Dependency Injection)</a>
+                    <a href="jax-rs.html" class="related-link"><span class="related-icon">🌐</span>JAX-RS (REST APIs)</a>
+                    <a href="../spring/mvc.html" class="related-link"><span class="related-icon">🍃</span>Spring MVC Architecture</a>
+                    <a href="../spring/security.html" class="related-link"><span class="related-icon">🔒</span>Spring Security</a>
+                    <a href="../web-concepts/sessions-cookies.html" class="related-link"><span class="related-icon">🍪</span>Sessions &amp; Cookies</a>
+                    <a href="../web-concepts/http.html" class="related-link"><span class="related-icon">📡</span>HTTP Protocol &amp; Methods</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

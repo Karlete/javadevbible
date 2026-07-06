@@ -1,471 +1,529 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.ejb.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EJB (Enterprise JavaBeans) - JavaDev Bible</title>
+    <title>EJB — Enterprise JavaBeans - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / EJB
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#jakarta-ee" data-i18n="nav.jakarta">Jakarta EE</a> /
+                EJB
             </nav>
-            <h1>EJB (Enterprise JavaBeans)</h1>
-            <p class="topic-subtitle">Server-Side Components with Built-In Enterprise Features</p>
-            <a href="../../index.html" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.ejb.h1">EJB — Enterprise JavaBeans</h1>
+            <p class="topic-subtitle" data-i18n="topic.ejb.subtitle">What EJBs were, why Spring replaced them, what still survives in legacy systems, and how to recognise them when you encounter them</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What are EJBs?</h2>
-            <p><strong>Think of EJB like a premium hotel service:</strong></p>
-            <ul>
-                <li>🏨 Regular bean = Basic apartment (you handle everything)</li>
-                <li>🌟 EJB = 5-star hotel (concierge handles transactions, security, room service)</li>
-                <li>📦 You just focus on your business - the "hotel" handles the rest</li>
-            </ul>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>EJB (Enterprise JavaBeans)</strong> are server-side components that provide built-in support for transactions, security, concurrency, and more. They're CDI beans with superpowers!</p>
-                <p><strong>Modern EJB:</strong> Simplified with annotations (no more XML hell from EJB 2.x days!)</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>EJB vs CDI Bean</h3>
-            <pre><code><span class="comment">// CDI Bean - Basic functionality</span>
-<span class="annotation">@RequestScoped</span>
-<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-    <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">PaymentService</span> payment;
+        <main class="topic-content">
 
-    <span class="keyword">public void</span> <span class="function">placeOrder</span>(<span class="class-name">Order</span> order) {
-        <span class="comment">// You handle transactions manually</span>
-        payment.process(order);
-    }
-}
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS EJB AND WHY IT MATTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is EJB — and Why Does It Matter in 2025?</h2>
+                <p><strong>EJB (Enterprise JavaBeans)</strong> is a server-side component
+                    model that was the dominant way to build enterprise Java applications from
+                    roughly 1999 to 2010. An EJB is a CDI bean with additional container-
+                    managed services baked in: distributed transactions, declarative security,
+                    connection pooling, instance pooling, remote invocation, and scheduling —
+                    all without writing a line of infrastructure code.</p>
 
-<span class="comment">// EJB - Built-in features!</span>
-<span class="annotation">@Stateless</span>  <span class="comment">// EJB annotation</span>
-<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-    <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">PaymentService</span> payment;
+                <p>EJBs are not dead. They are dead <em>in new projects</em>. Banking
+                    systems, insurance platforms, government portals, and telecom backends
+                    built between 2000 and 2015 run on WildFly, Payara, and WebSphere serving
+                    millions of transactions daily — and they are full of EJBs. A senior Java
+                    developer entering one of those environments without knowing what
+                    <code>@Stateless</code>, <code>@TransactionAttribute</code>, or
+                    <code>@MessageDriven</code> mean is walking in blind.</p>
 
-    <span class="comment">// Automatic transaction! Commits on success, rolls back on exception</span>
-    <span class="keyword">public void</span> <span class="function">placeOrder</span>(<span class="class-name">Order</span> order) {
-        payment.process(order);
-    }
-}</code></pre>
-        </section>
+                <div class="info-box note">
+                    <div class="info-box-title">EJB vs Spring — the same problem, different answers</div>
+                    <table>
+                        <tr><th>Concern</th><th>EJB answer</th><th>Spring answer</th></tr>
+                        <tr>
+                            <td>Transactions</td>
+                            <td><code>@TransactionAttribute</code> on EJB methods</td>
+                            <td><code>@Transactional</code> on any Spring bean</td>
+                        </tr>
+                        <tr>
+                            <td>Security</td>
+                            <td><code>@RolesAllowed</code>, <code>@DenyAll</code></td>
+                            <td><code>@PreAuthorize</code> via Spring Security</td>
+                        </tr>
+                        <tr>
+                            <td>Async execution</td>
+                            <td><code>@Asynchronous</code> on EJB method</td>
+                            <td><code>@Async</code> on any Spring bean</td>
+                        </tr>
+                        <tr>
+                            <td>Scheduling</td>
+                            <td><code>@Schedule</code> on <code>@Singleton</code> EJB</td>
+                            <td><code>@Scheduled</code> on any Spring bean</td>
+                        </tr>
+                        <tr>
+                            <td>Distributed TX</td>
+                            <td>JTA, built-in to EJB container</td>
+                            <td>JTA via external config, or local TX only</td>
+                        </tr>
+                        <tr>
+                            <td>Requires</td>
+                            <td>Full Jakarta EE application server</td>
+                            <td>Spring Boot with embedded Tomcat</td>
+                        </tr>
+                    </table>
+                    <p>Spring won on simplicity and developer experience. EJB 3.0 (2006) and
+                        the shift to annotations made EJBs dramatically easier than EJB 2.x,
+                        but Spring had already won the mindshare. Today, EJB Lite (no remote,
+                        no JMS) is available in the Web Profile — it's not entirely gone,
+                        but no new project should start with it when Spring exists.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Types of EJBs</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE BRIEF HISTORY: WHY EJB 2.x WAS PAINFUL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Why EJB 2.x Was Painful — and Why EJB 3 Came Too Late</h2>
 
-            <h3>1. @Stateless - No Client State (Most Common)</h3>
-            <pre><code><span class="annotation">@Stateless</span>  <span class="comment">// Pool of interchangeable instances</span>
+                <pre><code><span class="comment">/*
+ * EJB 2.x (1999–2006) — what developers actually had to write:
+ *
+ * 1. A Remote interface (what remote callers see)
+ * 2. A Local interface (what local callers see)
+ * 3. A Home interface (factory for the bean)
+ * 4. The bean implementation class (extending EntityBean or SessionBean)
+ * 5. A deployment descriptor (ejb-jar.xml) — hundreds of lines of XML
+ * 6. Vendor-specific XML for each app server (jboss.xml, weblogic-ejb-jar.xml...)
+ *
+ * For a simple CRUD service: 5+ files, ~500 lines of boilerplate.
+ * For a domain with 20 entities: 100+ files before writing business logic.
+ *
+ * EJB 3.0 (2006) replaced all of this with:
+ */</span>
+
+<span class="annotation">@Stateless</span>  <span class="comment">// that's it. One annotation.</span>
 <span class="keyword">public class</span> <span class="class-name">ProductService</span> {
     <span class="annotation">@PersistenceContext</span>
     <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
 
-    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">findProduct</span>(<span class="class-name">Long</span> id) {
-        <span class="keyword">return</span> em.find(Product.<span class="keyword">class</span>, id);
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">find</span>(<span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, id);
     }
+}
 
-    <span class="keyword">public void</span> <span class="function">saveProduct</span>(<span class="class-name">Product</span> product) {
-        em.persist(product);
+<span class="comment">/*
+ * EJB 3 was genuinely good. The problem: Spring had already won.
+ * By 2006, most greenfield enterprise Java was Spring-based.
+ * EJB 3's elegance arrived at market too late to reclaim developers.
+ */</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SESSION BEANS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Session Bean Types — What You'll See in Legacy Code</h2>
+
+                <h3>@Stateless — the workhorse (most common)</h3>
+                <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="annotation">@PersistenceContext</span>
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">PaymentGateway</span> gateway;
+
+    <span class="comment">// Transaction starts automatically when this method is called.
+    // If it returns normally → COMMIT. If it throws RuntimeException → ROLLBACK.</span>
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">placeOrder</span>(<span class="class-name">Cart</span> cart, <span class="class-name">PaymentDetails</span> payment) {
+        <span class="class-name">Order</span> order = <span class="keyword">new</span> <span class="class-name">Order</span>(cart);
+        em.persist(order);                   <span class="comment">// persisted in the same transaction</span>
+        gateway.charge(payment, cart.total()); <span class="comment">// if this throws, order.persist() rolls back too</span>
+        <span class="keyword">return</span> order;
     }
-}</code></pre>
+}
 
-            <p><strong>Characteristics:</strong></p>
-            <ul>
-                <li>✅ No state stored between method calls</li>
-                <li>✅ Container pools instances (efficient)</li>
-                <li>✅ Any instance can handle any request</li>
-                <li>✅ Thread-safe (container manages concurrency)</li>
-                <li>✅ Automatic transaction management</li>
-                <li>✅ Use for: Services, repositories, business logic</li>
-            </ul>
+<span class="comment">/*
+ * The container maintains a POOL of @Stateless instances.
+ * Under load: pool grows. At rest: pool shrinks.
+ * No client holds a reference to a specific instance between calls.
+ * Equivalent to Spring's @Service (singleton by default, stateless by convention).
+ */</span></code></pre>
 
-            <h3>2. @Stateful - Maintains Client State</h3>
-            <pre><code><span class="annotation">@Stateful</span>  <span class="comment">// One instance per client</span>
+                <h3>@Stateful — one instance per client conversation</h3>
+                <pre><code><span class="annotation">@Stateful</span>
 <span class="keyword">public class</span> <span class="class-name">ShoppingCart</span> {
-    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-    <span class="keyword">private</span> <span class="keyword">double</span> total = <span class="number">0.0</span>;
 
-    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">Product</span> product) {
-        items.add(product);
-        total += product.getPrice();
+    <span class="keyword">private final</span> <span class="class-name">List</span>&lt;<span class="class-name">CartItem</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="keyword">public void</span> <span class="function">add</span>(<span class="class-name">Product</span> product, <span class="keyword">int</span> qty) {
+        items.add(<span class="keyword">new</span> <span class="class-name">CartItem</span>(product, qty));
     }
 
-    <span class="keyword">public void</span> <span class="function">removeItem</span>(<span class="class-name">Product</span> product) {
-        items.remove(product);
-        total -= product.getPrice();
+    <span class="keyword">public</span> <span class="class-name">BigDecimal</span> <span class="function">total</span>() {
+        <span class="keyword">return</span> items.stream()
+            .map(<span class="class-name">CartItem</span>::subtotal)
+            .reduce(<span class="class-name">BigDecimal</span>.ZERO, <span class="class-name">BigDecimal</span>::add);
     }
 
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">getItems</span>() {
-        <span class="keyword">return</span> items;
+    <span class="annotation">@Remove</span>  <span class="comment">// client calls this to signal "I'm done, destroy this bean"</span>
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">checkout</span>(<span class="class-name">PaymentDetails</span> payment) {
+        <span class="comment">// final order processing</span>
+        <span class="keyword">return</span> orderService.placeOrder(items, payment);
     }
 
-    <span class="keyword">public</span> <span class="keyword">double</span> <span class="function">getTotal</span>() {
-        <span class="keyword">return</span> total;
-    }
-
-    <span class="annotation">@Remove</span>  <span class="comment">// Call this to destroy the bean</span>
-    <span class="keyword">public void</span> <span class="function">checkout</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Checkout complete. Cart destroyed."</span>);
+    <span class="annotation">@PreDestroy</span>
+    <span class="keyword">public void</span> <span class="function">cleanup</span>() {
+        <span class="comment">// called by container after @Remove or on session timeout</span>
     }
 }</code></pre>
 
-            <p><strong>Characteristics:</strong></p>
-            <ul>
-                <li>✅ Maintains state across method calls</li>
-                <li>✅ One instance dedicated to one client</li>
-                <li>✅ Can be passivated to disk if idle (saves memory)</li>
-                <li>✅ Use @Remove to destroy when done</li>
-                <li>✅ Use for: Shopping carts, wizards, conversational flows</li>
-            </ul>
+                <div class="info-box warning">
+                    <div class="info-box-title">@Stateful is the EJB type most likely to cause memory problems in legacy code</div>
+                    <p>Each client reference holds a dedicated instance. If clients don't call
+                        the <code>@Remove</code> method (because they crash, navigate away, or
+                        the developer simply forgot), the container accumulates unreachable
+                        <code>@Stateful</code> instances until the session timeout fires —
+                        typically 30 minutes. Under moderate load with a generous timeout,
+                        this is a heap pressure issue that manifests as a slow memory leak.
+                        When reading legacy code, look for <code>@Stateful</code> beans without
+                        a corresponding <code>@Remove</code> call on every exit path.</p>
+                </div>
 
-            <h3>3. @Singleton - One Instance for All (Shared)</h3>
-            <pre><code><span class="annotation">@Singleton</span>  <span class="comment">// Only ONE instance in entire application</span>
-<span class="annotation">@Startup</span>   <span class="comment">// Initialize at application startup</span>
-<span class="keyword">public class</span> <span class="class-name">CacheManager</span> {
-    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; cache = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
+                <h3>@Singleton — one shared instance with controlled concurrency</h3>
+                <pre><code><span class="annotation">@Singleton</span>
+<span class="annotation">@Startup</span>   <span class="comment">// eagerly initialized at deployment, not on first access</span>
+<span class="keyword">public class</span> <span class="class-name">AppConfigCache</span> {
+
+    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">String</span>&gt; config;
 
     <span class="annotation">@PostConstruct</span>
     <span class="keyword">public void</span> <span class="function">init</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Loading cache at startup..."</span>);
-        <span class="comment">// Load data</span>
+        config = loadFromDatabase();  <span class="comment">// runs once at startup</span>
     }
 
-    <span class="annotation">@Lock</span>(LockType.READ)  <span class="comment">// Multiple threads can read</span>
-    <span class="keyword">public</span> <span class="class-name">Object</span> <span class="function">get</span>(<span class="class-name">String</span> key) {
-        <span class="keyword">return</span> cache.get(key);
+    <span class="comment">// @Lock(LockType.READ) — multiple threads can call simultaneously (default for reads)</span>
+    <span class="annotation">@Lock</span>(<span class="class-name">LockType</span>.READ)
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">get</span>(<span class="class-name">String</span> key) {
+        <span class="keyword">return</span> config.get(key);
     }
 
-    <span class="annotation">@Lock</span>(LockType.WRITE)  <span class="comment">// Only one thread can write</span>
-    <span class="keyword">public void</span> <span class="function">put</span>(<span class="class-name">String</span> key, <span class="class-name">Object</span> value) {
-        cache.put(key, value);
-    }
-}</code></pre>
-
-            <p><strong>Characteristics:</strong></p>
-            <ul>
-                <li>✅ Single instance shared by all clients</li>
-                <li>✅ Can be eagerly initialized with @Startup</li>
-                <li>✅ Built-in concurrency control with @Lock</li>
-                <li>✅ Use for: Caches, configuration, app-wide state</li>
-            </ul>
-
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Instances</th>
-                        <th>State</th>
-                        <th>Use Case</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>@Stateless</strong></td>
-                        <td>Pool (many)</td>
-                        <td>No state</td>
-                        <td>Services, repositories</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@Stateful</strong></td>
-                        <td>One per client</td>
-                        <td>Maintains state</td>
-                        <td>Shopping carts, wizards</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@Singleton</strong></td>
-                        <td>One (shared)</td>
-                        <td>Shared state</td>
-                        <td>Caches, config</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2>Transaction Management</h2>
-            <p><strong>The killer feature of EJBs!</strong></p>
-
-            <h3>Automatic Transactions (Default)</h3>
-            <pre><code><span class="annotation">@Stateless</span>
-<span class="keyword">public class</span> <span class="class-name">BankService</span> {
-    <span class="annotation">@PersistenceContext</span>
-    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
-
-    <span class="comment">// Automatic transaction!</span>
-    <span class="comment">// If method completes: COMMIT</span>
-    <span class="comment">// If exception thrown: ROLLBACK</span>
-    <span class="keyword">public void</span> <span class="function">transfer</span>(<span class="class-name">Long</span> fromId, <span class="class-name">Long</span> toId, <span class="keyword">double</span> amount) {
-        <span class="class-name">Account</span> from = em.find(Account.<span class="keyword">class</span>, fromId);
-        <span class="class-name">Account</span> to = em.find(Account.<span class="keyword">class</span>, toId);
-
-        from.withdraw(amount);  <span class="comment">// Subtract from account</span>
-        to.deposit(amount);     <span class="comment">// Add to account</span>
-
-        <span class="comment">// Both updates happen together or not at all!</span>
-        <span class="keyword">if</span> (from.getBalance() < <span class="number">0</span>) {
-            <span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(<span class="string">"Insufficient funds"</span>);
-            <span class="comment">// Exception = automatic ROLLBACK!</span>
-        }
-    }
-}</code></pre>
-
-            <h3>Transaction Attributes</h3>
-            <pre><code><span class="annotation">@Stateless</span>
-<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-
-    <span class="comment">// REQUIRED (default): Use existing transaction or create new one</span>
-    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRED)
-    <span class="keyword">public void</span> <span class="function">placeOrder</span>(<span class="class-name">Order</span> order) {
-        <span class="comment">// Part of a transaction</span>
-    }
-
-    <span class="comment">// REQUIRES_NEW: Always create a new transaction</span>
-    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRES_NEW)
-    <span class="keyword">public void</span> <span class="function">logActivity</span>(<span class="class-name">String</span> message) {
-        <span class="comment">// Separate transaction - commits even if parent fails</span>
-    }
-
-    <span class="comment">// NOT_SUPPORTED: Run without transaction</span>
-    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.NOT_SUPPORTED)
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">searchOrders</span>(<span class="class-name">String</span> query) {
-        <span class="comment">// No transaction needed for read-only</span>
-        <span class="keyword">return</span> <span class="keyword">null</span>;
-    }
-
-    <span class="comment">// MANDATORY: Must be called within a transaction</span>
-    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.MANDATORY)
-    <span class="keyword">public void</span> <span class="function">updateInventory</span>(<span class="class-name">Product</span> product) {
-        <span class="comment">// Throws exception if no transaction exists</span>
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Security with EJBs</h2>
-
-            <h3>Role-Based Access Control</h3>
-            <pre><code><span class="annotation">@Stateless</span>
-<span class="annotation">@DeclareRoles</span>({<span class="string">"ADMIN"</span>, <span class="string">"USER"</span>, <span class="string">"MANAGER"</span>})
-<span class="keyword">public class</span> <span class="class-name">ProductService</span> {
-
-    <span class="comment">// Only ADMINs can call this</span>
-    <span class="annotation">@RolesAllowed</span>(<span class="string">"ADMIN"</span>)
-    <span class="keyword">public void</span> <span class="function">deleteProduct</span>(<span class="class-name">Long</span> id) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Deleting product "</span> + id);
-    }
-
-    <span class="comment">// ADMIN or MANAGER can call this</span>
-    <span class="annotation">@RolesAllowed</span>({<span class="string">"ADMIN"</span>, <span class="string">"MANAGER"</span>})
-    <span class="keyword">public void</span> <span class="function">updatePrice</span>(<span class="class-name">Long</span> id, <span class="keyword">double</span> newPrice) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Updating price"</span>);
-    }
-
-    <span class="comment">// Anyone authenticated can call this</span>
-    <span class="annotation">@RolesAllowed</span>({<span class="string">"ADMIN"</span>, <span class="string">"USER"</span>, <span class="string">"MANAGER"</span>})
-    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="class-name">Long</span> id) {
-        <span class="keyword">return</span> <span class="keyword">null</span>;
-    }
-
-    <span class="comment">// No authentication required</span>
-    <span class="annotation">@PermitAll</span>
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">getAllProducts</span>() {
-        <span class="keyword">return</span> <span class="keyword">null</span>;
-    }
-
-    <span class="comment">// Nobody can call this (useful for internal methods)</span>
-    <span class="annotation">@DenyAll</span>
-    <span class="keyword">private void</span> <span class="function">internalMethod</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Internal only"</span>);
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Asynchronous Methods</h2>
-
-            <h3>Fire and Forget</h3>
-            <pre><code><span class="annotation">@Stateless</span>
-<span class="keyword">public class</span> <span class="class-name">EmailService</span> {
-
-    <span class="annotation">@Asynchronous</span>  <span class="comment">// Runs in separate thread</span>
-    <span class="keyword">public void</span> <span class="function">sendEmail</span>(<span class="class-name">String</span> to, <span class="class-name">String</span> subject, <span class="class-name">String</span> body) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Sending email to "</span> + to + <span class="string">"..."</span>);
-        <span class="comment">// Simulate slow email sending</span>
-        <span class="keyword">try</span> {
-            <span class="class-name">Thread</span>.sleep(<span class="number">3000</span>);
-            <span class="class-name">System</span>.out.println(<span class="string">"Email sent!"</span>);
-        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) {
-            e.printStackTrace();
-        }
+    <span class="comment">// @Lock(LockType.WRITE) — exclusive access, blocks all reads and writes</span>
+    <span class="annotation">@Lock</span>(<span class="class-name">LockType</span>.WRITE)
+    <span class="keyword">public void</span> <span class="function">refresh</span>() {
+        config = loadFromDatabase();
     }
 }
 
-<span class="comment">// Usage</span>
-<span class="annotation">@Inject</span>
-<span class="keyword">private</span> <span class="class-name">EmailService</span> emailService;
+<span class="comment">/*
+ * Spring equivalent: @Component + @ApplicationScope (CDI) or a Spring singleton bean
+ * with explicit synchronization or ReadWriteLock.
+ * @Singleton EJB gives you the read/write lock semantics declaratively.
+ */</span></code></pre>
+            </section>
 
-<span class="keyword">public void</span> <span class="function">registerUser</span>(<span class="class-name">User</span> user) {
-    <span class="comment">// Save user to database</span>
-    database.save(user);
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — TRANSACTION MANAGEMENT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Transaction Management — The Feature EJBs Did Best</h2>
+                <p>Declarative transaction management is the feature that made EJBs genuinely
+                    valuable — and it's the one Spring copied most directly. Every EJB method
+                    has a transaction attribute that controls how it participates in an existing
+                    transaction or creates a new one:</p>
 
-    <span class="comment">// Send email asynchronously (doesn't block!)</span>
-    emailService.sendEmail(user.getEmail(), <span class="string">"Welcome!"</span>, <span class="string">"Thanks for joining!"</span>);
+                <pre><code><span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">PaymentService</span> {
 
-    <span class="class-name">System</span>.out.println(<span class="string">"User registered! Email sending in background..."</span>);
-    <span class="comment">// Method returns immediately, email sent in background</span>
+    <span class="comment">// REQUIRED (default): join existing TX, or start a new one if none exists</span>
+    <span class="annotation">@TransactionAttribute</span>(<span class="class-name">TransactionAttributeType</span>.REQUIRED)
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">Order</span> order) { ... }
+
+    <span class="comment">// REQUIRES_NEW: always start a NEW transaction, suspend any existing one
+    // Use for audit logging that must commit even if the calling TX rolls back</span>
+    <span class="annotation">@TransactionAttribute</span>(<span class="class-name">TransactionAttributeType</span>.REQUIRES_NEW)
+    <span class="keyword">public void</span> <span class="function">logPaymentAttempt</span>(<span class="class-name">Order</span> order, <span class="class-name">String</span> result) { ... }
+
+    <span class="comment">// NOT_SUPPORTED: suspend any existing TX, run without one
+    // Use for operations that must NOT participate in a TX (some bulk reads)</span>
+    <span class="annotation">@TransactionAttribute</span>(<span class="class-name">TransactionAttributeType</span>.NOT_SUPPORTED)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">exportAll</span>() { ... }
+
+    <span class="comment">// MANDATORY: must be called within an existing TX, throws if none</span>
+    <span class="annotation">@TransactionAttribute</span>(<span class="class-name">TransactionAttributeType</span>.MANDATORY)
+    <span class="keyword">public void</span> <span class="function">deductInventory</span>(<span class="class-name">Order</span> order) { ... }
 }</code></pre>
 
-            <h3>With Return Value (Future)</h3>
-            <pre><code><span class="annotation">@Stateless</span>
+                <div class="info-box tip">
+                    <div class="info-box-title">Spring @Transactional has the same propagation types — same mental model</div>
+                    <p>Spring's <code>@Transactional(propagation = Propagation.REQUIRES_NEW)</code>
+                        maps directly to EJB's
+                        <code>@TransactionAttribute(REQUIRES_NEW)</code>. The vocabulary is
+                        different but the semantics are identical — Spring modelled its
+                        transaction abstraction on EJB's declarative model. If you understand
+                        one, you understand the other. The key advantage of Spring's version:
+                        it works on any Spring bean, not just EJBs.</p>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">The self-invocation trap — same in EJB and Spring</div>
+                    <p>Calling an EJB method from within the same class does not go through
+                        the container proxy — transaction and security annotations are silently
+                        ignored. This is identical to Spring's
+                        <code>@Transactional</code> self-invocation problem covered in
+                        <a href="../spring/data-jpa.html">Spring Data JPA</a>. In EJB legacy
+                        code, this is one of the most common bugs: a method annotated
+                        <code>REQUIRES_NEW</code> is called directly from another method in
+                        the same bean and doesn't actually start a new transaction because
+                        the call never went through the proxy.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — MESSAGE-DRIVEN BEANS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Message-Driven Beans — Async Processing via JMS</h2>
+                <p>A <strong>Message-Driven Bean (MDB)</strong> is an EJB that listens to a
+                    JMS queue or topic and processes messages asynchronously. It's the Jakarta
+                    EE answer to "I need to process work off the request thread without polling."
+                    In modern systems this role is filled by Kafka consumers or Spring's
+                    <code>@JmsListener</code> — but MDBs are widespread in legacy banking
+                    and payment systems.</p>
+
+                <pre><code><span class="keyword">import</span> jakarta.ejb.MessageDriven;
+<span class="keyword">import</span> jakarta.jms.*;
+
+<span class="annotation">@MessageDriven</span>(activationConfig = {
+    <span class="annotation">@ActivationConfigProperty</span>(propertyName = <span class="string">"destinationType"</span>,   propertyValue = <span class="string">"jakarta.jms.Queue"</span>),
+    <span class="annotation">@ActivationConfigProperty</span>(propertyName = <span class="string">"destinationLookup"</span>, propertyValue = <span class="string">"java:/jms/queue/OrderQueue"</span>),
+    <span class="annotation">@ActivationConfigProperty</span>(propertyName = <span class="string">"acknowledgeMode"</span>,   propertyValue = <span class="string">"Auto-acknowledge"</span>)
+})
+<span class="keyword">public class</span> <span class="class-name">OrderProcessingMDB</span> <span class="keyword">implements</span> <span class="class-name">MessageListener</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">OrderService</span> orderService;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">onMessage</span>(<span class="class-name">Message</span> message) {
+        <span class="keyword">try</span> {
+            <span class="class-name">TextMessage</span> textMsg = (<span class="class-name">TextMessage</span>) message;
+            <span class="class-name">Long</span> orderId = <span class="class-name">Long</span>.parseLong(textMsg.getText());
+            orderService.processOrder(orderId);
+            <span class="comment">// container auto-acknowledges on successful return</span>
+        } <span class="keyword">catch</span> (<span class="class-name">JMSException</span> e) {
+            <span class="keyword">throw new</span> <span class="class-name">RuntimeException</span>(<span class="string">"Failed to process message"</span>, e);
+            <span class="comment">// RuntimeException causes the container to NOT acknowledge → message redelivered</span>
+        }
+    }
+}</code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">MDB vs Spring @JmsListener — same model, different wiring</div>
+                    <p>Spring's <code>@JmsListener</code> is the direct replacement in
+                        Spring Boot projects: same concept (method called when a message
+                        arrives), same JMS integration, but configured through Spring's
+                        <code>JmsListenerContainerFactory</code> rather than the EJB
+                        container's activation config XML. The acknowledgement semantics
+                        are identical — successful return acknowledges, uncaught exception
+                        triggers redelivery (depending on the acknowledgement mode).</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SCHEDULING AND ASYNC
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Scheduling and Async — Still Useful Patterns</h2>
+
+                <pre><code><span class="comment">// @Schedule — declarative cron scheduling on @Singleton EJBs</span>
+<span class="annotation">@Singleton</span>
+<span class="keyword">public class</span> <span class="class-name">MaintenanceScheduler</span> {
+
+    <span class="annotation">@Schedule</span>(hour = <span class="string">"2"</span>, minute = <span class="string">"0"</span>, persistent = <span class="keyword">false</span>)
+    <span class="keyword">public void</span> <span class="function">dailyCleanup</span>() { ... }  <span class="comment">// every night at 02:00</span>
+
+    <span class="annotation">@Schedule</span>(minute = <span class="string">"*/15"</span>, hour = <span class="string">"*"</span>, persistent = <span class="keyword">false</span>)
+    <span class="keyword">public void</span> <span class="function">healthCheck</span>() { ... }   <span class="comment">// every 15 minutes</span>
+}
+<span class="comment">// Spring equivalent: @Scheduled(cron = "0 0 2 * * *") on any @Component</span>
+
+<span class="comment">// @Asynchronous — fire-and-forget or Future-based async</span>
+<span class="annotation">@Stateless</span>
 <span class="keyword">public class</span> <span class="class-name">ReportService</span> {
 
     <span class="annotation">@Asynchronous</span>
-    <span class="keyword">public</span> <span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt; <span class="function">generateReport</span>() {
-        <span class="comment">// Simulate long-running task</span>
-        <span class="keyword">try</span> {
-            <span class="class-name">Thread</span>.sleep(<span class="number">5000</span>);
-        } <span class="keyword">catch</span> (<span class="class-name">InterruptedException</span> e) { }
-
-        <span class="class-name">String</span> report = <span class="string">"Sales Report: $1,234,567"</span>;
-        <span class="keyword">return</span> <span class="keyword">new</span> <span class="class-name">AsyncResult</span>&lt;&gt;(report);
+    <span class="keyword">public</span> <span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt; <span class="function">generateReport</span>(<span class="class-name">Long</span> userId) {
+        <span class="class-name">String</span> report = buildExpensiveReport(userId);
+        <span class="keyword">return</span> <span class="keyword">new</span> <span class="class-name">AsyncResult</span>&lt;&gt;(report);  <span class="comment">// EJB wrapper, not java.util.concurrent</span>
     }
 }
 
-<span class="comment">// Usage</span>
-<span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt; futureReport = reportService.generateReport();
+<span class="comment">// Caller can block on the result or check completion</span>
+<span class="class-name">Future</span>&lt;<span class="class-name">String</span>&gt; future = reportService.generateReport(userId);
+<span class="comment">// ... do other work ...</span>
+<span class="class-name">String</span> report = future.get();  <span class="comment">// blocks until ready</span>
 
-<span class="class-name">System</span>.out.println(<span class="string">"Report generation started..."</span>);
+<span class="comment">// Spring equivalent: @Async returning CompletableFuture&lt;String&gt;</span></code></pre>
 
-<span class="comment">// Do other work while report generates</span>
-doOtherWork();
+                <div class="info-box note">
+                    <div class="info-box-title">persistent = false on @Schedule — what it means and why it matters</div>
+                    <p>By default, EJB timers are <strong>persistent</strong> — the container
+                        stores them in a database so they survive server restarts. A daily job
+                        that was supposed to run at 02:00 while the server was down will fire
+                        immediately on restart. For most maintenance tasks this is wrong
+                        behaviour: a catch-up cleanup run at 09:47 on Monday because the server
+                        was restarted causes data anomalies. Setting
+                        <code>persistent = false</code> makes the timer ephemeral — it's
+                        simply missed if the server is down, and resumes on the next scheduled
+                        occurrence. Always set explicitly.</p>
+                </div>
+            </section>
 
-<span class="comment">// Wait for result when needed</span>
-<span class="class-name">String</span> report = futureReport.get();  <span class="comment">// Blocks until ready</span>
-<span class="class-name">System</span>.out.println(report);</code></pre>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — WHEN TO USE EJB TODAY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>When to Use EJB Today — and When Absolutely Not</h2>
 
-        <section class="content-section">
-            <h2>Scheduled Tasks (Timers)</h2>
+                <table>
+                    <tr><th>Scenario</th><th>Use EJB?</th><th>Why</th></tr>
+                    <tr>
+                        <td>New Spring Boot project</td>
+                        <td>No</td>
+                        <td>Spring provides all the same features with less operational complexity and a much larger ecosystem</td>
+                    </tr>
+                    <tr>
+                        <td>New Quarkus project</td>
+                        <td>Partially</td>
+                        <td>Quarkus supports CDI fully and JAX-RS; EJB Lite is supported but CDI + MicroProfile is the idiomatic path</td>
+                    </tr>
+                    <tr>
+                        <td>Maintaining legacy WildFly / WebSphere app</td>
+                        <td>Yes — work within what's there</td>
+                        <td>Migrating a 500k-line EJB codebase to Spring is a multi-year project; understand the existing patterns</td>
+                    </tr>
+                    <tr>
+                        <td>Need distributed (XA) transactions across multiple databases</td>
+                        <td>EJB container JTA is still strong here</td>
+                        <td>Spring can do JTA too, but the EJB container's JTA integration is battle-tested in financial systems</td>
+                    </tr>
+                    <tr>
+                        <td>Government / regulated systems with Jakarta EE certification requirements</td>
+                        <td>Sometimes mandated</td>
+                        <td>Some procurement specs explicitly require a certified Jakarta EE server — Spring doesn't certify</td>
+                    </tr>
+                </table>
+            </section>
 
-            <h3>Cron-Style Scheduling</h3>
-            <pre><code><span class="annotation">@Singleton</span>
-<span class="keyword">public class</span> <span class="class-name">ScheduledTasks</span> {
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-    <span class="comment">// Run every day at 2:00 AM</span>
-    <span class="annotation">@Schedule</span>(hour = <span class="string">"2"</span>, minute = <span class="string">"0"</span>, persistent = <span class="keyword">false</span>)
-    <span class="keyword">public void</span> <span class="function">dailyCleanup</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Running daily cleanup at 2 AM..."</span>);
-    }
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is the difference between @Stateless, @Stateful, and @Singleton EJBs?</strong><br>
+                    <code>@Stateless</code>: the container pools multiple instances, any of
+                    which can handle any request — no state is maintained between calls.
+                    <code>@Stateful</code>: one instance per client, state is preserved across
+                    method calls until the client calls a <code>@Remove</code> method.
+                    <code>@Singleton</code>: one instance shared by all clients for the
+                    application's lifetime, with container-managed read/write locking
+                    via <code>@Lock</code>.</p>
 
-    <span class="comment">// Run every 30 minutes</span>
-    <span class="annotation">@Schedule</span>(minute = <span class="string">"*/30"</span>, hour = <span class="string">"*"</span>)
-    <span class="keyword">public void</span> <span class="function">checkSystemHealth</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Health check..."</span>);
-    }
+                    <p><strong>Q: What does @TransactionAttribute(REQUIRES_NEW) do?</strong><br>
+                    It forces the method to always start a brand-new transaction, suspending
+                    any existing transaction the caller may be running in. The new transaction
+                    commits or rolls back independently of the caller's transaction. Common
+                    use: audit logging that must persist even when the calling transaction
+                    rolls back.</p>
+                </div>
 
-    <span class="comment">// Run every Monday at 9 AM</span>
-    <span class="annotation">@Schedule</span>(dayOfWeek = <span class="string">"Mon"</span>, hour = <span class="string">"9"</span>, minute = <span class="string">"0"</span>)
-    <span class="keyword">public void</span> <span class="function">weeklyReport</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Generating weekly report..."</span>);
-    }
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Why did Spring replace EJB as the dominant enterprise Java framework, despite EJB 3 being a genuine improvement?</strong><br>
+                    EJB 3.0 (2006) eliminated most of the EJB 2.x pain — annotations replaced
+                    XML, POJOs replaced required interfaces, <code>@PersistenceContext</code>
+                    replaced manual JNDI lookups. The problem was timing: Spring had already
+                    achieved critical mass between 2003 and 2005, during the EJB 2.x dark age.
+                    Spring also offered a lighter operational footprint (no full app server
+                    required), easier unit testing (POJO-based, no container needed), and a
+                    broader abstraction surface (data access, web MVC, batch, security — all
+                    integrated). By the time EJB 3 was good, switching from it had higher
+                    switching costs than staying with Spring.</p>
 
-    <span class="comment">// Multiple schedules on same method</span>
-    <span class="annotation">@Schedules</span>({
-        <span class="annotation">@Schedule</span>(hour = <span class="string">"8"</span>, minute = <span class="string">"0"</span>),   <span class="comment">// 8 AM</span>
-        <span class="annotation">@Schedule</span>(hour = <span class="string">"12"</span>, minute = <span class="string">"0"</span>),  <span class="comment">// 12 PM</span>
-        <span class="annotation">@Schedule</span>(hour = <span class="string">"18"</span>, minute = <span class="string">"0"</span>)   <span class="comment">// 6 PM</span>
-    })
-    <span class="keyword">public void</span> <span class="function">syncData</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Syncing data three times daily..."</span>);
-    }
-}</code></pre>
+                    <p><strong>Q: What is the self-invocation trap in EJBs, and why does it also affect Spring @Transactional?</strong><br>
+                    EJB container services (transactions, security) are applied through a
+                    container-generated proxy. When a method inside the same EJB calls another
+                    method in the same class, the call bypasses the proxy entirely — it goes
+                    directly to <code>this</code>. The container's interceptors never run, so
+                    <code>@TransactionAttribute</code> and <code>@RolesAllowed</code> are
+                    silently ignored. Spring's <code>@Transactional</code> has the identical
+                    problem for the identical reason: Spring AOP also uses a proxy, and
+                    <code>this.someMethod()</code> bypasses it. The fix in both cases is to
+                    inject a reference to self via the container, or restructure to avoid
+                    self-calls across transactional boundaries.</p>
 
-            <h3>Programmatic Timers</h3>
-            <pre><code><span class="annotation">@Singleton</span>
-<span class="keyword">public class</span> <span class="class-name">DynamicTimers</span> {
-    <span class="annotation">@Resource</span>
-    <span class="keyword">private</span> <span class="class-name">TimerService</span> timerService;
+                    <p><strong>Q: What is persistent = false on @Schedule, and what happens when you omit it?</strong><br>
+                    Without <code>persistent = false</code>, the EJB container persists timer
+                    metadata to a database. On server restart, any timers that should have
+                    fired while the server was down are fired immediately on startup —
+                    regardless of what time it is. For a 02:00 nightly cleanup this means
+                    it runs at 09:47 Monday morning after a weekend maintenance restart,
+                    potentially conflicting with live business operations. Setting
+                    <code>persistent = false</code> makes the timer ephemeral — missed
+                    firings are simply skipped.</p>
+                </div>
+            </section>
 
-    <span class="keyword">public void</span> <span class="function">scheduleTask</span>(<span class="keyword">long</span> delayMs) {
-        <span class="comment">// Create a timer that fires once after delay</span>
-        timerService.createSingleActionTimer(delayMs, <span class="keyword">new</span> <span class="class-name">TimerConfig</span>());
-    }
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="cdi.html" class="related-link"><span class="related-icon">💉</span>CDI (Dependency Injection)</a>
+                    <a href="transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions &amp; JTA</a>
+                    <a href="jpa.html" class="related-link"><span class="related-icon">💾</span>JPA (Java Persistence API)</a>
+                    <a href="overview.html" class="related-link"><span class="related-icon">🏢</span>Jakarta EE Overview</a>
+                    <a href="../spring/core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
+                    <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">🍃</span>Spring Data JPA</a>
+                </div>
+            </section>
 
-    <span class="annotation">@Timeout</span>  <span class="comment">// Called when timer fires</span>
-    <span class="keyword">public void</span> <span class="function">handleTimeout</span>(<span class="class-name">Timer</span> timer) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Timer fired!"</span>);
-    }
-}</code></pre>
-        </section>
+        </main>
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
-
-            <div class="best-practices">
-                <h3>✅ DO:</h3>
-                <ul>
-                    <li><strong>Use @Stateless for most services</strong> - Default choice</li>
-                    <li><strong>Use @Stateful sparingly</strong> - Memory intensive</li>
-                    <li><strong>Let container manage transactions</strong> - Don't use manual begin/commit</li>
-                    <li><strong>Use @Asynchronous for long tasks</strong> - Keep UI responsive</li>
-                    <li><strong>Leverage security annotations</strong> - Cleaner than manual checks</li>
-                    <li><strong>Use @Schedule for background jobs</strong> - Built-in scheduler</li>
-                    <li><strong>Call @Remove on @Stateful beans</strong> - Clean up resources</li>
-                </ul>
-
-                <h3>❌ DON'T:</h3>
-                <ul>
-                    <li><strong>Don't use EJBs if CDI beans suffice</strong> - EJBs add overhead</li>
-                    <li><strong>Don't store heavy objects in @Stateful</strong> - Memory issues</li>
-                    <li><strong>Don't create threads manually</strong> - Use @Asynchronous instead</li>
-                    <li><strong>Don't catch RuntimeException in transactions</strong> - Prevents rollback</li>
-                    <li><strong>Don't call local methods directly</strong> - Transaction/security won't work</li>
-                    <li><strong>Don't make EJBs final</strong> - Container needs to create proxies</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>EJBs</strong> are CDI beans with built-in enterprise features</li>
-                    <li><strong>@Stateless:</strong> Pool of instances, no state (most common)</li>
-                    <li><strong>@Stateful:</strong> Maintains state per client</li>
-                    <li><strong>@Singleton:</strong> One instance shared by all</li>
-                    <li><strong>Automatic transactions:</strong> Commit on success, rollback on exception</li>
-                    <li><strong>Security:</strong> @RolesAllowed, @PermitAll, @DenyAll</li>
-                    <li><strong>Asynchronous:</strong> @Asynchronous for background tasks</li>
-                    <li><strong>Scheduling:</strong> @Schedule for cron-style timers</li>
-                    <li><strong>When to use:</strong> Need transactions, security, async, or timers</li>
-                    <li><strong>When not to use:</strong> Simple services (use CDI beans instead)</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="cdi.html" class="related-link">CDI (Dependency Injection)</a>
-                <a href="transactions.html" class="related-link">Transactions</a>
-                <a href="jpa.html" class="related-link">JPA (Persistence)</a>
-            </div>
-        </section>
-    </main>
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

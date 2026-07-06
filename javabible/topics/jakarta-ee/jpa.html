@@ -1,464 +1,747 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.jpa.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPA (Java Persistence API) - JavaDev Bible</title>
+    <title>JPA — Java Persistence API - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / JPA
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#jakarta-ee" data-i18n="nav.jakarta">Jakarta EE</a> /
+                JPA
             </nav>
-            <h1>JPA (Java Persistence API)</h1>
-            <p class="topic-subtitle">Object-Relational Mapping for Database Access</p>
-            <a href="../../index.html" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.jpa.h1">JPA — Java Persistence API</h1>
+            <p class="topic-subtitle" data-i18n="topic.jpa.subtitle">The specification behind Hibernate and Spring Data JPA — entity mapping, the persistence context, N+1 queries, Open Session in View, and why an entity should never be a record</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is JPA?</h2>
-            <p><strong>Think of JPA like a translator between Java and databases:</strong></p>
-            <ul>
-                <li>🗣️ You speak Java (objects, methods)</li>
-                <li>🗄️ Database speaks SQL (tables, rows)</li>
-                <li>🔄 JPA translates between them automatically</li>
-                <li>✨ You work with objects, JPA handles SQL</li>
-            </ul>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>JPA (Java Persistence API)</strong> is a specification for mapping Java objects to database tables. It's an ORM (Object-Relational Mapping) framework that eliminates most SQL code.</p>
-                <p><strong>Popular implementations:</strong> Hibernate, EclipseLink, OpenJPA</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>Without JPA (Manual SQL)</h3>
-            <pre><code><span class="comment">// Lots of boilerplate code!</span>
-<span class="class-name">Connection</span> conn = DriverManager.getConnection(url);
-<span class="class-name">PreparedStatement</span> stmt = conn.prepareStatement(<span class="string">"SELECT * FROM users WHERE id = ?"</span>);
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS JPA AND WHY IT MATTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is JPA — and Why Does It Matter?</h2>
+                <p><strong>JPA (Jakarta Persistence API, formerly Java Persistence API)</strong>
+                    is a <em>specification</em> — a set of interfaces and annotations in
+                    <code>jakarta.persistence.*</code> with no working implementation behind
+                    them. It standardizes how a Java object graph maps to relational database
+                    tables (Object-Relational Mapping) and defines a query language, JPQL, that
+                    operates on entities instead of table rows. JPA on its own does not execute
+                    a single SQL statement — it needs a <strong>provider</strong> that
+                    implements the spec. Hibernate is the dominant provider; EclipseLink and
+                    OpenJPA are the others still in active use.</p>
+
+                <p>Before JPA (2006), every ORM vendor had its own proprietary API — Hibernate
+                    2.x had one API, TopLink had another. Switching providers meant rewriting
+                    data access code. JPA fixed that by giving providers a common contract to
+                    implement, the same way JDBC gave database vendors a common contract for
+                    drivers.</p>
+
+                <div style="display:flex; gap:1rem; align-items:stretch; margin:1rem 0;">
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+                        <div style="background:var(--color-header-bg, #1a3a4a); color:#fff; font-weight:600; padding:0.6rem 1rem; border-radius:6px 6px 0 0; font-size:0.9rem;">Without JPA (raw JDBC)</div>
+<pre style="margin:0; border-radius:0 0 6px 6px; flex:1;"><code><span class="class-name">Connection</span> conn = DriverManager.getConnection(url);
+<span class="class-name">PreparedStatement</span> stmt = conn.prepareStatement(
+    <span class="string">"SELECT * FROM users WHERE id = ?"</span>);
 stmt.setLong(<span class="number">1</span>, userId);
 <span class="class-name">ResultSet</span> rs = stmt.executeQuery();
-
 <span class="class-name">User</span> user = <span class="keyword">null</span>;
 <span class="keyword">if</span> (rs.next()) {
     user = <span class="keyword">new</span> <span class="class-name">User</span>();
     user.setId(rs.getLong(<span class="string">"id"</span>));
     user.setName(rs.getString(<span class="string">"name"</span>));
-    user.setEmail(rs.getString(<span class="string">"email"</span>));
 }
-rs.close();
-stmt.close();
-conn.close();</code></pre>
+rs.close(); stmt.close(); conn.close();</code></pre>
+                    </div>
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+                        <div style="background:var(--color-header-bg, #1a3a4a); color:#fff; font-weight:600; padding:0.6rem 1rem; border-radius:6px 6px 0 0; font-size:0.9rem;">With JPA</div>
+<pre style="margin:0; border-radius:0 0 6px 6px; flex:1;"><code><span class="class-name">User</span> user = em.find(User.<span class="keyword">class</span>, userId);
+<span class="comment">// mapping, connection handling, and</span>
+<span class="comment">// resource cleanup are gone</span></code></pre>
+                    </div>
+                </div>
 
-            <h3>With JPA (Simple!)</h3>
-            <pre><code><span class="comment">// One line!</span>
-<span class="class-name">User</span> user = entityManager.find(User.<span class="keyword">class</span>, userId);</code></pre>
-        </section>
+                <div class="info-box note">
+                    <div class="info-box-title">JPA is a specification, not a library you can run</div>
+                    <p>When you write <code>@Entity</code> or call
+                        <code>EntityManager.persist()</code>, you are calling into an
+                        interface. At runtime, a provider (almost always Hibernate) supplies
+                        the actual implementation: it generates the SQL, manages a first-level
+                        cache, tracks dirty state, and talks to the JDBC driver. Understanding
+                        this separation matters the first time you hit a Hibernate-specific
+                        feature (like <code>@DynamicUpdate</code> or Hibernate's second-level
+                        cache configuration) that isn't part of the JPA spec at all — knowing
+                        which layer you're in tells you where to look in the documentation.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Creating an Entity</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE THREE LAYERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Three Layers: JPA, Hibernate, and Spring Data JPA</h2>
+                <p>This is the single most common source of confusion for developers coming
+                    into Spring projects: three names get used almost interchangeably, but
+                    they are three distinct layers stacked on top of each other.</p>
 
-            <h3>Simple Entity</h3>
-            <pre><code><span class="keyword">import</span> jakarta.persistence.*;
+                <table>
+                    <tr><th>Layer</th><th>What it actually is</th><th>Responsibility</th><th>You'll recognize it by</th></tr>
+                    <tr>
+                        <td><strong>JPA</strong></td>
+                        <td>Specification (interfaces + annotations, zero logic)</td>
+                        <td>Defines <code>@Entity</code>, <code>@Id</code>, the <code>EntityManager</code> contract, and the JPQL grammar</td>
+                        <td><code>jakarta.persistence.*</code> imports</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hibernate</strong></td>
+                        <td>A JPA provider — the concrete implementation doing the work</td>
+                        <td>Generates SQL, manages the first-level cache and dirty checking, executes queries against JDBC</td>
+                        <td><code>org.hibernate.*</code> imports, <code>hibernate.hbm2ddl.auto</code> config</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Spring Data JPA</strong></td>
+                        <td>An abstraction <em>on top of</em> a JPA provider</td>
+                        <td>Generates repository implementations from interface method names, adds paging/sorting, wraps <code>EntityManager</code> calls in boilerplate you never see</td>
+                        <td><code>JpaRepository&lt;User, Long&gt;</code>, <code>@Query</code></td>
+                    </tr>
+                </table>
 
-<span class="annotation">@Entity</span>  <span class="comment">// Maps to database table</span>
-<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)  <span class="comment">// Optional: specify table name</span>
+                <p>Spring Data JPA does not replace Hibernate — it needs a JPA provider
+                    underneath it to function, and that provider is Hibernate by default in
+                    every Spring Boot starter. When <code>UserRepository extends
+                    JpaRepository&lt;User, Long&gt;</code> generates a working implementation
+                    from nothing but a method signature, it is Spring Data JPA parsing that
+                    method name, building a JPQL query, and delegating execution to the
+                    underlying <code>EntityManager</code> — which is, in turn, backed by
+                    Hibernate. Everything covered on this page is the middle and bottom
+                    layers: pure JPA and the concepts Hibernate implements underneath it. See
+                    <a href="../spring/data-jpa.html">Spring Data JPA</a> for the repository
+                    abstraction layer on top.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — ENTITIES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Entities — Mapping Java Objects to Tables</h2>
+                <p>An entity is a plain Java class annotated with <code>@Entity</code> that
+                    represents a row in a table. JPA imposes a small set of hard requirements
+                    on the class, and violating any of them either fails at startup or fails
+                    silently at runtime in ways that are painful to debug.</p>
+
+                <pre><code><span class="keyword">import</span> jakarta.persistence.*;
+
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)
 <span class="keyword">public class</span> <span class="class-name">User</span> {
 
-    <span class="annotation">@Id</span>  <span class="comment">// Primary key</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)  <span class="comment">// Auto-increment</span>
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
     <span class="annotation">@Column</span>(name = <span class="string">"user_name"</span>, length = <span class="number">50</span>, nullable = <span class="keyword">false</span>)
     <span class="keyword">private</span> <span class="class-name">String</span> username;
 
-    <span class="annotation">@Column</span>(unique = <span class="keyword">true</span>)
+    <span class="annotation">@Column</span>(unique = <span class="keyword">true</span>, nullable = <span class="keyword">false</span>)
     <span class="keyword">private</span> <span class="class-name">String</span> email;
 
-    <span class="keyword">private int</span> age;  <span class="comment">// Maps to "age" column automatically</span>
+    <span class="annotation">@Column</span>(name = <span class="string">"created_at"</span>, updatable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> <span class="class-name">Instant</span> createdAt;
 
-    <span class="annotation">@Temporal</span>(TemporalType.TIMESTAMP)
-    <span class="keyword">private</span> <span class="class-name">Date</span> createdAt;
-
-    <span class="comment">// Constructors</span>
-    <span class="keyword">public</span> <span class="function">User</span>() { }
+    <span class="comment">// Required by JPA: a no-arg constructor, package-private or higher.</span>
+    <span class="comment">// Hibernate uses it (via reflection) to instantiate entities before</span>
+    <span class="comment">// populating fields — you never call this yourself.</span>
+    <span class="keyword">protected</span> <span class="function">User</span>() { }
 
     <span class="keyword">public</span> <span class="function">User</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) {
         <span class="keyword">this</span>.username = username;
         <span class="keyword">this</span>.email = email;
-        <span class="keyword">this</span>.createdAt = <span class="keyword">new</span> <span class="class-name">Date</span>();
+        <span class="keyword">this</span>.createdAt = <span class="class-name">Instant</span>.now();
     }
 
-    <span class="comment">// Getters and setters</span>
     <span class="keyword">public</span> <span class="class-name">Long</span> <span class="function">getId</span>() { <span class="keyword">return</span> id; }
-    <span class="keyword">public void</span> <span class="function">setId</span>(<span class="class-name">Long</span> id) { <span class="keyword">this</span>.id = id; }
-
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getUsername</span>() { <span class="keyword">return</span> username; }
     <span class="keyword">public void</span> <span class="function">setUsername</span>(<span class="class-name">String</span> username) { <span class="keyword">this</span>.username = username; }
-
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getEmail</span>() { <span class="keyword">return</span> email; }
-    <span class="keyword">public void</span> <span class="function">setEmail</span>(<span class="class-name">String</span> email) { <span class="keyword">this</span>.email = email; }
 }</code></pre>
 
-            <p><strong>JPA creates this table automatically:</strong></p>
-            <pre><code><span class="keyword">CREATE TABLE</span> users (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_name VARCHAR(<span class="number">50</span>) NOT NULL,
-    email VARCHAR(<span class="number">255</span>) UNIQUE,
-    age INT,
-    created_at TIMESTAMP
-);</code></pre>
-        </section>
+                <div class="info-box warning">
+                    <div class="info-box-title">An entity must never be a <code>record</code></div>
+                    <p>This project's convention is <em>"always use record for DTOs"</em> — and
+                        that convention explicitly excludes entities. A <code>record</code> is
+                        implicitly <code>final</code>, has no no-arg constructor, and its
+                        fields are immutable. Hibernate needs to: (1) subclass the entity to
+                        create lazy-loading proxies for relationships — impossible on a
+                        <code>final</code> class; (2) instantiate the entity via a no-arg
+                        constructor and populate fields afterward via reflection — impossible
+                        without a no-arg constructor and mutable fields; (3) mutate fields
+                        directly for dirty checking on managed entities. Entities are mutable,
+                        non-final, framework-managed objects by design. Records are the right
+                        tool for query projections and API responses — never for
+                        <code>@Entity</code> classes.</p>
+                </div>
 
-        <section class="content-section">
-            <h2>EntityManager - Your Database Interface</h2>
+                <h3>Primary Key Generation Strategies</h3>
+                <table>
+                    <tr><th>Strategy</th><th>How it works</th><th>Trade-off</th></tr>
+                    <tr>
+                        <td><code>IDENTITY</code></td>
+                        <td>Delegates to the database's auto-increment column</td>
+                        <td>Simple and widely supported, but <strong>disables JDBC batch inserts</strong> in Hibernate — the ID must be known immediately after each insert, so each row is a separate round-trip</td>
+                    </tr>
+                    <tr>
+                        <td><code>SEQUENCE</code></td>
+                        <td>Uses a database sequence object, fetched in batches</td>
+                        <td>Preferred on PostgreSQL/Oracle — allows Hibernate to batch inserts because IDs are pre-allocated client-side</td>
+                    </tr>
+                    <tr>
+                        <td><code>TABLE</code></td>
+                        <td>Simulates a sequence using a dedicated table with row locking</td>
+                        <td>Portable across any database but the slowest option due to lock contention — avoid unless the database genuinely lacks sequence support</td>
+                    </tr>
+                    <tr>
+                        <td><code>AUTO</code></td>
+                        <td>Provider picks a strategy based on the dialect</td>
+                        <td>Convenient for prototypes; pin an explicit strategy before production so behavior doesn't silently change with a dialect upgrade</td>
+                    </tr>
+                </table>
 
-            <h3>Injecting EntityManager</h3>
-            <pre><code><span class="annotation">@Stateless</span>
+                <div class="info-box important">
+                    <div class="info-box-title">equals() and hashCode() on entities — the trap that breaks Sets</div>
+                    <p>Using the auto-generated <code>id</code> field for <code>equals()</code>
+                        is the natural instinct and the wrong default. A <strong>transient</strong>
+                        entity (not yet persisted) has <code>id == null</code>, so two different
+                        new entities are "equal" until persisted — breaking any
+                        <code>HashSet&lt;User&gt;</code> built before the flush. The safer pattern
+                        is a stable business key (e.g. <code>email</code>) or, for entities with
+                        no natural key, overriding <code>equals()</code>/<code>hashCode()</code>
+                        based on a constant when the entity is used in collections only after
+                        persistence. Never use Lombok's <code>@Data</code> on an entity — it
+                        generates <code>equals()</code>/<code>hashCode()</code> over every field,
+                        which triggers full lazy-loading of every relationship the moment the
+                        entity is put in a <code>HashSet</code> or compared.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — ENTITYMANAGER & PERSISTENCE CONTEXT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>EntityManager and the Persistence Context</h2>
+                <p>The <code>EntityManager</code> is the runtime interface to the persistence
+                    context — an in-memory first-level cache of managed entities scoped to a
+                    transaction. Every entity loaded through it is tracked: modify a field, and
+                    the change is written to the database at flush time with no explicit
+                    "save" call required.</p>
+
+                <pre><code><span class="annotation">@Stateless</span>
 <span class="keyword">public class</span> <span class="class-name">UserRepository</span> {
 
-    <span class="annotation">@PersistenceContext</span>  <span class="comment">// Inject EntityManager</span>
+    <span class="annotation">@PersistenceContext</span>
     <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
 
-    <span class="comment">// CRUD operations below...</span>
-}</code></pre>
+    <span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">User</span> user) {
+        em.persist(user);                       <span class="comment">// INSERT — assigns the ID</span>
+    }
 
-            <h3>Create (Insert)</h3>
-            <pre><code><span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">User</span> user) {
-    em.persist(user);  <span class="comment">// INSERT INTO users ...</span>
-    <span class="comment">// ID is automatically generated and set</span>
-}</code></pre>
+    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> em.find(User.<span class="keyword">class</span>, id);   <span class="comment">// SELECT, or returns from cache if already managed</span>
+    }
 
-            <h3>Read (Select)</h3>
-            <pre><code><span class="comment">// Find by primary key</span>
-<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
-    <span class="keyword">return</span> em.find(User.<span class="keyword">class</span>, id);  <span class="comment">// SELECT * FROM users WHERE id = ?</span>
-}
+    <span class="keyword">public void</span> <span class="function">renameUser</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> newName) {
+        <span class="class-name">User</span> user = em.find(User.<span class="keyword">class</span>, id);
+        user.setUsername(newName);              <span class="comment">// no em.update() — dirty checking</span>
+    }                                            <span class="comment">// detects the change and issues UPDATE at flush time</span>
 
-<span class="comment">// Find with query</span>
-<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findByEmail</span>(<span class="class-name">String</span> email) {
-    <span class="keyword">return</span> em.createQuery(<span class="string">"SELECT u FROM User u WHERE u.email = :email"</span>, User.<span class="keyword">class</span>)
-             .setParameter(<span class="string">"email"</span>, email)
-             .getSingleResult();
-}
-
-<span class="comment">// Find all</span>
-<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findAll</span>() {
-    <span class="keyword">return</span> em.createQuery(<span class="string">"SELECT u FROM User u"</span>, User.<span class="keyword">class</span>)
-             .getResultList();
-}</code></pre>
-
-            <h3>Update</h3>
-            <pre><code><span class="keyword">public void</span> <span class="function">updateUser</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> newEmail) {
-    <span class="class-name">User</span> user = em.find(User.<span class="keyword">class</span>, id);
-    <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
-        user.setEmail(newEmail);  <span class="comment">// Just change the object!</span>
-        <span class="comment">// JPA automatically updates database (no em.update() needed!)</span>
+    <span class="keyword">public void</span> <span class="function">deleteUser</span>(<span class="class-name">Long</span> id) {
+        <span class="class-name">User</span> user = em.find(User.<span class="keyword">class</span>, id);
+        <span class="keyword">if</span> (user != <span class="keyword">null</span>) em.remove(user);  <span class="comment">// DELETE at flush time</span>
     }
 }</code></pre>
 
-            <h3>Delete</h3>
-            <pre><code><span class="keyword">public void</span> <span class="function">deleteUser</span>(<span class="class-name">Long</span> id) {
-    <span class="class-name">User</span> user = em.find(User.<span class="keyword">class</span>, id);
-    <span class="keyword">if</span> (user != <span class="keyword">null</span>) {
-        em.remove(user);  <span class="comment">// DELETE FROM users WHERE id = ?</span>
-    }
-}</code></pre>
-        </section>
+                <h3>Entity Lifecycle</h3>
+                <pre><code>NEW (Transient)          — created with `new`, not tracked by JPA
+    ↓ em.persist()
+MANAGED (Persistent)     — tracked; field changes flush to the DB automatically
+    ↓ em.detach() / transaction ends / em.close()
+DETACHED                 — no longer tracked; changes are silently ignored
+    ↓ em.merge()          returns a new MANAGED copy — the original stays detached
+MANAGED (again, on the merged copy)
+    ↓ em.remove()
+REMOVED                  — scheduled for deletion
+    ↓ transaction commits
+Deleted from the database</code></pre>
 
-        <section class="content-section">
-            <h2>Relationships</h2>
+                <div class="info-box tip">
+                    <div class="info-box-title"><code>merge()</code> does not mutate the object you pass in</div>
+                    <p>A common bug: calling <code>em.merge(detachedUser)</code> and then
+                        continuing to use <code>detachedUser</code>, expecting it to now be
+                        managed. It isn't. <code>merge()</code> copies the state onto a
+                        (possibly newly loaded) managed entity and returns <em>that</em> — the
+                        argument you passed in stays detached. Always use the return value:
+                        <code>user = em.merge(user);</code></p>
+                </div>
 
-            <h3>@OneToMany - One User Has Many Orders</h3>
-            <pre><code><span class="annotation">@Entity</span>
+                <div class="info-box note">
+                    <div class="info-box-title">Transaction-scoped vs extended persistence context</div>
+                    <p>The default (and almost always correct) choice is a
+                        <strong>transaction-scoped</strong> persistence context — it exists only
+                        for the duration of a single transaction and is cleared afterward. An
+                        <strong>extended</strong> context, requested via
+                        <code>@PersistenceContext(type = PersistenceContextType.EXTENDED)</code>,
+                        survives across multiple transactions and is only valid on a
+                        <code>@Stateful</code> EJB, since it needs somewhere stateful to live.
+                        It exists mainly to support long-running conversations (a multi-step
+                        wizard editing one entity across several requests) — a niche use case
+                        that Spring's equivalent (<code>OSIV</code>, covered below) solves
+                        differently and with different trade-offs.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — RELATIONSHIPS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Relationships — Modeling Associations Between Entities</h2>
+
+                <h3>@OneToMany / @ManyToOne — bidirectional, with consistency helpers</h3>
+                <pre><code><span class="annotation">@Entity</span>
 <span class="keyword">public class</span> <span class="class-name">User</span> {
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
-
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"user"</span>, cascade = CascadeType.ALL)
+    <span class="comment">// mappedBy = the INVERSE side. It does not own the foreign key —</span>
+    <span class="comment">// it only mirrors what @ManyToOne declares on Order.</span>
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"user"</span>, cascade = CascadeType.PERSIST, orphanRemoval = <span class="keyword">true</span>)
     <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 
-    <span class="comment">// Getters/setters</span>
+    <span class="comment">// Helper methods keep both sides of the relationship in sync —</span>
+    <span class="comment">// forgetting this is the #1 bidirectional-relationship bug.</span>
+    <span class="keyword">public void</span> <span class="function">addOrder</span>(<span class="class-name">Order</span> order) {
+        orders.add(order);
+        order.setUser(<span class="keyword">this</span>);
+    }
+
+    <span class="keyword">public void</span> <span class="function">removeOrder</span>(<span class="class-name">Order</span> order) {
+        orders.remove(order);
+        order.setUser(<span class="keyword">null</span>);
+    }
 }
 
 <span class="annotation">@Entity</span>
-<span class="annotation">@Table</span>(name = <span class="string">"orders"</span>)
 <span class="keyword">public class</span> <span class="class-name">Order</span> {
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
+    <span class="keyword">private</span> <span class="class-name">BigDecimal</span> total;
 
-    <span class="keyword">private</span> <span class="class-name">String</span> productName;
-    <span class="keyword">private</span> <span class="keyword">double</span> total;
-
-    <span class="annotation">@ManyToOne</span>
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"user_id"</span>)  <span class="comment">// Foreign key column</span>
+    <span class="comment">// @ManyToOne is the OWNING side — it holds the foreign key column.</span>
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"user_id"</span>, nullable = <span class="keyword">false</span>)
     <span class="keyword">private</span> <span class="class-name">User</span> user;
 
-    <span class="comment">// Getters/setters</span>
+    <span class="keyword">void</span> <span class="function">setUser</span>(<span class="class-name">User</span> user) { <span class="keyword">this</span>.user = user; }
 }</code></pre>
 
-            <p><strong>Usage:</strong></p>
-            <pre><code><span class="class-name">User</span> user = <span class="keyword">new</span> <span class="class-name">User</span>(<span class="string">"Alice"</span>);
+                <div class="info-box warning">
+                    <div class="info-box-title">Only <code>@ManyToOne</code> owns the foreign key — mistaking this breaks writes silently</div>
+                    <p>Whichever side does <em>not</em> have <code>mappedBy</code> is the owning
+                        side, and only the owning side's state is written to the database. If
+                        you set <code>order.setUser(user)</code> you get a working foreign key.
+                        If you only do <code>user.getOrders().add(order)</code> without also
+                        setting the back-reference, JPA writes nothing — the collection update
+                        is silently ignored because <code>User</code> is the inverse
+                        (<code>mappedBy</code>) side. This is precisely why the
+                        <code>addOrder()</code>/<code>removeOrder()</code> helper pattern above
+                        exists — it makes it impossible to update one side and forget the other.</p>
+                </div>
 
-<span class="class-name">Order</span> order1 = <span class="keyword">new</span> <span class="class-name">Order</span>(<span class="string">"Laptop"</span>, <span class="number">999.99</span>);
-order1.setUser(user);
+                <h3>Cascade Types — what actually propagates</h3>
+                <table>
+                    <tr><th>Cascade type</th><th>Propagates</th><th>Common mistake</th></tr>
+                    <tr><td><code>PERSIST</code></td><td><code>em.persist()</code> to children when the parent is persisted</td><td>Safe and usually what you want on <code>@OneToMany</code></td></tr>
+                    <tr><td><code>MERGE</code></td><td><code>em.merge()</code> to children</td><td>Rarely needed alone</td></tr>
+                    <tr><td><code>REMOVE</code></td><td>Deletes children when the parent is deleted</td><td>Dangerous on <code>@ManyToOne</code> — deleting one <code>Order</code> should never cascade-delete the shared <code>User</code></td></tr>
+                    <tr><td><code>REFRESH</code></td><td>Reloads children from the DB when the parent is refreshed</td><td>Rare, used to discard uncommitted in-memory changes</td></tr>
+                    <tr><td><code>ALL</code></td><td>All of the above</td><td>The single most common source of accidental cascading deletes in code review — apply cascades individually and deliberately, not as a default</td></tr>
+                </table>
 
-<span class="class-name">Order</span> order2 = <span class="keyword">new</span> <span class="class-name">Order</span>(<span class="string">"Mouse"</span>, <span class="number">29.99</span>);
-order2.setUser(user);
-
-user.getOrders().add(order1);
-user.getOrders().add(order2);
-
-em.persist(user);  <span class="comment">// Saves user + both orders (cascade!)</span></code></pre>
-
-            <h3>@ManyToMany - Students and Courses</h3>
-            <pre><code><span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Student</span> {
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>
-    <span class="keyword">private</span> <span class="class-name">Long</span> id;
-
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
-
-    <span class="annotation">@ManyToMany</span>
-    <span class="annotation">@JoinTable</span>(
-        name = <span class="string">"student_course"</span>,  <span class="comment">// Join table name</span>
-        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"student_id"</span>),
-        inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"course_id"</span>)
-    )
-    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Course</span>&gt; courses = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-}
-
+                <h3>@ManyToMany — with an explicit join entity as the modern default</h3>
+                <pre><code><span class="comment">// The classic @ManyToMany + @JoinTable works, but the moment the join</span>
+<span class="comment">// table needs its own data (e.g. enrollment date), you need an explicit</span>
+<span class="comment">// join entity anyway. Most teams model it explicitly from the start:</span>
 <span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Course</span> {
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>
-    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+<span class="keyword">public class</span> <span class="class-name">Enrollment</span> {
+    <span class="annotation">@EmbeddedId</span>
+    <span class="keyword">private</span> <span class="class-name">EnrollmentId</span> id;
 
-    <span class="keyword">private</span> <span class="class-name">String</span> title;
+    <span class="annotation">@ManyToOne</span> <span class="annotation">@MapsId</span>(<span class="string">"studentId"</span>)
+    <span class="keyword">private</span> <span class="class-name">Student</span> student;
 
-    <span class="annotation">@ManyToMany</span>(mappedBy = <span class="string">"courses"</span>)
-    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Student</span>&gt; students = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    <span class="annotation">@ManyToOne</span> <span class="annotation">@MapsId</span>(<span class="string">"courseId"</span>)
+    <span class="keyword">private</span> <span class="class-name">Course</span> course;
+
+    <span class="keyword">private</span> <span class="class-name">LocalDate</span> enrolledOn;   <span class="comment">// the extra column plain @ManyToMany can't express</span>
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>JPQL (JPA Query Language)</h2>
-            <p><strong>Like SQL but for objects!</strong></p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — FETCHING & THE N+1 PROBLEM
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Fetching Strategies and the N+1 Query Problem</h2>
+                <p><code>@OneToMany</code> and <code>@ManyToMany</code> default to
+                    <code>FetchType.LAZY</code>; <code>@ManyToOne</code> and
+                    <code>@OneToOne</code> default to <code>FetchType.EAGER</code>. That EAGER
+                    default on <code>@ManyToOne</code> is one of JPA's most-criticized design
+                    decisions, and it directly causes the most common performance bug in every
+                    JPA codebase: <strong>N+1 queries</strong>.</p>
 
-            <h3>Basic Queries</h3>
-            <pre><code><span class="comment">// Select all</span>
+                <pre><code><span class="comment">// 1 query to fetch all users, then N additional queries — one per</span>
+<span class="comment">// user — the first time .getOrders() is touched inside the loop:</span>
 <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = em.createQuery(<span class="string">"SELECT u FROM User u"</span>, User.<span class="keyword">class</span>)
-                          .getResultList();
+                          .getResultList();          <span class="comment">// query #1</span>
 
-<span class="comment">// Where clause</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; adults = em.createQuery(
-    <span class="string">"SELECT u FROM User u WHERE u.age >= :age"</span>, User.<span class="keyword">class</span>)
+<span class="keyword">for</span> (<span class="class-name">User</span> u : users) {
+    <span class="class-name">System</span>.out.println(u.getOrders().size());  <span class="comment">// queries #2..N+1</span>
+}
+<span class="comment">// 100 users → 101 round-trips to the database instead of 1 or 2.</span></code></pre>
+
+                <p>The fix is a <strong>fetch join</strong>, which retrieves the association
+                    in the same query using a single SQL <code>JOIN</code>:</p>
+
+                <pre><code><span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = em.createQuery(
+    <span class="string">"SELECT DISTINCT u FROM User u LEFT JOIN FETCH u.orders"</span>,
+    User.<span class="keyword">class</span>).getResultList();
+<span class="comment">// 1 query total. DISTINCT is required — the join multiplies user rows</span>
+<span class="comment">// once per order, and Hibernate needs it to de-duplicate the Java result.</span></code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">You cannot fetch-join two collections in the same query</div>
+                    <p>Fetch-joining more than one <code>@OneToMany</code>/<code>@ManyToMany</code>
+                        collection at once produces a <code>MultipleBagFetchException</code> in
+                        Hibernate — the cartesian product between two collections makes the
+                        result set ambiguous to map back into Java objects. Fetch one collection
+                        per query, use an <code>@EntityGraph</code> (Spring Data JPA), or switch
+                        the collection type from <code>List</code> to <code>Set</code>, which
+                        allows fetching two at once at the cost of losing the ability to remove
+                        by index.</p>
+                </div>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">Default EAGER on @ManyToOne is almost always wrong</div>
+                    <p>Explicitly set <code>fetch = FetchType.LAZY</code> on every
+                        <code>@ManyToOne</code> and <code>@OneToOne</code> unless you have a
+                        specific reason not to. The EAGER default means every query that loads
+                        an <code>Order</code> silently also loads its <code>User</code> — and if
+                        that <code>User</code> has its own eager relationships, the chain keeps
+                        growing. Lazy-by-default and explicit fetch joins where needed gives you
+                        control over exactly what gets loaded, instead of discovering the real
+                        query shape by reading Hibernate's SQL log.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — OPEN SESSION IN VIEW
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Open Session in View (OSIV) — the Setting Everyone Ignores Until It Bites</h2>
+                <p>Spring Boot ships with <code>spring.jpa.open-in-view=true</code> by default,
+                    and logs a warning about it on every startup that most developers have
+                    learned to ignore. OSIV keeps the persistence context (and its underlying
+                    database connection) open for the <em>entire HTTP request</em>, not just
+                    for the duration of the <code>@Transactional</code> service method.</p>
+
+                <pre><code><span class="comment">// Without OSIV, this throws LazyInitializationException:</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/users/{id}"</span>)
+<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+    <span class="class-name">User</span> user = userRepository.findById(id).orElseThrow();
+    <span class="comment">// the @Transactional method that loaded `user` has already returned,</span>
+    <span class="comment">// its persistence context is closed, and `orders` was never fetched</span>
+    <span class="keyword">return</span> user;   <span class="comment">// Jackson serialization touches user.getOrders() here → boom</span>
+}</code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Why OSIV = true feels convenient and why that's the problem</div>
+                    <p>With OSIV enabled the example above just works — the connection stays
+                        open through serialization, so <code>getOrders()</code> silently
+                        triggers a lazy-load query at the last possible moment. That
+                        convenience is exactly the trap: it means N+1 queries can now happen
+                        inside the view/serialization layer, invisible to the service layer
+                        where developers actually look for performance problems, and every
+                        request holds a database connection open for its entire duration
+                        (including template rendering or JSON serialization time), reducing
+                        the effective size of your connection pool under load.</p>
+                </div>
+
+                <p>The production-grade fix is <code>spring.jpa.open-in-view=false</code>
+                    combined with fetching exactly what each endpoint needs — a fetch join or
+                    <code>@EntityGraph</code> in the repository method, or (better for read
+                    endpoints) a DTO projection that never touches the entity's lazy
+                    associations at all:</p>
+
+                <pre><code><span class="comment">// DTO projection: no entity, no lazy loading, no OSIV dependency.</span>
+<span class="keyword">public record</span> <span class="class-name">UserSummary</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> username, <span class="keyword">long</span> orderCount) {}
+
+<span class="annotation">@Query</span>(<span class="string">"""
+    SELECT new com.example.UserSummary(u.id, u.username, COUNT(o))
+    FROM User u LEFT JOIN u.orders o
+    GROUP BY u.id, u.username
+    """</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">UserSummary</span>&gt; <span class="function">summarize</span>();</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — JPQL, CRITERIA API, NATIVE SQL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JPQL, the Criteria API, and Native SQL</h2>
+
+                <h3>JPQL — operates on entities and their fields, not tables and columns</h3>
+                <pre><code><span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; adults = em.createQuery(
+    <span class="string">"SELECT u FROM User u WHERE u.age >= :age ORDER BY u.username"</span>, User.<span class="keyword">class</span>)
     .setParameter(<span class="string">"age"</span>, <span class="number">18</span>)
+    .setFirstResult(<span class="number">0</span>)
+    .setMaxResults(<span class="number">20</span>)
     .getResultList();
 
-<span class="comment">// Order by</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; sorted = em.createQuery(
-    <span class="string">"SELECT u FROM User u ORDER BY u.username ASC"</span>, User.<span class="keyword">class</span>)
-    .getResultList();
-
-<span class="comment">// Pagination</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; page = em.createQuery(<span class="string">"SELECT u FROM User u"</span>, User.<span class="keyword">class</span>)
-                          .setFirstResult(<span class="number">0</span>)     <span class="comment">// Start at 0</span>
-                          .setMaxResults(<span class="number">10</span>)    <span class="comment">// Get 10 records</span>
-                          .getResultList();</code></pre>
-
-            <h3>Joins</h3>
-            <pre><code><span class="comment">// Inner join</span>
-<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = em.createQuery(
-    <span class="string">"SELECT o FROM Order o JOIN o.user u WHERE u.username = :username"</span>,
-    Order.<span class="keyword">class</span>)
-    .setParameter(<span class="string">"username"</span>, <span class="string">"Alice"</span>)
-    .getResultList();
-
-<span class="comment">// Fetch join (avoids N+1 problem)</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; usersWithOrders = em.createQuery(
-    <span class="string">"SELECT u FROM User u LEFT JOIN FETCH u.orders"</span>,
-    User.<span class="keyword">class</span>)
-    .getResultList();</code></pre>
-
-            <h3>Aggregates</h3>
-            <pre><code><span class="comment">// Count</span>
 <span class="class-name">Long</span> count = em.createQuery(<span class="string">"SELECT COUNT(u) FROM User u"</span>, Long.<span class="keyword">class</span>)
-                  .getSingleResult();
+                  .getSingleResult();</code></pre>
 
-<span class="comment">// Average</span>
-<span class="class-name">Double</span> avgAge = em.createQuery(<span class="string">"SELECT AVG(u.age) FROM User u"</span>, Double.<span class="keyword">class</span>)
-                    .getSingleResult();
+                <h3>The Criteria API — type-safe queries built at compile time</h3>
+                <p>JPQL is a string — typos and field renames only surface at runtime. The
+                    Criteria API builds the same query as a type-safe object graph, checked by
+                    the compiler, at the cost of considerably more verbose code:</p>
+                <pre><code><span class="class-name">CriteriaBuilder</span> cb = em.getCriteriaBuilder();
+<span class="class-name">CriteriaQuery</span>&lt;<span class="class-name">User</span>&gt; query = cb.createQuery(User.<span class="keyword">class</span>);
+<span class="class-name">Root</span>&lt;<span class="class-name">User</span>&gt; root = query.from(User.<span class="keyword">class</span>);
 
-<span class="comment">// Sum</span>
-<span class="class-name">Double</span> total = em.createQuery(
-    <span class="string">"SELECT SUM(o.total) FROM Order o WHERE o.user.id = :userId"</span>,
-    Double.<span class="keyword">class</span>)
-    .setParameter(<span class="string">"userId"</span>, <span class="number">1L</span>)
-    .getSingleResult();</code></pre>
+query.select(root)
+     .where(cb.greaterThanOrEqualTo(root.get(<span class="string">"age"</span>), <span class="number">18</span>))
+     .orderBy(cb.asc(root.get(<span class="string">"username"</span>)));
 
-            <h3>Native SQL (When JPQL Isn't Enough)</h3>
-            <pre><code><span class="comment">// Execute native SQL</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = em.createNativeQuery(
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; adults = em.createQuery(query).getResultList();
+<span class="comment">// Most teams reserve Criteria for dynamic queries built from optional</span>
+<span class="comment">// filters (search forms); JPQL for everything with a fixed shape.</span></code></pre>
+
+                <h3>Native SQL — the escape hatch, used sparingly</h3>
+                <pre><code><span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = em.createNativeQuery(
     <span class="string">"SELECT * FROM users WHERE email LIKE ?1"</span>, User.<span class="keyword">class</span>)
     .setParameter(<span class="number">1</span>, <span class="string">"%@gmail.com"</span>)
-    .getResultList();</code></pre>
-        </section>
+    .getResultList();
+<span class="comment">// Loses database portability and JPQL's compile-time entity awareness —</span>
+<span class="comment">// reach for it only for vendor-specific features JPQL can't express</span>
+<span class="comment">// (window functions, full-text search, database-specific hints).</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Named Queries</h2>
-            <p><strong>Define queries once, reuse everywhere</strong></p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — CONCURRENCY: LOCKING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Concurrency: Optimistic and Pessimistic Locking</h2>
 
-            <pre><code><span class="annotation">@Entity</span>
-<span class="annotation">@NamedQueries</span>({
-    <span class="annotation">@NamedQuery</span>(
-        name = <span class="string">"User.findAll"</span>,
-        query = <span class="string">"SELECT u FROM User u"</span>
-    ),
-    <span class="annotation">@NamedQuery</span>(
-        name = <span class="string">"User.findByEmail"</span>,
-        query = <span class="string">"SELECT u FROM User u WHERE u.email = :email"</span>
-    ),
-    <span class="annotation">@NamedQuery</span>(
-        name = <span class="string">"User.findAdults"</span>,
-        query = <span class="string">"SELECT u FROM User u WHERE u.age >= 18"</span>
-    )
-})
-<span class="keyword">public class</span> <span class="class-name">User</span> {
-    <span class="comment">// Entity fields...</span>
+                <h3>Optimistic locking — the default and correct choice for most apps</h3>
+                <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Account</span> {
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+    <span class="keyword">private</span> <span class="class-name">BigDecimal</span> balance;
+
+    <span class="annotation">@Version</span>  <span class="comment">// Hibernate adds "WHERE version = ?" to every UPDATE</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> version;
 }
 
-<span class="comment">// Usage</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = em.createNamedQuery(<span class="string">"User.findAll"</span>, User.<span class="keyword">class</span>)
-                          .getResultList();
+<span class="comment">// If two transactions load the same row and both try to update it,</span>
+<span class="comment">// the second commit's WHERE version = ? matches zero rows and</span>
+<span class="comment">// Hibernate throws OptimisticLockException — no row was silently</span>
+<span class="comment">// overwritten. The caller decides whether to retry or fail the request.</span></code></pre>
 
-<span class="class-name">User</span> user = em.createNamedQuery(<span class="string">"User.findByEmail"</span>, User.<span class="keyword">class</span>)
-                 .setParameter(<span class="string">"email"</span>, <span class="string">"alice@example.com"</span>)
-                 .getSingleResult();</code></pre>
-        </section>
+                <h3>Pessimistic locking — when lost updates are unacceptable and retries aren't viable</h3>
+                <pre><code><span class="class-name">Account</span> account = em.find(Account.<span class="keyword">class</span>, id, LockModeType.PESSIMISTIC_WRITE);
+<span class="comment">// Issues SELECT ... FOR UPDATE — the database row-locks until the</span>
+<span class="comment">// transaction commits. Other transactions requesting the same lock block.</span>
+<span class="comment">// Trades throughput for a hard guarantee against concurrent writes —</span>
+<span class="comment">// reach for it in financial transfers, seat reservations, and</span>
+<span class="comment">// inventory decrements where a lost update is not an acceptable outcome.</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Entity Lifecycle</h2>
-
-            <pre><code>NEW (Transient)
-    ↓ em.persist()
-MANAGED (Persistent) ← Changes tracked, auto-saved
-    ↓ em.detach() or transaction ends
-DETACHED (No longer tracked)
-    ↓ em.merge()
-MANAGED again
-    ↓ em.remove()
-REMOVED (Marked for deletion)
-    ↓ transaction commits
-Deleted from database</code></pre>
-
-            <h3>Lifecycle Callbacks</h3>
-            <pre><code><span class="annotation">@Entity</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — LIFECYCLE CALLBACKS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Entity Lifecycle Callbacks</h2>
+                <pre><code><span class="annotation">@Entity</span>
 <span class="keyword">public class</span> <span class="class-name">Product</span> {
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
-
     <span class="keyword">private</span> <span class="class-name">String</span> name;
-    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> createdAt;
-    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> updatedAt;
+    <span class="keyword">private</span> <span class="class-name">Instant</span> createdAt;
+    <span class="keyword">private</span> <span class="class-name">Instant</span> updatedAt;
 
-    <span class="annotation">@PrePersist</span>  <span class="comment">// Before INSERT</span>
-    <span class="keyword">public void</span> <span class="function">onCreate</span>() {
-        createdAt = <span class="class-name">LocalDateTime</span>.now();
-        <span class="class-name">System</span>.out.println(<span class="string">"About to create: "</span> + name);
-    }
+    <span class="annotation">@PrePersist</span>
+    <span class="keyword">void</span> <span class="function">onCreate</span>() { createdAt = <span class="class-name">Instant</span>.now(); }
 
-    <span class="annotation">@PreUpdate</span>  <span class="comment">// Before UPDATE</span>
-    <span class="keyword">public void</span> <span class="function">onUpdate</span>() {
-        updatedAt = <span class="class-name">LocalDateTime</span>.now();
-        <span class="class-name">System</span>.out.println(<span class="string">"Updating: "</span> + name);
-    }
+    <span class="annotation">@PreUpdate</span>
+    <span class="keyword">void</span> <span class="function">onUpdate</span>() { updatedAt = <span class="class-name">Instant</span>.now(); }
 
-    <span class="annotation">@PostPersist</span>  <span class="comment">// After INSERT</span>
-    <span class="keyword">public void</span> <span class="function">afterCreate</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Created with ID: "</span> + id);
-    }
-
-    <span class="annotation">@PostLoad</span>  <span class="comment">// After entity loaded from database</span>
-    <span class="keyword">public void</span> <span class="function">afterLoad</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Loaded: "</span> + name);
-    }
-
-    <span class="annotation">@PreRemove</span>  <span class="comment">// Before DELETE</span>
-    <span class="keyword">public void</span> <span class="function">onDelete</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"About to delete: "</span> + name);
-    }
+    <span class="annotation">@PostLoad</span>
+    <span class="keyword">void</span> <span class="function">afterLoad</span>() { <span class="comment">/* e.g. warm a transient computed field */</span> }
 }</code></pre>
-        </section>
+                <div class="info-box note">
+                    <div class="info-box-title">Callbacks are for entity-local bookkeeping only</div>
+                    <p>Timestamps and simple field derivation belong here. Anything that calls
+                        another service, sends an event, or touches a different aggregate does
+                        not — that logic belongs in the service layer, inside the transaction
+                        that triggered the change. Lifecycle callbacks that reach out to other
+                        beans are a common source of hidden, hard-to-test coupling.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — BEST PRACTICES / PITFALLS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-            <div class="best-practices">
-                <h3>✅ DO:</h3>
-                <ul>
-                    <li><strong>Use JPQL for most queries</strong> - Database-independent</li>
-                    <li><strong>Use fetch joins to avoid N+1</strong> - Load related data efficiently</li>
-                    <li><strong>Use pagination for large result sets</strong> - setMaxResults()</li>
-                    <li><strong>Let transactions handle persistence</strong> - Changes auto-saved</li>
-                    <li><strong>Use @NamedQueries for common queries</strong> - Validated at startup</li>
-                    <li><strong>Keep entities simple</strong> - No business logic</li>
-                    <li><strong>Use cascade wisely</strong> - Understand propagation</li>
-                </ul>
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Set <code>fetch = FetchType.LAZY</code> explicitly on every <code>@ManyToOne</code>/<code>@OneToOne</code> — never rely on the EAGER default</li>
+                        <li>Set <code>spring.jpa.open-in-view=false</code> in every Spring Boot project and fetch exactly what each use case needs</li>
+                        <li>Return DTOs (records) from service and controller boundaries — never serialize entities directly</li>
+                        <li>Use fetch joins or <code>@EntityGraph</code> whenever you know a collection will be accessed</li>
+                        <li>Use <code>@Version</code> optimistic locking on any entity subject to concurrent updates</li>
+                        <li>Prefer <code>SEQUENCE</code> over <code>IDENTITY</code> when the database supports it, to keep batch inserts working</li>
+                    </ul>
 
-                <h3>❌ DON'T:</h3>
-                <ul>
-                    <li><strong>Don't forget @Id</strong> - Every entity needs primary key</li>
-                    <li><strong>Don't expose entities to view layer</strong> - Use DTOs</li>
-                    <li><strong>Don't use SELECT *</strong> - Fetch only needed columns</li>
-                    <li><strong>Don't load entire tables</strong> - Use pagination</li>
-                    <li><strong>Don't put business logic in entities</strong> - Keep them data-focused</li>
-                    <li><strong>Don't forget lazy vs eager loading</strong> - Default is lazy for collections</li>
-                </ul>
-            </div>
-        </section>
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't expose <code>@Entity</code> classes as REST response bodies — bidirectional relationships cause infinite serialization loops and leak persistence details into the API contract</li>
+                        <li>Don't use Lombok's <code>@Data</code> or <code>@EqualsAndHashCode</code> on entities — it generates field-based equality that forces lazy associations to load</li>
+                        <li>Don't put an entity in a <code>HashSet</code> before it has a stable identity or business key</li>
+                        <li>Don't cascade <code>REMOVE</code> from the "many" side of a <code>@ManyToOne</code> — that deletes a shared parent</li>
+                        <li>Don't fetch-join two collections in the same JPQL query — restructure or use <code>Set</code></li>
+                        <li>Don't leave <code>open-in-view</code> at its default without understanding what it's hiding</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>JPA</strong> maps Java objects to database tables automatically</li>
-                    <li><strong>@Entity:</strong> Marks a class as a database table</li>
-                    <li><strong>@Id:</strong> Primary key field</li>
-                    <li><strong>EntityManager:</strong> Your interface to the database (persist, find, remove)</li>
-                    <li><strong>JPQL:</strong> Object-oriented query language (like SQL for objects)</li>
-                    <li><strong>Relationships:</strong> @OneToMany, @ManyToOne, @ManyToMany</li>
-                    <li><strong>Cascade:</strong> Propagate operations to related entities</li>
-                    <li><strong>Lifecycle:</strong> New → Managed → Detached → Removed</li>
-                    <li><strong>Implementations:</strong> Hibernate (most popular), EclipseLink, OpenJPA</li>
-                    <li><strong>Benefits:</strong> No SQL code, database portability, automatic mapping</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 11 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="transactions.html" class="related-link">Transactions</a>
-                <a href="bean-validation.html" class="related-link">Bean Validation</a>
-                <a href="ejb.html" class="related-link">EJB (Enterprise JavaBeans)</a>
-            </div>
-        </section>
-    </main>
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is the difference between JPA and Hibernate?</strong><br>
+                    JPA is a specification — interfaces and annotations with no runtime logic.
+                    Hibernate is a concrete provider that implements that specification. Code
+                    written against <code>jakarta.persistence.EntityManager</code> can, in
+                    theory, run against any JPA provider without changes.</p>
+
+                    <p><strong>Q: What's the difference between <code>persist()</code>, <code>merge()</code>, and <code>remove()</code>?</strong><br>
+                    <code>persist()</code> makes a transient (new) entity managed and schedules
+                    an INSERT. <code>merge()</code> copies the state of a detached entity onto
+                    a managed one (loading it first if necessary) and returns that managed
+                    copy — the argument stays detached. <code>remove()</code> schedules a
+                    managed entity for deletion.</p>
+
+                    <p><strong>Q: What is lazy loading?</strong><br>
+                    An association marked <code>FetchType.LAZY</code> is not loaded from the
+                    database until the code actually accesses it (e.g. calling
+                    <code>.getOrders()</code>). It's implemented via a runtime proxy that
+                    triggers the query on first access.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Explain the N+1 problem and two different ways to fix it.</strong><br>
+                    Loading a list of N parent entities and then accessing a lazy association
+                    on each one inside a loop triggers 1 query for the parents plus N
+                    additional queries — one per parent — for the association. Fix #1: a JPQL
+                    fetch join (<code>LEFT JOIN FETCH</code>) retrieves everything in a single
+                    query via SQL JOIN. Fix #2: a DTO projection query that never touches the
+                    lazy association at all, aggregating in SQL instead of Java. Fetch joins
+                    keep the entity graph; DTO projections avoid loading entities entirely and
+                    are generally preferable for read-only endpoints.</p>
+
+                    <p><strong>Q: What is Open Session in View, and why do many senior engineers disable it in production?</strong><br>
+                    OSIV keeps the persistence context (and a database connection) open for
+                    the full HTTP request instead of just the transactional service method.
+                    It's convenient — lazy associations can still be accessed during JSON
+                    serialization — but it hides N+1 queries inside the view layer, holds
+                    connections open longer than necessary (shrinking the effective pool size
+                    under load), and encourages controllers to depend on lazy loading instead
+                    of fetching exactly what they need. Disabling it (<code>open-in-view=false</code>)
+                    forces every endpoint to fetch its data explicitly, at the cost of an
+                    immediate <code>LazyInitializationException</code> the first time an
+                    endpoint accidentally relies on the old behavior — which is precisely the
+                    bug it's designed to surface.</p>
+
+                    <p><strong>Q: Why should an entity never be a <code>record</code>?</strong><br>
+                    Hibernate needs to generate proxy subclasses for lazy-loaded associations
+                    (impossible on an implicitly <code>final</code> record), instantiate the
+                    entity via a no-arg constructor and populate fields via reflection
+                    (records have neither), and mutate fields in place for dirty checking
+                    (record fields are immutable). Records are the right shape for DTOs and
+                    query projections, which are read-once and thrown away — the opposite of
+                    an entity's mutable, tracked lifecycle.</p>
+
+                    <p><strong>Q: Why is <code>GenerationType.IDENTITY</code> often a worse default than <code>SEQUENCE</code> in high-throughput systems?</strong><br>
+                    With <code>IDENTITY</code>, the database assigns the primary key on
+                    insert, so Hibernate must execute (and flush) each insert individually to
+                    learn the generated ID — batch inserts are effectively disabled.
+                    <code>SEQUENCE</code> lets Hibernate pre-allocate a block of IDs client-side
+                    (via <code>allocationSize</code>), so it can batch multiple inserts into
+                    fewer round-trips before ever hitting the database.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="ejb.html" class="related-link"><span class="related-icon">🧩</span>EJB (Enterprise JavaBeans)</a>
+                    <a href="transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions &amp; JTA</a>
+                    <a href="cdi.html" class="related-link"><span class="related-icon">💉</span>CDI (Dependency Injection)</a>
+                    <a href="overview.html" class="related-link"><span class="related-icon">🏢</span>Jakarta EE Overview</a>
+                    <a href="../databases/jpa-hibernate.html" class="related-link"><span class="related-icon">💾</span>JPA &amp; Hibernate</a>
+                    <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">🍃</span>Spring Data JPA</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

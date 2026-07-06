@@ -21,8 +21,8 @@ class Particle {
         this.x = Math.random() * canvas.width;
         this.y = Math.random() * canvas.height - canvas.height;
         this.text = codeSnippets[Math.floor(Math.random() * codeSnippets.length)];
-        this.fontSize = Math.floor(Math.random() * 5) + 11;
-        this.opacity = Math.random() * 0.15 + 0.15;
+        this.fontSize = Math.floor(Math.random() * 7) + 12;
+        this.opacity = Math.random() * 0.3 + 0.25;
         this.speed = Math.random() * 0.5 + 0.4;
         this.color = `rgba(0, 255, 180, ${this.opacity})`;
     }
@@ -72,7 +72,7 @@ class ParticlesCanvas {
 
     createParticles() {
         this.particles = [];
-        for (let i = 0; i < 25; i++) {
+        for (let i = 0; i < 40; i++) {
             this.particles.push(new Particle(this.canvas));
         }
     }

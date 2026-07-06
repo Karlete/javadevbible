@@ -1,491 +1,835 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.jaxrs.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JAX-RS (RESTful Web Services) - JavaDev Bible</title>
+    <title>JAX-RS — Jakarta RESTful Web Services - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#jakarta-ee">Jakarta EE</a> / JAX-RS
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#jakarta-ee" data-i18n="nav.jakarta">Jakarta EE</a> /
+                JAX-RS
             </nav>
-            <h1>JAX-RS (RESTful Web Services)</h1>
-            <p class="topic-subtitle">Building REST APIs with Jakarta EE</p>
-            <a href="../../index.html" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.jaxrs.h1">JAX-RS — Jakarta RESTful Web Services</h1>
+            <p class="topic-subtitle" data-i18n="topic.jaxrs.subtitle">The standard specification for REST APIs in Jakarta EE — resource classes, parameter binding, exception mappers, filters, and how JAX-RS compares to Spring MVC in real projects</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is JAX-RS?</h2>
-            <p><strong>Think of JAX-RS like a restaurant's ordering system:</strong></p>
-            <ul>
-                <li>📱 Customer (Frontend) makes requests via menu (API endpoints)</li>
-                <li>📋 Waiter (JAX-RS) takes orders and delivers food (data)</li>
-                <li>🍳 Kitchen (Backend) prepares the order (business logic)</li>
-                <li>✨ Everything communicated in simple format (JSON)</li>
-            </ul>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>JAX-RS (Jakarta RESTful Web Services)</strong> is the standard API for building REST APIs in Jakarta EE. It uses annotations to map HTTP requests to Java methods.</p>
-                <p><strong>Popular implementations:</strong> Jersey, RESTEasy, Apache CXF</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>Simple REST API Example</h3>
-            <pre><code><span class="annotation">@Path</span>(<span class="string">"/hello"</span>)  <span class="comment">// Base URL: /api/hello</span>
-<span class="keyword">public class</span> <span class="class-name">HelloResource</span> {
+        <main class="topic-content">
 
-    <span class="annotation">@GET</span>  <span class="comment">// HTTP GET request</span>
-    <span class="annotation">@Produces</span>(MediaType.TEXT_PLAIN)
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">sayHello</span>() {
-        <span class="keyword">return</span> <span class="string">"Hello, World!"</span>;
-    }
-}
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS JAX-RS AND WHY IT MATTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is JAX-RS — and Why Does It Matter in 2025?</h2>
+                <p><strong>JAX-RS (Jakarta RESTful Web Services)</strong> is a
+                    <em>specification</em> — a set of annotations and interfaces in
+                    <code>jakarta.ws.rs.*</code> that standardizes how to map HTTP requests to
+                    Java methods. Like JPA, it has no runtime code of its own: you need a
+                    provider implementation at runtime. Jersey (the RI), RESTEasy (WildFly's
+                    bundled impl), and Apache CXF are the three providers still in active use.</p>
 
-<span class="comment">// Access: GET http://localhost:8080/api/hello</span>
-<span class="comment">// Returns: Hello, World!</span></code></pre>
-        </section>
+                <p>Before JAX-RS (2008), every framework had its own proprietary way to
+                    handle REST: raw Servlets with switch statements over
+                    <code>request.getMethod()</code>, framework-specific annotations, or
+                    vendor-specific XML configuration. JAX-RS gave Jakarta EE a vendor-neutral
+                    model that still ships inside every certified application server today.</p>
 
-        <section class="content-section">
-            <h2>Application Configuration</h2>
+                <table>
+                    <tr><th>Without JAX-RS (raw Servlet)</th><th>With JAX-RS</th></tr>
+                    <tr>
+                        <td>
+<pre><code><span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> res) {
+    <span class="class-name">String</span> id = req.getParameter(<span class="string">"id"</span>);
+    <span class="keyword">if</span> (id == <span class="keyword">null</span>) { res.sendError(<span class="number">400</span>); <span class="keyword">return</span>; }
+    <span class="class-name">Product</span> p = service.findById(<span class="class-name">Long</span>.parseLong(id));
+    <span class="keyword">if</span> (p == <span class="keyword">null</span>) { res.sendError(<span class="number">404</span>); <span class="keyword">return</span>; }
+    res.setContentType(<span class="string">"application/json"</span>);
+    <span class="comment">// manual JSON serialization...</span>
+}</code></pre>
+                        </td>
+                        <td>
+<pre><code><span class="annotation">@GET</span>
+<span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+<span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
+<span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(
+        <span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> service.findById(id);  <span class="comment">// 404 on null via mapper</span>
+}</code></pre>
+                        </td>
+                    </tr>
+                </table>
 
-            <pre><code><span class="keyword">import</span> jakarta.ws.rs.ApplicationPath;
+                <div class="info-box note">
+                    <div class="info-box-title">JAX-RS vs Spring MVC — why this page still matters if you write Spring Boot</div>
+                    <table>
+                        <tr><th>Aspect</th><th>JAX-RS</th><th>Spring MVC / Spring REST</th></tr>
+                        <tr>
+                            <td>Origin</td>
+                            <td>Jakarta EE specification (vendor-neutral)</td>
+                            <td>Spring Framework (proprietary, but dominant)</td>
+                        </tr>
+                        <tr>
+                            <td>Annotation set</td>
+                            <td><code>@Path</code>, <code>@GET</code>, <code>@Produces</code>, <code>@QueryParam</code></td>
+                            <td><code>@RequestMapping</code>, <code>@GetMapping</code>, <code>@RequestParam</code></td>
+                        </tr>
+                        <tr>
+                            <td>Where you'll find it</td>
+                            <td>WildFly, Payara, WebSphere, Quarkus — any Jakarta EE server</td>
+                            <td>Spring Boot, embedded Tomcat/Undertow</td>
+                        </tr>
+                        <tr>
+                            <td>JSON binding</td>
+                            <td>JSON-B (spec) or Jackson (provider-plugged)</td>
+                            <td>Jackson (default, auto-configured)</td>
+                        </tr>
+                        <tr>
+                            <td>Exception handling</td>
+                            <td><code>ExceptionMapper&lt;T&gt;</code> implementations</td>
+                            <td><code>@ExceptionHandler</code> / <code>@ControllerAdvice</code></td>
+                        </tr>
+                        <tr>
+                            <td>Greenfield choice in 2025</td>
+                            <td>Quarkus (excellent JAX-RS via RESTEasy Reactive), Helidon</td>
+                            <td>Spring Boot (still dominant in enterprise)</td>
+                        </tr>
+                    </table>
+                    <p>Spring Boot is the more common choice for new projects, but JAX-RS is
+                        the standard in a large body of existing Jakarta EE systems and is
+                        the <em>native</em> model in Quarkus, which is gaining traction for
+                        cloud-native workloads. Understanding JAX-RS also makes Spring MVC
+                        trivial by comparison — the mental model is nearly identical,
+                        the annotations just have different names.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — BOOTSTRAP: APPLICATION + RESOURCE CLASS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Bootstrapping a JAX-RS Application</h2>
+
+                <h3>The <code>Application</code> subclass — entry point in Jakarta EE</h3>
+                <pre><code><span class="keyword">import</span> jakarta.ws.rs.ApplicationPath;
 <span class="keyword">import</span> jakarta.ws.rs.core.Application;
 
-<span class="annotation">@ApplicationPath</span>(<span class="string">"/api"</span>)  <span class="comment">// All endpoints start with /api</span>
+<span class="annotation">@ApplicationPath</span>(<span class="string">"/api"</span>)
 <span class="keyword">public class</span> <span class="class-name">RestApplication</span> <span class="keyword">extends</span> <span class="class-name">Application</span> {
-    <span class="comment">// No code needed! Just this annotation configures everything</span>
+    <span class="comment">// Empty body: the container discovers all @Provider and resource</span>
+    <span class="comment">// classes annotated with @Path on the classpath automatically.</span>
+    <span class="comment">// Alternatively, override getClasses() to register explicitly.</span>
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>HTTP Methods</h2>
+                <h3>A complete, production-shaped resource class</h3>
+                <pre><code><span class="keyword">import</span> jakarta.inject.Inject;
+<span class="keyword">import</span> jakarta.validation.Valid;
+<span class="keyword">import</span> jakarta.ws.rs.*;
+<span class="keyword">import</span> jakarta.ws.rs.core.*;
 
-            <pre><code><span class="annotation">@Path</span>(<span class="string">"/users"</span>)
+<span class="annotation">@Path</span>(<span class="string">"/users"</span>)
+<span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)   <span class="comment">// class-level default</span>
+<span class="annotation">@Consumes</span>(MediaType.APPLICATION_JSON)
 <span class="keyword">public class</span> <span class="class-name">UserResource</span> {
 
     <span class="annotation">@Inject</span>
     <span class="keyword">private</span> <span class="class-name">UserService</span> userService;
 
-    <span class="comment">// GET /api/users - Get all users</span>
     <span class="annotation">@GET</span>
-    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getAllUsers</span>() {
-        <span class="keyword">return</span> userService.findAll();
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">UserDto</span>&gt; <span class="function">listUsers</span>(
+            <span class="annotation">@QueryParam</span>(<span class="string">"page"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"0"</span>) <span class="keyword">int</span> page,
+            <span class="annotation">@QueryParam</span>(<span class="string">"size"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"20"</span>) <span class="keyword">int</span> size) {
+        <span class="keyword">return</span> userService.findAll(page, size);
     }
 
-    <span class="comment">// GET /api/users/123 - Get specific user</span>
     <span class="annotation">@GET</span>
     <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
-    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getUser</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
-        <span class="keyword">return</span> userService.findById(id);
+    <span class="keyword">public</span> <span class="class-name">UserDto</span> <span class="function">getUser</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> userService.findById(id)
+            .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">NotFoundException</span>(<span class="string">"User not found: "</span> + id));
     }
 
-    <span class="comment">// POST /api/users - Create new user</span>
     <span class="annotation">@POST</span>
-    <span class="annotation">@Consumes</span>(MediaType.APPLICATION_JSON)
-    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
-    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">createUser</span>(<span class="annotation">@Valid</span> <span class="class-name">User</span> user) {
-        <span class="class-name">User</span> created = userService.create(user);
-        <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.CREATED)
-                       .entity(created)
-                       .build();
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">createUser</span>(<span class="annotation">@Valid</span> <span class="class-name">CreateUserRequest</span> request,
+                                <span class="annotation">@Context</span> <span class="class-name">UriInfo</span> uriInfo) {
+        <span class="class-name">UserDto</span> created = userService.create(request);
+        <span class="class-name">URI</span> location = uriInfo.getAbsolutePathBuilder()
+                              .path(<span class="class-name">String</span>.valueOf(created.id()))
+                              .build();
+        <span class="keyword">return</span> <span class="class-name">Response</span>.created(location).entity(created).build();
     }
 
-    <span class="comment">// PUT /api/users/123 - Update user</span>
     <span class="annotation">@PUT</span>
     <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
-    <span class="annotation">@Consumes</span>(MediaType.APPLICATION_JSON)
-    <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">updateUser</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id, <span class="annotation">@Valid</span> <span class="class-name">User</span> user) {
-        <span class="keyword">return</span> userService.update(id, user);
+    <span class="keyword">public</span> <span class="class-name">UserDto</span> <span class="function">updateUser</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id,
+                              <span class="annotation">@Valid</span> <span class="class-name">UpdateUserRequest</span> request) {
+        <span class="keyword">return</span> userService.update(id, request);
     }
 
-    <span class="comment">// DELETE /api/users/123 - Delete user</span>
     <span class="annotation">@DELETE</span>
     <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
     <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">deleteUser</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
         userService.delete(id);
         <span class="keyword">return</span> <span class="class-name">Response</span>.noContent().build();
     }
-}</code></pre>
-
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>HTTP Method</th>
-                        <th>Purpose</th>
-                        <th>Has Body</th>
-                        <th>Idempotent</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>GET</strong></td>
-                        <td>Retrieve data</td>
-                        <td>No</td>
-                        <td>Yes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>POST</strong></td>
-                        <td>Create resource</td>
-                        <td>Yes</td>
-                        <td>No</td>
-                    </tr>
-                    <tr>
-                        <td><strong>PUT</strong></td>
-                        <td>Update (replace)</td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>PATCH</strong></td>
-                        <td>Partial update</td>
-                        <td>Yes</td>
-                        <td>No</td>
-                    </tr>
-                    <tr>
-                        <td><strong>DELETE</strong></td>
-                        <td>Remove resource</td>
-                        <td>No</td>
-                        <td>Yes</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2>Path Parameters</h2>
-
-            <pre><code><span class="annotation">@Path</span>(<span class="string">"/products"</span>)
-<span class="keyword">public class</span> <span class="class-name">ProductResource</span> {
-
-    <span class="comment">// Single parameter: /api/products/123</span>
-    <span class="annotation">@GET</span>
-    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
-        <span class="keyword">return</span> findProduct(id);
-    }
-
-    <span class="comment">// Multiple parameters: /api/products/electronics/laptops</span>
-    <span class="annotation">@GET</span>
-    <span class="annotation">@Path</span>(<span class="string">"/{category}/{subcategory}"</span>)
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">getByCategory</span>(
-        <span class="annotation">@PathParam</span>(<span class="string">"category"</span>) <span class="class-name">String</span> category,
-        <span class="annotation">@PathParam</span>(<span class="string">"subcategory"</span>) <span class="class-name">String</span> subcategory) {
-        <span class="keyword">return</span> findByCategory(category, subcategory);
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Query Parameters</h2>
-
-            <pre><code><span class="annotation">@Path</span>(<span class="string">"/search"</span>)
-<span class="keyword">public class</span> <span class="class-name">SearchResource</span> {
-
-    <span class="comment">// URL: /api/search?q=laptop&minPrice=500&maxPrice=2000</span>
-    <span class="annotation">@GET</span>
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">search</span>(
-        <span class="annotation">@QueryParam</span>(<span class="string">"q"</span>) <span class="class-name">String</span> query,
-        <span class="annotation">@QueryParam</span>(<span class="string">"minPrice"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"0"</span>) <span class="keyword">double</span> minPrice,
-        <span class="annotation">@QueryParam</span>(<span class="string">"maxPrice"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"10000"</span>) <span class="keyword">double</span> maxPrice) {
-
-        <span class="keyword">return</span> searchProducts(query, minPrice, maxPrice);
-    }
-
-    <span class="comment">// Pagination: /api/search?page=2&size=20</span>
-    <span class="annotation">@GET</span>
-    <span class="annotation">@Path</span>(<span class="string">"/paginated"</span>)
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">getPaginated</span>(
-        <span class="annotation">@QueryParam</span>(<span class="string">"page"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"1"</span>) <span class="keyword">int</span> page,
-        <span class="annotation">@QueryParam</span>(<span class="string">"size"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"10"</span>) <span class="keyword">int</span> size) {
-
-        <span class="keyword">return</span> getPage(page, size);
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Request and Response</h2>
-
-            <h3>Consuming JSON (Request Body)</h3>
-            <pre><code><span class="annotation">@POST</span>
-<span class="annotation">@Path</span>(<span class="string">"/orders"</span>)
-<span class="annotation">@Consumes</span>(MediaType.APPLICATION_JSON)  <span class="comment">// Accept JSON input</span>
-<span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)  <span class="comment">// Return JSON output</span>
-<span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">createOrder</span>(<span class="class-name">Order</span> order) {
-    <span class="comment">// JAX-RS automatically converts JSON to Order object!</span>
-    <span class="class-name">Order</span> created = orderService.create(order);
-
-    <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="number">201</span>)  <span class="comment">// HTTP 201 Created</span>
-                   .entity(created)
-                   .build();
-}</code></pre>
-
-            <h3>HTTP Status Codes</h3>
-            <pre><code><span class="annotation">@Path</span>(<span class="string">"/products"</span>)
-<span class="keyword">public class</span> <span class="class-name">ProductResource</span> {
-
-    <span class="annotation">@GET</span>
-    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
-        <span class="class-name">Product</span> product = productService.findById(id);
-
-        <span class="keyword">if</span> (product == <span class="keyword">null</span>) {
-            <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.NOT_FOUND)  <span class="comment">// 404</span>
-                           .entity(<span class="string">"Product not found"</span>)
-                           .build();
-        }
-
-        <span class="keyword">return</span> <span class="class-name">Response</span>.ok(product).build();  <span class="comment">// 200 OK</span>
-    }
-
-    <span class="annotation">@POST</span>
-    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">create</span>(<span class="class-name">Product</span> product) {
-        <span class="keyword">if</span> (product.getName() == <span class="keyword">null</span>) {
-            <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.BAD_REQUEST)  <span class="comment">// 400</span>
-                           .entity(<span class="string">"Name is required"</span>)
-                           .build();
-        }
-
-        <span class="class-name">Product</span> created = productService.create(product);
-        <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.CREATED).entity(created).build();  <span class="comment">// 201</span>
-    }
-
-    <span class="annotation">@DELETE</span>
-    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">delete</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
-        productService.delete(id);
-        <span class="keyword">return</span> <span class="class-name">Response</span>.noContent().build();  <span class="comment">// 204 No Content</span>
-    }
-}</code></pre>
-
-            <p><strong>Common Status Codes:</strong></p>
-            <ul>
-                <li><strong>200 OK:</strong> Success</li>
-                <li><strong>201 Created:</strong> Resource created</li>
-                <li><strong>204 No Content:</strong> Success, no body</li>
-                <li><strong>400 Bad Request:</strong> Invalid input</li>
-                <li><strong>401 Unauthorized:</strong> Not authenticated</li>
-                <li><strong>403 Forbidden:</strong> Not authorized</li>
-                <li><strong>404 Not Found:</strong> Resource doesn't exist</li>
-                <li><strong>500 Internal Server Error:</strong> Server error</li>
-            </ul>
-        </section>
-
-        <section class="content-section">
-            <h2>Exception Handling</h2>
-
-            <h3>WebApplicationException</h3>
-            <pre><code><span class="annotation">@GET</span>
-<span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
-<span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
-    <span class="class-name">Product</span> product = productService.findById(id);
-
-    <span class="keyword">if</span> (product == <span class="keyword">null</span>) {
-        <span class="comment">// Throw exception that becomes HTTP response</span>
-        <span class="keyword">throw new</span> <span class="class-name">WebApplicationException</span>(
-            <span class="string">"Product not found"</span>,
-            <span class="class-name">Response.Status</span>.NOT_FOUND
-        );
-    }
-
-    <span class="keyword">return</span> product;
-}</code></pre>
-
-            <h3>Exception Mapper</h3>
-            <pre><code><span class="comment">// Custom exception</span>
-<span class="keyword">public class</span> <span class="class-name">ProductNotFoundException</span> <span class="keyword">extends</span> <span class="class-name">RuntimeException</span> {
-    <span class="keyword">public</span> <span class="function">ProductNotFoundException</span>(<span class="class-name">String</span> message) {
-        <span class="keyword">super</span>(message);
-    }
 }
 
-<span class="comment">// Exception mapper</span>
+<span class="comment">// DTOs as records — immutable, no boilerplate, JSON-B/Jackson compatible</span>
+<span class="keyword">public record</span> <span class="class-name">UserDto</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> username, <span class="class-name">String</span> email) {}
+<span class="keyword">public record</span> <span class="class-name">CreateUserRequest</span>(<span class="annotation">@NotBlank</span> <span class="class-name">String</span> username,
+                               <span class="annotation">@Email</span> <span class="class-name">String</span> email) {}
+<span class="keyword">public record</span> <span class="class-name">UpdateUserRequest</span>(<span class="annotation">@Size</span>(max = <span class="number">50</span>) <span class="class-name">String</span> username) {}</code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Resource classes are instantiated per-request by default — never rely on field state</div>
+                    <p>Unlike Spring's singleton controllers, a JAX-RS resource class
+                        receives a new instance per HTTP request. Any state held in fields
+                        (counters, caches, partially built objects) is silently lost between
+                        calls. Stateful logic belongs in injected CDI beans with appropriate
+                        scope (<code>@ApplicationScoped</code>, <code>@RequestScoped</code>,
+                        etc.), not in the resource class itself. Some providers (Jersey, CXF)
+                        allow <code>@Singleton</code> on the resource class to opt out of
+                        this default — but then you must handle concurrency yourself.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — PARAMETER INJECTION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Parameter Injection — All the Ways to Bind Incoming Data</h2>
+                <p>JAX-RS can inject virtually anything from the request into method
+                    parameters or fields using annotations. Every injection annotation
+                    handles type conversion from the raw <code>String</code> to the Java type
+                    automatically, or throws a <code>400 Bad Request</code> if conversion
+                    fails.</p>
+
+                <pre><code><span class="annotation">@Path</span>(<span class="string">"/products"</span>)
+<span class="keyword">public class</span> <span class="class-name">ProductResource</span> {
+
+    <span class="comment">// @PathParam — from the URL segment declared in @Path</span>
+    <span class="comment">// GET /api/products/electronics/42</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/{category}/{id}"</span>)
+    <span class="keyword">public</span> <span class="class-name">ProductDto</span> <span class="function">getByCategory</span>(
+            <span class="annotation">@PathParam</span>(<span class="string">"category"</span>) <span class="class-name">String</span> category,
+            <span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) { ... }
+
+    <span class="comment">// @QueryParam — from the URL query string</span>
+    <span class="comment">// GET /api/products?q=laptop&minPrice=500&inStock=true&page=2&size=20</span>
+    <span class="annotation">@GET</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">ProductDto</span>&gt; <span class="function">search</span>(
+            <span class="annotation">@QueryParam</span>(<span class="string">"q"</span>) <span class="class-name">String</span> query,
+            <span class="annotation">@QueryParam</span>(<span class="string">"minPrice"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"0"</span>)    <span class="class-name">BigDecimal</span> minPrice,
+            <span class="annotation">@QueryParam</span>(<span class="string">"inStock"</span>) <span class="annotation">@DefaultValue</span>(<span class="string">"false"</span>) <span class="keyword">boolean</span> inStock,
+            <span class="annotation">@QueryParam</span>(<span class="string">"page"</span>)    <span class="annotation">@DefaultValue</span>(<span class="string">"0"</span>)     <span class="keyword">int</span> page,
+            <span class="annotation">@QueryParam</span>(<span class="string">"size"</span>)    <span class="annotation">@DefaultValue</span>(<span class="string">"20"</span>)    <span class="keyword">int</span> size) { ... }
+
+    <span class="comment">// @HeaderParam — from a specific HTTP header</span>
+    <span class="comment">// GET /api/products  X-Tenant-Id: acme</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/tenant"</span>)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">ProductDto</span>&gt; <span class="function">getByTenant</span>(
+            <span class="annotation">@HeaderParam</span>(<span class="string">"X-Tenant-Id"</span>) <span class="class-name">String</span> tenantId) { ... }
+
+    <span class="comment">// @CookieParam — from a specific cookie</span>
+    <span class="annotation">@GET</span>
+    <span class="annotation">@Path</span>(<span class="string">"/personalized"</span>)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">ProductDto</span>&gt; <span class="function">getPersonalized</span>(
+            <span class="annotation">@CookieParam</span>(<span class="string">"session_id"</span>) <span class="class-name">String</span> sessionId) { ... }
+
+    <span class="comment">// @Context — inject JAX-RS context objects (request, response, uriInfo...)</span>
+    <span class="annotation">@POST</span>
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">create</span>(<span class="class-name">CreateProductRequest</span> request,
+                            <span class="annotation">@Context</span> <span class="class-name">UriInfo</span> uriInfo,
+                            <span class="annotation">@Context</span> <span class="class-name">HttpHeaders</span> headers,
+                            <span class="annotation">@Context</span> <span class="class-name">SecurityContext</span> security) { ... }
+}</code></pre>
+
+                <table>
+                    <tr><th>Annotation</th><th>Source</th><th>Null if missing?</th></tr>
+                    <tr><td><code>@PathParam</code></td><td>URL path segment (<code>/{id}</code>)</td><td>Only if the regex allows the segment to be absent — unusual. If the path matches, the value is always present</td></tr>
+                    <tr><td><code>@QueryParam</code></td><td>URL query string (<code>?key=value</code>)</td><td>Yes — null for reference types, 0/false for primitives unless <code>@DefaultValue</code> is set</td></tr>
+                    <tr><td><code>@HeaderParam</code></td><td>HTTP request header</td><td>Yes — null if the header is absent</td></tr>
+                    <tr><td><code>@CookieParam</code></td><td>HTTP cookie</td><td>Yes — null if the cookie is absent</td></tr>
+                    <tr><td><code>@FormParam</code></td><td>Form field (<code>application/x-www-form-urlencoded</code>)</td><td>Yes — null if the field is absent</td></tr>
+                    <tr><td><code>@BeanParam</code></td><td>Groups multiple injection annotations into one object</td><td>Object is always created; individual fields follow their own annotation rules</td></tr>
+                    <tr><td><code>@Context</code></td><td>JAX-RS context objects (<code>UriInfo</code>, <code>HttpHeaders</code>, <code>Request</code>, <code>SecurityContext</code>)</td><td>Never null — always injected by the container</td></tr>
+                </table>
+
+                <h3><code>@BeanParam</code> — grouping parameters to avoid long parameter lists</h3>
+                <pre><code><span class="comment">// Instead of 5 @QueryParam parameters on the method signature:</span>
+<span class="keyword">public class</span> <span class="class-name">ProductSearchParams</span> {
+    <span class="annotation">@QueryParam</span>(<span class="string">"q"</span>)          <span class="keyword">public</span> <span class="class-name">String</span> query;
+    <span class="annotation">@QueryParam</span>(<span class="string">"minPrice"</span>)   <span class="annotation">@DefaultValue</span>(<span class="string">"0"</span>)  <span class="keyword">public</span> <span class="class-name">BigDecimal</span> minPrice;
+    <span class="annotation">@QueryParam</span>(<span class="string">"page"</span>)       <span class="annotation">@DefaultValue</span>(<span class="string">"0"</span>)  <span class="keyword">public</span> <span class="keyword">int</span> page;
+    <span class="annotation">@QueryParam</span>(<span class="string">"size"</span>)       <span class="annotation">@DefaultValue</span>(<span class="string">"20"</span>) <span class="keyword">public</span> <span class="keyword">int</span> size;
+    <span class="annotation">@HeaderParam</span>(<span class="string">"Accept-Language"</span>)             <span class="keyword">public</span> <span class="class-name">String</span> locale;
+}
+
+<span class="annotation">@GET</span>
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">ProductDto</span>&gt; <span class="function">search</span>(<span class="annotation">@BeanParam</span> <span class="class-name">ProductSearchParams</span> params) {
+    <span class="keyword">return</span> productService.search(params);
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — HTTP METHODS AND STATUS CODES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>HTTP Methods — Semantics, Status Codes, and Common Mistakes</h2>
+
+                <table>
+                    <tr><th>Method</th><th>Purpose</th><th>Request body</th><th>Idempotent</th><th>Safe</th><th>Correct success code</th></tr>
+                    <tr><td><code>GET</code></td><td>Retrieve resource or collection</td><td>No</td><td>Yes</td><td>Yes</td><td>200 OK</td></tr>
+                    <tr><td><code>POST</code></td><td>Create resource (or trigger an action)</td><td>Yes</td><td>No</td><td>No</td><td>201 Created + Location header</td></tr>
+                    <tr><td><code>PUT</code></td><td>Replace resource completely</td><td>Yes</td><td>Yes</td><td>No</td><td>200 OK (or 204 if no body returned)</td></tr>
+                    <tr><td><code>PATCH</code></td><td>Partial update</td><td>Yes</td><td>No (usually)</td><td>No</td><td>200 OK</td></tr>
+                    <tr><td><code>DELETE</code></td><td>Remove resource</td><td>No</td><td>Yes</td><td>No</td><td>204 No Content</td></tr>
+                    <tr><td><code>HEAD</code></td><td>Like GET but response body stripped — used to check existence/headers</td><td>No</td><td>Yes</td><td>Yes</td><td>200 OK</td></tr>
+                    <tr><td><code>OPTIONS</code></td><td>Returns supported methods — CORS preflight</td><td>No</td><td>Yes</td><td>Yes</td><td>200 OK</td></tr>
+                </table>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Idempotent does not mean "no side effects" — it means "same result if called N times"</div>
+                    <p><code>DELETE /users/42</code> is idempotent: the first call removes the
+                        user, the second call finds nothing and should return 204 or 404 — the
+                        resource ends up absent either way. Returning a 500 on the second call
+                        because the row no longer exists in the database is incorrect. The
+                        convention is 204 for both cases (or 404 if your API contract says
+                        "absence is an error"). The distinction matters because proxies,
+                        load balancers, and clients retry idempotent requests on timeout —
+                        if your handler isn't truly idempotent, a retry causes a duplicate
+                        operation.</p>
+                </div>
+
+                <h3>Response builder — the production shape</h3>
+                <pre><code><span class="comment">// POST: 201 Created with Location header pointing to the new resource</span>
+<span class="annotation">@POST</span>
+<span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">createOrder</span>(<span class="annotation">@Valid</span> <span class="class-name">CreateOrderRequest</span> request,
+                             <span class="annotation">@Context</span> <span class="class-name">UriInfo</span> uriInfo) {
+    <span class="class-name">OrderDto</span> created = orderService.create(request);
+    <span class="class-name">URI</span> location = uriInfo.getAbsolutePathBuilder()
+                          .path(<span class="class-name">String</span>.valueOf(created.id()))
+                          .build();
+    <span class="keyword">return</span> <span class="class-name">Response</span>.created(location)  <span class="comment">// sets status 201 + Location header</span>
+                   .entity(created)
+                   .build();
+}
+
+<span class="comment">// DELETE: 204 No Content — success with no response body</span>
+<span class="annotation">@DELETE</span>
+<span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+<span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">deleteOrder</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+    orderService.delete(id);
+    <span class="keyword">return</span> <span class="class-name">Response</span>.noContent().build();
+}
+
+<span class="comment">// GET that returns null without a mapper → serializes as HTTP 200 with JSON null body.</span>
+<span class="comment">// Always handle the not-found case explicitly:</span>
+<span class="annotation">@GET</span>
+<span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+<span class="keyword">public</span> <span class="class-name">OrderDto</span> <span class="function">getOrder</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> orderService.findById(id)
+        .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">NotFoundException</span>(<span class="string">"Order not found: "</span> + id));
+    <span class="comment">// NotFoundException is a WebApplicationException subtype that</span>
+    <span class="comment">// JAX-RS converts to 404 automatically — no custom mapper needed.</span>
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — EXCEPTION HANDLING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Exception Handling — Built-in Exceptions and Custom Mappers</h2>
+
+                <h3>Built-in <code>WebApplicationException</code> hierarchy</h3>
+                <p>JAX-RS ships ready-made exception types for the most common HTTP error
+                    statuses. Throwing any of these inside a resource method causes the runtime
+                    to respond with the corresponding status code — no mapper needed:</p>
+
+                <pre><code><span class="comment">// These are WebApplicationException subtypes — throw directly from resource methods</span>
+<span class="keyword">throw new</span> <span class="class-name">NotFoundException</span>(<span class="string">"Order "</span> + id + <span class="string">" not found"</span>);         <span class="comment">// 404</span>
+<span class="keyword">throw new</span> <span class="class-name">BadRequestException</span>(<span class="string">"Invalid payload: "</span> + reason);       <span class="comment">// 400</span>
+<span class="keyword">throw new</span> <span class="class-name">NotAuthorizedException</span>(<span class="string">"Bearer"</span>);                        <span class="comment">// 401 (requires challenge)</span>
+<span class="keyword">throw new</span> <span class="class-name">ForbiddenException</span>(<span class="string">"Insufficient permissions"</span>);           <span class="comment">// 403</span>
+<span class="keyword">throw new</span> <span class="class-name">NotAllowedException</span>(<span class="string">"GET"</span>, <span class="string">"POST"</span>);                      <span class="comment">// 405 — allowed methods required</span>
+<span class="keyword">throw new</span> <span class="class-name">NotAcceptableException</span>(<span class="string">"Only application/json supported"</span>); <span class="comment">// 406</span>
+<span class="keyword">throw new</span> <span class="class-name">ServiceUnavailableException</span>(300L);                         <span class="comment">// 503 with Retry-After seconds</span>
+<span class="keyword">throw new</span> <span class="class-name">InternalServerErrorException</span>(<span class="string">"Unexpected error"</span>);          <span class="comment">// 500 (but prefer ExceptionMapper)</span></code></pre>
+
+                <h3>Custom <code>ExceptionMapper</code> — the right pattern for domain exceptions</h3>
+                <p>Service-layer exceptions should not be <code>WebApplicationException</code>
+                    subclasses — the service layer should not know about HTTP. An
+                    <code>ExceptionMapper</code> bridges between domain exceptions and HTTP
+                    responses without coupling those layers:</p>
+
+                <pre><code><span class="comment">// Domain exception — knows nothing about HTTP</span>
+<span class="keyword">public class</span> <span class="class-name">OrderNotFoundException</span> <span class="keyword">extends</span> <span class="class-name">RuntimeException</span> {
+    <span class="keyword">private final</span> <span class="class-name">Long</span> orderId;
+    <span class="keyword">public</span> <span class="function">OrderNotFoundException</span>(<span class="class-name">Long</span> orderId) {
+        <span class="keyword">super</span>(<span class="string">"Order not found: "</span> + orderId);
+        <span class="keyword">this</span>.orderId = orderId;
+    }
+    <span class="keyword">public</span> <span class="class-name">Long</span> <span class="function">getOrderId</span>() { <span class="keyword">return</span> orderId; }
+}
+
+<span class="comment">// Error response body — a record is perfect here</span>
+<span class="keyword">public record</span> <span class="class-name">ErrorResponse</span>(<span class="class-name">String</span> error, <span class="class-name">String</span> message, <span class="class-name">String</span> path) {}
+
+<span class="comment">// The mapper: discovered automatically thanks to @Provider</span>
 <span class="annotation">@Provider</span>
-<span class="keyword">public class</span> <span class="class-name">ProductNotFoundMapper</span>
-    <span class="keyword">implements</span> <span class="class-name">ExceptionMapper</span>&lt;<span class="class-name">ProductNotFoundException</span>&gt; {
+<span class="keyword">public class</span> <span class="class-name">OrderNotFoundMapper</span>
+        <span class="keyword">implements</span> <span class="class-name">ExceptionMapper</span>&lt;<span class="class-name">OrderNotFoundException</span>&gt; {
+
+    <span class="annotation">@Context</span>
+    <span class="keyword">private</span> <span class="class-name">UriInfo</span> uriInfo;
 
     <span class="annotation">@Override</span>
-    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">toResponse</span>(<span class="class-name">ProductNotFoundException</span> exception) {
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">toResponse</span>(<span class="class-name">OrderNotFoundException</span> ex) {
         <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.NOT_FOUND)
-                       .entity(<span class="keyword">new</span> <span class="class-name">ErrorMessage</span>(exception.getMessage()))
+                       .entity(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(
+                           <span class="string">"NOT_FOUND"</span>,
+                           ex.getMessage(),
+                           uriInfo.getPath()))
                        .build();
     }
 }
 
-<span class="comment">// Now you can throw it anywhere</span>
-<span class="annotation">@GET</span>
-<span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
-<span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
-    <span class="keyword">return</span> productService.findById(id)
-        .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">ProductNotFoundException</span>(<span class="string">"Product not found"</span>));
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Filters and Interceptors</h2>
-
-            <h3>Request Filter (Authentication)</h3>
-            <pre><code><span class="annotation">@Provider</span>
-<span class="annotation">@Priority</span>(Priorities.AUTHENTICATION)
-<span class="keyword">public class</span> <span class="class-name">AuthenticationFilter</span> <span class="keyword">implements</span> <span class="class-name">ContainerRequestFilter</span> {
+<span class="comment">// A single catch-all mapper for unhandled RuntimeExceptions</span>
+<span class="annotation">@Provider</span>
+<span class="keyword">public class</span> <span class="class-name">GlobalExceptionMapper</span>
+        <span class="keyword">implements</span> <span class="class-name">ExceptionMapper</span>&lt;<span class="class-name">Exception</span>&gt; {
 
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">filter</span>(<span class="class-name">ContainerRequestContext</span> requestContext) {
-        <span class="class-name">String</span> token = requestContext.getHeaderString(<span class="string">"Authorization"</span>);
-
-        <span class="keyword">if</span> (token == <span class="keyword">null</span> || !isValidToken(token)) {
-            requestContext.abortWith(
-                <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.UNAUTHORIZED)
-                        .entity(<span class="string">"Unauthorized"</span>)
-                        .build()
-            );
-        }
-    }
-
-    <span class="keyword">private</span> <span class="keyword">boolean</span> <span class="function">isValidToken</span>(<span class="class-name">String</span> token) {
-        <span class="comment">// Validate JWT token</span>
-        <span class="keyword">return</span> <span class="keyword">true</span>;
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">toResponse</span>(<span class="class-name">Exception</span> ex) {
+        <span class="comment">// Never leak internal exception details to clients in production</span>
+        <span class="keyword">return</span> <span class="class-name">Response</span>.serverError()
+                       .entity(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(
+                           <span class="string">"INTERNAL_ERROR"</span>,
+                           <span class="string">"An unexpected error occurred"</span>,
+                           <span class="keyword">null</span>))
+                       .build();
     }
 }</code></pre>
 
-            <h3>Response Filter (CORS)</h3>
-            <pre><code><span class="annotation">@Provider</span>
+                <div class="info-box warning">
+                    <div class="info-box-title">A <code>ExceptionMapper&lt;Exception&gt;</code> intercepts JAX-RS's own <code>WebApplicationException</code> — this is usually wrong</div>
+                    <p>If you register a mapper for the root <code>Exception</code> type, it
+                        also catches every <code>WebApplicationException</code> (including
+                        <code>NotFoundException</code>, <code>ForbiddenException</code>, etc.)
+                        and overrides their status codes with whatever your mapper returns.
+                        The fix is to check whether the caught exception is a
+                        <code>WebApplicationException</code> and pass it through:</p>
+                    <pre><code><span class="annotation">@Override</span>
+<span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">toResponse</span>(<span class="class-name">Exception</span> ex) {
+    <span class="keyword">if</span> (ex <span class="keyword">instanceof</span> <span class="class-name">WebApplicationException</span> wae) {
+        <span class="keyword">return</span> wae.getResponse();   <span class="comment">// let JAX-RS handle its own exceptions</span>
+    }
+    <span class="keyword">return</span> <span class="class-name">Response</span>.serverError()
+                   .entity(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"INTERNAL_ERROR"</span>, <span class="string">"..."</span>, <span class="keyword">null</span>))
+                   .build();
+}</code></pre>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — FILTERS AND INTERCEPTORS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Filters and Interceptors — Cross-Cutting Concerns</h2>
+                <p>JAX-RS has two distinct extension points for cross-cutting concerns:
+                    <strong>filters</strong> operate on request/response metadata (headers,
+                    status, URI); <strong>interceptors</strong> operate on the message body
+                    (wrapping <code>MessageBodyReader</code>/<code>MessageBodyWriter</code>
+                    during (de)serialization). Most real-world needs are met by filters.</p>
+
+                <h3>Request filter — authentication</h3>
+                <pre><code><span class="annotation">@Provider</span>
+<span class="annotation">@Priority</span>(Priorities.AUTHENTICATION)  <span class="comment">// runs before AUTHORIZATION filters</span>
+<span class="keyword">public class</span> <span class="class-name">JwtAuthFilter</span> <span class="keyword">implements</span> <span class="class-name">ContainerRequestFilter</span> {
+
+    <span class="annotation">@Inject</span>
+    <span class="keyword">private</span> <span class="class-name">JwtValidator</span> jwtValidator;
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">filter</span>(<span class="class-name">ContainerRequestContext</span> ctx) {
+        <span class="class-name">String</span> header = ctx.getHeaderString(<span class="class-name">HttpHeaders</span>.AUTHORIZATION);
+        <span class="keyword">if</span> (header == <span class="keyword">null</span> || !header.startsWith(<span class="string">"Bearer "</span>)) {
+            ctx.abortWith(<span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.UNAUTHORIZED)
+                                  .header(<span class="string">"WWW-Authenticate"</span>, <span class="string">"Bearer"</span>)
+                                  .build());
+            <span class="keyword">return</span>;
+        }
+        <span class="class-name">String</span> token = header.substring(<span class="number">7</span>);
+        <span class="keyword">try</span> {
+            <span class="class-name">UserPrincipal</span> principal = jwtValidator.validate(token);
+            <span class="comment">// Install a SecurityContext so @Context SecurityContext works downstream</span>
+            ctx.setSecurityContext(<span class="keyword">new</span> <span class="class-name">JwtSecurityContext</span>(principal));
+        } <span class="keyword">catch</span> (<span class="class-name">InvalidTokenException</span> e) {
+            ctx.abortWith(<span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.UNAUTHORIZED).build());
+        }
+    }
+}</code></pre>
+
+                <h3>Response filter — CORS</h3>
+                <pre><code><span class="annotation">@Provider</span>
 <span class="keyword">public class</span> <span class="class-name">CorsFilter</span> <span class="keyword">implements</span> <span class="class-name">ContainerResponseFilter</span> {
 
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">filter</span>(<span class="class-name">ContainerRequestContext</span> requestContext,
-                      <span class="class-name">ContainerResponseContext</span> responseContext) {
-        responseContext.getHeaders().add(<span class="string">"Access-Control-Allow-Origin"</span>, <span class="string">"*"</span>);
-        responseContext.getHeaders().add(<span class="string">"Access-Control-Allow-Methods"</span>,
-                                         <span class="string">"GET, POST, PUT, DELETE"</span>);
-        responseContext.getHeaders().add(<span class="string">"Access-Control-Allow-Headers"</span>,
-                                         <span class="string">"Content-Type, Authorization"</span>);
+    <span class="keyword">public void</span> <span class="function">filter</span>(<span class="class-name">ContainerRequestContext</span> req,
+                      <span class="class-name">ContainerResponseContext</span> res) {
+        <span class="keyword">var</span> headers = res.getHeaders();
+        headers.add(<span class="string">"Access-Control-Allow-Origin"</span>,  <span class="string">"https://myapp.example.com"</span>);
+        headers.add(<span class="string">"Access-Control-Allow-Methods"</span>, <span class="string">"GET, POST, PUT, PATCH, DELETE, OPTIONS"</span>);
+        headers.add(<span class="string">"Access-Control-Allow-Headers"</span>, <span class="string">"Authorization, Content-Type"</span>);
+        headers.add(<span class="string">"Access-Control-Max-Age"</span>,       <span class="string">"86400"</span>);
     }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Async Processing</h2>
+                <div class="info-box important">
+                    <div class="info-box-title"><code>Access-Control-Allow-Origin: *</code> and credentials don't mix</div>
+                    <p>If the browser sends a request with cookies or an
+                        <code>Authorization</code> header (a "credentialed request"), the
+                        wildcard <code>*</code> origin is rejected by every modern browser.
+                        You must echo back the specific <code>Origin</code> header value from
+                        the request, add
+                        <code>Access-Control-Allow-Credentials: true</code>, and whitelist only
+                        your known origins server-side. The wildcard is only safe for public,
+                        anonymous read APIs.</p>
+                </div>
 
-            <pre><code><span class="annotation">@Path</span>(<span class="string">"/async"</span>)
-<span class="keyword">public class</span> <span class="class-name">AsyncResource</span> {
+                <h3><code>@NameBinding</code> — applying filters to specific endpoints only</h3>
+                <pre><code><span class="comment">// 1. Declare a name-binding annotation</span>
+<span class="annotation">@NameBinding</span>
+<span class="annotation">@Target</span>({ElementType.TYPE, ElementType.METHOD})
+<span class="annotation">@Retention</span>(RetentionPolicy.RUNTIME)
+<span class="keyword">public @interface</span> <span class="class-name">Authenticated</span> {}
 
-    <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">ReportService</span> reportService;
+<span class="comment">// 2. Apply the annotation to the filter</span>
+<span class="annotation">@Provider</span>
+<span class="annotation">@Authenticated</span>
+<span class="keyword">public class</span> <span class="class-name">JwtAuthFilter</span> <span class="keyword">implements</span> <span class="class-name">ContainerRequestFilter</span> { ... }
 
-    <span class="annotation">@GET</span>
-    <span class="annotation">@Path</span>(<span class="string">"/report"</span>)
-    <span class="keyword">public void</span> <span class="function">generateReport</span>(<span class="annotation">@Suspended</span> <span class="class-name">AsyncResponse</span> response) {
-        <span class="comment">// Process in background thread</span>
-        <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
-            <span class="keyword">try</span> {
-                <span class="comment">// Long-running task</span>
-                <span class="class-name">String</span> report = reportService.generate();
-                response.resume(report);  <span class="comment">// Send response when ready</span>
-            } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
-                response.resume(e);  <span class="comment">// Send error</span>
-            }
-        }).start();
+<span class="comment">// 3. Tag only the endpoints (or whole resource class) that need it</span>
+<span class="annotation">@Path</span>(<span class="string">"/orders"</span>)
+<span class="annotation">@Authenticated</span>   <span class="comment">// every method in this class now goes through JwtAuthFilter</span>
+<span class="keyword">public class</span> <span class="class-name">OrderResource</span> { ... }
 
-        <span class="comment">// Method returns immediately, response sent later</span>
+<span class="annotation">@Path</span>(<span class="string">"/health"</span>)
+<span class="keyword">public class</span> <span class="class-name">HealthResource</span> { ... }  <span class="comment">// not tagged → filter never runs here</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — CONTENT NEGOTIATION & JSON-B
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Content Negotiation and JSON Serialization</h2>
+                <p>JAX-RS uses the <code>Accept</code> and <code>Content-Type</code> headers
+                    to select the right <code>MessageBodyWriter</code>/<code>MessageBodyReader</code>
+                    for serialization. <code>@Produces</code> declares what the endpoint can
+                    return; <code>@Consumes</code> declares what it can accept. If no matching
+                    provider is found, JAX-RS returns <code>406 Not Acceptable</code> or
+                    <code>415 Unsupported Media Type</code> automatically.</p>
+
+                <pre><code><span class="annotation">@GET</span>
+<span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
+<span class="annotation">@Produces</span>({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
+<span class="keyword">public</span> <span class="class-name">ProductDto</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+    <span class="comment">// Sends JSON if client sends: Accept: application/json</span>
+    <span class="comment">// Sends XML if client sends:  Accept: application/xml</span>
+    <span class="comment">// Returns 406 if client sends: Accept: text/csv</span>
+    <span class="keyword">return</span> productService.findById(id);
+}</code></pre>
+
+                <h3>JSON-B configuration — controlling serialization</h3>
+                <pre><code><span class="comment">// JSON-B (Jakarta JSON Binding) is the spec-standard JSON provider</span>
+<span class="comment">// Customize it by providing a Jsonb instance or using annotations on the DTO</span>
+
+<span class="keyword">public record</span> <span class="class-name">ProductDto</span>(
+    <span class="class-name">Long</span> id,
+
+    <span class="annotation">@JsonbProperty</span>(<span class="string">"product_name"</span>)  <span class="comment">// serializes as "product_name" not "name"</span>
+    <span class="class-name">String</span> name,
+
+    <span class="annotation">@JsonbNumberFormat</span>(<span class="string">"#0.00"</span>)
+    <span class="class-name">BigDecimal</span> price,
+
+    <span class="annotation">@JsonbDateFormat</span>(<span class="string">"yyyy-MM-dd"</span>)
+    <span class="class-name">LocalDate</span> createdOn,
+
+    <span class="annotation">@JsonbTransient</span>  <span class="comment">// excluded from serialization entirely</span>
+    <span class="class-name">String</span> internalCode
+) {}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — BEAN VALIDATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Bean Validation Integration</h2>
+                <p>JAX-RS integrates with Jakarta Bean Validation out of the box on any
+                    certified Jakarta EE container. Adding <code>@Valid</code> to a parameter
+                    or return type triggers constraint validation automatically — no manual
+                    validation code needed. Validation failures are caught by a built-in
+                    <code>ExceptionMapper</code> for
+                    <code>ConstraintViolationException</code> (the container usually provides
+                    one; register a custom one to control the response shape).</p>
+
+                <pre><code><span class="keyword">public record</span> <span class="class-name">CreateProductRequest</span>(
+    <span class="annotation">@NotBlank</span>(<span class="string">message = "Name is required"</span>)
+    <span class="annotation">@Size</span>(max = <span class="number">100</span>)
+    <span class="class-name">String</span> name,
+
+    <span class="annotation">@NotNull</span>
+    <span class="annotation">@DecimalMin</span>(<span class="string">"0.01"</span>)
+    <span class="class-name">BigDecimal</span> price,
+
+    <span class="annotation">@NotBlank</span>
+    <span class="annotation">@Pattern</span>(regexp = <span class="string">"[A-Z]{2,5}"</span>)
+    <span class="class-name">String</span> sku
+) {}
+
+<span class="annotation">@POST</span>
+<span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">create</span>(<span class="annotation">@Valid</span> <span class="class-name">CreateProductRequest</span> request) {
+    <span class="comment">// If any constraint fails, JAX-RS intercepts and returns 400</span>
+    <span class="comment">// before this line is ever reached</span>
+    <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="number">201</span>).entity(productService.create(request)).build();
+}
+
+<span class="comment">// Register a custom mapper to control the error response shape:</span>
+<span class="annotation">@Provider</span>
+<span class="keyword">public class</span> <span class="class-name">ValidationExceptionMapper</span>
+        <span class="keyword">implements</span> <span class="class-name">ExceptionMapper</span>&lt;<span class="class-name">ConstraintViolationException</span>&gt; {
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">toResponse</span>(<span class="class-name">ConstraintViolationException</span> ex) {
+        <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">String</span>&gt; errors = ex.getConstraintViolations().stream()
+            .collect(<span class="class-name">Collectors</span>.toMap(
+                cv -> cv.getPropertyPath().toString(),
+                cv -> cv.getMessage()
+            ));
+        <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.BAD_REQUEST)
+                       .entity(errors)
+                       .build();
     }
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Content Negotiation</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — ASYNC
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Async Processing — <code>@Suspended</code> and <code>CompletionStage</code></h2>
+                <p>JAX-RS offers two async models. The <code>@Suspended</code> model
+                    (JAX-RS 2.0) suspends the request-handling thread and resumes the
+                    response from any other thread. The <code>CompletionStage</code> return
+                    type (JAX-RS 2.1) is the cleaner modern approach — no thread management,
+                    integrates with virtual threads in Java 21.</p>
 
-            <pre><code><span class="annotation">@Path</span>(<span class="string">"/products"</span>)
-<span class="keyword">public class</span> <span class="class-name">ProductResource</span> {
+                <pre><code><span class="comment">// JAX-RS 2.1+: return CompletionStage — clean, no manual thread management</span>
+<span class="annotation">@GET</span>
+<span class="annotation">@Path</span>(<span class="string">"/reports/{id}"</span>)
+<span class="keyword">public</span> <span class="class-name">CompletionStage</span>&lt;<span class="class-name">Response</span>&gt; <span class="function">getReport</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> reportService.buildAsync(id)
+                       .thenApply(<span class="class-name">Response</span>::ok)
+                       .thenApply(<span class="class-name">Response.ResponseBuilder</span>::build);
+}
 
-    <span class="annotation">@GET</span>
-    <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
-    <span class="annotation">@Produces</span>({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
-    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
-        <span class="comment">// Returns JSON or XML based on Accept header</span>
-        <span class="comment">// Accept: application/json → JSON response</span>
-        <span class="comment">// Accept: application/xml → XML response</span>
-        <span class="keyword">return</span> productService.findById(id);
-    }
+<span class="comment">// JAX-RS 2.0: @Suspended — more control, more verbosity</span>
+<span class="annotation">@GET</span>
+<span class="annotation">@Path</span>(<span class="string">"/legacy-reports/{id}"</span>)
+<span class="keyword">public void</span> <span class="function">getLegacyReport</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id,
+                            <span class="annotation">@Suspended</span> <span class="class-name">AsyncResponse</span> ar) {
+    ar.setTimeout(<span class="number">10</span>, <span class="class-name">TimeUnit</span>.SECONDS);
+    ar.setTimeoutHandler(resp -> resp.resume(
+        <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.SERVICE_UNAVAILABLE).build()));
 
-    <span class="annotation">@POST</span>
-    <span class="annotation">@Consumes</span>({MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML})
-    <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">create</span>(<span class="class-name">Product</span> product) {
-        <span class="comment">// Accepts JSON or XML based on Content-Type header</span>
-        <span class="keyword">return</span> <span class="class-name">Response</span>.ok(productService.create(product)).build();
-    }
-}</code></pre>
-        </section>
+    reportService.buildAsync(id)
+                 .thenAccept(report -> ar.resume(<span class="class-name">Response</span>.ok(report).build()))
+                 .exceptionally(ex -> { ar.resume(ex); <span class="keyword">return null</span>; });
+}
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+<span class="comment">// Important: new Thread(() -> ...).start() in a resource method is wrong.</span>
+<span class="comment">// Use @Asynchronous on the EJB service, or an injected ManagedExecutorService,</span>
+<span class="comment">// so the container manages the thread lifecycle (transactions, security context).</span></code></pre>
 
-            <div class="best-practices">
-                <h3>✅ DO:</h3>
-                <ul>
-                    <li><strong>Use proper HTTP methods</strong> - GET for read, POST for create, etc.</li>
-                    <li><strong>Return correct status codes</strong> - 200, 201, 404, 500, etc.</li>
-                    <li><strong>Use @Valid for validation</strong> - Automatic bean validation</li>
-                    <li><strong>Handle exceptions properly</strong> - Use exception mappers</li>
-                    <li><strong>Version your APIs</strong> - /api/v1/users, /api/v2/users</li>
-                    <li><strong>Use pagination for large datasets</strong> - page and size parameters</li>
-                    <li><strong>Document your API</strong> - OpenAPI/Swagger</li>
-                    <li><strong>Secure endpoints</strong> - Authentication and authorization</li>
-                </ul>
+                <div class="info-box warning">
+                    <div class="info-box-title">Never spawn raw threads from inside a JAX-RS resource method</div>
+                    <p>The original file in this project showed
+                        <code>new Thread(() -&gt; ...).start()</code> inside an async
+                        resource — this is wrong in a managed environment. Raw threads bypass
+                        the container's thread pool management, don't inherit the current
+                        transaction context or security context, can't use
+                        <code>@PersistenceContext</code> injection reliably, and may exhaust
+                        file descriptors under load. Use a
+                        <code>ManagedExecutorService</code> (injected via
+                        <code>@Resource</code>), <code>@Asynchronous</code> EJB methods, or
+                        return a <code>CompletionStage</code> from a properly managed async
+                        service.</p>
+                </div>
+            </section>
 
-                <h3>❌ DON'T:</h3>
-                <ul>
-                    <li><strong>Don't use GET for mutations</strong> - Use POST/PUT/DELETE</li>
-                    <li><strong>Don't return null</strong> - Return 404 or empty list</li>
-                    <li><strong>Don't expose entities directly</strong> - Use DTOs</li>
-                    <li><strong>Don't forget CORS</strong> - Frontend needs it</li>
-                    <li><strong>Don't ignore status codes</strong> - Always return appropriate codes</li>
-                    <li><strong>Don't put business logic in resources</strong> - Use services</li>
-                    <li><strong>Don't forget error handling</strong> - Always handle exceptions</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>JAX-RS</strong> builds REST APIs with annotations</li>
-                    <li><strong>@Path:</strong> Maps URL to resource class/method</li>
-                    <li><strong>@GET, @POST, @PUT, @DELETE:</strong> HTTP methods</li>
-                    <li><strong>@PathParam:</strong> URL path variables (/users/{id})</li>
-                    <li><strong>@QueryParam:</strong> Query string parameters (?page=1)</li>
-                    <li><strong>@Produces/@Consumes:</strong> Content type (JSON, XML)</li>
-                    <li><strong>Response:</strong> Build custom HTTP responses with status codes</li>
-                    <li><strong>Exception handling:</strong> ExceptionMapper for custom error responses</li>
-                    <li><strong>Filters:</strong> Request/response interceptors (auth, CORS)</li>
-                    <li><strong>Implementations:</strong> Jersey, RESTEasy, Apache CXF</li>
-                </ul>
-            </div>
-        </section>
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Always return <code>Response</code> from <code>@POST</code> with a <code>Location</code> header pointing to the new resource — this is the correct REST contract, and clients depend on it to retrieve the created entity</li>
+                        <li>Use <code>@NameBinding</code> to scope filters to specific endpoints instead of running them globally — authentication filters on a health check endpoint are unnecessary overhead</li>
+                        <li>Use DTOs (records) as request and response types — never expose <code>@Entity</code> classes at the boundary. Bidirectional JPA relationships cause infinite serialization loops</li>
+                        <li>Register a <code>ExceptionMapper&lt;ConstraintViolationException&gt;</code> to control the validation error response shape — the default varies by provider and is usually not API-quality</li>
+                        <li>Set explicit CORS origins, never <code>*</code> when credentials are involved</li>
+                        <li>Use <code>CompletionStage</code> return types for async endpoints instead of <code>@Suspended</code> — cleaner code, better integration with modern Java concurrency</li>
+                    </ul>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="json.html" class="related-link">JSON Processing & Binding</a>
-                <a href="bean-validation.html" class="related-link">Bean Validation</a>
-                <a href="security.html" class="related-link">Security & Authentication</a>
-            </div>
-        </section>
-    </main>
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't return <code>null</code> from resource methods — it serializes as HTTP 204 or an empty body, not a 404. Throw <code>NotFoundException</code> or use an <code>Optional</code>-aware pattern</li>
+                        <li>Don't put business logic in resource classes — they are HTTP adapters only. All validation beyond format checking, all transactions, and all domain rules belong in a service layer</li>
+                        <li>Don't register an <code>ExceptionMapper&lt;Exception&gt;</code> without first checking for and passing through <code>WebApplicationException</code> — otherwise your 404s become 500s</li>
+                        <li>Don't spawn raw <code>Thread</code> objects from resource methods — use container-managed threading</li>
+                        <li>Don't rely on resource-class field state between requests — resource instances are per-request, not singletons</li>
+                        <li>Don't manually inline HTTP status codes as integers (<code>Response.status(404)</code>) — use <code>Response.Status</code> constants for readability and to avoid typos</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is the difference between <code>@PathParam</code> and <code>@QueryParam</code>?</strong><br>
+                    <code>@PathParam</code> binds a variable segment from the URL path declared
+                    in <code>@Path</code> (e.g. <code>/{id}</code> → <code>@PathParam("id")</code>).
+                    <code>@QueryParam</code> binds a key-value pair from the URL query string
+                    (e.g. <code>?page=2</code> → <code>@QueryParam("page")</code>). Path params
+                    identify a specific resource; query params typically filter or paginate a
+                    collection.</p>
+
+                    <p><strong>Q: What HTTP status code should a successful <code>@POST</code> that creates a resource return?</strong><br>
+                    201 Created, along with a <code>Location</code> header containing the URI
+                    of the newly created resource. Returning 200 OK is technically wrong
+                    because 200 means "here is the state of an existing resource" while
+                    201 means "I created something new and here is where to find it."</p>
+
+                    <p><strong>Q: What does <code>@Produces</code> do?</strong><br>
+                    It declares the media types the endpoint can return (e.g.
+                    <code>application/json</code>, <code>application/xml</code>). The JAX-RS
+                    runtime matches the client's <code>Accept</code> header against the
+                    declared types to pick the right <code>MessageBodyWriter</code> for
+                    serialization. If no matching type can be found, the runtime returns
+                    406 Not Acceptable automatically.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A <code>@GET</code> endpoint returns null when the entity is not found. What actually happens, and what should happen instead?</strong><br>
+                    When a JAX-RS method with a non-<code>Response</code> return type returns
+                    null, the runtime maps it to a 204 No Content response with an empty body
+                    — not a 404. This is wrong for a GET on a single resource where absence
+                    means "not found". The correct approach is to throw
+                    <code>NotFoundException</code> (a <code>WebApplicationException</code>
+                    subtype that produces a 404) or to use a service return type of
+                    <code>Optional&lt;T&gt;</code> and call
+                    <code>.orElseThrow(() -&gt; new NotFoundException(...))</code>. Using a
+                    custom <code>ExceptionMapper</code> keeps the 404 response shape
+                    consistent with all other error responses in the API.</p>
+
+                    <p><strong>Q: Why is registering a global <code>ExceptionMapper&lt;Exception&gt;</code> dangerous, and how do you fix it?</strong><br>
+                    <code>WebApplicationException</code> is a subclass of
+                    <code>RuntimeException</code> which is a subclass of
+                    <code>Exception</code>. A mapper for <code>Exception</code> therefore
+                    catches every <code>NotFoundException</code>, <code>ForbiddenException</code>,
+                    and <code>BadRequestException</code> that resource methods and the
+                    framework itself throw, replacing their carefully assigned status codes
+                    with whatever your mapper returns — usually 500. The fix is to check
+                    <code>if (ex instanceof WebApplicationException wae) return
+                    wae.getResponse();</code> at the top of <code>toResponse()</code>,
+                    delegating all JAX-RS exceptions back to the framework's default
+                    handling.</p>
+
+                    <p><strong>Q: What is the difference between a JAX-RS filter and an interceptor, and when do you use each?</strong><br>
+                    Filters implement <code>ContainerRequestFilter</code> or
+                    <code>ContainerResponseFilter</code> and operate on request/response
+                    metadata: headers, URI, HTTP method, status code, and whether to
+                    abort a request before the resource method runs. Interceptors implement
+                    <code>ReaderInterceptor</code> or <code>WriterInterceptor</code> and
+                    wrap the reading or writing of the message body — they are invoked during
+                    deserialization (request body → Java object) and serialization (Java
+                    object → response body). Typical filter use cases: authentication, CORS,
+                    logging, rate limiting. Typical interceptor use cases: request body
+                    decryption, response compression, audit logging of full request/response
+                    payloads.</p>
+
+                    <p><strong>Q: JAX-RS resource classes are per-request by default. What does this mean for concurrent access, and when would you change it?</strong><br>
+                    Each incoming HTTP request gets its own instance of the resource class,
+                    so fields on the resource class are never shared between concurrent
+                    requests — there is no concurrency problem on the resource class itself.
+                    The trade-off is that instantiation and injection happen on every request.
+                    Annotating the resource class with <code>@Singleton</code> (Jersey) or
+                    registering it as a singleton creates one shared instance for all
+                    requests, eliminating per-request instantiation overhead at the cost of
+                    requiring thread-safe handling for any mutable state. In practice,
+                    resource classes should hold no mutable state at all — only injected
+                    services — making the per-request default safe and the singleton
+                    alternative irrelevant.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="cdi.html" class="related-link"><span class="related-icon">💉</span>CDI (Dependency Injection)</a>
+                    <a href="ejb.html" class="related-link"><span class="related-icon">🧩</span>EJB (Enterprise JavaBeans)</a>
+                    <a href="jpa.html" class="related-link"><span class="related-icon">💾</span>JPA (Java Persistence API)</a>
+                    <a href="transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions &amp; JTA</a>
+                    <a href="overview.html" class="related-link"><span class="related-icon">🏢</span>Jakarta EE Overview</a>
+                    <a href="../spring/rest.html" class="related-link"><span class="related-icon">🍃</span>Spring REST</a>
+                    <a href="../web-concepts/rest.html" class="related-link"><span class="related-icon">🌐</span>RESTful API Principles</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

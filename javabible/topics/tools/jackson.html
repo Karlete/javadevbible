@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.jackson.page-title">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jackson — JSON in Java - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#tools" data-i18n="nav.tools">Tools &amp; Ecosystem</a> /
+                Jackson
+            </nav>
+            <h1 data-i18n="topic.jackson.h1">Jackson — JSON in Java</h1>
+            <p class="topic-subtitle" data-i18n="topic.jackson.subtitle">The de-facto standard for JSON serialisation in Java — how it works, how Spring Boot configures it, and the gotchas that will bite you in production</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS JACKSON AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Jackson, and Why Does Every Java Project Use It?</h2>
+                <p>Jackson is a Java library for processing JSON — converting Java objects to
+                    JSON strings (<strong>serialisation</strong>) and JSON strings back to Java
+                    objects (<strong>deserialisation</strong>). It is not part of the JDK, not
+                    part of the Java EE / Jakarta EE spec, and not written by Spring — it is an
+                    independent open-source library that became the industry default because it
+                    is fast, flexible, and deeply integrated into every major Java framework.</p>
+
+                <p>Before Jackson, Java had no standard way to handle JSON. Projects used
+                    string concatenation, home-grown parsers, or the Jakarta EE JSON-P/JSON-B
+                    APIs (which are correct but verbose and less widely adopted). Jackson solved
+                    the problem once and solved it well — its <code>ObjectMapper</code> can
+                    convert any Java object to JSON and back with zero configuration for the
+                    common case, and precise control when needed.</p>
+
+                <pre><code><span class="comment">/*
+ * Before Jackson — manual JSON construction (real pre-2010 code):
+ *
+ *   String json = "{\"name\":\"" + user.getName() + "\","
+ *               + "\"email\":\"" + user.getEmail() + "\"}";
+ *
+ * Problem: escaping, null handling, nested objects, arrays — all manual.
+ * No type safety, no refactoring support, wrong JSON on one typo.
+ *
+ * With Jackson:
+ */</span>
+<span class="class-name">ObjectMapper</span> mapper = <span class="keyword">new</span> <span class="class-name">ObjectMapper</span>();
+<span class="class-name">String</span> json = mapper.writeValueAsString(user);          <span class="comment">// → {"name":"Ana","email":"ana@example.com"}</span>
+<span class="class-name">User</span> parsed = mapper.readValue(json, <span class="class-name">User</span>.<span class="keyword">class</span>);       <span class="comment">// back to User</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Jackson in Spring Boot — you're already using it</div>
+                    <p><code>spring-boot-starter-web</code> pulls in
+                        <code>jackson-databind</code> as a transitive dependency. Spring Boot
+                        auto-configures an <code>ObjectMapper</code> bean and registers it as
+                        the <code>HttpMessageConverter</code> for <code>application/json</code>
+                        — every <code>@RestController</code> method that returns an object uses
+                        Jackson under the hood. You've been using it since page one of this
+                        Bible; this page explains how it actually works.</p>
+                </div>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Three Jackson modules — know which one does what</div>
+                    <table>
+                        <tr><th>Module</th><th>What it does</th></tr>
+                        <tr>
+                            <td><code>jackson-core</code></td>
+                            <td>Low-level streaming API (<code>JsonParser</code>,
+                                <code>JsonGenerator</code>) — you rarely use this directly</td>
+                        </tr>
+                        <tr>
+                            <td><code>jackson-databind</code></td>
+                            <td><code>ObjectMapper</code> and data binding — this is "Jackson"
+                                for 99% of use cases</td>
+                        </tr>
+                        <tr>
+                            <td><code>jackson-annotations</code></td>
+                            <td>All the <code>@Json*</code> annotations —
+                                pulled in transitively by databind</td>
+                        </tr>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — OBJECTMAPPER: THE CORE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>ObjectMapper — The Core, and Why You Don't new It Per Request</h2>
+
+                <pre><code><span class="comment">// ObjectMapper is THREAD-SAFE after configuration — create once, reuse everywhere</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">ObjectMapper</span> <span class="function">objectMapper</span>() {
+    <span class="keyword">return new</span> <span class="class-name">ObjectMapper</span>()
+        .registerModule(<span class="keyword">new</span> <span class="class-name">JavaTimeModule</span>())                         <span class="comment">// LocalDate, LocalDateTime, etc.</span>
+        .disable(<span class="class-name">SerializationFeature</span>.WRITE_DATES_AS_TIMESTAMPS)      <span class="comment">// ISO-8601 strings, not epoch longs</span>
+        .disable(<span class="class-name">DeserializationFeature</span>.FAIL_ON_UNKNOWN_PROPERTIES)   <span class="comment">// ignore extra JSON fields</span>
+        .enable(<span class="class-name">MapperFeature</span>.ACCEPT_CASE_INSENSITIVE_PROPERTIES);    <span class="comment">// "Name" binds to "name"</span>
+}
+
+<span class="comment">// Basic operations</span>
+<span class="class-name">ObjectMapper</span> mapper = <span class="keyword">new</span> <span class="class-name">ObjectMapper</span>();
+
+<span class="comment">// Serialise — object to JSON string</span>
+<span class="class-name">String</span> json        = mapper.writeValueAsString(user);
+<span class="class-name">String</span> prettyJson  = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(user);
+
+<span class="comment">// Deserialise — JSON string to object</span>
+<span class="class-name">User</span> user          = mapper.readValue(json, <span class="class-name">User</span>.<span class="keyword">class</span>);
+
+<span class="comment">// Generic types — List, Map, Page&lt;T&gt; require TypeReference</span>
+<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users   = mapper.readValue(json, <span class="keyword">new</span> <span class="class-name">TypeReference</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt;&gt;() {});
+
+<span class="comment">// Convert between types (e.g. Map → POJO, useful for dynamic structures)</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; map = mapper.convertValue(user, <span class="keyword">new</span> <span class="class-name">TypeReference</span>&lt;&gt;() {});
+<span class="class-name">User</span> fromMap       = mapper.convertValue(map, <span class="class-name">User</span>.<span class="keyword">class</span>);</code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">new ObjectMapper() per request is a real performance bug</div>
+                    <p><code>ObjectMapper</code> construction is expensive — it scans the
+                        classpath, builds internal caches for every type it encounters, and
+                        registers modules. Creating a new instance per HTTP request in a high-
+                        traffic API measurably degrades throughput. The instance itself is
+                        fully thread-safe after configuration; share one instance (or use the
+                        Spring-managed bean) across the entire application.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — CORE ANNOTATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Core Annotations</h2>
+
+                <pre><code><span class="keyword">public class</span> <span class="class-name">UserDto</span> {
+
+    <span class="annotation">@JsonProperty</span>(<span class="string">"full_name"</span>)          <span class="comment">// serialises as "full_name" in JSON, even though the field is "name"</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+
+    <span class="annotation">@JsonIgnore</span>                          <span class="comment">// excluded from both serialisation AND deserialisation</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> passwordHash;
+
+    <span class="annotation">@JsonAlias</span>({<span class="string">"mail"</span>, <span class="string">"emailAddress"</span>})  <span class="comment">// accepts any of these names when deserialising; serialises as "email"</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+
+    <span class="annotation">@JsonFormat</span>(pattern = <span class="string">"yyyy-MM-dd HH:mm:ss"</span>, timezone = <span class="string">"UTC"</span>)
+    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> createdAt;
+
+    <span class="annotation">@JsonInclude</span>(<span class="class-name">JsonInclude</span>.<span class="class-name">Include</span>.NON_NULL)  <span class="comment">// field omitted from JSON when value is null</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> middleName;
+
+    <span class="annotation">@JsonAnyGetter</span>                       <span class="comment">// serialises a Map's entries as top-level JSON properties</span>
+    <span class="keyword">private</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; extra = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
+}</code></pre>
+
+                <pre><code><span class="comment">// Class-level annotations</span>
+<span class="annotation">@JsonIgnoreProperties</span>(ignoreUnknown = <span class="keyword">true</span>)    <span class="comment">// class-level equivalent of FAIL_ON_UNKNOWN_PROPERTIES=false</span>
+<span class="annotation">@JsonNaming</span>(<span class="class-name">PropertyNamingStrategies</span>.<span class="class-name">SnakeCaseStrategy</span>.<span class="keyword">class</span>)  <span class="comment">// camelCase → snake_case globally for this class</span>
+<span class="keyword">public class</span> <span class="class-name">ExternalApiResponse</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> firstName;   <span class="comment">// serialised as "first_name" automatically</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> lastName;    <span class="comment">// serialised as "last_name" automatically</span>
+}</code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">@JsonInclude at the mapper level vs per-class</div>
+                    <p>Setting <code>@JsonInclude(NON_NULL)</code> on a single class controls
+                        only that class. Applying it globally via
+                        <code>mapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)</code>
+                        affects every type the mapper serialises. Spring Boot exposes this as
+                        <code>spring.jackson.default-property-inclusion=non_null</code> in
+                        <code>application.properties</code> — cleaner than subclassing
+                        <code>ObjectMapper</code>.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — RECORDS AND JACKSON
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Records and Jackson — Java 17+ Idiom</h2>
+                <p>Java records are immutable by construction — no setters, all fields set via
+                    the canonical constructor. Jackson supports records natively from
+                    <code>jackson-databind 2.12+</code> (which corresponds to Spring Boot 2.4+
+                    — all Boot 3.x versions qualify).</p>
+
+                <pre><code><span class="comment">// Records deserialise via constructor — no default constructor needed, no setters needed</span>
+<span class="keyword">public record</span> <span class="class-name">UserResponse</span>(
+    <span class="class-name">Long</span> id,
+    <span class="class-name">String</span> name,
+    <span class="annotation">@JsonProperty</span>(<span class="string">"email_address"</span>) <span class="class-name">String</span> email,  <span class="comment">// annotations on record components work</span>
+    <span class="annotation">@JsonFormat</span>(pattern = <span class="string">"yyyy-MM-dd"</span>) <span class="class-name">LocalDate</span> dob
+) {}</code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Records need ParameterNamesModule — or Boot handles it for you</div>
+                    <p>Jackson maps JSON keys to constructor parameters by name. Constructor
+                        parameter names are only available in bytecode if the
+                        <code>-parameters</code> compiler flag was used (same caveat as
+                        <code>@PathVariable</code> in Spring MVC — see
+                        <a href="../spring/mvc.html">Spring MVC</a>). Without it, Jackson
+                        needs <code>@JsonCreator</code> + <code>@JsonProperty</code> on every
+                        constructor parameter to know the mapping. Spring Boot's auto-
+                        configured <code>ObjectMapper</code> registers
+                        <code>ParameterNamesModule</code> automatically and enables
+                        <code>-parameters</code> via its Maven/Gradle plugin — so records
+                        "just work" in a standard Boot project. Outside Boot, register it
+                        explicitly:</p>
+                    <pre><code>mapper.registerModule(<span class="keyword">new</span> <span class="class-name">ParameterNamesModule</span>());</code></pre>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — DATE/TIME: THE MOST COMMON GOTCHA
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Date and Time — The Most Common Production Gotcha</h2>
+
+                <pre><code><span class="comment">// Without JavaTimeModule: LocalDateTime throws InvalidDefinitionException at runtime
+// With JavaTimeModule + WRITE_DATES_AS_TIMESTAMPS disabled: ISO-8601 strings</span>
+
+<span class="comment">// Maven dependency (not pulled in by spring-boot-starter-web automatically in all versions)</span></code></pre>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.datatype&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;jackson-datatype-jsr310&lt;/<span class="keyword">artifactId</span>&gt;
+    <span class="comment">&lt;!-- version managed by Spring Boot parent --&gt;</span>
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+                <pre><code><span class="comment">// Register the module — or set it in application.properties (Spring Boot)</span>
+<span class="class-name">ObjectMapper</span> mapper = <span class="keyword">new</span> <span class="class-name">ObjectMapper</span>()
+    .registerModule(<span class="keyword">new</span> <span class="class-name">JavaTimeModule</span>())
+    .disable(<span class="class-name">SerializationFeature</span>.WRITE_DATES_AS_TIMESTAMPS);</code></pre>
+
+                <pre><code><span class="comment"># application.properties — the Spring Boot way: no Java config needed</span>
+spring.jackson.serialization.write-dates-as-timestamps=false
+spring.jackson.time-zone=UTC</code></pre>
+
+                <table>
+                    <tr><th>Type</th><th>Without module</th><th>With module (ISO-8601)</th></tr>
+                    <tr><td><code>LocalDate</code></td><td>Exception</td><td><code>"2024-01-15"</code></td></tr>
+                    <tr><td><code>LocalDateTime</code></td><td>Exception</td><td><code>"2024-01-15T10:30:00"</code></td></tr>
+                    <tr><td><code>ZonedDateTime</code></td><td>Exception</td><td><code>"2024-01-15T10:30:00+01:00"</code></td></tr>
+                    <tr><td><code>Instant</code></td><td>Exception</td><td><code>"2024-01-15T09:30:00Z"</code></td></tr>
+                </table>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">WRITE_DATES_AS_TIMESTAMPS=true (the default) sends epoch milliseconds</div>
+                    <p>Without disabling this feature, Jackson serialises
+                        <code>LocalDateTime.of(2024, 1, 15, 10, 30)</code> as the array
+                        <code>[2024,1,15,10,30]</code> or a numeric epoch — not the
+                        human-readable ISO-8601 string any frontend or external API expects.
+                        This is one of the most common "why is the date showing as a number"
+                        bugs in new Spring projects.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SPRING BOOT AUTO-CONFIGURATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Spring Boot Auto-Configuration — What Boot Does by Default</h2>
+                <p>Spring Boot auto-configures a single <code>ObjectMapper</code> bean via
+                    <code>JacksonAutoConfiguration</code>. Knowing what it sets by default
+                    tells you what you don't need to configure manually — and what to override
+                    when the default is wrong for your use case.</p>
+
+                <table>
+                    <tr><th>Feature</th><th>Boot default</th><th>Why</th></tr>
+                    <tr>
+                        <td><code>FAIL_ON_UNKNOWN_PROPERTIES</code></td>
+                        <td><strong>false</strong></td>
+                        <td>Additive API versioning — clients that send unknown fields don't break</td>
+                    </tr>
+                    <tr>
+                        <td><code>WRITE_DATES_AS_TIMESTAMPS</code></td>
+                        <td>true (pre-Boot 3.x) / configurable</td>
+                        <td>Always set explicitly via properties — don't rely on the default</td>
+                    </tr>
+                    <tr>
+                        <td><code>MapperFeature.DEFAULT_VIEW_INCLUSION</code></td>
+                        <td>false</td>
+                        <td>Fields without <code>@JsonView</code> are excluded when a view is active</td>
+                    </tr>
+                    <tr>
+                        <td><code>ParameterNamesModule</code></td>
+                        <td>Registered</td>
+                        <td>Records and constructor injection work without <code>@JsonCreator</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>JavaTimeModule</code></td>
+                        <td>Registered if on classpath</td>
+                        <td>Auto-detects <code>jackson-datatype-jsr310</code></td>
+                    </tr>
+                </table>
+
+                <pre><code><span class="comment"># The cleanest way to customise Boot's ObjectMapper: application.properties</span>
+<span class="comment"># Avoids subclassing or replacing the auto-configured bean entirely</span>
+spring.jackson.serialization.write-dates-as-timestamps=false
+spring.jackson.deserialization.fail-on-unknown-properties=false
+spring.jackson.default-property-inclusion=non_null
+spring.jackson.time-zone=UTC
+spring.jackson.property-naming-strategy=SNAKE_CASE     <span class="comment"># camelCase → snake_case globally</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Customising Boot's ObjectMapper without replacing it</div>
+                    <p>If you declare a <code>@Bean</code> of type <code>ObjectMapper</code>,
+                        Boot's auto-configuration backs off entirely — you own the whole
+                        configuration. A safer alternative is
+                        <code>Jackson2ObjectMapperBuilderCustomizer</code>: it lets you add
+                        modules, set features, or change naming strategy
+                        <strong>on top of</strong> Boot's defaults rather than replacing them,
+                        which means Boot's own modules (ParameterNames, JavaTime) stay
+                        registered:</p>
+                    <pre><code><span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">Jackson2ObjectMapperBuilderCustomizer</span> <span class="function">jacksonCustomizer</span>() {
+    <span class="keyword">return</span> builder -&gt; builder
+        .modules(<span class="keyword">new</span> <span class="class-name">JavaTimeModule</span>())
+        .featuresToDisable(<span class="class-name">SerializationFeature</span>.WRITE_DATES_AS_TIMESTAMPS)
+        .propertyNamingStrategy(<span class="class-name">PropertyNamingStrategies</span>.SNAKE_CASE);
+}</code></pre>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — CUSTOM SERIALIZERS AND DESERIALIZERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Custom Serializers and Deserializers</h2>
+                <p>Use custom serializers when Jackson's default output for a type is wrong
+                    for your API contract — sensitive data masking, legacy format compatibility,
+                    or types Jackson can't handle automatically (e.g. third-party value
+                    objects).</p>
+
+                <pre><code><span class="comment">// Custom serializer — masks a credit card number to show only last 4 digits</span>
+<span class="keyword">public class</span> <span class="class-name">MaskedCardSerializer</span> <span class="keyword">extends</span> <span class="class-name">JsonSerializer</span>&lt;<span class="class-name">String</span>&gt; {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">serialize</span>(<span class="class-name">String</span> value, <span class="class-name">JsonGenerator</span> gen, <span class="class-name">SerializerProvider</span> provider)
+            <span class="keyword">throws</span> <span class="class-name">IOException</span> {
+        <span class="keyword">if</span> (value != <span class="keyword">null</span> && value.length() &gt; <span class="number">4</span>) {
+            gen.writeString(<span class="string">"****-****-****-"</span> + value.substring(value.length() - <span class="number">4</span>));
+        } <span class="keyword">else</span> {
+            gen.writeString(value);
+        }
+    }
+}
+
+<span class="comment">// Attach to a specific field via annotation</span>
+<span class="keyword">public class</span> <span class="class-name">PaymentDto</span> {
+    <span class="annotation">@JsonSerialize</span>(using = <span class="class-name">MaskedCardSerializer</span>.<span class="keyword">class</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> cardNumber;
+}</code></pre>
+
+                <pre><code><span class="comment">// Custom deserializer — parses a non-standard date format from a legacy API</span>
+<span class="keyword">public class</span> <span class="class-name">LegacyDateDeserializer</span> <span class="keyword">extends</span> <span class="class-name">JsonDeserializer</span>&lt;<span class="class-name">LocalDate</span>&gt; {
+    <span class="keyword">private static final</span> <span class="class-name">DateTimeFormatter</span> FMT =
+        <span class="class-name">DateTimeFormatter</span>.ofPattern(<span class="string">"dd/MM/yyyy"</span>);
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">LocalDate</span> <span class="function">deserialize</span>(<span class="class-name">JsonParser</span> p, <span class="class-name">DeserializationContext</span> ctx)
+            <span class="keyword">throws</span> <span class="class-name">IOException</span> {
+        <span class="keyword">return</span> <span class="class-name">LocalDate</span>.parse(p.getText(), FMT);
+    }
+}
+
+<span class="keyword">public record</span> <span class="class-name">LegacyOrderDto</span>(
+    <span class="class-name">Long</span> id,
+    <span class="annotation">@JsonDeserialize</span>(using = <span class="class-name">LegacyDateDeserializer</span>.<span class="keyword">class</span>) <span class="class-name">LocalDate</span> orderDate
+) {}</code></pre>
+
+                <pre><code><span class="comment">// Register serializers globally on the mapper (instead of per-field annotations)</span>
+<span class="class-name">SimpleModule</span> module = <span class="keyword">new</span> <span class="class-name">SimpleModule</span>();
+module.addSerializer(<span class="class-name">String</span>.<span class="keyword">class</span>, <span class="keyword">new</span> <span class="class-name">MaskedCardSerializer</span>());
+mapper.registerModule(module);</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — @JSONVIEW: FIELD VISIBILITY BY CONTEXT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>@JsonView — Different Fields for Different Contexts</h2>
+                <p><code>@JsonView</code> lets you define named "views" and annotate fields with
+                    the views in which they should appear. A public API endpoint and an admin
+                    endpoint can return the same object but with different fields — without
+                    creating two separate DTOs.</p>
+
+                <pre><code><span class="comment">// Define view marker interfaces (no methods needed — they're just type tokens)</span>
+<span class="keyword">public class</span> <span class="class-name">Views</span> {
+    <span class="keyword">public interface</span> <span class="class-name">Public</span> {}
+    <span class="keyword">public interface</span> <span class="class-name">Admin</span> <span class="keyword">extends</span> <span class="class-name">Public</span> {}  <span class="comment">// Admin extends Public — inherits Public fields</span>
+}
+
+<span class="keyword">public class</span> <span class="class-name">UserDto</span> {
+    <span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Public</span>.<span class="keyword">class</span>)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Public</span>.<span class="keyword">class</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> name;
+
+    <span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Admin</span>.<span class="keyword">class</span>)  <span class="comment">// only visible in Admin view</span>
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+
+    <span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Admin</span>.<span class="keyword">class</span>)  <span class="comment">// only visible in Admin view</span>
+    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> lastLogin;
+}
+
+<span class="comment">// In a Spring MVC controller — activate the view per endpoint</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{id}"</span>)
+<span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Public</span>.<span class="keyword">class</span>)         <span class="comment">// returns: {id, name}</span>
+<span class="keyword">public</span> <span class="class-name">UserDto</span> <span class="function">getPublic</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
+
+<span class="annotation">@GetMapping</span>(<span class="string">"/admin/users/{id}"</span>)
+<span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Admin</span>.<span class="keyword">class</span>)          <span class="comment">// returns: {id, name, email, lastLogin}</span>
+<span class="keyword">public</span> <span class="class-name">UserDto</span> <span class="function">getAdmin</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }</code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">@JsonView vs separate DTOs — when to use each</div>
+                    <p><code>@JsonView</code> is the right tool when two endpoints return the
+                        same underlying data with different visibility — same service call,
+                        same object, different serialisation. Use separate DTOs when the
+                        <strong>data itself</strong> differs — a list view that calls a
+                        different query than the detail view, or an admin view that joins
+                        additional tables. Overusing <code>@JsonView</code> on a complex
+                        object with many views produces an unmaintainable annotation forest.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — JACKSON IN TESTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Jackson in Tests</h2>
+
+                <pre><code><span class="comment">// In @WebMvcTest — ObjectMapper is auto-configured and injectable</span>
+<span class="annotation">@WebMvcTest</span>(<span class="class-name">UserController</span>.<span class="keyword">class</span>)
+<span class="keyword">class</span> <span class="class-name">UserControllerTest</span> {
+    <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">MockMvc</span> mockMvc;
+    <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">ObjectMapper</span> objectMapper;  <span class="comment">// same instance as the app uses</span>
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">createUser_serialisesCorrectly</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">var</span> request = <span class="keyword">new</span> <span class="class-name">CreateUserRequest</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="string">"pass1234"</span>);
+
+        mockMvc.perform(post(<span class="string">"/api/users"</span>)
+                .contentType(<span class="class-name">MediaType</span>.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))  <span class="comment">// use the injected mapper</span>
+            .andExpect(status().isCreated());
+    }
+}
+
+<span class="comment">// Pure unit test — no Spring context needed for serialisation logic</span>
+<span class="keyword">class</span> <span class="class-name">UserDtoSerializationTest</span> {
+    <span class="keyword">private final</span> <span class="class-name">ObjectMapper</span> mapper = <span class="keyword">new</span> <span class="class-name">ObjectMapper</span>()
+        .registerModule(<span class="keyword">new</span> <span class="class-name">JavaTimeModule</span>())
+        .disable(<span class="class-name">SerializationFeature</span>.WRITE_DATES_AS_TIMESTAMPS);
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">passwordHash_isNeverSerialised</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">var</span> user = <span class="keyword">new</span> <span class="class-name">UserDto</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"$2a$10$abc..."</span>);
+        <span class="class-name">String</span> json = mapper.writeValueAsString(user);
+
+        assertThat(json).doesNotContain(<span class="string">"passwordHash"</span>);
+        assertThat(json).doesNotContain(<span class="string">"$2a$"</span>);  <span class="comment">// assert the actual hash value isn't there either</span>
+    }
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">dates_serialiseAsIso8601</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">var</span> dto = <span class="keyword">new</span> <span class="class-name">EventDto</span>(<span class="class-name">LocalDateTime</span>.of(<span class="number">2024</span>, <span class="number">1</span>, <span class="number">15</span>, <span class="number">10</span>, <span class="number">30</span>));
+        <span class="class-name">String</span> json = mapper.writeValueAsString(dto);
+
+        assertThat(json).contains(<span class="string">"\"2024-01-15T10:30:00\""</span>);  <span class="comment">// ISO-8601, not an array or epoch</span>
+    }
+}</code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">Test what Jackson does, not just what your controller does</div>
+                    <p>A pure unit test of serialisation (no Spring context, no MockMvc) runs
+                        in milliseconds and catches the most common Jackson bugs: missing
+                        modules, wrong date format, fields that should be hidden appearing in
+                        output. These bugs are typically only caught by manual API testing or
+                        in production when a client complains about the response shape — a
+                        trivial unit test catches them at build time.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is Jackson and what is ObjectMapper?</strong><br>
+                    Jackson is the de-facto Java library for JSON processing.
+                    <code>ObjectMapper</code> is its main entry point — it serialises Java
+                    objects to JSON strings and deserialises JSON strings back to Java objects.
+                    In Spring Boot it's auto-configured as a singleton bean and used
+                    automatically by every <code>@RestController</code>.</p>
+
+                    <p><strong>Q: What does @JsonIgnore do?</strong><br>
+                    It excludes a field from both serialisation (Java → JSON) and
+                    deserialisation (JSON → Java). Common use: password hashes, internal
+                    audit fields, or any data that must never leave the server boundary.
+                    Use <code>@JsonIgnoreProperties</code> at class level to ignore specific
+                    fields by name, or to ignore unknown fields from an incoming JSON body.</p>
+
+                    <p><strong>Q: Why does LocalDateTime sometimes serialise as an array or a number?</strong><br>
+                    Without <code>JavaTimeModule</code> registered and
+                    <code>WRITE_DATES_AS_TIMESTAMPS</code> disabled, Jackson falls back to
+                    serialising date/time types as their internal representation — an array
+                    of fields or an epoch value. Registering <code>JavaTimeModule</code> and
+                    disabling timestamps produces ISO-8601 strings instead.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Why is creating a new ObjectMapper per request a performance problem, and what's the correct pattern?</strong><br>
+                    <code>ObjectMapper</code> construction is expensive — it scans the
+                    classpath, registers modules, and builds internal type caches.
+                    <code>ObjectMapper</code> is fully thread-safe after configuration, so the
+                    correct pattern is one shared instance (a Spring bean, or a static final
+                    field in a utility class). Creating a new instance per request measurably
+                    degrades throughput under load.</p>
+
+                    <p><strong>Q: How does Spring Boot configure Jackson by default, and how do you customise it without replacing the auto-configured bean entirely?</strong><br>
+                    Boot's <code>JacksonAutoConfiguration</code> creates the
+                    <code>ObjectMapper</code> bean and registers modules including
+                    <code>ParameterNamesModule</code> and <code>JavaTimeModule</code> (if on
+                    classpath). Declaring your own <code>@Bean ObjectMapper</code> replaces
+                    the auto-configuration entirely, losing those defaults. The safe
+                    alternative is <code>Jackson2ObjectMapperBuilderCustomizer</code> — it
+                    adds to Boot's defaults instead of replacing them, and is the right choice
+                    for enabling features, adding modules, or changing naming strategy.</p>
+
+                    <p><strong>Q: What does FAIL_ON_UNKNOWN_PROPERTIES=false enable, and when would you want it set to true?</strong><br>
+                    With <code>false</code> (Boot's default), incoming JSON that contains
+                    fields the Java class doesn't have is silently ignored — a v1 client
+                    sending a v2 payload doesn't fail. This is what makes additive API
+                    versioning safe. You'd want <code>true</code> in a strict contract
+                    scenario — for example, when deserialising a configuration file where
+                    an unknown key almost certainly means a typo, and silently ignoring it
+                    would hide the error.</p>
+
+                    <p><strong>Q: What is @JsonView and when is it preferable to separate DTOs?</strong><br>
+                    <code>@JsonView</code> controls field visibility by context — the same
+                    object can serialise differently for a public endpoint vs an admin
+                    endpoint without creating two classes. It's the right tool when the
+                    underlying data is the same and only the visibility differs. Separate
+                    DTOs are correct when the queries, the data shape, or the service calls
+                    differ — not just the fields included in the response.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../spring/rest.html" class="related-link"><span class="related-icon">🌐</span>Spring REST</a>
+                    <a href="../spring/mvc.html" class="related-link"><span class="related-icon">🍃</span>Spring MVC Architecture</a>
+                    <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">💾</span>Spring Data JPA</a>
+                    <a href="../jakarta-ee/jpa.html" class="related-link"><span class="related-icon">🏢</span>JPA (Java Persistence API)</a>
+                    <a href="../security/jwt.html" class="related-link"><span class="related-icon">🎫</span>JWT (JSON Web Tokens)</a>
+                    <a href="testing.html" class="related-link"><span class="related-icon">🧪</span>Testing (JUnit, Mockito)</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/i18n.js"></script>
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
