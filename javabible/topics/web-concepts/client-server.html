@@ -1,645 +1,534 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.client-server.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Client-Server Architecture - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#web-concepts">Web Concepts</a> / Client-Server Architecture
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#web-concepts" data-i18n="nav.web-concepts">Web Concepts</a> /
+                Client-Server Architecture
             </nav>
-            <h1>Client-Server Architecture</h1>
-            <p class="topic-subtitle">The foundation of modern web applications</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.client-server.h1">Client-Server Architecture</h1>
+            <p class="topic-subtitle" data-i18n="topic.client-server.subtitle">Roles, not machines: how clients and servers divide responsibility, why three-tier architecture won, and where your Spring Boot app is both client and server at once</p>
+            <a href="../../index.html" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is Client-Server Architecture?</h2>
-            <p>The <strong>Client-Server Architecture</strong> is one of the most fundamental concepts in computing and the backbone of nearly every application you use today. Whether you're checking email, browsing social media, shopping online, or using a banking app, you're interacting with client-server systems.</p>
+    <div class="topic-layout">
 
-            <p>At its core, this architecture divides computing tasks between two distinct roles: <strong>clients</strong> that request services, and <strong>servers</strong> that provide them. This separation of concerns has revolutionized how we build software, enabling the internet as we know it.</p>
-
-            <h3>A Simple Analogy: The Restaurant</h3>
-            <p>Understanding client-server architecture becomes intuitive when you think of it like dining at a restaurant:</p>
-            <ul>
-                <li><strong>Client (Customer):</strong> You, the diner, make requests. "I'd like a margherita pizza with extra cheese." You don't need to know how to make pizza or where the ingredients come from—you just need to know how to order.</li>
-                <li><strong>Server (Kitchen):</strong> The kitchen receives your order, has all the ingredients, equipment, and expertise to prepare it, and sends back the finished dish. The kitchen can serve many customers simultaneously.</li>
-                <li><strong>Network (Waiter):</strong> The waiter carries messages between you and the kitchen. They speak a "protocol"—taking your order in a standard format, delivering it to the kitchen, and bringing back your food.</li>
-                <li><strong>Menu (API):</strong> The menu defines what you can order and how to order it. You can't ask for something that's not on the menu (unless the restaurant is very accommodating!).</li>
-            </ul>
-
-            <div class="info-box">
-                <p><strong>Client-Server Architecture</strong> is a distributed computing model where:</p>
-                <ul>
-                    <li><strong>Clients</strong> are programs that request services or resources. They initiate communication and present information to users.</li>
-                    <li><strong>Servers</strong> are programs that provide services or resources. They wait for requests, process them, and return results.</li>
-                    <li><strong>Network</strong> is the communication medium that connects them, using standardized protocols (usually HTTP/HTTPS for web applications).</li>
-                    <li><strong>Protocol</strong> is the agreed-upon "language" and rules for communication (like HTTP, WebSocket, or gRPC).</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>The Fundamental Communication Pattern</h3>
-            <p>Every client-server interaction follows a simple pattern: <strong>request and response</strong>. The client asks for something, and the server provides it (or explains why it can't).</p>
+        <main class="topic-content">
 
-            <pre><code><span class="comment">// The fundamental flow of client-server communication:</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS IT AND WHY IT EXISTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Client-Server Architecture — and Why Does It Exist?</h2>
+                <p>The <strong>client-server model</strong> is a way of distributing a
+                    computing task between two cooperating roles: a <strong>client</strong>
+                    that initiates a request, and a <strong>server</strong> that listens
+                    for requests, processes them, and returns a response. Every layer of
+                    the modern web — a browser talking to a REST API, a microservice
+                    calling another microservice, a mobile app syncing data — is an
+                    instance of this same pattern.</p>
 
-┌──────────┐         Request          ┌──────────┐
-│          │  ────────────────────▶   │          │
-│  CLIENT  │     "GET /users"         │  SERVER  │
-│ (Browser)│                          │  (Java)  │
-│          │  ◀────────────────────   │          │
-└──────────┘        Response          └──────────┘
-                 [User Data]
+                <p>It exists to solve a concrete problem: <strong>where should
+                    application logic, data, and control over both live?</strong> Before
+                    this model was standard, that question was answered in two bad ways —
+                    either everything lived on one expensive central machine (the mainframe
+                    era), or business logic and direct database credentials were baked
+                    into every desktop client that shipped (the two-tier era). Both put
+                    the wrong things in the wrong place. Client-server architecture — and
+                    specifically its three-tier evolution — separates presentation,
+                    business logic, and data storage into independently deployable,
+                    independently scalable layers.</p>
 
-<span class="comment">// Key characteristics:</span>
-<span class="comment">// 1. Client ALWAYS initiates - server never contacts client first (in HTTP)</span>
-<span class="comment">// 2. Server can handle MANY clients simultaneously</span>
-<span class="comment">// 3. Client and server can be on different machines, different continents</span>
-<span class="comment">// 4. Communication happens over a network using agreed protocols</span></code></pre>
-        </section>
+                <pre><code><span class="comment">/*
+ * BEFORE — two-tier: the desktop client talks directly to the database.
+ * Business rules and database credentials live inside every installed copy
+ * of the client. This was completely standard in the 1990s and is still
+ * the default mistake newcomers make when they first connect a UI to a DB.
+ */</span>
+<span class="keyword">public class</span> <span class="class-name">OrderDesktopClient</span> {
+    <span class="keyword">public void</span> <span class="function">placeOrder</span>(<span class="class-name">Long</span> productId, <span class="keyword">int</span> quantity) <span class="keyword">throws</span> <span class="class-name">SQLException</span> {
+        <span class="comment">// The client owns a raw JDBC connection with real DB credentials.</span>
+        <span class="comment">// Anyone who decompiles this .jar has your database password.</span>
+        <span class="class-name">Connection</span> conn = <span class="class-name">DriverManager</span>.getConnection(
+            <span class="string">"jdbc:postgresql://prod-db:5432/shop"</span>, <span class="string">"app_user"</span>, <span class="string">"h4rdc0d3d"</span>);
 
-        <section class="content-section">
-            <h2>Why Client-Server? A Brief History</h2>
-            <p>Before client-server architecture, computing was dominated by <strong>mainframe systems</strong> where a single powerful computer did all the processing, and users accessed it through "dumb terminals" that could only display text.</p>
+        <span class="comment">// Business rule ("check stock before selling") lives in the CLIENT.</span>
+        <span class="comment">// Every desktop installation must be updated to change this rule,</span>
+        <span class="comment">// and a malicious or buggy client can simply skip the check.</span>
+        <span class="class-name">ResultSet</span> rs = conn.prepareStatement(
+            <span class="string">"SELECT stock FROM products WHERE id = "</span> + productId).executeQuery();
+        <span class="keyword">if</span> (rs.next() && rs.getInt(<span class="string">"stock"</span>) >= quantity) {
+            conn.prepareStatement(
+                <span class="string">"UPDATE products SET stock = stock - "</span> + quantity +
+                <span class="string">" WHERE id = "</span> + productId).executeUpdate();   <span class="comment">// SQL injection too</span>
+        }
+    }
+}
 
-            <p>The evolution happened in stages:</p>
+<span class="comment">/*
+ * AFTER — three-tier: the client only knows an HTTP contract.
+ * Business logic and data access move behind a server the client never sees.
+ */</span>
+<span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/orders"</span>)
+<span class="keyword">public class</span> <span class="class-name">OrderController</span> {
 
-            <h3>1960s-70s: Mainframe Era</h3>
-            <pre><code><span class="comment">// All processing on one central computer</span>
-┌─────────────────────────────────────────────────┐
-│                   MAINFRAME                      │
-│         (Does ALL the computing work)            │
-└─────────────────────────────────────────────────┘
-        ↑           ↑           ↑
-   [Terminal]  [Terminal]  [Terminal]
-   (Display    (Display    (Display
-     only)       only)       only)
+    <span class="keyword">private final</span> <span class="class-name">OrderService</span> orderService;   <span class="comment">// constructor injection</span>
 
-<span class="comment">// Problems: Expensive, single point of failure, limited scalability</span></code></pre>
+    <span class="keyword">public</span> <span class="function">OrderController</span>(<span class="class-name">OrderService</span> orderService) {
+        <span class="keyword">this</span>.orderService = orderService;
+    }
 
-            <h3>1980s-90s: Client-Server Revolution</h3>
-            <pre><code><span class="comment">// Processing distributed between client and server</span>
-┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Client  │     │  Client  │     │  Client  │
-│    PC    │     │    PC    │     │    PC    │
-│(Has own  │     │(Has own  │     │(Has own  │
-│   CPU)   │     │   CPU)   │     │   CPU)   │
-└────┬─────┘     └────┬─────┘     └────┬─────┘
-     │               │               │
-     └───────────────┼───────────────┘
-                     │
-              ┌──────┴──────┐
-              │   SERVER    │
-              │ (Shared     │
-              │  resources) │
-              └─────────────┘
+    <span class="annotation">@PostMapping</span>
+    <span class="keyword">public</span> <span class="class-name">OrderResponse</span> <span class="function">placeOrder</span>(<span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> <span class="class-name">OrderRequest</span> request) {
+        <span class="comment">// Credentials never leave the server. The stock rule can change</span>
+        <span class="comment">// without touching a single client. The client only ever sees JSON.</span>
+        <span class="keyword">return</span> orderService.placeOrder(request);
+    }
+}
 
-<span class="comment">// Benefits: Cheaper, more scalable, distributed processing</span></code></pre>
+<span class="comment">// The client's entire responsibility is now this:</span>
+<span class="class-name">HttpRequest</span> req = <span class="class-name">HttpRequest</span>.newBuilder()
+    .uri(<span class="class-name">URI</span>.create(<span class="string">"https://shop.example.com/api/orders"</span>))
+    .header(<span class="string">"Content-Type"</span>, <span class="string">"application/json"</span>)
+    .POST(<span class="class-name">HttpRequest</span>.BodyPublishers.ofString(json))
+    .build();</code></pre>
+            </section>
 
-            <h3>2000s-Present: Web and Cloud Era</h3>
-            <pre><code><span class="comment">// Thin clients (browsers) with powerful server infrastructure</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — ROLES ARE CONTEXTUAL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Client and Server Are Roles, Not Machines</h2>
+                <p>The single most common misunderstanding when developers first meet this
+                    model: assuming "client" and "server" describe fixed types of hardware
+                    or software. They don't. They describe <strong>who initiated the
+                    request in a given exchange</strong>. The exact same process can be a
+                    server in one connection and a client in another, simultaneously.</p>
 
-   📱        💻        🖥️        📺
-  Mobile    Laptop   Desktop    Smart TV
-    │          │         │         │
-    └──────────┴────┬────┴─────────┘
-                    │
-              ┌─────┴─────┐
-              │  INTERNET │
-              └─────┬─────┘
-                    │
-    ┌───────────────┼───────────────┐
-    │               │               │
-┌───┴───┐     ┌────┴────┐    ┌────┴────┐
-│Server │     │ Server  │    │ Server  │
-│Cluster│     │ Cluster │    │ Cluster │
-│(AWS)  │     │(Google) │    │(Azure)  │
-└───────┘     └─────────┘    └─────────┘
-
-<span class="comment">// Modern reality: Multiple clients, distributed servers, cloud infrastructure</span></code></pre>
-
-            <p>This evolution happened because of several factors:</p>
-            <ul>
-                <li><strong>Cost reduction:</strong> Personal computers became affordable</li>
-                <li><strong>Network improvements:</strong> Faster, more reliable networks</li>
-                <li><strong>Scalability needs:</strong> More users required distributed processing</li>
-                <li><strong>User experience:</strong> Rich interfaces needed client-side processing</li>
-            </ul>
-        </section>
-
-        <section class="content-section">
-            <h2>Understanding Roles: Who is the Client? Who is the Server?</h2>
-            <p>One common source of confusion is understanding what constitutes a "client" and what constitutes a "server." The answer depends on <strong>perspective and context</strong>—the same machine can be both!</p>
-
-            <div class="info-box note">
-                <div class="info-box-title">Key Insight</div>
-                <p><strong>Client and server are ROLES, not physical machines.</strong> The same computer can act as a client in one interaction and a server in another. What matters is who initiates the request and who responds.</p>
-            </div>
-
-            <pre><code><span class="comment">// Example: Your Java backend is BOTH client and server</span>
+                <pre><code><span class="comment">// A single Spring Boot application, two roles at once:</span>
 
                     Acts as SERVER                Acts as CLIENT
-                    (for browsers)                (for database)
+                    (for the browser)             (for the database)
                           │                             │
 ┌──────────┐         ┌────┴─────────────────────────────┴────┐         ┌──────────┐
-│          │ Request │                                       │ Request │          │
-│  Browser │ ──────▶ │           JAVA APPLICATION            │ ──────▶ │ Database │
-│ (Client) │         │                                       │         │ (Server) │
-│          │ ◀────── │                                       │ ◀────── │          │
-└──────────┘ Response└───────────────────────────────────────┘ Response└──────────┘
+│ Browser  │ Request │                                       │ Query   │ Postgres │
+│ (Client) │ ──────▶ │           OrderController             │ ──────▶ │ (Server) │
+│          │ ◀────── │                 ↓                     │ ◀────── │          │
+└──────────┘ Response│           OrderService                │ Result  └──────────┘
+                      │                 ↓                     │
+                      │           PaymentClient  ──────────▶  │  Payment Service
+                      └───────────────────────────────────────┘  (server, elsewhere)
 
-<span class="comment">// The Java app RECEIVES requests from browsers (it's the server)</span>
-<span class="comment">// The Java app SENDS requests to database (it's the client)</span>
+<span class="comment">// In a microservice chain the same rule holds at every hop:</span>
+Order Service ──(client)──▶ Payment Service ──(client)──▶ Fraud-Check Service</code></pre>
 
-<span class="comment">// In microservices, this gets even more complex:</span>
-User Service ──────▶ Order Service ──────▶ Payment Service
-  (client)            (server/client)         (server)</code></pre>
+                <p>This matters in real code, not just in diagrams. A service class that
+                    calls out to another microservice is acting as a client the moment it
+                    does so — and should be built with the same discipline you'd expect
+                    from any HTTP client: timeouts, retries, and circuit breakers, because
+                    the "server" on the other end can fail or be slow just like any
+                    external dependency.</p>
 
-            <p>This dual nature is essential in modern distributed systems. Your Spring Boot application:</p>
-            <ul>
-                <li><strong>Acts as a SERVER</strong> when handling HTTP requests from browsers or mobile apps</li>
-                <li><strong>Acts as a CLIENT</strong> when querying databases, calling external APIs, or communicating with other microservices</li>
-            </ul>
-        </section>
+                <pre><code><span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
 
-        <section class="content-section">
-            <h2>Key Components in Detail</h2>
+    <span class="keyword">private final</span> <span class="class-name">OrderRepository</span> orderRepository;
+    <span class="keyword">private final</span> <span class="class-name">PaymentClient</span> paymentClient;   <span class="comment">// this class is a CLIENT</span>
 
-            <h3>The Client</h3>
-            <p>A <strong>client</strong> is any program or device that initiates requests to a server. Clients are responsible for:</p>
-            <ul>
-                <li><strong>User interface:</strong> Presenting data in a human-readable form</li>
-                <li><strong>Input handling:</strong> Collecting user actions (clicks, typing, gestures)</li>
-                <li><strong>Request formation:</strong> Translating user actions into server requests</li>
-                <li><strong>Response processing:</strong> Receiving and displaying server responses</li>
-                <li><strong>Local processing:</strong> Performing operations that don't need server involvement</li>
-            </ul>
-
-            <pre><code><span class="comment">// Types of clients in the Java ecosystem:</span>
-
-<span class="comment">// 1. WEB BROWSER (Chrome, Firefox, Safari, Edge)</span>
-<span class="comment">//    The most common client for web applications</span>
-<span class="comment">//    - Renders HTML, CSS for visual presentation</span>
-<span class="comment">//    - Executes JavaScript for interactivity</span>
-<span class="comment">//    - Makes HTTP/HTTPS requests via fetch() or XMLHttpRequest</span>
-<span class="comment">//    - Handles cookies, local storage, session management</span>
-
-<span class="comment">// 2. MOBILE APPLICATION (Android, iOS)</span>
-<span class="comment">//    Native apps that communicate with backend servers</span>
-<span class="comment">//    - Android: Java/Kotlin with Retrofit, OkHttp</span>
-<span class="comment">//    - iOS: Swift/Objective-C with URLSession</span>
-<span class="comment">//    - Cross-platform: React Native, Flutter</span>
-
-<span class="comment">// 3. DESKTOP APPLICATION</span>
-<span class="comment">//    Standalone programs that may need server connectivity</span>
-<span class="comment">//    - JavaFX applications</span>
-<span class="comment">//    - Electron apps (VS Code, Slack desktop)</span>
-<span class="comment">//    - Native Windows/Mac/Linux applications</span>
-
-<span class="comment">// 4. ANOTHER SERVER (Server-to-Server / Backend-to-Backend)</span>
-<span class="comment">//    In microservices, servers call other servers</span>
-<span class="comment">//    - Using RestTemplate, WebClient, Feign in Spring</span>
-<span class="comment">//    - gRPC for high-performance communication</span>
-
-<span class="comment">// 5. COMMAND LINE TOOLS (curl, wget, httpie)</span>
-<span class="comment">//    Useful for testing and automation</span>
-curl -X GET https://api.example.com/users \
-     -H "Authorization: Bearer token123"
-
-<span class="comment">// 6. IOT DEVICES (Internet of Things)</span>
-<span class="comment">//    Smart devices that report data to servers</span>
-<span class="comment">//    - Temperature sensors, smart home devices</span>
-<span class="comment">//    - Often use MQTT or lightweight HTTP</span></code></pre>
-
-            <h3>The Server</h3>
-            <p>A <strong>server</strong> is a program (and often the machine running it) that waits for incoming requests and provides responses. Think of it as a tireless worker that's always "listening" for someone to ask for help.</p>
-
-            <p>Server responsibilities include:</p>
-            <ul>
-                <li><strong>Listening:</strong> Constantly waiting for incoming connections on specified ports</li>
-                <li><strong>Authentication:</strong> Verifying who is making the request</li>
-                <li><strong>Authorization:</strong> Checking if they're allowed to do what they're asking</li>
-                <li><strong>Business logic:</strong> Processing requests according to application rules</li>
-                <li><strong>Data management:</strong> Reading from and writing to databases</li>
-                <li><strong>Response generation:</strong> Creating and sending appropriate responses</li>
-                <li><strong>Concurrent handling:</strong> Managing multiple client requests simultaneously</li>
-            </ul>
-
-            <pre><code><span class="comment">// What a server actually does - step by step:</span>
-
-<span class="comment">// 1. SERVER STARTUP</span>
-<span class="comment">//    The server binds to a port and starts listening</span>
-<span class="comment">//    Port 8080 for HTTP development, 443 for HTTPS production</span>
-
-@SpringBootApplication
-<span class="keyword">public class</span> <span class="class-name">MyApplication</span> {
-    <span class="keyword">public static void</span> main(String[] args) {
-        SpringApplication.run(MyApplication.<span class="keyword">class</span>, args);
-        <span class="comment">// Server is now listening on port 8080</span>
-        <span class="comment">// It will wait here indefinitely for requests</span>
+    <span class="keyword">public</span> <span class="function">OrderService</span>(<span class="class-name">OrderRepository</span> orderRepository, <span class="class-name">PaymentClient</span> paymentClient) {
+        <span class="keyword">this</span>.orderRepository = orderRepository;
+        <span class="keyword">this</span>.paymentClient = paymentClient;
     }
-}
 
-<span class="comment">// 2. REQUEST ARRIVES</span>
-<span class="comment">//    A client connects and sends an HTTP request</span>
-<span class="comment">//    Spring automatically routes it to the right method</span>
+    <span class="keyword">public</span> <span class="class-name">OrderResponse</span> <span class="function">placeOrder</span>(<span class="class-name">OrderRequest</span> request) {
+        <span class="class-name">Order</span> order = orderRepository.save(<span class="keyword">new</span> <span class="class-name">Order</span>(request.productId(), request.quantity()));
 
-<span class="annotation">@RestController</span>
-<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+        <span class="comment">// OrderService is a client of PaymentService here — same failure modes</span>
+        <span class="comment">// as any external HTTP call: it can time out, it can 5xx, it can be slow.</span>
+        <span class="class-name">PaymentResult</span> result = paymentClient.charge(order.id(), request.amount());
 
-    <span class="annotation">@GetMapping</span>(<span class="string">"/users"</span>)
-    <span class="keyword">public</span> List&lt;User&gt; getUsers() {
-        <span class="comment">// 3. PROCESSING</span>
-        <span class="comment">//    - Authenticate (who is this?)</span>
-        <span class="comment">//    - Authorize (can they do this?)</span>
-        <span class="comment">//    - Execute business logic</span>
-        <span class="comment">//    - Access database if needed</span>
-
-        <span class="comment">// 4. RESPONSE</span>
-        <span class="comment">//    - Create response object</span>
-        <span class="comment">//    - Serialize to JSON</span>
-        <span class="comment">//    - Send back to client</span>
-        <span class="keyword">return</span> userService.findAll();
+        <span class="keyword">return new</span> <span class="class-name">OrderResponse</span>(order.id(), result.status());
     }
-}
+}</code></pre>
+            </section>
 
-<span class="comment">// Common Java server technologies:</span>
-<span class="comment">// - Spring Boot (most popular, convention over configuration)</span>
-<span class="comment">// - Jakarta EE (enterprise standard, formerly Java EE)</span>
-<span class="comment">// - Quarkus (cloud-native, fast startup)</span>
-<span class="comment">// - Micronaut (low memory footprint, compile-time DI)</span></code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — THE THREE COMPONENTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Three Components: Client, Server, and Network</h2>
 
-            <h3>The Network</h3>
-            <p>The <strong>network</strong> is the communication medium that allows clients and servers to exchange messages. For most web development, you'll work with networks through the <strong>HTTP protocol</strong>, but understanding the underlying layers helps when debugging issues.</p>
+                <h3>The Client</h3>
+                <p>A client's job is to gather intent from a user (or another system),
+                    turn it into a well-formed request, send it, and do something useful
+                    with whatever comes back. It does not need to know how the server
+                    fulfills the request — only the contract for asking.</p>
 
-            <p>Network communication is organized in <strong>layers</strong>, each with a specific responsibility. This is called the <strong>OSI model</strong> (simplified to 4 layers in TCP/IP):</p>
+                <table>
+                    <tr><th>Client type</th><th>Typical Java-ecosystem tooling</th><th>Notes</th></tr>
+                    <tr>
+                        <td>Web browser</td>
+                        <td><code>fetch()</code>, <code>XMLHttpRequest</code></td>
+                        <td>Renders HTML/CSS, executes JS, is itself a full HTTP client</td>
+                    </tr>
+                    <tr>
+                        <td>Mobile app</td>
+                        <td>Retrofit / OkHttp (Android), URLSession (iOS)</td>
+                        <td>Native apps still just send HTTP requests underneath</td>
+                    </tr>
+                    <tr>
+                        <td>Another backend service</td>
+                        <td><code>RestClient</code> / <code>WebClient</code> (Spring 6+), <code>HttpClient</code> (Java 11+), Feign, gRPC stubs</td>
+                        <td><code>RestTemplate</code> is in maintenance mode; prefer <code>RestClient</code> for new synchronous code and <code>WebClient</code> for reactive code</td>
+                    </tr>
+                    <tr>
+                        <td>CLI / automation</td>
+                        <td><code>curl</code>, <code>httpie</code>, CI pipeline scripts</td>
+                        <td>Useful for testing a server in isolation from any UI</td>
+                    </tr>
+                </table>
 
-            <pre><code><span class="comment">// The network stack - how data travels from your browser to a server</span>
+                <h3>The Server</h3>
+                <p>A server binds to a port, listens continuously, and for each incoming
+                    connection: authenticates the caller, authorizes the action, executes
+                    business logic, touches whatever data store it needs, and serializes a
+                    response. Spring Boot and Jakarta EE containers handle the socket
+                    plumbing and threading for you — your code only has to fill in the
+                    business-logic step.</p>
 
-┌─────────────────────────────────────────────────────────────────────┐
-│  APPLICATION LAYER (HTTP, HTTPS, WebSocket, gRPC)                   │
-│  ─────────────────────────────────────────────────────────────────  │
-│  This is where YOU work as a developer                              │
-│  - HTTP requests and responses                                      │
-│  - JSON/XML data formats                                            │
-│  - Headers, cookies, authentication tokens                          │
-├─────────────────────────────────────────────────────────────────────┤
-│  TRANSPORT LAYER (TCP, UDP)                                         │
-│  ─────────────────────────────────────────────────────────────────  │
-│  Ensures reliable delivery of data                                  │
-│  - TCP: Reliable, ordered delivery (used by HTTP)                   │
-│  - UDP: Fast but unreliable (used by video streaming, gaming)       │
-│  - Ports: Identifies which application gets the data                │
-├─────────────────────────────────────────────────────────────────────┤
-│  NETWORK LAYER (IP - Internet Protocol)                             │
-│  ─────────────────────────────────────────────────────────────────  │
-│  Handles addressing and routing                                     │
-│  - IP addresses: 192.168.1.1 (IPv4) or 2001:db8::1 (IPv6)          │
-│  - Routers use this to forward packets                              │
-├─────────────────────────────────────────────────────────────────────┤
-│  PHYSICAL/LINK LAYER (Ethernet, WiFi, Fiber)                        │
-│  ─────────────────────────────────────────────────────────────────  │
-│  Actual transmission of bits over physical medium                   │
-│  - MAC addresses                                                    │
-│  - Electrical signals, light pulses, radio waves                    │
-└─────────────────────────────────────────────────────────────────────┘
-
-<span class="comment">// What happens when you visit https://myapp.com/users:</span>
-
-1. Browser creates HTTP request (Application Layer)
-2. Request is wrapped in TCP packet (Transport Layer)
-   - Source port: 54321 (random high port)
-   - Destination port: 443 (HTTPS)
-3. TCP packet wrapped in IP packet (Network Layer)
-   - Source IP: Your computer's IP
-   - Destination IP: myapp.com's IP (resolved via DNS)
-4. IP packet sent over your network (Physical Layer)
-   - WiFi, Ethernet, etc.
-5. Packets hop through routers across the internet
-6. Arrives at server, unpacked layer by layer
-7. Server processes request, sends response back the same way</code></pre>
-
-            <h3>Ports: The Apartment Numbers of the Internet</h3>
-            <p>A <strong>port</strong> is like an apartment number. The IP address gets you to the building (the server), but the port tells you which apartment (application) to deliver to.</p>
-
-            <pre><code><span class="comment">// Common ports you should know:</span>
-
-Port 80    →  HTTP (unencrypted web traffic)
-Port 443   →  HTTPS (encrypted web traffic)
-Port 8080  →  Common development server port
-Port 3000  →  Common for Node.js, React dev servers
-Port 5432  →  PostgreSQL database
-Port 3306  →  MySQL database
-Port 27017 →  MongoDB
-Port 6379  →  Redis
-
-<span class="comment">// Your Spring Boot app typically runs on:</span>
-http://localhost:8080   <span class="comment">// During development</span>
-https://myapp.com:443   <span class="comment">// In production (443 is default for HTTPS)</span>
-
-<span class="comment">// A single server can run multiple applications on different ports:</span>
-Server IP: 192.168.1.100
-├── Port 8080 → User Service
-├── Port 8081 → Order Service
-├── Port 8082 → Payment Service
-└── Port 5432 → PostgreSQL Database</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>How It Works in Practice</h2>
-
-            <pre><code><span class="comment">// Step-by-step: User clicks "View Profile"</span>
-
-<span class="comment">// 1. CLIENT: Browser creates HTTP request</span>
-GET /api/users/123 HTTP/1.1
-Host: myapp.com
-Accept: application/json
-Authorization: Bearer eyJhbGc...
-
-<span class="comment">// 2. NETWORK: Request travels over internet</span>
-<span class="comment">//    DNS resolves myapp.com → 203.0.113.50</span>
-<span class="comment">//    TCP connection established</span>
-<span class="comment">//    Request sent to server</span>
-
-<span class="comment">// 3. SERVER: Java application receives request</span>
-<span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{id}"</span>)
-<span class="keyword">public</span> ResponseEntity&lt;User&gt; getUser(<span class="annotation">@PathVariable</span> Long id) {
-    <span class="comment">// Validate authentication</span>
-    <span class="comment">// Query database</span>
-    User user = userRepository.findById(id)
-        .orElseThrow(() -> <span class="keyword">new</span> NotFoundException());
-    <span class="keyword">return</span> ResponseEntity.ok(user);
-}
-
-<span class="comment">// 4. SERVER: Creates HTTP response</span>
-HTTP/1.1 200 OK
-Content-Type: application/json
-
-{
-    "id": 123,
-    "name": "John Doe",
-    "email": "john@example.com"
-}
-
-<span class="comment">// 5. CLIENT: Browser receives and renders data</span>
-<span class="comment">//    JavaScript processes JSON</span>
-<span class="comment">//    Updates the UI</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Architecture Patterns</h2>
-
-            <h3>Two-Tier Architecture</h3>
-            <pre><code><span class="comment">// Direct client-to-database (legacy, simple apps)</span>
-
-┌──────────┐              ┌──────────┐
-│  CLIENT  │  ──────────▶ │ DATABASE │
-│ (Desktop │              │ (MySQL)  │
-│   App)   │  ◀────────── │          │
-└──────────┘              └──────────┘
-
-<span class="comment">// Problems:</span>
-<span class="comment">// - Business logic in client (hard to maintain)</span>
-<span class="comment">// - Security risks (direct DB access)</span>
-<span class="comment">// - Tight coupling</span></code></pre>
-
-            <h3>Three-Tier Architecture (Most Common)</h3>
-            <pre><code><span class="comment">// Client → Server → Database</span>
-
-┌──────────┐       ┌──────────┐       ┌──────────┐
-│  CLIENT  │       │  SERVER  │       │ DATABASE │
-│ (Browser)│ ────▶ │ (Spring  │ ────▶ │ (Postgre │
-│          │       │   Boot)  │       │   SQL)   │
-│          │ ◀──── │          │ ◀──── │          │
-└──────────┘       └──────────┘       └──────────┘
-                        │
-              ┌─────────┴─────────┐
-              │                   │
-         Presentation       Business
-            Layer            Logic
-         (Controllers)     (Services)</code></pre>
-
-            <h3>N-Tier / Microservices</h3>
-            <pre><code><span class="comment">// Multiple specialized services</span>
-
-┌──────────┐       ┌─────────────────────────────────────┐
-│          │       │            API Gateway              │
-│  CLIENT  │ ────▶ │         (Authentication)            │
-│          │       └─────────────────────────────────────┘
-└──────────┘                      │
-                    ┌─────────────┼─────────────┐
-                    ▼             ▼             ▼
-              ┌──────────┐ ┌──────────┐ ┌──────────┐
-              │   User   │ │  Order   │ │ Payment  │
-              │ Service  │ │ Service  │ │ Service  │
-              └──────────┘ └──────────┘ └──────────┘
-                    │             │             │
-                    ▼             ▼             ▼
-              ┌──────────┐ ┌──────────┐ ┌──────────┐
-              │  User DB │ │ Order DB │ │Payment DB│
-              └──────────┘ └──────────┘ └──────────┘</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Java Client-Server Example</h2>
-
-            <h3>Server Side (Spring Boot)</h3>
-            <pre><code><span class="comment">// ProductController.java</span>
+                <pre><code><span class="comment">// Server side — modern Spring Boot 3.x, constructor injection, record DTOs</span>
 <span class="annotation">@RestController</span>
 <span class="annotation">@RequestMapping</span>(<span class="string">"/api/products"</span>)
 <span class="keyword">public class</span> <span class="class-name">ProductController</span> {
 
-    <span class="keyword">private final</span> ProductService productService;
+    <span class="keyword">private final</span> <span class="class-name">ProductService</span> productService;
 
-    <span class="comment">// GET /api/products - List all products</span>
-    <span class="annotation">@GetMapping</span>
-    <span class="keyword">public</span> List&lt;Product&gt; getAllProducts() {
-        <span class="keyword">return</span> productService.findAll();
+    <span class="keyword">public</span> <span class="function">ProductController</span>(<span class="class-name">ProductService</span> productService) {
+        <span class="keyword">this</span>.productService = productService;   <span class="comment">// single constructor → @Autowired not needed</span>
     }
 
-    <span class="comment">// GET /api/products/123 - Get specific product</span>
     <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> Product getProduct(<span class="annotation">@PathVariable</span> Long id) {
-        <span class="keyword">return</span> productService.findById(id);
+    <span class="keyword">public</span> <span class="class-name">ProductResponse</span> <span class="function">getProduct</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> productService.findById(id);   <span class="comment">// never return the JPA entity directly</span>
     }
 
-    <span class="comment">// POST /api/products - Create new product</span>
     <span class="annotation">@PostMapping</span>
-    <span class="keyword">public</span> Product createProduct(<span class="annotation">@RequestBody</span> Product product) {
-        <span class="keyword">return</span> productService.save(product);
+    <span class="annotation">@ResponseStatus</span>(HttpStatus.CREATED)
+    <span class="keyword">public</span> <span class="class-name">ProductResponse</span> <span class="function">createProduct</span>(<span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> <span class="class-name">ProductRequest</span> request) {
+        <span class="keyword">return</span> productService.create(request);
     }
+}
 
-    <span class="comment">// PUT /api/products/123 - Update product</span>
-    <span class="annotation">@PutMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> Product updateProduct(
-            <span class="annotation">@PathVariable</span> Long id,
-            <span class="annotation">@RequestBody</span> Product product) {
-        <span class="keyword">return</span> productService.update(id, product);
-    }
+<span class="comment">// DTOs are records — immutable, no proxy needed, no accidental lazy-loading</span>
+<span class="comment">// of JPA associations leaking into a JSON response.</span>
+<span class="keyword">public record</span> <span class="class-name">ProductRequest</span>(<span class="annotation">@NotBlank</span> <span class="class-name">String</span> name, <span class="annotation">@Positive</span> <span class="class-name">BigDecimal</span> price) {}
+<span class="keyword">public record</span> <span class="class-name">ProductResponse</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> name, <span class="class-name">BigDecimal</span> price) {}</code></pre>
 
-    <span class="comment">// DELETE /api/products/123 - Delete product</span>
-    <span class="annotation">@DeleteMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public void</span> deleteProduct(<span class="annotation">@PathVariable</span> Long id) {
-        productService.delete(id);
-    }
-}</code></pre>
+                <div class="info-box note">
+                    <div class="info-box-title">Why not just return the JPA entity?</div>
+                    <p>Returning an entity directly couples your public API contract to
+                        your persistence model — a column rename becomes a breaking API
+                        change — and risks serializing lazily-loaded associations that
+                        trigger extra queries or throw
+                        <code>LazyInitializationException</code> outside the persistence
+                        context. A record DTO is a deliberate, stable boundary between
+                        "what the database looks like" and "what the client is allowed to
+                        see." See <a href="jakarta-ee/jpa.html">JPA</a> for why entities
+                        must never be records themselves (proxying requirements).</p>
+                </div>
+            </section>
 
-            <h3>Client Side (Java HttpClient)</h3>
-            <pre><code><span class="comment">// Java 11+ HttpClient as a client</span>
-<span class="keyword">public class</span> <span class="class-name">ProductClient</span> {
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — NETWORK LAYERS AND PORTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Network: Layers and Ports, Just Enough to Debug Confidently</h2>
+                <p>Day to day you work almost entirely at the application layer (HTTP).
+                    But when a connection refuses, times out, or gets blocked by a
+                    firewall, knowing which layer you're debugging saves hours.</p>
 
-    <span class="keyword">private final</span> HttpClient httpClient = HttpClient.newHttpClient();
-    <span class="keyword">private final</span> String baseUrl = <span class="string">"http://localhost:8080/api/products"</span>;
-    <span class="keyword">private final</span> ObjectMapper mapper = <span class="keyword">new</span> ObjectMapper();
+                <table>
+                    <tr><th>Layer</th><th>Handles</th><th>You touch this when...</th></tr>
+                    <tr><td>Application (HTTP, WebSocket, gRPC)</td><td>Requests, headers, JSON bodies</td><td>Writing controllers, clients — this is where you live daily</td></tr>
+                    <tr><td>Transport (TCP, UDP)</td><td>Reliable ordered delivery, ports</td><td>Diagnosing "connection refused" vs "connection reset"</td></tr>
+                    <tr><td>Network (IP)</td><td>Addressing and routing</td><td>Debugging DNS, VPCs, or "unreachable host" errors</td></tr>
+                    <tr><td>Physical/Link (Ethernet, Wi-Fi)</td><td>Raw bit transmission</td><td>Almost never, as an application developer</td></tr>
+                </table>
 
-    <span class="comment">// GET request - Fetch all products</span>
-    <span class="keyword">public</span> List&lt;Product&gt; getAllProducts() <span class="keyword">throws</span> Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl))
-            .GET()
-            .header(<span class="string">"Accept"</span>, <span class="string">"application/json"</span>)
-            .build();
+                <p>A <strong>port</strong> identifies which application on a machine should
+                    receive the traffic — the IP address gets you to the host, the port
+                    gets you to the right process.</p>
 
-        HttpResponse&lt;String&gt; response = httpClient.send(
-            request, HttpResponse.BodyHandlers.ofString()
-        );
+                <pre><code><span class="comment">// Ports worth memorizing:</span>
+Port 80    →  HTTP  (unencrypted)
+Port 443   →  HTTPS (encrypted — the production default)
+Port 8080  →  Common Spring Boot development default
+Port 5432  →  PostgreSQL
+Port 3306  →  MySQL
+Port 6379  →  Redis
 
-        <span class="keyword">return</span> mapper.readValue(
-            response.body(),
-            <span class="keyword">new</span> TypeReference&lt;List&lt;Product&gt;&gt;() {}
-        );
-    }
+<span class="comment">// One host, several independently deployed services on different ports:</span>
+192.168.1.100
+├── :8080 → user-service
+├── :8081 → order-service
+└── :8082 → payment-service</code></pre>
 
-    <span class="comment">// POST request - Create a product</span>
-    <span class="keyword">public</span> Product createProduct(Product product) <span class="keyword">throws</span> Exception {
-        String json = mapper.writeValueAsString(product);
+                <div class="info-box note">
+                    <div class="info-box-title">The mechanics of a single request/response are covered elsewhere</div>
+                    <p>DNS resolution, the TCP handshake, and the exact anatomy of an HTTP
+                        request line are covered in depth in
+                        <a href="http.html">HTTP Protocol &amp; Methods</a> and
+                        <a href="request-response.html">Request/Response Cycle</a> — this
+                        page focuses on the architectural shape, not the wire protocol.</p>
+                </div>
+            </section>
 
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(baseUrl))
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .header(<span class="string">"Content-Type"</span>, <span class="string">"application/json"</span>)
-            .build();
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — ARCHITECTURE PATTERNS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Architecture Patterns: Two-Tier, Three-Tier, and Microservices</h2>
 
-        HttpResponse&lt;String&gt; response = httpClient.send(
-            request, HttpResponse.BodyHandlers.ofString()
-        );
+                <h3>Two-Tier — Client Talks Directly to the Database</h3>
+                <pre><code>┌──────────┐              ┌──────────┐
+│  CLIENT  │  ──────────▶ │ DATABASE │
+│ (Desktop)│  ◀────────── │ (MySQL)  │
+└──────────┘              └──────────┘
 
-        <span class="keyword">return</span> mapper.readValue(response.body(), Product.<span class="keyword">class</span>);
-    }
-}</code></pre>
-        </section>
+<span class="comment">// Still seen in legacy internal tools and quick scripts.</span>
+<span class="comment">// Acceptable for a single trusted internal user; wrong for anything</span>
+<span class="comment">// exposed to the public internet — see Section 0's before/after example.</span></code></pre>
 
-        <section class="content-section">
-            <h2>Stateless vs Stateful Servers</h2>
+                <h3>Three-Tier — The Default for Good Reason</h3>
+                <pre><code>┌──────────┐       ┌──────────┐       ┌──────────┐
+│  CLIENT  │ ────▶ │  SERVER  │ ────▶ │ DATABASE │
+│ (Browser)│       │ (Spring  │       │ (Postgre │
+│          │ ◀──── │   Boot)  │ ◀──── │   SQL)   │
+└──────────┘       └──────────┘       └──────────┘
+                        │
+              ┌─────────┴─────────┐
+         Presentation        Business logic
+          (Controllers)         (Services)
 
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Aspect</th>
-                        <th>Stateless</th>
-                        <th>Stateful</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Memory</strong></td>
-                        <td>No client data stored</td>
-                        <td>Remembers client state</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Scalability</strong></td>
-                        <td>Easy to scale horizontally</td>
-                        <td>Requires sticky sessions</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Example</strong></td>
-                        <td>REST APIs with JWT</td>
-                        <td>WebSocket connections</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Request handling</strong></td>
-                        <td>Any server can handle</td>
-                        <td>Same server required</td>
-                    </tr>
-                </tbody>
-            </table>
+<span class="comment">// One deployable server holds business logic; database credentials never</span>
+<span class="comment">// leave it; the client is replaceable (web, mobile, CLI) without touching</span>
+<span class="comment">// the rules that govern the business.</span></code></pre>
 
-            <pre><code><span class="comment">// STATELESS: Each request contains all needed info</span>
+                <h3>N-Tier / Microservices — Splitting the Middle Tier Itself</h3>
+                <pre><code>┌──────────┐       ┌─────────────────────────────────────┐
+│  CLIENT  │ ────▶ │            API Gateway               │
+└──────────┘       └─────────────────────────────────────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    ▼              ▼              ▼
+              ┌──────────┐  ┌──────────┐  ┌──────────┐
+              │   User   │  │  Order   │  │ Payment  │
+              │ Service  │  │ Service  │  │ Service  │
+              └────┬─────┘  └────┬─────┘  └────┬─────┘
+                   ▼             ▼             ▼
+              ┌──────────┐ ┌──────────┐ ┌──────────┐
+              │  User DB │ │ Order DB │ │Payment DB│
+              └──────────┘ └──────────┘ └──────────┘
+
+<span class="comment">// Each service is independently deployable and independently scalable —</span>
+<span class="comment">// the trade-off is that "the server" is no longer one thing you can reason</span>
+<span class="comment">// about locally: distributed failure modes replace in-process ones.</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Splitting into microservices is an organizational decision before it's a technical one</div>
+                    <p>Microservices solve independent scaling and independent deployment
+                        at the cost of network calls where you used to have method calls,
+                        distributed transactions where you used to have one ACID
+                        transaction, and operational overhead (service discovery,
+                        observability, versioned contracts between teams). A well-built
+                        three-tier monolith with clean internal module boundaries will
+                        outperform a poorly-decomposed set of microservices on almost every
+                        axis except independent team deployment. Reach for this split when
+                        the reason is organizational (multiple teams needing independent
+                        release cadences) or a genuinely different scaling profile between
+                        components — not by default.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — STATELESS VS STATEFUL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Stateless vs Stateful Servers</h2>
+                <p>This decision shapes how easily your server scales horizontally, and it
+                    is made per-endpoint, not just per-application.</p>
+
+                <table class="comparison-table">
+                    <tr><th>Aspect</th><th>Stateless</th><th>Stateful</th></tr>
+                    <tr><td>Where client identity lives</td><td>Inside every request (e.g. a JWT)</td><td>In server-side memory, keyed by a session ID</td></tr>
+                    <tr><td>Horizontal scaling</td><td>Trivial — any instance can serve any request</td><td>Needs sticky sessions or a shared session store</td></tr>
+                    <tr><td>Typical use</td><td>REST APIs</td><td>WebSocket connections, classic server-rendered sessions</td></tr>
+                    <tr><td>Failure recovery</td><td>Any healthy instance recovers seamlessly</td><td>Losing the instance holding the session loses the session</td></tr>
+                </table>
+
+                <pre><code><span class="comment">// STATELESS — every request is self-describing; any instance can serve it</span>
 <span class="annotation">@GetMapping</span>(<span class="string">"/api/profile"</span>)
-<span class="keyword">public</span> User getProfile(<span class="annotation">@RequestHeader</span>(<span class="string">"Authorization"</span>) String token) {
-    <span class="comment">// Token contains user identity - no server-side session needed</span>
-    Long userId = jwtService.extractUserId(token);
+<span class="keyword">public</span> <span class="class-name">UserResponse</span> <span class="function">getProfile</span>(<span class="annotation">@RequestHeader</span>(<span class="string">"Authorization"</span>) <span class="class-name">String</span> bearerToken) {
+    <span class="class-name">Long</span> userId = jwtService.extractUserId(bearerToken);
     <span class="keyword">return</span> userService.findById(userId);
 }
 
-<span class="comment">// STATEFUL: Server remembers the session</span>
+<span class="comment">// STATEFUL — the server must remember which instance holds this session</span>
 <span class="annotation">@GetMapping</span>(<span class="string">"/api/profile"</span>)
-<span class="keyword">public</span> User getProfile(HttpSession session) {
-    <span class="comment">// Server stores session data - must hit same server</span>
-    Long userId = (Long) session.getAttribute(<span class="string">"userId"</span>);
+<span class="keyword">public</span> <span class="class-name">UserResponse</span> <span class="function">getProfile</span>(<span class="class-name">HttpSession</span> session) {
+    <span class="class-name">Long</span> userId = (<span class="class-name">Long</span>) session.getAttribute(<span class="string">"userId"</span>);
     <span class="keyword">return</span> userService.findById(userId);
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Benefits and Challenges</h2>
+                <p>Session and cookie mechanics — how a session ID actually gets to the
+                    server on every request, and what a load balancer does with
+                    sticky sessions — are covered fully in
+                    <a href="sessions-cookies.html">Sessions &amp; Cookies</a>. JWT
+                    structure and validation are covered in
+                    <a href="../security/jwt.html">JWT (JSON Web Tokens)</a>.</p>
+            </section>
 
-            <div class="best-practices">
-                <h3>Benefits:</h3>
-                <ul>
-                    <li><strong>Separation of concerns:</strong> UI separate from business logic</li>
-                    <li><strong>Scalability:</strong> Add more servers to handle load</li>
-                    <li><strong>Maintainability:</strong> Update server without changing clients</li>
-                    <li><strong>Security:</strong> Centralized data protection</li>
-                    <li><strong>Multi-platform:</strong> One server, many client types</li>
-                </ul>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-                <h3>Challenges:</h3>
-                <ul>
-                    <li><strong>Network dependency:</strong> Requires connectivity</li>
-                    <li><strong>Latency:</strong> Network round-trips add delay</li>
-                    <li><strong>Single point of failure:</strong> Server down = app down</li>
-                    <li><strong>Complexity:</strong> More moving parts to manage</li>
-                </ul>
-            </div>
-        </section>
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Keep business logic and database credentials on the server — never in a client, no matter how "trusted" that client feels</li>
+                        <li>Return DTOs (records), never JPA entities, from controller methods</li>
+                        <li>Prefer stateless endpoints (token-based identity) whenever the operation allows it — it's what makes horizontal scaling trivial</li>
+                        <li>Treat calls to other services as client calls with the same discipline as any external HTTP dependency: timeouts, retries with backoff, and circuit breakers</li>
+                        <li>Choose three-tier as the default architecture; justify microservices with a concrete organizational or scaling reason, not novelty</li>
+                    </ul>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Client:</strong> Initiates requests (browser, mobile app, other servers)</li>
-                    <li><strong>Server:</strong> Processes requests and returns responses</li>
-                    <li><strong>Network:</strong> Carries messages using protocols (HTTP)</li>
-                    <li><strong>Three-tier:</strong> Client → Server → Database (most common)</li>
-                    <li><strong>Stateless:</strong> Preferred for scalability (REST + JWT)</li>
-                    <li><strong>Java servers:</strong> Spring Boot, Jakarta EE handle the heavy lifting</li>
-                </ul>
-            </div>
-        </section>
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't let a desktop or mobile client hold direct database credentials or connection strings</li>
+                        <li>Don't assume "my server" only ever plays the server role — the moment it calls another service or the database, it is a client and can fail like one</li>
+                        <li>Don't default to stateful sessions for new REST APIs unless there's a specific reason (e.g. a WebSocket connection genuinely needs pinned state)</li>
+                        <li>Don't split a monolith into microservices to chase a trend — the distributed-systems failure modes you inherit are real and permanent</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="server-vs-client.html" class="related-link">Server vs Client Execution</a>
-                <a href="http.html" class="related-link">HTTP Protocol</a>
-                <a href="rest-principles.html" class="related-link">RESTful APIs</a>
-                <a href="request-response.html" class="related-link">Request/Response Cycle</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is the difference between a client and a server?</strong><br>
+                    A client initiates a request; a server listens for requests, processes
+                    them, and returns a response. These are roles defined by who initiates
+                    the exchange, not fixed properties of a machine or program.</p>
+
+                    <p><strong>Q: Why is three-tier architecture preferred over having the client talk directly to the database?</strong><br>
+                    Three-tier keeps database credentials and business logic on the server,
+                    where they can be secured and changed centrally without touching every
+                    installed client. Direct client-to-database access exposes credentials,
+                    duplicates business rules across every client installation, and makes
+                    those rules trivially bypassable.</p>
+
+                    <p><strong>Q: What does it mean for a server to be "stateless"?</strong><br>
+                    A stateless server keeps no memory of previous requests from a given
+                    client between calls — every request carries all the information
+                    needed to process it (typically a token identifying the user). This
+                    means any server instance can handle any request, which is what makes
+                    horizontal scaling straightforward.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Can the same application be both a client and a server? Give a concrete example and explain the implication for how you'd build it.</strong><br>
+                    Yes — a typical Spring Boot service is a server when it receives HTTP
+                    requests from a browser or another service, and a client the moment it
+                    queries its own database, calls an external API, or calls another
+                    microservice. The implication is that the outbound calls it makes as a
+                    client deserve the same resilience engineering you'd apply to any
+                    external dependency: explicit timeouts, retry policies with backoff,
+                    and circuit breakers — because the process being called can fail or
+                    degrade independently of the caller, and a synchronous chain of
+                    services with no timeouts turns one slow dependency into a
+                    cascading outage.</p>
+
+                    <p><strong>Q: What specifically breaks when you move from a three-tier monolith to microservices, and how do teams typically compensate?</strong><br>
+                    Three things that were free inside a single process stop being free:
+                    (1) method calls become network calls, introducing latency and partial
+                    failure where there was none before; (2) a single ACID database
+                    transaction across what used to be one schema becomes a distributed
+                    consistency problem, typically compensated for with the Saga pattern
+                    and eventual consistency rather than XA transactions; (3) a single
+                    deployable artifact with one log stream becomes N independently
+                    deployed services requiring distributed tracing, centralized logging,
+                    and service-to-service contract versioning to remain debuggable. Teams
+                    compensate with API gateways, service meshes, and observability
+                    tooling — none of which existed as a concern in the monolith.</p>
+
+                    <p><strong>Q: When would you deliberately choose a stateful server design for a new feature in 2026, given that stateless is the default recommendation?</strong><br>
+                    WebSocket-based features are the clearest case: a persistent bidirectional
+                    connection is inherently pinned to the server instance that accepted it,
+                    so there is no meaningful "stateless" version of that connection — the
+                    server must hold connection state for as long as the socket is open.
+                    Real-time collaborative editing, live notifications, and trading
+                    dashboards are typical examples. Even there, teams often keep the
+                    durable state (e.g. document content) in a shared store like Redis so
+                    that only the live connection, not the underlying data, is pinned to one
+                    instance — limiting the blast radius if that instance goes down.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="server-vs-client.html" class="related-link"><span class="related-icon">🔀</span>Server vs Client Execution</a>
+                    <a href="http.html" class="related-link"><span class="related-icon">🌐</span>HTTP Protocol &amp; Methods</a>
+                    <a href="rest.html" class="related-link"><span class="related-icon">🔗</span>RESTful API Principles</a>
+                    <a href="request-response.html" class="related-link"><span class="related-icon">🔄</span>Request/Response Cycle</a>
+                    <a href="sessions-cookies.html" class="related-link"><span class="related-icon">🍪</span>Sessions &amp; Cookies</a>
+                    <a href="websockets.html" class="related-link"><span class="related-icon">🔌</span>WebSockets</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

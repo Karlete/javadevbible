@@ -1,6 +1,6 @@
 # JavaDev Bible - Project Status
 
-**Last Updated:** June 22, 2026 (Session 7 - Visual Enhancements Complete)
+**Last Updated:** July 7, 2026 (Session 8 - Web Concepts Review & Link Fixes)
 
 ## Overview
 
@@ -109,7 +109,7 @@ The JavaDev Bible is a comprehensive, web-based knowledge base covering Java dev
 - [x] Request/Response Cycle (`topics/web-concepts/request-response.html`)
 - [x] Sessions & Cookies (`topics/web-concepts/sessions-cookies.html`)
 - [x] CORS (`topics/web-concepts/cors.html`)
-- [x] WebSockets (`topics/web-concepts/websockets.html`)
+- [x] WebSockets (`topics/web-concepts/websocket.html`)
 
 ---
 
