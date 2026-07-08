@@ -1,689 +1,667 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.relationships.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Entity Relationships - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#databases">Databases & Persistence</a> / Entity Relationships
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#databases" data-i18n="nav.databases">Databases &amp; Persistence</a> /
+                Entity Relationships
             </nav>
-            <h1>Entity Relationships</h1>
-            <p class="topic-subtitle">Mapping associations between entities in JPA</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.relationships.h1">Entity Relationships</h1>
+            <p class="topic-subtitle" data-i18n="topic.relationships.subtitle">How JPA maps foreign keys to Java objects — the ownership rules, the cascade traps, and the N+1 problem that will hit you in production</p>
+            <a href="../../index.html#databases" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>Understanding Relationships</h2>
-            <p>In relational databases, tables are connected through foreign keys. In JPA, we map these connections as <strong>relationships</strong> between entity objects. Understanding relationships is crucial for designing efficient and maintainable data models.</p>
+    <div class="topic-layout">
 
-            <h3>Types of Relationships</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Relationship</th>
-                        <th>Description</th>
-                        <th>Example</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>@OneToOne</strong></td>
-                        <td>One entity relates to exactly one other</td>
-                        <td>User - UserProfile</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@OneToMany</strong></td>
-                        <td>One entity relates to many others</td>
-                        <td>Department - Employees</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@ManyToOne</strong></td>
-                        <td>Many entities relate to one</td>
-                        <td>Employees - Department</td>
-                    </tr>
-                    <tr>
-                        <td><strong>@ManyToMany</strong></td>
-                        <td>Many entities relate to many others</td>
-                        <td>Students - Courses</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <h3>Directionality</h3>
-            <pre><code><span class="comment">// UNIDIRECTIONAL: Only one side knows about the relationship</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Employee</span> {
-    <span class="annotation">@ManyToOne</span>
-    <span class="keyword">private</span> Department department;  <span class="comment">// Employee knows about Department</span>
-}
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Department</span> {
-    <span class="comment">// Department doesn't know about Employees</span>
-}
-
-<span class="comment">// BIDIRECTIONAL: Both sides know about each other</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Employee</span> {
-    <span class="annotation">@ManyToOne</span>
-    <span class="keyword">private</span> Department department;
-}
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Department</span> {
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"department"</span>)
-    <span class="keyword">private</span> List&lt;Employee&gt; employees;  <span class="comment">// Department also knows about Employees</span>
-}</code></pre>
-
-            <div class="info-box tip">
-                <div class="info-box-title">Owning Side vs Inverse Side</div>
-                <p>In bidirectional relationships, one side "owns" the relationship (has the foreign key column). The inverse side uses <code>mappedBy</code> to indicate it's not the owner.</p>
-                <ul>
-                    <li><strong>Owning side:</strong> The side that contains the foreign key (usually @ManyToOne)</li>
-                    <li><strong>Inverse side:</strong> Uses mappedBy attribute</li>
-                    <li><strong>Rule:</strong> Only changes to the owning side are persisted!</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>@OneToOne Relationship</h2>
-            <p>A one-to-one relationship where each entity instance relates to exactly one instance of another entity.</p>
+        <main class="topic-content">
 
-            <h3>Unidirectional @OneToOne</h3>
-            <pre><code><span class="comment">// User has one Profile</span>
-<span class="annotation">@Entity</span>
-<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)
-<span class="keyword">public class</span> <span class="class-name">User</span> {
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What are Entity Relationships — and What Problem Do They Solve?</h2>
+                <p>In a relational database, tables are linked through foreign keys.
+                    In JPA, these links become Java object references — an
+                    <code>Order</code> object holds a reference to a
+                    <code>Customer</code> object, not just a <code>customerId</code>
+                    long. JPA's relationship annotations tell the ORM how to translate
+                    between those two representations.</p>
 
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
+                <p>Getting relationships wrong is the most common source of production
+                    performance problems with JPA. Fetch strategies, cascade choices,
+                    and ownership rules all have direct consequences in the SQL that
+                    gets executed. Understanding the mechanics — not just the
+                    annotations — is what separates correct from accidental.</p>
 
-    <span class="keyword">private</span> String username;
+                <pre><code><span class="comment">// BEFORE JPA — you manage the foreign key yourself</span>
+<span class="keyword">public record</span> <span class="class-name">OrderRow</span>(<span class="keyword">long</span> id, <span class="keyword">long</span> customerId, <span class="class-name">String</span> status) {}
 
-    <span class="annotation">@OneToOne</span>(cascade = CascadeType.ALL, orphanRemoval = <span class="keyword">true</span>)
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"profile_id"</span>, referencedColumnName = <span class="string">"id"</span>)
-    <span class="keyword">private</span> UserProfile profile;
+<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">getCustomer</span>(<span class="class-name">OrderRow</span> order) {
+    <span class="keyword">return</span> customerRepo.findById(order.customerId());   <span class="comment">// separate query every time</span>
 }
 
+<span class="comment">// AFTER JPA — the ORM manages the join for you</span>
 <span class="annotation">@Entity</span>
-<span class="annotation">@Table</span>(name = <span class="string">"user_profiles"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserProfile</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String fullName;
-    <span class="keyword">private</span> String bio;
-    <span class="keyword">private</span> String avatarUrl;
-}
-
-<span class="comment">// Database tables:</span>
-<span class="comment">// users: id, username, profile_id (FK)</span>
-<span class="comment">// user_profiles: id, full_name, bio, avatar_url</span></code></pre>
-
-            <h3>Bidirectional @OneToOne</h3>
-            <pre><code><span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String username;
-
-    <span class="annotation">@OneToOne</span>(cascade = CascadeType.ALL, orphanRemoval = <span class="keyword">true</span>)
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"profile_id"</span>)
-    <span class="keyword">private</span> UserProfile profile;
-
-    <span class="comment">// Helper method to maintain bidirectional consistency</span>
-    <span class="keyword">public void</span> <span class="function">setProfile</span>(UserProfile profile) {
-        <span class="keyword">if</span> (profile == <span class="keyword">null</span>) {
-            <span class="keyword">if</span> (<span class="keyword">this</span>.profile != <span class="keyword">null</span>) {
-                <span class="keyword">this</span>.profile.setUser(<span class="keyword">null</span>);
-            }
-        } <span class="keyword">else</span> {
-            profile.setUser(<span class="keyword">this</span>);
-        }
-        <span class="keyword">this</span>.profile = profile;
-    }
-}
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">UserProfile</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String fullName;
-
-    <span class="annotation">@OneToOne</span>(mappedBy = <span class="string">"profile"</span>)  <span class="comment">// Inverse side</span>
-    <span class="keyword">private</span> User user;
+<span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="keyword">private</span> <span class="class-name">Customer</span> customer;   <span class="comment">// loaded on demand, or joined with JOIN FETCH</span>
 }</code></pre>
 
-            <h3>@OneToOne with Shared Primary Key</h3>
-            <pre><code><span class="comment">// Both entities share the same ID (more efficient, no extra FK column)</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> {
+                <table class="comparison-table">
+                    <tr><th>Annotation</th><th>Cardinality</th><th>E-commerce example</th><th>Default fetch</th></tr>
+                    <tr><td><code>@ManyToOne</code></td><td>Many → One</td><td>Order → Customer</td><td>EAGER (override to LAZY)</td></tr>
+                    <tr><td><code>@OneToMany</code></td><td>One → Many</td><td>Customer → Orders</td><td>LAZY</td></tr>
+                    <tr><td><code>@OneToOne</code></td><td>One → One</td><td>Customer → ShippingAddress</td><td>EAGER (override to LAZY)</td></tr>
+                    <tr><td><code>@ManyToMany</code></td><td>Many → Many</td><td>Order ↔ Product (via OrderItem)</td><td>LAZY — but prefer intermediate entity</td></tr>
+                </table>
+            </section>
 
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — OWNERSHIP AND mappedBy
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Owning Side and <code>mappedBy</code> — The Rule Everyone Gets Wrong</h2>
+                <p>In every bidirectional relationship there is an <strong>owning
+                    side</strong> (the entity that holds the foreign key column) and
+                    an <strong>inverse side</strong> (declared with
+                    <code>mappedBy</code>). JPA only looks at the owning side to
+                    decide what SQL to write. If you only update the inverse side,
+                    the change is not persisted.</p>
 
-    <span class="keyword">private</span> String username;
+                <pre><code><span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
-    <span class="annotation">@OneToOne</span>(mappedBy = <span class="string">"user"</span>, cascade = CascadeType.ALL)
-    <span class="annotation">@PrimaryKeyJoinColumn</span>
-    <span class="keyword">private</span> UserProfile profile;
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"customer_id"</span>)   <span class="comment">// owning side — holds the FK column</span>
+    <span class="keyword">private</span> <span class="class-name">Customer</span> customer;
 }
 
 <span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">UserProfile</span> {
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
-    <span class="annotation">@Id</span>
-    <span class="keyword">private</span> Long id;  <span class="comment">// Same ID as User!</span>
-
-    <span class="keyword">private</span> String fullName;
-
-    <span class="annotation">@OneToOne</span>
-    <span class="annotation">@MapsId</span>  <span class="comment">// Use User's ID as this entity's ID</span>
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"id"</span>)
-    <span class="keyword">private</span> User user;
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"customer"</span>)   <span class="comment">// inverse side — mappedBy = field name in Order</span>
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 }
 
-<span class="comment">// Database tables:</span>
-<span class="comment">// users: id, username</span>
-<span class="comment">// user_profiles: id (PK and FK to users), full_name</span></code></pre>
-        </section>
+<span class="comment">// WRONG — updates only the inverse side; Hibernate ignores it</span>
+customer.getOrders().add(order);     <span class="comment">// no SQL UPDATE issued</span>
 
-        <section class="content-section">
-            <h2>@OneToMany and @ManyToOne</h2>
-            <p>The most common relationship type. One entity (the "one" side) has many related entities (the "many" side).</p>
+<span class="comment">// CORRECT — update the owning side</span>
+order.setCustomer(customer);         <span class="comment">// UPDATE orders SET customer_id = ? WHERE id = ?</span>
 
-            <h3>Bidirectional @OneToMany / @ManyToOne (Recommended)</h3>
-            <pre><code><span class="comment">// Department has many Employees</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Department</span> {
+<span class="comment">// ALSO CORRECT — update both sides so the in-memory object graph is consistent</span>
+order.setCustomer(customer);
+customer.getOrders().add(order);     <span class="comment">// keeps the collection accurate without a DB roundtrip</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">The rule: <code>mappedBy</code> = "I am not the owner; look over there"</div>
+                    <p>The value of <code>mappedBy</code> is the <em>field name</em>
+                        on the owning entity, not the column name, not the table name.
+                        If you write <code>mappedBy = "customer_id"</code> (the column
+                        name) instead of <code>mappedBy = "customer"</code> (the field
+                        name), JPA will throw a mapping exception at startup. This is
+                        the most frequent typo in bidirectional relationship
+                        declarations.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — @ManyToOne AND @OneToMany
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>@ManyToOne and @OneToMany — The E-Commerce Core</h2>
+                <p>The <code>@ManyToOne</code> / <code>@OneToMany</code> pair is the
+                    most common relationship in any real application. In e-commerce:
+                    many orders belong to one customer; one customer has many orders.
+                    The FK column <code>customer_id</code> lives in the
+                    <code>orders</code> table — that's why <code>Order</code> is the
+                    owning side.</p>
+
+                <pre><code><span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
 
     <span class="annotation">@Id</span>
     <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
-    <span class="keyword">private</span> String name;
+    <span class="keyword">private</span> <span class="class-name">String</span> email;
+    <span class="keyword">private</span> <span class="class-name">String</span> fullName;
 
     <span class="annotation">@OneToMany</span>(
-        mappedBy = <span class="string">"department"</span>,           <span class="comment">// Points to field in Employee</span>
-        cascade = CascadeType.ALL,           <span class="comment">// Cascade all operations</span>
-        orphanRemoval = <span class="keyword">true</span>                 <span class="comment">// Remove orphaned employees</span>
+        mappedBy = <span class="string">"customer"</span>,
+        cascade = {CascadeType.PERSIST, CascadeType.MERGE},
+        <span class="comment">// NOTE: CascadeType.REMOVE is intentionally absent.
+        // Deleting a customer should not cascade-delete their orders —
+        // orders are financial records that must be retained.
+        // orphanRemoval is also absent for the same reason.</span>
+        fetch = FetchType.LAZY
     )
-    <span class="keyword">private</span> List&lt;Employee&gt; employees = <span class="keyword">new</span> ArrayList&lt;&gt;();
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 
-    <span class="comment">// Helper methods to maintain bidirectional consistency</span>
-    <span class="keyword">public void</span> <span class="function">addEmployee</span>(Employee employee) {
-        employees.add(employee);
-        employee.setDepartment(<span class="keyword">this</span>);
+    <span class="comment">// Bidirectional helper — keeps both sides of the in-memory graph consistent</span>
+    <span class="keyword">public void</span> <span class="function">addOrder</span>(<span class="class-name">Order</span> order) {
+        orders.add(order);
+        order.setCustomer(<span class="keyword">this</span>);
     }
 
-    <span class="keyword">public void</span> <span class="function">removeEmployee</span>(Employee employee) {
-        employees.remove(employee);
-        employee.setDepartment(<span class="keyword">null</span>);
-    }
-}
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Employee</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-
-    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)     <span class="comment">// LAZY is recommended</span>
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"department_id"</span>)    <span class="comment">// FK column name</span>
-    <span class="keyword">private</span> Department department;          <span class="comment">// Owning side!</span>
-}
-
-<span class="comment">// Database tables:</span>
-<span class="comment">// departments: id, name</span>
-<span class="comment">// employees: id, name, department_id (FK to departments)</span>
-
-<span class="comment">// Usage:</span>
-Department dept = <span class="keyword">new</span> Department();
-dept.setName(<span class="string">"Engineering"</span>);
-
-Employee emp1 = <span class="keyword">new</span> Employee();
-emp1.setName(<span class="string">"Alice"</span>);
-dept.addEmployee(emp1);  <span class="comment">// Use helper method!</span>
-
-Employee emp2 = <span class="keyword">new</span> Employee();
-emp2.setName(<span class="string">"Bob"</span>);
-dept.addEmployee(emp2);
-
-entityManager.persist(dept);  <span class="comment">// Cascade saves employees too</span></code></pre>
-
-            <h3>Unidirectional @ManyToOne (Simple)</h3>
-            <pre><code><span class="comment">// Employee knows about Department, but not vice versa</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Employee</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-
-    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"department_id"</span>, nullable = <span class="keyword">false</span>)
-    <span class="keyword">private</span> Department department;
-}
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Department</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-    <span class="comment">// No reference to employees</span>
-}
-
-<span class="comment">// To get employees of a department, use JPQL:</span>
-List&lt;Employee&gt; employees = em.createQuery(
-    <span class="string">"SELECT e FROM Employee e WHERE e.department.id = :deptId"</span>,
-    Employee.<span class="keyword">class</span>
-).setParameter(<span class="string">"deptId"</span>, departmentId)
- .getResultList();</code></pre>
-
-            <h3>Unidirectional @OneToMany (Avoid!)</h3>
-            <pre><code><span class="comment">// NOT RECOMMENDED - Creates join table unnecessarily</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Department</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-
-    <span class="annotation">@OneToMany</span>
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"department_id"</span>)  <span class="comment">// Without this, creates join table!</span>
-    <span class="keyword">private</span> List&lt;Employee&gt; employees;
-}
-
-<span class="comment">// This works but is inefficient. Prefer bidirectional with @ManyToOne owning side.</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>@ManyToMany Relationship</h2>
-            <p>Used when entities on both sides can have multiple related entities. Requires a join table.</p>
-
-            <h3>Basic @ManyToMany</h3>
-            <pre><code><span class="comment">// Students can enroll in many Courses, Courses have many Students</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Student</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-
-    <span class="annotation">@ManyToMany</span>
-    <span class="annotation">@JoinTable</span>(
-        name = <span class="string">"student_courses"</span>,                        <span class="comment">// Join table name</span>
-        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"student_id"</span>),   <span class="comment">// FK to this entity</span>
-        inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"course_id"</span>)  <span class="comment">// FK to other entity</span>
-    )
-    <span class="keyword">private</span> Set&lt;Course&gt; courses = <span class="keyword">new</span> HashSet&lt;&gt;();
-
-    <span class="comment">// Helper methods</span>
-    <span class="keyword">public void</span> <span class="function">enrollInCourse</span>(Course course) {
-        courses.add(course);
-        course.getStudents().add(<span class="keyword">this</span>);
-    }
-
-    <span class="keyword">public void</span> <span class="function">dropCourse</span>(Course course) {
-        courses.remove(course);
-        course.getStudents().remove(<span class="keyword">this</span>);
+    <span class="keyword">public void</span> <span class="function">removeOrder</span>(<span class="class-name">Order</span> order) {
+        orders.remove(order);
+        order.setCustomer(<span class="keyword">null</span>);
     }
 }
 
 <span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Course</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String title;
-
-    <span class="annotation">@ManyToMany</span>(mappedBy = <span class="string">"courses"</span>)  <span class="comment">// Inverse side</span>
-    <span class="keyword">private</span> Set&lt;Student&gt; students = <span class="keyword">new</span> HashSet&lt;&gt;();
-}
-
-<span class="comment">// Database tables:</span>
-<span class="comment">// students: id, name</span>
-<span class="comment">// courses: id, title</span>
-<span class="comment">// student_courses: student_id (FK), course_id (FK) - join table!</span></code></pre>
-
-            <h3>@ManyToMany with Extra Columns (Intermediate Entity)</h3>
-            <pre><code><span class="comment">// When join table needs extra data (enrollment_date, grade, etc.)</span>
-<span class="comment">// Use intermediate entity instead of @ManyToMany</span>
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Student</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"student"</span>, cascade = CascadeType.ALL, orphanRemoval = <span class="keyword">true</span>)
-    <span class="keyword">private</span> Set&lt;Enrollment&gt; enrollments = <span class="keyword">new</span> HashSet&lt;&gt;();
-
-    <span class="keyword">public void</span> <span class="function">enrollInCourse</span>(Course course, LocalDate enrollmentDate) {
-        Enrollment enrollment = <span class="keyword">new</span> Enrollment(<span class="keyword">this</span>, course, enrollmentDate);
-        enrollments.add(enrollment);
-        course.getEnrollments().add(enrollment);
-    }
-}
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Course</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String title;
-
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"course"</span>)
-    <span class="keyword">private</span> Set&lt;Enrollment&gt; enrollments = <span class="keyword">new</span> HashSet&lt;&gt;();
-}
-
-<span class="comment">// The intermediate entity</span>
-<span class="annotation">@Entity</span>
-<span class="annotation">@Table</span>(name = <span class="string">"enrollments"</span>)
-<span class="keyword">public class</span> <span class="class-name">Enrollment</span> {
-
-    <span class="annotation">@EmbeddedId</span>
-    <span class="keyword">private</span> EnrollmentId id;
-
-    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
-    <span class="annotation">@MapsId</span>(<span class="string">"studentId"</span>)
-    <span class="keyword">private</span> Student student;
-
-    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
-    <span class="annotation">@MapsId</span>(<span class="string">"courseId"</span>)
-    <span class="keyword">private</span> Course course;
-
-    <span class="comment">// Extra columns!</span>
-    <span class="keyword">private</span> LocalDate enrollmentDate;
-    <span class="keyword">private</span> String grade;
-    <span class="keyword">private</span> Boolean completed;
-
-    <span class="keyword">public</span> <span class="function">Enrollment</span>() {}
-
-    <span class="keyword">public</span> <span class="function">Enrollment</span>(Student student, Course course, LocalDate enrollmentDate) {
-        <span class="keyword">this</span>.id = <span class="keyword">new</span> EnrollmentId(student.getId(), course.getId());
-        <span class="keyword">this</span>.student = student;
-        <span class="keyword">this</span>.course = course;
-        <span class="keyword">this</span>.enrollmentDate = enrollmentDate;
-    }
-}
-
-<span class="comment">// Composite key for Enrollment</span>
-<span class="annotation">@Embeddable</span>
-<span class="keyword">public class</span> <span class="class-name">EnrollmentId</span> <span class="keyword">implements</span> Serializable {
-
-    <span class="keyword">private</span> Long studentId;
-    <span class="keyword">private</span> Long courseId;
-
-    <span class="keyword">public</span> <span class="function">EnrollmentId</span>() {}
-
-    <span class="keyword">public</span> <span class="function">EnrollmentId</span>(Long studentId, Long courseId) {
-        <span class="keyword">this</span>.studentId = studentId;
-        <span class="keyword">this</span>.courseId = courseId;
-    }
-
-    <span class="comment">// equals() and hashCode() REQUIRED!</span>
-    <span class="annotation">@Override</span>
-    <span class="keyword">public boolean</span> <span class="function">equals</span>(Object o) {
-        <span class="keyword">if</span> (<span class="keyword">this</span> == o) <span class="keyword">return true</span>;
-        <span class="keyword">if</span> (o == <span class="keyword">null</span> || getClass() != o.getClass()) <span class="keyword">return false</span>;
-        EnrollmentId that = (EnrollmentId) o;
-        <span class="keyword">return</span> Objects.equals(studentId, that.studentId) &&
-               Objects.equals(courseId, that.courseId);
-    }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public int</span> <span class="function">hashCode</span>() {
-        <span class="keyword">return</span> Objects.hash(studentId, courseId);
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Self-Referential Relationships</h2>
-            <p>When an entity references itself (e.g., employee-manager, category-subcategory).</p>
-
-            <pre><code><span class="comment">// Employee with Manager (who is also an Employee)</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Employee</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-
-    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"manager_id"</span>)
-    <span class="keyword">private</span> Employee manager;
-
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"manager"</span>)
-    <span class="keyword">private</span> List&lt;Employee&gt; subordinates = <span class="keyword">new</span> ArrayList&lt;&gt;();
-
-    <span class="keyword">public void</span> <span class="function">addSubordinate</span>(Employee employee) {
-        subordinates.add(employee);
-        employee.setManager(<span class="keyword">this</span>);
-    }
-}
-
-<span class="comment">// Database table:</span>
-<span class="comment">// employees: id, name, manager_id (FK to employees.id)</span>
-
-<span class="comment">// Category with parent/children (tree structure)</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Category</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-
-    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"parent_id"</span>)
-    <span class="keyword">private</span> Category parent;
-
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"parent"</span>, cascade = CascadeType.ALL)
-    <span class="keyword">private</span> List&lt;Category&gt; children = <span class="keyword">new</span> ArrayList&lt;&gt;();
-
-    <span class="keyword">public boolean</span> <span class="function">isRoot</span>() {
-        <span class="keyword">return</span> parent == <span class="keyword">null</span>;
-    }
-
-    <span class="keyword">public boolean</span> <span class="function">isLeaf</span>() {
-        <span class="keyword">return</span> children.isEmpty();
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Cascade Operations</h2>
-            <p>Cascade types determine which operations propagate from parent to child entities.</p>
-
-            <pre><code><span class="comment">// CascadeType options:</span>
-
-<span class="annotation">@OneToMany</span>(cascade = CascadeType.PERSIST)  <span class="comment">// persist() cascades</span>
-<span class="annotation">@OneToMany</span>(cascade = CascadeType.MERGE)    <span class="comment">// merge() cascades</span>
-<span class="annotation">@OneToMany</span>(cascade = CascadeType.REMOVE)   <span class="comment">// remove() cascades</span>
-<span class="annotation">@OneToMany</span>(cascade = CascadeType.REFRESH)  <span class="comment">// refresh() cascades</span>
-<span class="annotation">@OneToMany</span>(cascade = CascadeType.DETACH)   <span class="comment">// detach() cascades</span>
-<span class="annotation">@OneToMany</span>(cascade = CascadeType.ALL)      <span class="comment">// All of the above</span>
-
-<span class="comment">// Multiple cascade types</span>
-<span class="annotation">@OneToMany</span>(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-
-<span class="comment">// Example: Order with OrderItems</span>
-<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"orders"</span>)
 <span class="keyword">public class</span> <span class="class-name">Order</span> {
 
     <span class="annotation">@Id</span>
     <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
-    <span class="keyword">private</span> Long id;
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)   <span class="comment">// always LAZY — override the EAGER default</span>
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"customer_id"</span>, nullable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> <span class="class-name">Customer</span> customer;          <span class="comment">// owning side: holds the FK column</span>
+
+    <span class="annotation">@Enumerated</span>(EnumType.STRING)
+    <span class="keyword">private</span> <span class="class-name">OrderStatus</span> status = <span class="class-name">OrderStatus</span>.PENDING;
 
     <span class="annotation">@OneToMany</span>(
         mappedBy = <span class="string">"order"</span>,
-        cascade = CascadeType.ALL,  <span class="comment">// Save/delete items with order</span>
-        orphanRemoval = <span class="keyword">true</span>        <span class="comment">// Delete items removed from collection</span>
+        cascade = CascadeType.ALL,    <span class="comment">// ALL is correct here — items are children of the order</span>
+        orphanRemoval = <span class="keyword">true</span>          <span class="comment">// removing an item from the collection deletes it from the DB</span>
     )
-    <span class="keyword">private</span> List&lt;OrderItem&gt; items = <span class="keyword">new</span> ArrayList&lt;&gt;();
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">OrderItem</span> item) {
+        items.add(item);
+        item.setOrder(<span class="keyword">this</span>);
+    }
 }
 
-<span class="comment">// orphanRemoval example:</span>
-Order order = em.find(Order.<span class="keyword">class</span>, 1L);
-order.getItems().remove(0);  <span class="comment">// This item will be DELETED from DB!</span>
-<span class="comment">// Without orphanRemoval, it would just set order_id to NULL</span></code></pre>
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"order_items"</span>)
+<span class="keyword">public class</span> <span class="class-name">OrderItem</span> {
 
-            <div class="info-box warning">
-                <div class="info-box-title">Cascade with Care!</div>
-                <ul>
-                    <li><strong>CascadeType.REMOVE</strong> can accidentally delete more than intended</li>
-                    <li><strong>Don't cascade on @ManyToOne</strong> - deleting an employee shouldn't delete the department!</li>
-                    <li><strong>Use cascade for parent-child</strong> relationships where child can't exist without parent</li>
-                </ul>
-            </div>
-        </section>
+    <span class="annotation">@Id</span>
+    <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
-        <section class="content-section">
-            <h2>Fetch Types and Lazy Loading</h2>
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"order_id"</span>, nullable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> <span class="class-name">Order</span> order;
 
-            <pre><code><span class="comment">// FetchType.LAZY - Load on demand (recommended for collections)</span>
-<span class="annotation">@OneToMany</span>(fetch = FetchType.LAZY)  <span class="comment">// Default for @OneToMany, @ManyToMany</span>
-<span class="keyword">private</span> List&lt;Employee&gt; employees;
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"product_id"</span>, nullable = <span class="keyword">false</span>)
+    <span class="keyword">private</span> <span class="class-name">Product</span> product;
 
-<span class="comment">// FetchType.EAGER - Load immediately</span>
-<span class="annotation">@ManyToOne</span>(fetch = FetchType.EAGER)  <span class="comment">// Default for @ManyToOne, @OneToOne</span>
-<span class="keyword">private</span> Department department;
+    <span class="keyword">private</span> <span class="keyword">int</span> quantity;
 
-<span class="comment">// BEST PRACTICE: Make everything LAZY</span>
-<span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)  <span class="comment">// Override default EAGER</span>
-<span class="keyword">private</span> Department department;
-
-<span class="annotation">@OneToOne</span>(fetch = FetchType.LAZY)   <span class="comment">// Override default EAGER</span>
-<span class="keyword">private</span> UserProfile profile;
-
-<span class="comment">// LazyInitializationException: Accessing lazy field outside session</span>
-Employee emp = em.find(Employee.<span class="keyword">class</span>, 1L);
-em.close();  <span class="comment">// Session closed!</span>
-emp.getDepartment().getName();  <span class="comment">// LazyInitializationException!</span>
-
-<span class="comment">// Solutions:</span>
-
-<span class="comment">// 1. JOIN FETCH in query</span>
-Employee emp = em.createQuery(
-    <span class="string">"SELECT e FROM Employee e JOIN FETCH e.department WHERE e.id = :id"</span>,
-    Employee.<span class="keyword">class</span>
-).setParameter(<span class="string">"id"</span>, 1L).getSingleResult();
-em.close();
-emp.getDepartment().getName();  <span class="comment">// Works! Already loaded.</span>
-
-<span class="comment">// 2. Initialize before closing session</span>
-Employee emp = em.find(Employee.<span class="keyword">class</span>, 1L);
-Hibernate.initialize(emp.getDepartment());  <span class="comment">// Force load</span>
-em.close();
-
-<span class="comment">// 3. @Transactional in Spring (keeps session open)</span>
-<span class="annotation">@Transactional</span>
-<span class="keyword">public</span> EmployeeDTO <span class="function">getEmployeeWithDepartment</span>(Long id) {
-    Employee emp = repository.findById(id).orElseThrow();
-    <span class="keyword">return new</span> EmployeeDTO(emp, emp.getDepartment().getName());  <span class="comment">// Works!</span>
+    <span class="keyword">private</span> <span class="class-name">BigDecimal</span> unitPrice;   <span class="comment">// snapshot — not product.getPrice()</span>
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+                <div class="info-box warning">
+                    <div class="info-box-title"><code>CascadeType.ALL</code> + <code>orphanRemoval</code> on a collection is not always correct</div>
+                    <p>The example above uses <code>CascadeType.ALL</code> and
+                        <code>orphanRemoval = true</code> on the
+                        <code>Order → OrderItem</code> relationship. This is correct
+                        because <code>OrderItem</code> is a dependent child that cannot
+                        exist without its parent order. It is <strong>not</strong>
+                        correct on the <code>Customer → Order</code> side, where those
+                        same options would delete all of a customer's historical orders
+                        when the customer is deleted. Before writing
+                        <code>cascade = CascadeType.ALL, orphanRemoval = true</code>,
+                        ask: "If the parent is deleted, should all children be deleted
+                        too?" If the answer is "no" or "depends on business rules",
+                        specify only <code>PERSIST</code> and <code>MERGE</code>.</p>
+                </div>
+            </section>
 
-            <div class="best-practices">
-                <h3>Do's</h3>
-                <ul>
-                    <li><strong>Prefer @ManyToOne</strong> as the owning side</li>
-                    <li><strong>Use helper methods</strong> to maintain bidirectional consistency</li>
-                    <li><strong>Make all relationships LAZY</strong> by default</li>
-                    <li><strong>Use JOIN FETCH</strong> to avoid N+1 problems</li>
-                    <li><strong>Prefer Set over List</strong> for @ManyToMany to avoid duplicates</li>
-                    <li><strong>Use intermediate entities</strong> for @ManyToMany with extra columns</li>
-                    <li><strong>Always implement equals() and hashCode()</strong> for composite keys</li>
-                </ul>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — @OneToOne
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>@OneToOne — Two Patterns, One Correct Choice</h2>
+                <p>The two common ways to map a one-to-one relationship are: a
+                    separate FK column, or a shared primary key. The shared primary
+                    key (<code>@MapsId</code>) is the better choice when the child
+                    entity's identity is inseparable from the parent's — it removes
+                    a redundant column and makes the JOIN condition trivial.</p>
 
-                <h3>Don'ts</h3>
-                <ul>
-                    <li><strong>Don't use EAGER</strong> fetching unless absolutely necessary</li>
-                    <li><strong>Don't cascade REMOVE</strong> on @ManyToOne</li>
-                    <li><strong>Don't use unidirectional @OneToMany</strong> without @JoinColumn</li>
-                    <li><strong>Don't forget mappedBy</strong> on inverse side</li>
-                    <li><strong>Don't mix business logic</strong> in entity helper methods</li>
-                </ul>
-            </div>
-        </section>
+                <pre><code><span class="comment">// Pattern A — separate FK column (default, fine for most cases)</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>@OneToOne:</strong> One-to-one mapping, consider shared primary key</li>
-                    <li><strong>@OneToMany / @ManyToOne:</strong> Most common, prefer bidirectional with @ManyToOne owning</li>
-                    <li><strong>@ManyToMany:</strong> Uses join table, consider intermediate entity for extra data</li>
-                    <li><strong>mappedBy:</strong> Indicates inverse (non-owning) side</li>
-                    <li><strong>cascade:</strong> Propagate operations to related entities</li>
-                    <li><strong>orphanRemoval:</strong> Delete children removed from collection</li>
-                    <li><strong>FetchType.LAZY:</strong> Default for collections, use for all relationships</li>
-                    <li><strong>Helper methods:</strong> Essential for maintaining bidirectional consistency</li>
-                </ul>
-            </div>
-        </section>
+    <span class="annotation">@OneToOne</span>(
+        cascade = CascadeType.ALL,
+        orphanRemoval = <span class="keyword">true</span>,
+        fetch = FetchType.LAZY   <span class="comment">// override the EAGER default</span>
+    )
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"shipping_address_id"</span>)
+    <span class="keyword">private</span> <span class="class-name">ShippingAddress</span> shippingAddress;
+}
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="jpa-hibernate.html" class="related-link">JPA & Hibernate</a>
-                <a href="orms.html" class="related-link">ORMs</a>
-                <a href="transactions.html" class="related-link">Transactions (ACID)</a>
-                <a href="../spring/data-jpa.html" class="related-link">Spring Data JPA</a>
-            </div>
-        </section>
-    </main>
+<span class="comment">// Pattern B — shared primary key (@MapsId), cleaner for child-is-extension semantics</span>
+<span class="comment">// No extra column; shipping_addresses.id IS the FK to customers.id</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@OneToOne</span>(mappedBy = <span class="string">"customer"</span>, cascade = CascadeType.ALL,
+              orphanRemoval = <span class="keyword">true</span>, fetch = FetchType.LAZY)
+    <span class="keyword">private</span> <span class="class-name">ShippingAddress</span> shippingAddress;
+}
+
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"shipping_addresses"</span>)
+<span class="keyword">public class</span> <span class="class-name">ShippingAddress</span> {
+    <span class="annotation">@Id</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;   <span class="comment">// no @GeneratedValue — derived from customer</span>
+
+    <span class="annotation">@OneToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@MapsId</span>            <span class="comment">// uses customer.id as this entity's PK</span>
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"id"</span>)
+    <span class="keyword">private</span> <span class="class-name">Customer</span> customer;
+
+    <span class="keyword">private</span> <span class="class-name">String</span> street;
+    <span class="keyword">private</span> <span class="class-name">String</span> city;
+    <span class="keyword">private</span> <span class="class-name">String</span> postalCode;
+    <span class="keyword">private</span> <span class="class-name">String</span> country;
+}</code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title"><code>@OneToOne</code> lazy loading requires bytecode enhancement</div>
+                    <p><code>FetchType.LAZY</code> on <code>@OneToOne</code> is
+                        declared but not guaranteed. For the inverse side (the side
+                        with <code>mappedBy</code>), Hibernate cannot use a proxy
+                        because it needs to check whether a row even exists — which
+                        requires a query. Without bytecode enhancement (Hibernate's
+                        <code>hibernate-enhance-maven-plugin</code> with
+                        <code>enableLazyInitialization=true</code>), the
+                        <code>@OneToOne</code> inverse side will always load eagerly
+                        regardless of the declared fetch type. If this relationship
+                        is performance-sensitive, use bytecode enhancement or switch
+                        to <code>@MapsId</code> (Pattern B), where Hibernate can proxy
+                        because the ID is always known.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — @ManyToMany → INTERMEDIATE ENTITY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>@ManyToMany — Avoid It; Use an Intermediate Entity</h2>
+                <p>Pure <code>@ManyToMany</code> generates a join table with only two
+                    FK columns. In practice you almost always need additional data on
+                    that join — a quantity, a price at the time of purchase, an
+                    enrollment date, a status. You can't add columns to a pure
+                    <code>@ManyToMany</code> join table without converting it to an
+                    intermediate entity anyway. Start with the intermediate entity.</p>
+
+                <pre><code><span class="comment">// BAD — pure @ManyToMany — join table has only (order_id, product_id),
+// no room for quantity or unit_price</span>
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="annotation">@ManyToMany</span>
+    <span class="annotation">@JoinTable</span>(name = <span class="string">"order_products"</span>,
+        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"order_id"</span>),
+        inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"product_id"</span>)
+    )
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; products;   <span class="comment">// ✗ can't store quantity or price here</span>
+}</code></pre>
+
+                <pre><code><span class="comment">// CORRECT — intermediate entity with composite key via @EmbeddedId + @MapsId</span>
+
+<span class="annotation">@Embeddable</span>
+<span class="keyword">public class</span> <span class="class-name">OrderItemId</span> <span class="keyword">implements</span> <span class="class-name">Serializable</span> {
+    <span class="keyword">private</span> <span class="class-name">Long</span> orderId;
+    <span class="keyword">private</span> <span class="class-name">Long</span> productId;
+
+    <span class="comment">// equals and hashCode are mandatory for @Embeddable composite keys</span>
+    <span class="annotation">@Override</span>
+    <span class="keyword">public boolean</span> <span class="function">equals</span>(<span class="class-name">Object</span> o) {
+        <span class="keyword">if</span> (<span class="keyword">this</span> == o) <span class="keyword">return true</span>;
+        <span class="keyword">if</span> (!(o <span class="keyword">instanceof</span> <span class="class-name">OrderItemId</span> that)) <span class="keyword">return false</span>;
+        <span class="keyword">return</span> <span class="class-name">Objects</span>.equals(orderId, that.orderId)
+            && <span class="class-name">Objects</span>.equals(productId, that.productId);
+    }
+
+    <span class="annotation">@Override</span>
+    <span class="keyword">public int</span> <span class="function">hashCode</span>() { <span class="keyword">return</span> <span class="class-name">Objects</span>.hash(orderId, productId); }
+}
+
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"order_items"</span>)
+<span class="keyword">public class</span> <span class="class-name">OrderItem</span> {
+
+    <span class="annotation">@EmbeddedId</span>
+    <span class="keyword">private</span> <span class="class-name">OrderItemId</span> id = <span class="keyword">new</span> <span class="class-name">OrderItemId</span>();
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@MapsId</span>(<span class="string">"orderId"</span>)
+    <span class="keyword">private</span> <span class="class-name">Order</span> order;
+
+    <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
+    <span class="annotation">@MapsId</span>(<span class="string">"productId"</span>)
+    <span class="keyword">private</span> <span class="class-name">Product</span> product;
+
+    <span class="comment">// data that belongs to the join — impossible with pure @ManyToMany</span>
+    <span class="keyword">private</span> <span class="keyword">int</span> quantity;
+    <span class="keyword">private</span> <span class="class-name">BigDecimal</span> unitPrice;   <span class="comment">// price at the time of purchase — not product.getPrice()</span>
+}
+
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"order"</span>, cascade = CascadeType.ALL, orphanRemoval = <span class="keyword">true</span>)
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">Product</span> product, <span class="keyword">int</span> quantity) {
+        <span class="class-name">OrderItem</span> item = <span class="keyword">new</span> <span class="class-name">OrderItem</span>();
+        item.setOrder(<span class="keyword">this</span>);
+        item.setProduct(product);
+        item.setQuantity(quantity);
+        item.setUnitPrice(product.getPrice());   <span class="comment">// snapshot the price now</span>
+        items.add(item);
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — FETCH TYPES AND N+1
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Fetch Types and the N+1 Problem</h2>
+                <p>The N+1 problem is the most common JPA performance bug. It happens
+                    when you load N parent records and then trigger N additional
+                    queries to load a child association — one per parent. The result
+                    is N+1 queries where 1 JOIN would have sufficed.</p>
+
+                <h3>How N+1 happens</h3>
+                <pre><code><span class="comment">// Scenario: list 50 orders with the customer email for each</span>
+
+<span class="comment">// Query 1 — loads the orders</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = orderRepo.findAll();
+<span class="comment">// SELECT * FROM orders              → 50 rows</span>
+
+<span class="comment">// 50 queries follow — one per order, triggered by accessing order.getCustomer()</span>
+<span class="keyword">for</span> (<span class="class-name">Order</span> o : orders) {
+    <span class="class-name">System</span>.out.println(o.getCustomer().getEmail());
+    <span class="comment">// SELECT * FROM customers WHERE id = 1
+    // SELECT * FROM customers WHERE id = 2
+    // ...
+    // SELECT * FROM customers WHERE id = 50
+    // Total: 51 queries</span>
+}
+
+<span class="comment">// customer is LAZY — Hibernate can't know you'll need it when loading orders,
+// so it defers each load to when you access it. By that point it's too late to batch.</span></code></pre>
+
+                <h3>Fix 1: JOIN FETCH in JPQL</h3>
+                <pre><code><span class="comment">// Fetch orders and customers in a single JOIN</span>
+<span class="annotation">@Query</span>(<span class="string">"""
+    SELECT o FROM Order o
+    JOIN FETCH o.customer
+    WHERE o.status = :status
+    """</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findByStatusWithCustomer</span>(<span class="annotation">@Param</span>(<span class="string">"status"</span>) <span class="class-name">String</span> status);
+<span class="comment">// SELECT o.*, c.* FROM orders o JOIN customers c ON c.id = o.customer_id
+// WHERE o.status = ?
+// → 1 query, all data</span></code></pre>
+
+                <h3>Fix 2: EntityGraph (declarative, reusable)</h3>
+                <pre><code><span class="annotation">@NamedEntityGraph</span>(
+    name = <span class="string">"Order.withCustomerAndItems"</span>,
+    attributeNodes = {
+        <span class="annotation">@NamedAttributeNode</span>(<span class="string">"customer"</span>),
+        <span class="annotation">@NamedAttributeNode</span>(value = <span class="string">"items"</span>, subgraph = <span class="string">"items-with-product"</span>)
+    },
+    subgraphs = <span class="annotation">@NamedSubgraph</span>(
+        name = <span class="string">"items-with-product"</span>,
+        attributeNodes = <span class="annotation">@NamedAttributeNode</span>(<span class="string">"product"</span>)
+    )
+)
+<span class="annotation">@Entity</span>
+<span class="keyword">public class</span> <span class="class-name">Order</span> { ... }
+
+<span class="comment">// In the repository — apply the graph to a specific query only</span>
+<span class="annotation">@EntityGraph</span>(<span class="string">"Order.withCustomerAndItems"</span>)
+<span class="annotation">@Query</span>(<span class="string">"SELECT o FROM Order o WHERE o.id = :id"</span>)
+<span class="class-name">Optional</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findByIdWithDetails</span>(<span class="annotation">@Param</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id);</code></pre>
+
+                <h3>Fix 3: Batch size (global fallback for collections)</h3>
+                <pre><code><span class="comment"># application.properties — Hibernate fetches lazy collections in batches
+# Instead of 50 queries (one per order), Hibernate does ceiling(50/20) = 3 queries</span>
+spring.jpa.properties.hibernate.default_batch_fetch_size=20
+
+<span class="comment">// Or per-collection for fine-grained control</span>
+<span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"order"</span>, fetch = FetchType.LAZY)
+<span class="annotation">@BatchSize</span>(size = 20)
+<span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items;</code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">EAGER fetch does not solve N+1 — it makes it worse</div>
+                    <p>A common misconception is that switching to
+                        <code>FetchType.EAGER</code> prevents N+1. It doesn't — it
+                        makes N+1 happen at load time instead of at access time,
+                        making it harder to notice and impossible to opt out of.
+                        Every <code>findAll()</code> and every
+                        <code>findById()</code> will join the eager association,
+                        even when the caller doesn't need it. Keep everything LAZY
+                        and use JOIN FETCH or EntityGraph for the specific queries
+                        that need the association.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — CASCADE AND ORPHAN REMOVAL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Cascade and <code>orphanRemoval</code> — Applied With Precision</h2>
+
+                <table class="comparison-table">
+                    <tr><th>Cascade type</th><th>Propagates</th><th>Common use</th></tr>
+                    <tr><td><code>PERSIST</code></td><td><code>persist()</code></td><td>Save child when saving parent</td></tr>
+                    <tr><td><code>MERGE</code></td><td><code>merge()</code></td><td>Update child when updating parent</td></tr>
+                    <tr><td><code>REMOVE</code></td><td><code>remove()</code></td><td>Delete child when parent is deleted — use only for true parent-child</td></tr>
+                    <tr><td><code>ALL</code></td><td>Everything</td><td>Correct only for strictly dependent children (order items, line items, addresses)</td></tr>
+                </table>
+
+                <pre><code><span class="comment">// orphanRemoval = true: removing an item from the collection issues a DELETE
+// Without it: removing from the collection just sets the FK to NULL</span>
+
+<span class="class-name">Order</span> order = orderRepo.findById(<span class="number">1L</span>).orElseThrow();
+order.getItems().remove(<span class="number">0</span>);   <span class="comment">// with orphanRemoval=true → DELETE FROM order_items WHERE id = ?</span>
+                              <span class="comment">// without orphanRemoval   → UPDATE order_items SET order_id = NULL WHERE id = ?</span>
+orderRepo.save(order);
+
+<span class="comment">// CASCADE REMOVE + orphanRemoval decision matrix:
+//
+// Order → OrderItem   YES: items cannot exist without the order
+// Customer → Order    NO:  orders are financial records, retain even if customer is deleted
+// Product → Category  NO:  category can exist independently; use FK constraint instead</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Set <code>FetchType.LAZY</code> on every relationship — override <code>@ManyToOne</code> and <code>@OneToOne</code> which default to EAGER</li>
+                        <li>Always update the owning side of a bidirectional relationship; update both sides to keep the in-memory object graph consistent</li>
+                        <li>Use helper methods (<code>addItem()</code>, <code>removeItem()</code>) to encapsulate both-side updates — never let callers manipulate collections directly</li>
+                        <li>Choose cascade types explicitly per relationship: <code>{PERSIST, MERGE}</code> is the safe default; add <code>REMOVE</code> only when children cannot exist without the parent</li>
+                        <li>Replace <code>@ManyToMany</code> with an intermediate entity — you will need extra columns eventually, and the migration is painful</li>
+                        <li>Always implement <code>equals()</code> and <code>hashCode()</code> on <code>@Embeddable</code> composite keys — JPA requires it for correct collection behaviour</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't use <code>FetchType.EAGER</code> to "fix" a <code>LazyInitializationException</code> — use JOIN FETCH or <code>@EntityGraph</code> for the specific query that needs the data</li>
+                        <li>Don't write <code>cascade = CascadeType.ALL, orphanRemoval = true</code> by reflex — ask whether deleting the parent should delete the children; if unsure, the answer is no</li>
+                        <li>Don't use <code>mappedBy</code> with the column name (<code>"customer_id"</code>) instead of the field name (<code>"customer"</code>) — it will throw a mapping exception at startup</li>
+                        <li>Don't use a unidirectional <code>@OneToMany</code> without <code>@JoinColumn</code> — JPA generates an extra join table where no join table should exist</li>
+                        <li>Don't rely on <code>FetchType.LAZY</code> on the inverse side of a <code>@OneToOne</code> without bytecode enhancement — it silently loads eagerly</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is the owning side of a relationship in JPA, and why does it matter?</strong><br>
+                    The owning side is the entity that holds the foreign key column
+                    in the database — typically the <code>@ManyToOne</code> side.
+                    It matters because JPA only looks at the owning side to generate
+                    SQL. If you update only the inverse side (the one with
+                    <code>mappedBy</code>), the change will not be written to the
+                    database. The correct approach is to always update the owning
+                    side, and optionally also update the inverse side collection to
+                    keep the in-memory object graph consistent.</p>
+
+                    <p><strong>Q: What is <code>orphanRemoval = true</code> and when should you use it?</strong><br>
+                    <code>orphanRemoval = true</code> means that when a child entity
+                    is removed from its parent's collection, JPA issues a DELETE for
+                    that child. Without it, removing from the collection only sets
+                    the foreign key to null. Use it when children are strictly
+                    dependent on the parent and cannot exist independently — order
+                    items that belong to an order are the canonical example. Don't
+                    use it on relationships where the child has independent meaning,
+                    such as orders belonging to a customer.</p>
+
+                    <p><strong>Q: What is the N+1 problem and how do you detect it?</strong><br>
+                    N+1 happens when loading N entities triggers N additional queries
+                    to load a lazy association — one per entity instead of a single
+                    JOIN. Detection: enable SQL logging
+                    (<code>spring.jpa.show-sql=true</code> and
+                    <code>logging.level.org.hibernate.type=TRACE</code>) and look for
+                    repeated identical queries differing only in the ID parameter.
+                    Fix: use JOIN FETCH or <code>@EntityGraph</code> on the query
+                    that needs the association.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: You have a <code>Customer</code> entity with
+                        <code>@OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)</code>
+                        on the <code>orders</code> collection. A customer is deleted.
+                        What happens, and is this correct?</strong><br>
+                    All of the customer's orders are deleted — cascade REMOVE
+                    propagates to every order in the collection, and those orders
+                    cascade further to their items if that relationship also has
+                    cascade REMOVE. This is almost certainly not correct for an
+                    e-commerce application. Orders are financial records that must
+                    be retained for accounting, auditing, and regulatory compliance,
+                    regardless of whether the customer account still exists. The
+                    correct cascade configuration for this relationship is
+                    <code>{PERSIST, MERGE}</code> only. The customer's deletion
+                    should either be blocked by a database FK constraint (if orders
+                    still exist), or handled by a soft-delete pattern
+                    (<code>deleted_at TIMESTAMPTZ</code>) that never actually removes
+                    the row. <code>CascadeType.ALL</code> is correct only for
+                    strictly dependent children — those that have no business meaning
+                    outside the parent, like <code>OrderItem</code> relative to
+                    <code>Order</code>.</p>
+
+                    <p><strong>Q: You declare <code>@OneToOne(fetch = FetchType.LAZY)</code>
+                        on the inverse side of a bidirectional relationship. In
+                        production, you observe that the association always loads
+                        eagerly despite the declaration. Why?</strong><br>
+                    For the inverse side of a <code>@OneToOne</code>, Hibernate
+                    cannot use a proxy without knowing whether the associated row
+                    exists. A proxy object would need to return null if no row
+                    exists, but a null proxy is not the same as a null reference —
+                    Hibernate can't distinguish "no associated entity" from "entity
+                    exists but not yet loaded" without querying. The result: the
+                    inverse side loads eagerly to determine existence, ignoring the
+                    <code>LAZY</code> declaration. Solutions: use bytecode
+                    enhancement via <code>hibernate-enhance-maven-plugin</code>
+                    with <code>enableLazyInitialization = true</code>, which
+                    instruments the proxy to handle nullable associations correctly;
+                    or restructure to use <code>@MapsId</code> (shared primary key),
+                    where Hibernate knows the FK equals the PK and can create a proxy
+                    unconditionally.</p>
+
+                    <p><strong>Q: Why should you replace <code>@ManyToMany</code> with an intermediate entity in almost every production use case?</strong><br>
+                    Pure <code>@ManyToMany</code> generates a join table with only
+                    two foreign key columns. In practice, the join always ends up
+                    needing additional data — a quantity, a price at purchase time,
+                    a timestamp, a status. Adding columns to a pure
+                    <code>@ManyToMany</code> join table requires converting it to an
+                    intermediate entity anyway, and that migration is disruptive
+                    because all the application code referencing the collection must
+                    change. Starting with an intermediate entity costs one extra class
+                    and provides a place for any future data on the join, clean
+                    ownership semantics, explicit composite key management, and the
+                    ability to query the join table as a first-class entity in JPQL.
+                    In the e-commerce domain specifically:
+                    <code>Order ↔ Product</code> via <code>OrderItem</code> with
+                    <code>quantity</code> and <code>unitPrice</code> is the textbook
+                    example — a pure <code>@ManyToMany</code> would make it
+                    impossible to store what was actually purchased and at what
+                    price.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="sql.html" class="related-link"><span class="related-icon">🗄️</span>SQL Basics</a>
+                    <a href="transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions (ACID)</a>
+                    <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">🍃</span>Spring Data JPA</a>
+                    <a href="../jakarta-ee/jpa.html" class="related-link"><span class="related-icon">☕</span>Jakarta JPA</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

@@ -1,772 +1,603 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.dbtx.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transactions (ACID) - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#databases">Databases & Persistence</a> / Transactions (ACID)
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#databases" data-i18n="nav.databases">Databases &amp; Persistence</a> /
+                Transactions (ACID)
             </nav>
-            <h1>Transactions (ACID)</h1>
-            <p class="topic-subtitle">Ensuring data integrity and consistency</p>
-            <a href="../../index.html" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.dbtx.h1">Transactions (ACID)</h1>
+            <p class="topic-subtitle" data-i18n="topic.dbtx.subtitle">What the database engine actually does when it commits — concurrency anomalies, isolation levels, row locking, deadlocks, and raw JDBC transaction control</p>
+            <a href="../../index.html#databases" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is a Transaction?</h2>
-            <p>A <strong>transaction</strong> is a sequence of database operations that are treated as a single, indivisible unit of work. Either ALL operations complete successfully (commit), or NONE of them do (rollback). Transactions are fundamental to maintaining data integrity.</p>
+    <div class="topic-layout">
 
-            <h3>The Classic Example: Bank Transfer</h3>
-            <pre><code><span class="comment">// Transfer $100 from Account A to Account B</span>
-<span class="comment">// This MUST be atomic - both operations or neither!</span>
-
-BEGIN TRANSACTION;
-
-<span class="comment">// Step 1: Debit from Account A</span>
-UPDATE accounts SET balance = balance - 100 WHERE id = 'A';
-
-<span class="comment">// Step 2: Credit to Account B</span>
-UPDATE accounts SET balance = balance + 100 WHERE id = 'B';
-
-<span class="comment">// If both succeed</span>
-COMMIT;
-
-<span class="comment">// If anything fails</span>
-ROLLBACK;
-
-<span class="comment">// Without transactions, if step 1 succeeds but step 2 fails:</span>
-<span class="comment">// - Account A loses $100</span>
-<span class="comment">// - Account B doesn't gain $100</span>
-<span class="comment">// - $100 just vanishes! BAD!</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>ACID Properties</h2>
-            <p>ACID is the set of properties that guarantee transaction reliability.</p>
-
-            <h3>A - Atomicity</h3>
-            <pre><code><span class="comment">// ATOMICITY: "All or Nothing"</span>
-<span class="comment">// A transaction is an atomic unit - it either completes entirely or not at all.</span>
-
-┌───────────────────────────────────────────────────────────┐
-│                     TRANSACTION                            │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐       │
-│  │ Operation 1 │─▶│ Operation 2 │─▶│ Operation 3 │       │
-│  └─────────────┘  └─────────────┘  └─────────────┘       │
-│                                                           │
-│  If ANY operation fails → ROLLBACK ALL                   │
-│  If ALL operations succeed → COMMIT ALL                  │
-└───────────────────────────────────────────────────────────┘
-
-<span class="comment">// Example: Creating an order</span>
-<span class="keyword">try</span> {
-    tx.begin();
-
-    <span class="comment">// 1. Create order</span>
-    em.persist(order);
-
-    <span class="comment">// 2. Create order items</span>
-    <span class="keyword">for</span> (OrderItem item : items) {
-        em.persist(item);
-    }
-
-    <span class="comment">// 3. Update inventory</span>
-    <span class="keyword">for</span> (OrderItem item : items) {
-        Product p = em.find(Product.<span class="keyword">class</span>, item.getProductId());
-        p.setStock(p.getStock() - item.getQuantity());
-    }
-
-    <span class="comment">// 4. Charge customer</span>
-    paymentService.charge(order.getCustomerId(), order.getTotal());
-
-    tx.commit();  <span class="comment">// All 4 steps complete together</span>
-} <span class="keyword">catch</span> (Exception e) {
-    tx.rollback();  <span class="comment">// All 4 steps undone</span>
-}</code></pre>
-
-            <h3>C - Consistency</h3>
-            <pre><code><span class="comment">// CONSISTENCY: Database moves from one valid state to another</span>
-<span class="comment">// Transactions must maintain all database rules and constraints.</span>
-
-<span class="comment">// Example constraints that must be maintained:</span>
-<span class="comment">// - Primary key uniqueness</span>
-<span class="comment">// - Foreign key references</span>
-<span class="comment">// - Check constraints (balance >= 0)</span>
-<span class="comment">// - Unique constraints (email must be unique)</span>
-
-<span class="comment">// Before transaction: Total money in system = $10,000</span>
-<span class="comment">// After transaction: Total money in system = $10,000</span>
-<span class="comment">// Money doesn't appear or disappear!</span>
-
-┌─────────────────┐                      ┌─────────────────┐
-│  VALID STATE    │                      │  VALID STATE    │
-│                 │                      │                 │
-│  Account A: 500 │      Transaction     │  Account A: 400 │
-│  Account B: 300 │  ─────────────────▶  │  Account B: 400 │
-│  ─────────────  │                      │  ─────────────  │
-│  Total:    800  │                      │  Total:    800  │
-└─────────────────┘                      └─────────────────┘</code></pre>
-
-            <h3>I - Isolation</h3>
-            <pre><code><span class="comment">// ISOLATION: Concurrent transactions don't interfere with each other</span>
-<span class="comment">// Each transaction sees a consistent snapshot of data.</span>
-
-<span class="comment">// Problem without isolation (Lost Update):</span>
-
-Time    Transaction 1             Transaction 2
-───────────────────────────────────────────────────
-T1      Read balance = 100
-T2                                Read balance = 100
-T3      Balance = 100 + 50
-T4      Write balance = 150
-T5                                Balance = 100 + 30
-T6                                Write balance = 130  <span class="comment">← T1's update LOST!</span>
-
-<span class="comment">// With proper isolation:</span>
-Time    Transaction 1             Transaction 2
-───────────────────────────────────────────────────
-T1      Read balance = 100
-T2                                Read balance = 100 (waits or sees 100)
-T3      Balance = 100 + 50
-T4      Write balance = 150
-T5      COMMIT
-T6                                Read balance = 150
-T7                                Balance = 150 + 30
-T8                                Write balance = 180  <span class="comment">← Both updates preserved!</span></code></pre>
-
-            <h3>D - Durability</h3>
-            <pre><code><span class="comment">// DURABILITY: Once committed, data survives any failure</span>
-<span class="comment">// Power outage, crash, hardware failure - data persists!</span>
-
-<span class="comment">// How databases achieve durability:</span>
-
-┌─────────────────────────────────────────────────────────────────┐
-│                    COMMIT PROCESS                                │
-│                                                                  │
-│  1. Write changes to TRANSACTION LOG (Write-Ahead Logging)      │
-│     └─▶ Log is on persistent storage (disk)                     │
-│                                                                  │
-│  2. Flush log to disk (fsync)                                   │
-│     └─▶ Data guaranteed on stable storage                       │
-│                                                                  │
-│  3. Return "commit successful" to application                   │
-│                                                                  │
-│  4. Write actual data pages to disk (can be lazy)               │
-│     └─▶ If crash before this, recover from log                  │
-│                                                                  │
-│  After commit: Even if server explodes, data is safe!           │
-└─────────────────────────────────────────────────────────────────┘</code></pre>
-
-            <div class="info-box">
-                <p><strong>ACID Summary:</strong></p>
-                <ul>
-                    <li><strong>Atomicity:</strong> All or nothing</li>
-                    <li><strong>Consistency:</strong> Valid state to valid state</li>
-                    <li><strong>Isolation:</strong> Transactions don't interfere</li>
-                    <li><strong>Durability:</strong> Committed = permanent</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Transaction Isolation Levels</h2>
-            <p>Isolation levels control how much transactions are isolated from each other. Higher isolation = more safety but less performance.</p>
+        <main class="topic-content">
 
-            <h3>Concurrency Problems</h3>
-            <pre><code><span class="comment">// 1. DIRTY READ: Reading uncommitted data from another transaction</span>
-Transaction 1                    Transaction 2
-─────────────────────────────────────────────────
-UPDATE balance SET val=150
-                                 SELECT val FROM balance  <span class="comment">→ 150 (dirty!)</span>
-ROLLBACK
-                                 <span class="comment">Uses 150, but actual value is still 100!</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS A TRANSACTION AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Is a Database Transaction — and Why Does It Exist?</h2>
+                <p>A <strong>transaction</strong> is a sequence of SQL statements the
+                    database engine treats as a single, indivisible unit of work,
+                    bounded by <code>BEGIN</code> and either <code>COMMIT</code> or
+                    <code>ROLLBACK</code>. Every higher-level abstraction you use —
+                    JTA's <code>UserTransaction</code>, Spring's
+                    <code>@Transactional</code>, JPA's <code>EntityTransaction</code> —
+                    is ultimately a wrapper around exactly this mechanism: turning off
+                    autocommit on a JDBC connection, running statements, and issuing
+                    <code>commit()</code> or <code>rollback()</code> on that same
+                    connection. This page covers what the database engine itself does
+                    to make that guarantee hold — the mechanism every framework in this
+                    Bible delegates to.</p>
 
-<span class="comment">// 2. NON-REPEATABLE READ: Same query returns different results</span>
-Transaction 1                    Transaction 2
-─────────────────────────────────────────────────
-SELECT val FROM balance <span class="comment">→ 100</span>
-                                 UPDATE balance SET val=150
-                                 COMMIT
-SELECT val FROM balance <span class="comment">→ 150</span>   <span class="comment">Different result!</span>
+                <pre><code><span class="comment">-- WITHOUT an explicit transaction (autocommit ON, the JDBC default):
+-- each statement commits independently the instant it runs.</span>
+INSERT INTO orders (customer_id, status, total) VALUES (501, <span class="string">'PENDING'</span>, 129.90);
+<span class="comment">-- ↑ committed immediately, order row now permanent</span>
+UPDATE products SET stock = stock - 2 WHERE id = 42;
+<span class="comment">-- ↑ if the connection drops or this statement fails, the order above
+--   already exists in the database with no stock ever decremented.
+--   Two customers can now buy the last 2 units of the same product.</span>
 
-<span class="comment">// 3. PHANTOM READ: New rows appear in repeated query</span>
-Transaction 1                    Transaction 2
-─────────────────────────────────────────────────
-SELECT * WHERE age > 25  <span class="comment">→ 3 rows</span>
-                                 INSERT INTO users (age=30)
-                                 COMMIT
-SELECT * WHERE age > 25  <span class="comment">→ 4 rows</span>  <span class="comment">Phantom row!</span></code></pre>
+<span class="comment">-- WITH an explicit transaction: both statements share one fate.</span>
+BEGIN;
+INSERT INTO orders (customer_id, status, total)
+    VALUES (501, <span class="string">'PENDING'</span>, 129.90)
+    RETURNING id;                                 <span class="comment">-- id = 8842</span>
+UPDATE products SET stock = stock - 2
+    WHERE id = 42 AND stock >= 2;                 <span class="comment">-- guards against overselling</span>
+<span class="comment">-- application checks affected-row count here:
+-- 0 rows updated → insufficient stock → ROLLBACK, reject the order
+-- 1 row updated  → proceed → COMMIT</span>
+COMMIT;</code></pre>
+            </section>
 
-            <h3>Isolation Levels Comparison</h3>
-            <table class="comparison-table">
-                <thead>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — ACID AT THE ENGINE LEVEL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>ACID — What the Engine Actually Does for Each Guarantee</h2>
+                <p>ACID is recited far more often than it's understood. Each letter
+                    corresponds to a distinct mechanism inside the storage engine —
+                    knowing which mechanism enforces which guarantee is what lets you
+                    reason about failure modes instead of just reciting definitions.</p>
+
+                <table class="comparison-table">
+                    <tr><th>Property</th><th>Guarantee</th><th>Mechanism</th><th>What it does NOT cover</th></tr>
                     <tr>
-                        <th>Isolation Level</th>
-                        <th>Dirty Read</th>
-                        <th>Non-Repeatable</th>
-                        <th>Phantom Read</th>
-                        <th>Performance</th>
+                        <td><strong>Atomicity</strong></td>
+                        <td>All statements in the transaction take effect, or none do</td>
+                        <td>Write-ahead log (WAL) — changes are logged before applied; an incomplete transaction is undone by replaying the log's inverse on recovery</td>
+                        <td>Partial failure across <em>independently committed</em> transactions in different services — that's what the Saga pattern exists for</td>
                     </tr>
-                </thead>
-                <tbody>
                     <tr>
-                        <td><strong>READ_UNCOMMITTED</strong></td>
-                        <td>Possible</td>
-                        <td>Possible</td>
-                        <td>Possible</td>
-                        <td>Fastest</td>
+                        <td><strong>Consistency</strong></td>
+                        <td>Every constraint (FK, unique, check) holds before and after</td>
+                        <td>The database engine's constraint checker, evaluated at commit time (or per-statement, depending on the constraint)</td>
+                        <td>Business-logic consistency — "this order total matches its line items" is your application's responsibility, not the engine's</td>
                     </tr>
                     <tr>
-                        <td><strong>READ_COMMITTED</strong></td>
+                        <td><strong>Isolation</strong></td>
+                        <td>Concurrent transactions don't corrupt each other's view of the data</td>
+                        <td>Row locks and/or MVCC snapshots — mechanism and strength depend entirely on the isolation level (Section 3)</td>
+                        <td>Perfect isolation by default — the default level on most engines (READ COMMITTED) still permits non-repeatable and phantom reads</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Durability</strong></td>
+                        <td>Once <code>COMMIT</code> returns, the data survives a crash</td>
+                        <td>WAL entries are <code>fsync</code>'d to disk before the commit acknowledgement is returned to the client — the data pages themselves can be flushed lazily afterward</td>
+                        <td>Storage hardware failure, a misconfigured <code>fsync</code>/<code>synchronous_commit</code> setting, or a replica that hasn't caught up — these are operational concerns, not the engine's default guarantee</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — CONCURRENCY ANOMALIES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Concurrency Anomalies — What Isolation Actually Protects Against</h2>
+                <p>Isolation levels exist to prevent specific, well-defined anomalies
+                    that occur when two transactions run at the same time against the
+                    same rows. You cannot reason about which isolation level to choose
+                    without first being precise about which anomaly you're preventing.</p>
+
+                <table class="comparison-table">
+                    <tr><th>Anomaly</th><th>What happens</th><th>Example</th></tr>
+                    <tr>
+                        <td><strong>Dirty read</strong></td>
+                        <td>T1 reads a row T2 modified but hasn't committed. T2 rolls back — T1 acted on data that never existed</td>
+                        <td>T2 sets <code>stock = 0</code> mid-transaction; T1 reads 0 and blocks the sale; T2 rolls back and stock was actually 40 all along</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Non-repeatable read</strong></td>
+                        <td>T1 reads a row twice in the same transaction and gets two different values because T2 committed a change in between</td>
+                        <td>T1 reads <code>product.price = 19.90</code>, does some validation, reads it again for the final charge — now it's <code>24.90</code> because a price update committed in between</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Phantom read</strong></td>
+                        <td>T1 runs the same <em>range</em> query twice and gets a different <em>set of rows</em> because T2 inserted or deleted a matching row</td>
+                        <td>T1 counts <code>orders WHERE status = 'PENDING'</code> twice for a report; T2 inserts a new pending order between the two counts — the totals don't match within the same transaction</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Lost update</strong></td>
+                        <td>T1 and T2 both read the same row, both compute a new value from what they read, and whichever commits last silently overwrites the other's change — not just stale data, an actual write disappears</td>
+                        <td>T1 and T2 both read <code>stock = 10</code>, both decrement by their own quantity and write back independently — the write with the later commit wins, and one customer's stock decrement is erased entirely, oversold inventory follows</td>
+                    </tr>
+                </table>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Lost update is not prevented by READ COMMITTED — this is the anomaly that causes real oversold-inventory incidents</div>
+                    <p>Of the four anomalies, lost update is the one developers most
+                        often assume their default isolation level already handles. It
+                        doesn't, on most engines, unless the write itself is expressed
+                        as an atomic operation. The fix is either a single
+                        <code>UPDATE ... SET stock = stock - ?</code> statement (the
+                        database computes the new value from the current row under its
+                        own lock, so there is no separate "read then write" window), or
+                        explicit locking (Section 4), or optimistic version checking
+                        (Section 7) — never a naive read-modify-write from application
+                        code.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — ISOLATION LEVELS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Isolation Levels — And Where Real Engines Diverge From the Standard</h2>
+                <p>The SQL standard defines four isolation levels in terms of which
+                    anomalies they permit. In practice, the actual engines you deploy
+                    to implement these levels through different mechanisms — locking
+                    versus MVCC snapshots — and some provide <em>stronger</em>
+                    guarantees than the standard requires for a given level. Knowing
+                    your specific engine's behavior, not just the ANSI table, is what
+                    separates correct concurrency reasoning from cargo-culting.</p>
+
+                <table class="comparison-table">
+                    <tr><th>Isolation level</th><th>Dirty read</th><th>Non-repeatable read</th><th>Phantom read</th><th>Default on</th></tr>
+                    <tr>
+                        <td><strong>READ UNCOMMITTED</strong></td>
+                        <td>Possible</td>
+                        <td>Possible</td>
+                        <td>Possible</td>
+                        <td>Almost nothing in production — reading data that was never committed is rarely acceptable</td>
+                    </tr>
+                    <tr>
+                        <td><strong>READ COMMITTED</strong></td>
                         <td>Prevented</td>
                         <td>Possible</td>
                         <td>Possible</td>
-                        <td>Fast</td>
+                        <td>PostgreSQL, Oracle, SQL Server — good default throughput/safety balance for OLTP</td>
                     </tr>
                     <tr>
-                        <td><strong>REPEATABLE_READ</strong></td>
+                        <td><strong>REPEATABLE READ</strong></td>
                         <td>Prevented</td>
                         <td>Prevented</td>
-                        <td>Possible</td>
-                        <td>Medium</td>
+                        <td>Possible per the standard</td>
+                        <td>MySQL/InnoDB</td>
                     </tr>
                     <tr>
                         <td><strong>SERIALIZABLE</strong></td>
                         <td>Prevented</td>
                         <td>Prevented</td>
                         <td>Prevented</td>
-                        <td>Slowest</td>
+                        <td>Financial reconciliation, regulatory reporting — correct but expensive under contention</td>
                     </tr>
-                </tbody>
-            </table>
+                </table>
 
-            <h3>Setting Isolation Levels</h3>
-            <pre><code><span class="comment">// JDBC</span>
-Connection conn = dataSource.getConnection();
-conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+                <div class="info-box note">
+                    <div class="info-box-title">Two engines both call it "REPEATABLE READ" and both quietly exceed the standard</div>
+                    <p><strong>PostgreSQL's REPEATABLE READ is snapshot isolation:</strong>
+                        the transaction sees a consistent snapshot of the database taken
+                        at its first statement. Because every read for the rest of the
+                        transaction comes from that same frozen snapshot, phantom rows
+                        genuinely cannot appear — Postgres prevents phantom reads at
+                        this level in practice, despite the SQL standard only requiring
+                        it at SERIALIZABLE. What Postgres does <em>not</em> prevent here
+                        is a write-write conflict: if two transactions both try to
+                        update the same row from their respective snapshots, the second
+                        to commit gets a serialization failure and must retry.</p>
+                    <p><strong>MySQL/InnoDB's REPEATABLE READ</strong> also prevents most
+                        phantom reads in practice, but through a completely different
+                        mechanism: <em>gap locking</em> and <em>next-key locks</em>,
+                        which lock the ranges between index entries, not just matching
+                        rows — so a concurrent <code>INSERT</code> that would land inside
+                        an already-queried range is blocked outright rather than merely
+                        invisible. This is also precisely why InnoDB deadlocks more
+                        often under REPEATABLE READ than READ COMMITTED: gap locks
+                        conflict far more frequently than exact-row locks.</p>
+                </div>
+            </section>
 
-<span class="comment">// JPA/Hibernate</span>
-<span class="annotation">@PersistenceContext</span>
-EntityManager em;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — LOCKING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Row Locking — Shared, Exclusive, and <code>SKIP LOCKED</code></h2>
+                <p>A <strong>shared lock</strong> (read lock) allows other transactions
+                    to also read the row but blocks writers. An
+                    <strong>exclusive lock</strong> (write lock) blocks everyone else
+                    from reading or writing that row until the lock is released at
+                    commit or rollback. <code>SELECT ... FOR UPDATE</code> explicitly
+                    takes an exclusive lock on the selected rows for the duration of the
+                    transaction.</p>
 
-Map&lt;String, Object&gt; props = <span class="keyword">new</span> HashMap&lt;&gt;();
-props.put(<span class="string">"jakarta.persistence.lock.timeout"</span>, 3000);
-em.find(Account.<span class="keyword">class</span>, accountId, LockModeType.PESSIMISTIC_WRITE, props);
+                <pre><code><span class="comment">-- Prevent a lost update on inventory by locking the row before reading it</span>
+BEGIN;
+SELECT stock FROM products WHERE id = 42 FOR UPDATE;
+<span class="comment">-- any other transaction's SELECT ... FOR UPDATE on id=42 now blocks here</span>
+UPDATE products SET stock = stock - 2 WHERE id = 42;
+COMMIT;   <span class="comment">-- lock released</span></code></pre>
 
-<span class="comment">// Spring @Transactional</span>
-<span class="annotation">@Transactional</span>(isolation = Isolation.SERIALIZABLE)
-<span class="keyword">public void</span> <span class="function">criticalOperation</span>() {
-    <span class="comment">// Highest isolation</span>
-}
+                <h3>The production pattern: <code>FOR UPDATE SKIP LOCKED</code></h3>
+                <p>A naive job queue where multiple worker processes poll the same
+                    table with <code>FOR UPDATE</code> serializes every worker onto
+                    whichever row is locked first — the second worker blocks and waits.
+                    <code>SKIP LOCKED</code> tells the engine to simply skip rows
+                    already locked by another transaction, letting concurrent workers
+                    each grab a different row instead of queuing behind each other.
+                    This is the real mechanism behind most hand-rolled outbox and
+                    job-queue implementations, before reaching for a dedicated message
+                    broker.</p>
 
-<span class="annotation">@Transactional</span>(isolation = Isolation.READ_COMMITTED)  <span class="comment">// Default for most DBs</span>
-<span class="keyword">public void</span> <span class="function">normalOperation</span>() {
-    <span class="comment">// Standard isolation</span>
+                <pre><code><span class="comment">-- Worker pattern: N processes competing for pending outbox events,
+-- each one claiming a different batch instead of blocking on the same rows</span>
+BEGIN;
+SELECT id, payload FROM outbox_events
+    WHERE status = <span class="string">'PENDING'</span>
+    ORDER BY created_at
+    LIMIT 10
+    FOR UPDATE SKIP LOCKED;
+
+UPDATE outbox_events SET status = <span class="string">'PROCESSING'</span>
+    WHERE id = ANY(:claimed_ids);
+COMMIT;
+<span class="comment">-- a second worker running the exact same query concurrently gets the
+-- NEXT 10 unlocked rows, not a block waiting for the first worker's lock</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — DEADLOCKS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Deadlocks — How They Form and How the Engine Resolves Them</h2>
+                <p>A deadlock happens when two transactions each hold a lock the other
+                    one needs, and each is waiting for the other to release it. Neither
+                    can proceed. This is not a bug in the database — it's an inherent
+                    risk of any system that locks resources, and it is entirely
+                    preventable at the application layer.</p>
+
+                <pre><code><span class="comment">-- Transaction 1: transferring stock from product 42 to product 77
+-- Transaction 2: transferring stock from product 77 to product 42
+-- Running concurrently, in opposite lock order:
+
+-- T1                                   T2
+-- ─────────────────────────────────────────────────────────────
+-- BEGIN;                               BEGIN;
+-- UPDATE products SET stock=stock-5    UPDATE products SET stock=stock-3
+--   WHERE id = 42;   -- locks 42         WHERE id = 77;   -- locks 77
+--                                        (both locks acquired so far)
+-- UPDATE products SET stock=stock+5    UPDATE products SET stock=stock+3
+--   WHERE id = 77;   -- BLOCKS,          WHERE id = 42;   -- BLOCKS,
+--   waiting for T2 to release 77         waiting for T1 to release 42
+--
+-- Neither can proceed → circular wait → DEADLOCK</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">The engine breaks the deadlock for you — but your code must handle it</div>
+                    <p>Every production database engine runs a deadlock detector that
+                        periodically checks the "waits-for" graph among active locks.
+                        When it finds a cycle, it picks one transaction as the victim —
+                        typically the one that has done the least work, or the one that
+                        would be cheapest to roll back — and aborts it with a
+                        deadlock-detected error (SQLState <code>40001</code> on most
+                        engines), while letting the other proceed. Your application
+                        <strong>must</strong> catch this specific error and retry the
+                        aborted transaction; treating it as a generic failure and giving
+                        up loses the operation.</p>
+                </div>
+
+                <p>The structural fix — the one that actually prevents deadlocks
+                    instead of just handling them after the fact — is
+                    <strong>always acquiring locks on multiple rows in the same,
+                    consistent order</strong> across your entire codebase (for example,
+                    always by ascending primary key):</p>
+
+                <pre><code><span class="comment">// Sort by ID before locking — every caller now acquires locks in the same
+// order, so the circular wait above becomes structurally impossible</span>
+<span class="keyword">public void</span> <span class="function">transferStock</span>(<span class="class-name">Long</span> fromProductId, <span class="class-name">Long</span> toProductId, <span class="keyword">int</span> quantity) {
+    <span class="class-name">Long</span> first  = <span class="class-name">Math</span>.min(fromProductId, toProductId);
+    <span class="class-name">Long</span> second = <span class="class-name">Math</span>.max(fromProductId, toProductId);
+
+    <span class="comment">// Lock in ascending ID order regardless of transfer direction</span>
+    em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, first,  <span class="class-name">LockModeType</span>.PESSIMISTIC_WRITE);
+    em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, second, <span class="class-name">LockModeType</span>.PESSIMISTIC_WRITE);
+
+    <span class="comment">// ... apply the actual stock movement using fromProductId / toProductId</span>
 }</code></pre>
+            </section>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Default Isolation Levels</div>
-                <ul>
-                    <li><strong>MySQL (InnoDB):</strong> REPEATABLE_READ</li>
-                    <li><strong>PostgreSQL:</strong> READ_COMMITTED</li>
-                    <li><strong>Oracle:</strong> READ_COMMITTED</li>
-                    <li><strong>SQL Server:</strong> READ_COMMITTED</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — JDBC TRANSACTION CONTROL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Raw JDBC Transaction Control — What Every Framework Wraps</h2>
+                <p>Autocommit is <code>true</code> by default on a JDBC
+                    <code>Connection</code> — every statement commits on its own the
+                    instant it executes. Multi-statement atomicity requires explicitly
+                    disabling it, and explicitly restoring it before the connection goes
+                    back to the pool, since a pooled connection with autocommit still
+                    disabled will silently corrupt the next borrower's behavior.</p>
 
-        <section class="content-section">
-            <h2>Transactions in Java</h2>
-
-            <h3>JDBC Transactions</h3>
-            <pre><code><span class="keyword">public void</span> <span class="function">transferFunds</span>(<span class="keyword">long</span> fromId, <span class="keyword">long</span> toId, BigDecimal amount) {
-    Connection conn = <span class="keyword">null</span>;
-
-    <span class="keyword">try</span> {
-        conn = dataSource.getConnection();
-
-        <span class="comment">// 1. Disable auto-commit (start transaction)</span>
+                <pre><code><span class="keyword">public void</span> <span class="function">placeOrder</span>(<span class="class-name">Long</span> customerId, <span class="class-name">Long</span> productId, <span class="keyword">int</span> quantity, <span class="class-name">BigDecimal</span> total) <span class="keyword">throws</span> <span class="class-name">SQLException</span> {
+    <span class="keyword">try</span> (<span class="class-name">Connection</span> conn = dataSource.getConnection()) {
         conn.setAutoCommit(<span class="keyword">false</span>);
 
-        <span class="comment">// 2. Debit source account</span>
-        <span class="keyword">try</span> (PreparedStatement debitStmt = conn.prepareStatement(
-                <span class="string">"UPDATE accounts SET balance = balance - ? WHERE id = ? AND balance >= ?"</span>)) {
-            debitStmt.setBigDecimal(1, amount);
-            debitStmt.setLong(2, fromId);
-            debitStmt.setBigDecimal(3, amount);
-
-            <span class="keyword">if</span> (debitStmt.executeUpdate() == 0) {
-                <span class="keyword">throw new</span> RuntimeException(<span class="string">"Insufficient funds"</span>);
-            }
-        }
-
-        <span class="comment">// 3. Credit destination account</span>
-        <span class="keyword">try</span> (PreparedStatement creditStmt = conn.prepareStatement(
-                <span class="string">"UPDATE accounts SET balance = balance + ? WHERE id = ?"</span>)) {
-            creditStmt.setBigDecimal(1, amount);
-            creditStmt.setLong(2, toId);
-            creditStmt.executeUpdate();
-        }
-
-        <span class="comment">// 4. Commit transaction</span>
-        conn.commit();
-
-    } <span class="keyword">catch</span> (Exception e) {
-        <span class="comment">// 5. Rollback on any error</span>
-        <span class="keyword">if</span> (conn != <span class="keyword">null</span>) {
-            <span class="keyword">try</span> {
-                conn.rollback();
-            } <span class="keyword">catch</span> (SQLException ex) {
-                ex.printStackTrace();
-            }
-        }
-        <span class="keyword">throw new</span> RuntimeException(<span class="string">"Transfer failed"</span>, e);
-
-    } <span class="keyword">finally</span> {
-        <span class="keyword">if</span> (conn != <span class="keyword">null</span>) {
-            <span class="keyword">try</span> {
-                conn.setAutoCommit(<span class="keyword">true</span>);  <span class="comment">// Reset for connection pool</span>
-                conn.close();
-            } <span class="keyword">catch</span> (SQLException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-}</code></pre>
-
-            <h3>JPA/Hibernate Transactions</h3>
-            <pre><code><span class="keyword">public void</span> <span class="function">transferFunds</span>(<span class="keyword">long</span> fromId, <span class="keyword">long</span> toId, BigDecimal amount) {
-    EntityManager em = emf.createEntityManager();
-    EntityTransaction tx = em.getTransaction();
-
-    <span class="keyword">try</span> {
-        tx.begin();
-
-        Account fromAccount = em.find(Account.<span class="keyword">class</span>, fromId, LockModeType.PESSIMISTIC_WRITE);
-        Account toAccount = em.find(Account.<span class="keyword">class</span>, toId, LockModeType.PESSIMISTIC_WRITE);
-
-        <span class="keyword">if</span> (fromAccount.getBalance().compareTo(amount) < 0) {
-            <span class="keyword">throw new</span> RuntimeException(<span class="string">"Insufficient funds"</span>);
-        }
-
-        fromAccount.setBalance(fromAccount.getBalance().subtract(amount));
-        toAccount.setBalance(toAccount.getBalance().add(amount));
-
-        tx.commit();
-
-    } <span class="keyword">catch</span> (Exception e) {
-        <span class="keyword">if</span> (tx.isActive()) {
-            tx.rollback();
-        }
-        <span class="keyword">throw</span> e;
-
-    } <span class="keyword">finally</span> {
-        em.close();
-    }
-}</code></pre>
-
-            <h3>Spring @Transactional</h3>
-            <pre><code><span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">AccountService</span> {
-
-    <span class="keyword">private final</span> AccountRepository accountRepository;
-
-    <span class="comment">// Basic transaction</span>
-    <span class="annotation">@Transactional</span>
-    <span class="keyword">public void</span> <span class="function">transferFunds</span>(Long fromId, Long toId, BigDecimal amount) {
-        Account from = accountRepository.findById(fromId)
-            .orElseThrow(() -> <span class="keyword">new</span> AccountNotFoundException(fromId));
-        Account to = accountRepository.findById(toId)
-            .orElseThrow(() -> <span class="keyword">new</span> AccountNotFoundException(toId));
-
-        <span class="keyword">if</span> (from.getBalance().compareTo(amount) < 0) {
-            <span class="keyword">throw new</span> InsufficientFundsException();
-        }
-
-        from.withdraw(amount);
-        to.deposit(amount);
-        <span class="comment">// Commit happens automatically if no exception</span>
-        <span class="comment">// Rollback happens automatically on RuntimeException</span>
-    }
-
-    <span class="comment">// Read-only transaction (optimization)</span>
-    <span class="annotation">@Transactional</span>(readOnly = <span class="keyword">true</span>)
-    <span class="keyword">public</span> Account <span class="function">getAccount</span>(Long id) {
-        <span class="keyword">return</span> accountRepository.findById(id).orElseThrow();
-    }
-
-    <span class="comment">// Custom timeout</span>
-    <span class="annotation">@Transactional</span>(timeout = 30)  <span class="comment">// 30 seconds</span>
-    <span class="keyword">public void</span> <span class="function">longRunningOperation</span>() {
-        <span class="comment">// ...</span>
-    }
-
-    <span class="comment">// Specify which exceptions cause rollback</span>
-    <span class="annotation">@Transactional</span>(
-        rollbackFor = Exception.<span class="keyword">class</span>,           <span class="comment">// Rollback for all exceptions</span>
-        noRollbackFor = EmailException.<span class="keyword">class</span>    <span class="comment">// Except this one</span>
-    )
-    <span class="keyword">public void</span> <span class="function">createUserAndNotify</span>(User user) {
-        userRepository.save(user);
-        emailService.sendWelcome(user);  <span class="comment">// Email failure won't rollback user creation</span>
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Transaction Propagation (Spring)</h2>
-            <p>Propagation defines how transactions behave when one @Transactional method calls another.</p>
-
-            <pre><code><span class="comment">// REQUIRED (default): Join existing or create new</span>
-<span class="annotation">@Transactional</span>(propagation = Propagation.REQUIRED)
-<span class="keyword">public void</span> <span class="function">methodA</span>() {
-    <span class="comment">// If called without transaction → creates new</span>
-    <span class="comment">// If called within transaction → joins it</span>
-}
-
-<span class="comment">// REQUIRES_NEW: Always create new (suspends existing)</span>
-<span class="annotation">@Transactional</span>(propagation = Propagation.REQUIRES_NEW)
-<span class="keyword">public void</span> <span class="function">auditLog</span>(String action) {
-    <span class="comment">// Always runs in its own transaction</span>
-    <span class="comment">// Commits even if outer transaction rolls back</span>
-}
-
-<span class="comment">// MANDATORY: Must run within existing transaction</span>
-<span class="annotation">@Transactional</span>(propagation = Propagation.MANDATORY)
-<span class="keyword">public void</span> <span class="function">mustBeInTransaction</span>() {
-    <span class="comment">// Throws exception if no transaction exists</span>
-}
-
-<span class="comment">// SUPPORTS: Use transaction if exists, otherwise non-transactional</span>
-<span class="annotation">@Transactional</span>(propagation = Propagation.SUPPORTS)
-<span class="keyword">public</span> Account <span class="function">findAccount</span>(Long id) {
-    <span class="comment">// Works with or without transaction</span>
-}
-
-<span class="comment">// NOT_SUPPORTED: Always run non-transactionally</span>
-<span class="annotation">@Transactional</span>(propagation = Propagation.NOT_SUPPORTED)
-<span class="keyword">public void</span> <span class="function">nonTransactionalOperation</span>() {
-    <span class="comment">// Suspends existing transaction</span>
-}
-
-<span class="comment">// NEVER: Must NOT run within transaction</span>
-<span class="annotation">@Transactional</span>(propagation = Propagation.NEVER)
-<span class="keyword">public void</span> <span class="function">mustNotBeInTransaction</span>() {
-    <span class="comment">// Throws exception if transaction exists</span>
-}
-
-<span class="comment">// NESTED: Nested transaction with savepoint</span>
-<span class="annotation">@Transactional</span>(propagation = Propagation.NESTED)
-<span class="keyword">public void</span> <span class="function">nestedOperation</span>() {
-    <span class="comment">// Creates savepoint, can rollback independently</span>
-}</code></pre>
-
-            <h3>Propagation Example</h3>
-            <pre><code><span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-
-    <span class="keyword">private final</span> PaymentService paymentService;
-    <span class="keyword">private final</span> AuditService auditService;
-
-    <span class="annotation">@Transactional</span>
-    <span class="keyword">public void</span> <span class="function">placeOrder</span>(Order order) {
-        <span class="comment">// Save order (within this transaction)</span>
-        orderRepository.save(order);
-
-        <span class="comment">// Process payment (within this transaction - REQUIRED)</span>
-        paymentService.processPayment(order);  <span class="comment">// Joins transaction</span>
-
-        <span class="comment">// Audit log (separate transaction - REQUIRES_NEW)</span>
-        auditService.logOrderPlaced(order);  <span class="comment">// Own transaction</span>
-
-        <span class="comment">// If payment fails, order is rolled back</span>
-        <span class="comment">// But audit log is already committed!</span>
-    }
-}
-
-<span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">PaymentService</span> {
-
-    <span class="annotation">@Transactional</span>(propagation = Propagation.REQUIRED)  <span class="comment">// Default</span>
-    <span class="keyword">public void</span> <span class="function">processPayment</span>(Order order) {
-        <span class="comment">// Part of outer transaction</span>
-    }
-}
-
-<span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">AuditService</span> {
-
-    <span class="annotation">@Transactional</span>(propagation = Propagation.REQUIRES_NEW)
-    <span class="keyword">public void</span> <span class="function">logOrderPlaced</span>(Order order) {
-        <span class="comment">// Always commits, even if outer rolls back</span>
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Locking Strategies</h2>
-
-            <h3>Optimistic Locking</h3>
-            <pre><code><span class="comment">// Optimistic: Assume no conflicts, detect them at commit time</span>
-<span class="comment">// Best for read-heavy workloads with rare conflicts</span>
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">Product</span> {
-
-    <span class="annotation">@Id</span>
-    <span class="keyword">private</span> Long id;
-
-    <span class="keyword">private</span> String name;
-    <span class="keyword">private</span> Integer quantity;
-
-    <span class="annotation">@Version</span>  <span class="comment">// Optimistic locking version field</span>
-    <span class="keyword">private</span> Long version;
-}
-
-<span class="comment">// How it works:</span>
-<span class="comment">// 1. Read product (version = 1)</span>
-<span class="comment">// 2. Modify product</span>
-<span class="comment">// 3. UPDATE product SET ..., version = 2 WHERE id = ? AND version = 1</span>
-<span class="comment">// 4. If 0 rows updated → OptimisticLockException (someone else modified!)</span>
-
-<span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">ProductService</span> {
-
-    <span class="annotation">@Transactional</span>
-    <span class="keyword">public void</span> <span class="function">updateQuantity</span>(Long productId, Integer newQuantity) {
         <span class="keyword">try</span> {
-            Product product = productRepository.findById(productId).orElseThrow();
-            product.setQuantity(newQuantity);
-            <span class="comment">// On save, JPA checks version</span>
-        } <span class="keyword">catch</span> (OptimisticLockException e) {
-            <span class="comment">// Another transaction modified this product</span>
-            <span class="keyword">throw new</span> ConcurrentModificationException(<span class="string">"Product was modified by another user"</span>);
+            <span class="class-name">Long</span> orderId;
+            <span class="keyword">try</span> (<span class="class-name">PreparedStatement</span> insertOrder = conn.prepareStatement(
+                    <span class="string">"INSERT INTO orders (customer_id, status, total) VALUES (?, 'PENDING', ?)"</span>,
+                    <span class="class-name">Statement</span>.RETURN_GENERATED_KEYS)) {
+                insertOrder.setLong(1, customerId);
+                insertOrder.setBigDecimal(2, total);
+                insertOrder.executeUpdate();
+
+                <span class="keyword">try</span> (<span class="class-name">ResultSet</span> keys = insertOrder.getGeneratedKeys()) {
+                    keys.next();
+                    orderId = keys.getLong(1);
+                }
+            }
+
+            <span class="comment">// Savepoint: if the stock decrement fails due to insufficient stock,
+            // roll back only this part and mark the order as failed —
+            // without undoing the order row that was just inserted above.</span>
+            <span class="class-name">Savepoint</span> beforeStockUpdate = conn.setSavepoint(<span class="string">"beforeStockUpdate"</span>);
+
+            <span class="keyword">try</span> (<span class="class-name">PreparedStatement</span> decrementStock = conn.prepareStatement(
+                    <span class="string">"UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?"</span>)) {
+                decrementStock.setInt(1, quantity);
+                decrementStock.setLong(2, productId);
+                decrementStock.setInt(3, quantity);
+
+                <span class="keyword">if</span> (decrementStock.executeUpdate() == <span class="number">0</span>) {
+                    conn.rollback(beforeStockUpdate);
+                    markOrderFailed(conn, orderId, <span class="string">"INSUFFICIENT_STOCK"</span>);
+                } <span class="keyword">else</span> {
+                    conn.releaseSavepoint(beforeStockUpdate);
+                }
+            }
+
+            conn.commit();
+
+        } <span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+            conn.rollback();
+            <span class="keyword">throw</span> e;
+        } <span class="keyword">finally</span> {
+            conn.setAutoCommit(<span class="keyword">true</span>);   <span class="comment">// mandatory before returning to the pool</span>
         }
     }
 }</code></pre>
 
-            <h3>Pessimistic Locking</h3>
-            <pre><code><span class="comment">// Pessimistic: Assume conflicts, prevent them with locks</span>
-<span class="comment">// Best for high-contention scenarios</span>
-
-<span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">InventoryService</span> {
-
-    <span class="annotation">@PersistenceContext</span>
-    <span class="keyword">private</span> EntityManager em;
-
-    <span class="annotation">@Transactional</span>
-    <span class="keyword">public void</span> <span class="function">decrementStock</span>(Long productId, <span class="keyword">int</span> quantity) {
-        <span class="comment">// Acquire exclusive lock (FOR UPDATE)</span>
-        Product product = em.find(
-            Product.<span class="keyword">class</span>,
-            productId,
-            LockModeType.PESSIMISTIC_WRITE  <span class="comment">// SELECT ... FOR UPDATE</span>
-        );
-
-        <span class="keyword">if</span> (product.getStock() < quantity) {
-            <span class="keyword">throw new</span> InsufficientStockException();
+                <div class="info-box warning">
+                    <div class="info-box-title">Deadlock retry with raw JDBC</div>
+                    <p>Catch the deadlock SQLState explicitly and retry a bounded number
+                        of times, rather than treating every <code>SQLException</code>
+                        the same way:</p>
+                    <pre><code><span class="keyword">int</span> attempts = <span class="number">0</span>;
+<span class="keyword">while</span> (<span class="keyword">true</span>) {
+    <span class="keyword">try</span> {
+        placeOrder(customerId, productId, quantity, total);
+        <span class="keyword">break</span>;
+    } <span class="keyword">catch</span> (<span class="class-name">SQLException</span> e) {
+        <span class="keyword">if</span> (<span class="string">"40001"</span>.equals(e.getSQLState()) && ++attempts < <span class="number">3</span>) {
+            <span class="keyword">continue</span>;   <span class="comment">// deadlock victim — safe to retry</span>
         }
-
-        product.setStock(product.getStock() - quantity);
-        <span class="comment">// Lock released on commit/rollback</span>
-    }
-}
-
-<span class="comment">// Lock modes:</span>
-LockModeType.PESSIMISTIC_READ   <span class="comment">// Shared lock (read allowed, write blocked)</span>
-LockModeType.PESSIMISTIC_WRITE  <span class="comment">// Exclusive lock (all access blocked)</span>
-LockModeType.PESSIMISTIC_FORCE_INCREMENT  <span class="comment">// Exclusive + increment version</span>
-
-<span class="comment">// With JPQL</span>
-List&lt;Product&gt; products = em.createQuery(
-    <span class="string">"SELECT p FROM Product p WHERE p.category = :cat"</span>, Product.<span class="keyword">class</span>)
-    .setParameter(<span class="string">"cat"</span>, category)
-    .setLockMode(LockModeType.PESSIMISTIC_WRITE)
-    .getResultList();
-
-<span class="comment">// Spring Data JPA</span>
-<span class="keyword">public interface</span> <span class="class-name">ProductRepository</span> <span class="keyword">extends</span> JpaRepository&lt;Product, Long&gt; {
-
-    <span class="annotation">@Lock</span>(LockModeType.PESSIMISTIC_WRITE)
-    <span class="annotation">@Query</span>(<span class="string">"SELECT p FROM Product p WHERE p.id = :id"</span>)
-    Optional&lt;Product&gt; <span class="function">findByIdForUpdate</span>(<span class="annotation">@Param</span>(<span class="string">"id"</span>) Long id);
-}</code></pre>
-
-            <h3>Optimistic vs Pessimistic</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Aspect</th>
-                        <th>Optimistic</th>
-                        <th>Pessimistic</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Approach</strong></td>
-                        <td>Detect conflicts</td>
-                        <td>Prevent conflicts</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Locking</strong></td>
-                        <td>No actual locks</td>
-                        <td>Database row locks</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Performance</strong></td>
-                        <td>Better for reads</td>
-                        <td>Better for high contention</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Conflict handling</strong></td>
-                        <td>Exception at commit</td>
-                        <td>Blocked until lock released</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Deadlock risk</strong></td>
-                        <td>None</td>
-                        <td>Possible</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Use case</strong></td>
-                        <td>Web applications</td>
-                        <td>Financial systems</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2>Common Transaction Pitfalls</h2>
-
-            <div class="best-practices">
-                <h3>1. Self-Invocation (Proxy Bypass)</h3>
-                <pre><code><span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-
-    <span class="annotation">@Transactional</span>
-    <span class="keyword">public void</span> <span class="function">placeOrder</span>(Order order) {
-        saveOrder(order);    <span class="comment">// Calls method below</span>
-        processPayment(order);
-    }
-
-    <span class="annotation">@Transactional</span>(propagation = Propagation.REQUIRES_NEW)
-    <span class="keyword">public void</span> <span class="function">saveOrder</span>(Order order) {
-        <span class="comment">// THIS DOESN'T GET ITS OWN TRANSACTION!</span>
-        <span class="comment">// Self-invocation bypasses the proxy!</span>
-    }
-}
-
-<span class="comment">// Solution: Inject self or use separate service</span>
-<span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> OrderPersistenceService persistenceService;
-
-    <span class="annotation">@Transactional</span>
-    <span class="keyword">public void</span> <span class="function">placeOrder</span>(Order order) {
-        persistenceService.saveOrder(order);  <span class="comment">// Proxy is used!</span>
-        processPayment(order);
+        <span class="keyword">throw new</span> <span class="class-name">RuntimeException</span>(<span class="string">"Order failed after retries"</span>, e);
     }
 }</code></pre>
+                </div>
+            </section>
 
-                <h3>2. Catching Exceptions</h3>
-                <pre><code><span class="comment">// BAD: Swallowing exception prevents rollback</span>
-<span class="annotation">@Transactional</span>
-<span class="keyword">public void</span> <span class="function">badMethod</span>() {
-    <span class="keyword">try</span> {
-        riskyOperation();
-    } <span class="keyword">catch</span> (Exception e) {
-        log.error(<span class="string">"Error"</span>, e);
-        <span class="comment">// Transaction commits! Data may be inconsistent!</span>
-    }
-}
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — OPTIMISTIC vs PESSIMISTIC LOCKING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Optimistic vs Pessimistic Locking — At the SQL Level</h2>
+                <p>Both strategies solve the lost-update anomaly from Section 2, but at
+                    opposite points in time: pessimistic locking prevents the conflict
+                    from ever happening; optimistic locking lets it happen and detects
+                    it at write time.</p>
 
-<span class="comment">// GOOD: Re-throw or manually rollback</span>
-<span class="annotation">@Transactional</span>
-<span class="keyword">public void</span> <span class="function">goodMethod</span>() {
-    <span class="keyword">try</span> {
-        riskyOperation();
-    } <span class="keyword">catch</span> (Exception e) {
-        log.error(<span class="string">"Error"</span>, e);
-        <span class="keyword">throw</span> e;  <span class="comment">// Transaction rolls back</span>
-    }
-}
+                <pre><code><span class="comment">-- PESSIMISTIC: acquire the lock up front (see Section 4) — nobody else
+-- can even read-for-update this row until this transaction ends.
+SELECT stock FROM products WHERE id = 42 FOR UPDATE;
+UPDATE products SET stock = stock - 2 WHERE id = 42;
 
-<span class="comment">// OR: Mark for rollback manually</span>
-<span class="annotation">@Autowired</span>
-TransactionStatus status;
+-- OPTIMISTIC: no lock at all — read the current version, write only if
+-- the version hasn't changed since. If another transaction committed
+-- first, this UPDATE affects 0 rows and the application must detect it.</span>
+SELECT stock, version FROM products WHERE id = 42;   <span class="comment">-- version = 7</span>
+UPDATE products
+    SET stock = stock - 2, version = version + 1
+    WHERE id = 42 AND version = 7;
+<span class="comment">-- affected rows == 0 → someone else updated first → application retries
+--   or surfaces a conflict to the caller (JPA does exactly this via @Version,
+--   throwing OptimisticLockException — see JPA & Hibernate)</span></code></pre>
 
-<span class="keyword">try</span> {
-    riskyOperation();
-} <span class="keyword">catch</span> (Exception e) {
-    TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
-}</code></pre>
+                <table class="comparison-table">
+                    <tr><th>Aspect</th><th>Optimistic</th><th>Pessimistic</th></tr>
+                    <tr><td><strong>When the conflict surfaces</strong></td><td>At write time (0 rows affected)</td><td>Never — the second transaction simply waits</td></tr>
+                    <tr><td><strong>Lock held</strong></td><td>None</td><td>Row-level lock for the transaction's duration</td></tr>
+                    <tr><td><strong>Throughput under low contention</strong></td><td>Excellent — no blocking</td><td>Unnecessary overhead for rare conflicts</td></tr>
+                    <tr><td><strong>Behavior under high contention</strong></td><td>Retry storms — most writers lose the race and must retry</td><td>Serializes cleanly — writers queue instead of failing</td></tr>
+                    <tr><td><strong>Deadlock risk</strong></td><td>None — no locks to deadlock on</td><td>Present — see Section 5</td></tr>
+                    <tr><td><strong>Typical fit</strong></td><td>Web applications, low-conflict read-heavy tables</td><td>High-contention counters (flash-sale inventory), financial ledgers</td></tr>
+                </table>
+            </section>
 
-                <h3>3. Long Transactions</h3>
-                <pre><code><span class="comment">// BAD: Transaction held during external call</span>
-<span class="annotation">@Transactional</span>
-<span class="keyword">public void</span> <span class="function">processOrder</span>(Order order) {
-    orderRepository.save(order);
-    externalPaymentService.charge(order);  <span class="comment">// HTTP call! 5 seconds!</span>
-    <span class="comment">// Database connection held for entire time</span>
-}
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-<span class="comment">// GOOD: External calls outside transaction</span>
-<span class="keyword">public void</span> <span class="function">processOrder</span>(Order order) {
-    Order savedOrder = saveOrder(order);  <span class="comment">// Transaction 1</span>
-    PaymentResult result = externalPaymentService.charge(order);  <span class="comment">// No tx</span>
-    updateOrderStatus(savedOrder, result);  <span class="comment">// Transaction 2</span>
-}
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Keep transactions as short as possible — start late, commit early. No HTTP calls, no file I/O, no waiting on user input while a transaction is open</li>
+                        <li>Express read-modify-write operations as a single atomic <code>UPDATE ... SET x = x - ?</code> statement whenever possible — it closes the lost-update window without needing any lock at all</li>
+                        <li>Choose the isolation level deliberately, per query if your driver allows it — don't raise it globally "just in case"; know exactly which anomaly you're preventing and why</li>
+                        <li>Use <code>FOR UPDATE SKIP LOCKED</code> for queue/worker-competing-for-rows patterns instead of plain <code>FOR UPDATE</code>, which serializes workers unnecessarily</li>
+                        <li>Acquire locks on multiple rows in one consistent, codebase-wide order (e.g. ascending primary key) — this eliminates entire classes of deadlocks structurally, not reactively</li>
+                        <li>Catch the deadlock SQLState explicitly and retry with a bounded attempt count — a well-designed transaction should be safely retryable</li>
+                        <li>Explicitly reset <code>autocommit(true)</code> before returning a connection to the pool</li>
+                    </ul>
 
-<span class="annotation">@Transactional</span>
-<span class="keyword">private</span> Order <span class="function">saveOrder</span>(Order order) {
-    <span class="keyword">return</span> orderRepository.save(order);
-}</code></pre>
-            </div>
-        </section>
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't leave a connection idle mid-transaction while waiting on an external system — this is the single most common cause of "connection pool exhausted" incidents in production</li>
+                        <li>Don't assume READ COMMITTED prevents lost updates — it doesn't; only atomic statements, explicit locking, or optimistic version checks do</li>
+                        <li>Don't set SERIALIZABLE globally hoping it "fixes concurrency bugs" — it multiplies serialization failures under load and every writer needs a retry loop to survive it</li>
+                        <li>Don't assume your isolation level's behavior matches the ANSI standard exactly — verify against your specific engine (Section 3); code that's correct on PostgreSQL can behave differently on MySQL</li>
+                        <li>Don't use pessimistic locking on read-heavy, low-conflict tables — the lock overhead costs far more throughput than the rare conflict it prevents</li>
+                        <li>Don't treat every <code>SQLException</code> the same in a transactional method — a deadlock-detected error is recoverable by retry; a constraint violation is not</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Transaction:</strong> Atomic unit of database work</li>
-                    <li><strong>ACID:</strong> Atomicity, Consistency, Isolation, Durability</li>
-                    <li><strong>Isolation Levels:</strong> READ_UNCOMMITTED to SERIALIZABLE</li>
-                    <li><strong>@Transactional:</strong> Spring's declarative transaction management</li>
-                    <li><strong>Propagation:</strong> How transactions interact when nested</li>
-                    <li><strong>Optimistic Locking:</strong> @Version field, detect conflicts</li>
-                    <li><strong>Pessimistic Locking:</strong> FOR UPDATE, prevent conflicts</li>
-                    <li><strong>Common pitfalls:</strong> Self-invocation, swallowed exceptions, long transactions</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="jdbc.html" class="related-link">JDBC</a>
-                <a href="jpa-hibernate.html" class="related-link">JPA & Hibernate</a>
-                <a href="connection-pooling.html" class="related-link">Connection Pooling</a>
-                <a href="../jakarta-ee/transactions.html" class="related-link">Jakarta EE Transactions</a>
-            </div>
-        </section>
-    </main>
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is a database transaction, and what do <code>COMMIT</code> and <code>ROLLBACK</code> do?</strong><br>
+                    A transaction is a group of SQL statements the database treats as
+                    one indivisible unit, started with <code>BEGIN</code>.
+                    <code>COMMIT</code> makes every change in the transaction permanent
+                    and visible to other transactions. <code>ROLLBACK</code> undoes
+                    every change made since <code>BEGIN</code>, as if none of it ever
+                    happened.</p>
+
+                    <p><strong>Q: What is the difference between a dirty read and a non-repeatable read?</strong><br>
+                    A dirty read is reading data another transaction hasn't committed
+                    yet — that data might never actually exist if the other transaction
+                    rolls back. A non-repeatable read is reading the same already-committed
+                    row twice within one transaction and getting two different values,
+                    because another transaction committed a change to it in between the
+                    two reads.</p>
+
+                    <p><strong>Q: What is the difference between optimistic and pessimistic locking?</strong><br>
+                    Pessimistic locking acquires a database lock up front (<code>SELECT
+                    ... FOR UPDATE</code>), so no other transaction can touch that row
+                    until the lock is released. Optimistic locking takes no lock at all;
+                    it reads a version number, and the final write only succeeds if the
+                    version hasn't changed — otherwise it fails and the caller retries.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Explain why PostgreSQL's REPEATABLE READ prevents phantom reads even though the SQL standard doesn't require that at this level.</strong><br>
+                    PostgreSQL implements REPEATABLE READ as snapshot isolation: the
+                    transaction takes a consistent snapshot of the entire database at
+                    its first statement, and every subsequent read in that transaction
+                    is served from that same frozen snapshot regardless of what other
+                    transactions commit afterward. Because the snapshot itself cannot
+                    gain new rows, a phantom read is structurally impossible — not
+                    merely policy-prevented, but mechanically impossible given how MVCC
+                    visibility works. What Postgres does not prevent at this level is a
+                    write-write conflict: if two transactions both try to update the
+                    same row based on their respective snapshots, the second to commit
+                    receives a serialization failure and must retry the whole
+                    transaction. This is a different failure mode than locking-based
+                    engines, where the second writer simply blocks instead of failing.</p>
+
+                    <p><strong>Q: Describe how a deadlock forms between two transactions and how the database resolves it. How do you prevent it at the application level?</strong><br>
+                    A deadlock forms when transaction A holds a lock transaction B needs,
+                    and B simultaneously holds a lock A needs — a circular wait where
+                    neither can proceed. The database's deadlock detector periodically
+                    scans the waits-for graph among active locks; when it finds a cycle,
+                    it picks one transaction as the victim (typically the cheapest to
+                    roll back) and aborts it with a deadlock error, letting the other
+                    proceed. The application must catch that specific error (SQLState
+                    <code>40001</code>) and retry the aborted transaction — treating it
+                    as a fatal error loses the operation. The real prevention, though,
+                    is structural: always acquire locks on multiple rows in the same
+                    consistent order across the entire codebase (for example, sorted by
+                    ascending primary key before locking), which makes the circular wait
+                    condition impossible to construct in the first place, regardless of
+                    which direction the business operation logically flows.</p>
+
+                    <p><strong>Q: You're building a flash-sale inventory decrement that will see extremely high write contention on a small number of product rows. Would you choose <code>SELECT ... FOR UPDATE</code> or optimistic locking with a version column, and what failure mode does your choice carry under load?</strong><br>
+                    Pessimistic locking (<code>FOR UPDATE</code>) is the correct choice
+                    here specifically because contention is high and concentrated on a
+                    few rows. Optimistic locking under this exact scenario produces a
+                    retry storm: nearly every concurrent writer reads the same version,
+                    all but one lose the race at commit time, and all of those retry —
+                    re-reading, recomputing, and re-attempting the write, often colliding
+                    again on the next attempt too. That retry amplification can make
+                    optimistic locking perform worse than pessimistic locking under
+                    exactly the high-contention condition optimistic locking is usually
+                    praised for avoiding elsewhere. Pessimistic locking instead serializes
+                    writers cleanly through the lock queue — worse latency per request
+                    under load, but no wasted retry work and no risk of an update being
+                    silently lost. The trade-off to watch is deadlock risk: with multiple
+                    rows locked per transaction, lock ordering (previous question)
+                    becomes mandatory, not optional.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="jdbc.html" class="related-link"><span class="related-icon">🔌</span>JDBC</a>
+                    <a href="connection-pooling.html" class="related-link"><span class="related-icon">🏊</span>Connection Pooling</a>
+                    <a href="jpa-hibernate.html" class="related-link"><span class="related-icon">💾</span>JPA &amp; Hibernate</a>
+                    <a href="relationships.html" class="related-link"><span class="related-icon">🔗</span>Entity Relationships</a>
+                    <a href="orms.html" class="related-link"><span class="related-icon">🗺️</span>ORMs</a>
+                    <a href="../jakarta-ee/transactions.html" class="related-link"><span class="related-icon">🏢</span>Jakarta Transactions (JTA)</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>

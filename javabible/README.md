@@ -79,9 +79,9 @@ javabible/
     ├── build-tools/                     (7 topics)
     ├── web-concepts/                    (8 topics)
     ├── servers/                         (6 topics)
-    ├── databases/                       (7 topics)
+    ├── databases/                       (6 topics)
     ├── security/                        (6 topics)
-    ├── tools/                           (6 topics)
+    ├── tools/                           (7 topics)
     └── best-practices/                  (6 topics)
 ```
 
