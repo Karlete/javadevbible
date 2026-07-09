@@ -1,336 +1,248 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.web-xml.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Deployment Descriptors (web.xml) - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#servers">Application Servers</a> / Deployment Descriptors
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#servers" data-i18n="nav.servers">Application Servers &amp; Deployment</a> /
+                Deployment Descriptors
             </nav>
-            <h1>Deployment Descriptors (web.xml)</h1>
-            <p class="topic-subtitle">Configuring Java web applications</p>
-            <a href="../../index.html#servers" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.web-xml.h1">Deployment Descriptors (web.xml)</h1>
+            <p class="topic-subtitle" data-i18n="topic.web-xml.subtitle">The XML configuration annotations replaced for most apps — what still needs it, what's now legacy, and the direct mapping to its modern Spring equivalent</p>
+            <a href="../../index.html#servers" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is a Deployment Descriptor?</h2>
-            <p>A <strong>Deployment Descriptor</strong> is an XML configuration file that tells the servlet container how to deploy and run your web application. The most important deployment descriptor is <code>web.xml</code>, located in the <code>WEB-INF/</code> directory.</p>
+    <div class="topic-layout">
 
-            <p>While modern Java applications often use annotations instead of XML configuration, understanding deployment descriptors is essential for maintaining legacy applications and handling configurations that annotations can't express.</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>Historical Context</h3>
-            <p>Before Servlet 3.0 (released in 2009), <code>web.xml</code> was <strong>mandatory</strong>. Every Java web application needed this file to register servlets, configure filters, and define listeners.</p>
+        <main class="topic-content">
 
-            <h3>Annotations vs web.xml</h3>
-            <pre><code><span class="comment">// Before Servlet 3.0 - Required web.xml</span>
-&lt;servlet&gt;
-    &lt;servlet-name&gt;hello&lt;/servlet-name&gt;
-    &lt;servlet-class&gt;com.example.HelloServlet&lt;/servlet-class&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is a Deployment Descriptor — and Why Does it Still Exist?</h2>
+                <p>A <strong>deployment descriptor</strong> is an XML file, living at
+                    <code>WEB-INF/web.xml</code> inside a WAR, that tells the servlet
+                    container how to wire up an application — which classes are servlets,
+                    which URLs map to them, what filters run and in what order, how sessions
+                    and security are configured. Before <strong>Servlet 3.0</strong> (2009),
+                    this file was mandatory — there was no other way to register a servlet
+                    at all. Annotations removed that requirement for the common case, but
+                    XML configuration didn't disappear: it remains the only mechanism for a
+                    handful of things annotations genuinely can't express, and it's essential
+                    for reading and maintaining the large body of Java EE applications
+                    written before annotations existed.</p>
+
+                <pre><code><span class="comment">// BEFORE Servlet 3.0 — mandatory, and this is the ENTIRE registration</span>
+&lt;<span class="keyword">servlet</span>&gt;
+    &lt;servlet-name&gt;productServlet&lt;/servlet-name&gt;
+    &lt;servlet-class&gt;com.shop.ProductServlet&lt;/servlet-class&gt;
 &lt;/servlet&gt;
-&lt;servlet-mapping&gt;
-    &lt;servlet-name&gt;hello&lt;/servlet-name&gt;
-    &lt;url-pattern&gt;/hello&lt;/url-pattern&gt;
+&lt;<span class="keyword">servlet-mapping</span>&gt;
+    &lt;servlet-name&gt;productServlet&lt;/servlet-name&gt;
+    &lt;url-pattern&gt;/products&lt;/url-pattern&gt;
 &lt;/servlet-mapping&gt;
 
-<span class="comment">// After Servlet 3.0 - Just use annotation</span>
-<span class="annotation">@WebServlet</span>(<span class="string">"/hello"</span>)
-<span class="keyword">public class</span> <span class="class-name">HelloServlet</span> <span class="keyword">extends</span> HttpServlet {
-    <span class="comment">// ...</span>
-}</code></pre>
+<span class="comment">// AFTER Servlet 3.0 — the same registration, one line, no XML at all</span>
+<span class="annotation">@WebServlet</span>(<span class="string">"/products"</span>)
+<span class="keyword">public class</span> <span class="class-name">ProductServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> { <span class="comment">/* ... */</span> }</code></pre>
 
-            <div class="info-box">
-                <p><strong>When to Use web.xml:</strong></p>
-                <ul>
-                    <li>Complex URL patterns with wildcards</li>
-                    <li>Ops needs to change config without rebuild</li>
-                    <li>Specific filter chain ordering required</li>
-                    <li>Override third-party library defaults</li>
-                    <li>Legacy application maintenance</li>
-                </ul>
-            </div>
-        </section>
+                <div class="info-box">
+                    <div class="info-box-title">When XML configuration is still the right tool</div>
+                    <ul>
+                        <li>Ops needs to change configuration (a URL pattern, a filter's enabled state) without a rebuild and redeploy of compiled code</li>
+                        <li>Overriding a third-party library's own servlet/filter registration, which you can't retroactively annotate</li>
+                        <li>Precise, explicit filter chain ordering across many filters from different sources</li>
+                        <li>Maintaining an existing legacy application that predates annotation-based configuration</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Basic web.xml Structure</h2>
-
-            <h3>Location</h3>
-            <pre><code>mywebapp.war
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — STRUCTURE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Structure and Namespace</h2>
+                <pre><code>mywebapp.war
 └── WEB-INF/
-    └── web.xml    <span class="comment">&lt;-- Lives here!</span></code></pre>
+    └── web.xml</code></pre>
 
-            <h3>Minimal Template</h3>
-            <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;<span class="keyword">web-app</span> xmlns="https://jakarta.ee/xml/ns/jakartaee"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
-                             https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
-         version="6.0"&gt;
+                <pre><code>&lt;?xml version=<span class="string">"1.0"</span> encoding=<span class="string">"UTF-8"</span>?&gt;
+&lt;<span class="keyword">web-app</span> xmlns=<span class="string">"https://jakarta.ee/xml/ns/jakartaee"</span>
+         xmlns:xsi=<span class="string">"http://www.w3.org/2001/XMLSchema-instance"</span>
+         xsi:schemaLocation=<span class="string">"https://jakarta.ee/xml/ns/jakartaee
+                             https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"</span>
+         version=<span class="string">"6.0"</span>&gt;
 
-    &lt;display-name&gt;My Web Application&lt;/display-name&gt;
-    &lt;description&gt;A sample web application&lt;/description&gt;
-
+    &lt;display-name&gt;Shop Catalog Service&lt;/display-name&gt;
     <span class="comment">&lt;!-- Configuration goes here --&gt;</span>
 
 &lt;/web-app&gt;</code></pre>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Important: Namespace Versions</div>
-                <p>Match your web.xml namespace to your container version:</p>
-                <ul>
-                    <li><strong>Tomcat 9:</strong> Servlet 4.0, <code>xmlns.jcp.org</code></li>
-                    <li><strong>Tomcat 10+:</strong> Servlet 5.0+, <code>jakarta.ee</code></li>
-                </ul>
-            </div>
-        </section>
+                <div class="info-box warning">
+                    <div class="info-box-title">The namespace must match your container's Servlet spec version</div>
+                    <p>Tomcat 9 and earlier expect the older <code>xmlns.jcp.org</code>
+                        namespace and <code>javax</code> classes; Tomcat 10+ expects the
+                        <code>jakarta.ee</code> namespace shown above. Mismatching these is a
+                        common, confusing failure mode — the descriptor may parse without
+                        error while the classes it references don't exist under the
+                        container's actual namespace. Full detail on this migration is on
+                        <a href="servlet-container.html">Servlet Containers</a>.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Configuring Servlets</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SERVLETS AND FILTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Configuring Servlets and Filters</h2>
 
-            <h3>Basic Servlet Registration</h3>
-            <pre><code><span class="comment">&lt;!-- Define the servlet --&gt;</span>
-&lt;<span class="keyword">servlet</span>&gt;
-    &lt;servlet-name&gt;ProductServlet&lt;/servlet-name&gt;
-    &lt;servlet-class&gt;com.example.ProductServlet&lt;/servlet-class&gt;
-&lt;/servlet&gt;
-
-<span class="comment">&lt;!-- Map URLs to the servlet --&gt;</span>
-&lt;<span class="keyword">servlet-mapping</span>&gt;
-    &lt;servlet-name&gt;ProductServlet&lt;/servlet-name&gt;
-    &lt;url-pattern&gt;/products&lt;/url-pattern&gt;
-&lt;/servlet-mapping&gt;
-
-&lt;<span class="keyword">servlet-mapping</span>&gt;
-    &lt;servlet-name&gt;ProductServlet&lt;/servlet-name&gt;
-    &lt;url-pattern&gt;/products/*&lt;/url-pattern&gt;
-&lt;/servlet-mapping&gt;</code></pre>
-
-            <h3>Servlet with Init Parameters</h3>
-            <pre><code>&lt;<span class="keyword">servlet</span>&gt;
-    &lt;servlet-name&gt;ReportServlet&lt;/servlet-name&gt;
-    &lt;servlet-class&gt;com.example.ReportServlet&lt;/servlet-class&gt;
-
-    <span class="comment">&lt;!-- Init parameters --&gt;</span>
+                <h3>Servlet registration with init parameters</h3>
+                <pre><code>&lt;<span class="keyword">servlet</span>&gt;
+    &lt;servlet-name&gt;reportServlet&lt;/servlet-name&gt;
+    &lt;servlet-class&gt;com.shop.ReportServlet&lt;/servlet-class&gt;
     &lt;<span class="keyword">init-param</span>&gt;
         &lt;param-name&gt;maxResults&lt;/param-name&gt;
         &lt;param-value&gt;100&lt;/param-value&gt;
     &lt;/init-param&gt;
-    &lt;<span class="keyword">init-param</span>&gt;
-        &lt;param-name&gt;cacheEnabled&lt;/param-name&gt;
-        &lt;param-value&gt;true&lt;/param-value&gt;
-    &lt;/init-param&gt;
+    &lt;load-on-startup&gt;1&lt;/load-on-startup&gt;   <span class="comment">&lt;!-- lower number = higher startup priority --&gt;</span>
+&lt;/servlet&gt;
+&lt;<span class="keyword">servlet-mapping</span>&gt;
+    &lt;servlet-name&gt;reportServlet&lt;/servlet-name&gt;
+    &lt;url-pattern&gt;/reports/*&lt;/url-pattern&gt;
+&lt;/servlet-mapping&gt;</code></pre>
 
-    <span class="comment">&lt;!-- Load on startup (lower = higher priority) --&gt;</span>
-    &lt;load-on-startup&gt;1&lt;/load-on-startup&gt;
-&lt;/servlet&gt;</code></pre>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Pattern type</th><th>Example</th><th>Matches</th><th>Priority</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Exact match</td><td><code>/catalog/products</code></td><td>Only that exact path</td><td>Highest</td></tr>
+                        <tr><td>Path match</td><td><code>/catalog/*</code></td><td><code>/catalog</code>, <code>/catalog/x</code>, <code>/catalog/x/y</code></td><td>2nd</td></tr>
+                        <tr><td>Extension match</td><td><code>*.do</code></td><td>Anything ending in <code>.do</code></td><td>3rd</td></tr>
+                        <tr><td>Default</td><td><code>/</code></td><td>Anything not matched above</td><td>Lowest</td></tr>
+                    </tbody>
+                </table>
 
-            <pre><code><span class="comment">// Accessing init parameters in your servlet:</span>
-<span class="keyword">public void</span> init() <span class="keyword">throws</span> ServletException {
-    <span class="keyword">int</span> maxResults = Integer.parseInt(getInitParameter(<span class="string">"maxResults"</span>));
-    <span class="keyword">boolean</span> cacheEnabled = Boolean.parseBoolean(getInitParameter(<span class="string">"cacheEnabled"</span>));
-}</code></pre>
-
-            <h3>URL Pattern Matching Rules</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Pattern Type</th>
-                        <th>Example</th>
-                        <th>Matches</th>
-                        <th>Priority</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Exact Match</strong></td>
-                        <td>/catalog/products</td>
-                        <td>Only /catalog/products</td>
-                        <td>1 (Highest)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Path Match</strong></td>
-                        <td>/catalog/*</td>
-                        <td>/catalog, /catalog/x, /catalog/x/y</td>
-                        <td>2</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Extension Match</strong></td>
-                        <td>*.do</td>
-                        <td>/anything.do, /path/action.do</td>
-                        <td>3</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Default</strong></td>
-                        <td>/</td>
-                        <td>Anything not matched above</td>
-                        <td>4 (Lowest)</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2>Configuring Filters</h2>
-
-            <h3>Basic Filter Registration</h3>
-            <pre><code>&lt;<span class="keyword">filter</span>&gt;
-    &lt;filter-name&gt;LoggingFilter&lt;/filter-name&gt;
-    &lt;filter-class&gt;com.example.LoggingFilter&lt;/filter-class&gt;
-&lt;/filter&gt;
-
-&lt;<span class="keyword">filter-mapping</span>&gt;
-    &lt;filter-name&gt;LoggingFilter&lt;/filter-name&gt;
-    &lt;url-pattern&gt;/*&lt;/url-pattern&gt;  <span class="comment">&lt;!-- Apply to all URLs --&gt;</span>
-&lt;/filter-mapping&gt;</code></pre>
-
-            <h3>Filter Chain Ordering</h3>
-            <p><strong>Critical:</strong> Filters execute in the order they appear in web.xml:</p>
-            <pre><code><span class="comment">&lt;!-- Filters execute in this order: --&gt;</span>
-
-<span class="comment">&lt;!-- 1. First: Character encoding --&gt;</span>
+                <h3>Filter chain — execution order is declaration order, and that's the whole rule</h3>
+                <pre><code><span class="comment">&lt;!-- Filters execute in EXACTLY the order they appear in this file --&gt;</span>
 &lt;<span class="keyword">filter</span>&gt;
-    &lt;filter-name&gt;EncodingFilter&lt;/filter-name&gt;
-    &lt;filter-class&gt;com.example.EncodingFilter&lt;/filter-class&gt;
+    &lt;filter-name&gt;encodingFilter&lt;/filter-name&gt;
+    &lt;filter-class&gt;com.shop.EncodingFilter&lt;/filter-class&gt;
 &lt;/filter&gt;
 &lt;filter-mapping&gt;
-    &lt;filter-name&gt;EncodingFilter&lt;/filter-name&gt;
+    &lt;filter-name&gt;encodingFilter&lt;/filter-name&gt;
     &lt;url-pattern&gt;/*&lt;/url-pattern&gt;
 &lt;/filter-mapping&gt;
 
-<span class="comment">&lt;!-- 2. Second: Authentication --&gt;</span>
 &lt;<span class="keyword">filter</span>&gt;
-    &lt;filter-name&gt;AuthFilter&lt;/filter-name&gt;
-    &lt;filter-class&gt;com.example.AuthFilter&lt;/filter-class&gt;
+    &lt;filter-name&gt;authFilter&lt;/filter-name&gt;
+    &lt;filter-class&gt;com.shop.AuthFilter&lt;/filter-class&gt;
 &lt;/filter&gt;
 &lt;filter-mapping&gt;
-    &lt;filter-name&gt;AuthFilter&lt;/filter-name&gt;
+    &lt;filter-name&gt;authFilter&lt;/filter-name&gt;
     &lt;url-pattern&gt;/secure/*&lt;/url-pattern&gt;
-&lt;/filter-mapping&gt;
-
-<span class="comment">&lt;!-- 3. Third: Authorization --&gt;</span>
-&lt;<span class="keyword">filter</span>&gt;
-    &lt;filter-name&gt;AuthzFilter&lt;/filter-name&gt;
-    &lt;filter-class&gt;com.example.AuthzFilter&lt;/filter-class&gt;
-&lt;/filter&gt;
-&lt;filter-mapping&gt;
-    &lt;filter-name&gt;AuthzFilter&lt;/filter-name&gt;
-    &lt;url-pattern&gt;/admin/*&lt;/url-pattern&gt;
 &lt;/filter-mapping&gt;</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Session Configuration</h2>
+                <div class="info-box note">
+                    <div class="info-box-title">Annotation-based and Spring apps need an explicit order instead</div>
+                    <p>Without a <code>web.xml</code> to read top-to-bottom, ordering isn't
+                        implicit — <code>@WebFilter</code>-annotated filters and Spring's own
+                        <code>FilterRegistrationBean</code> both require an explicit
+                        <code>@Order</code> value or <code>setOrder()</code> call, precisely
+                        because declaration order in annotated/component-scanned code carries
+                        no guaranteed sequence the way physical position in an XML file
+                        does.</p>
+                </div>
 
-            <pre><code>&lt;<span class="keyword">session-config</span>&gt;
-    <span class="comment">&lt;!-- Session timeout in minutes (0 = never expires) --&gt;</span>
-    &lt;session-timeout&gt;30&lt;/session-timeout&gt;
+                <h3>File uploads — multipart configuration</h3>
+                <pre><code>&lt;<span class="keyword">multipart-config</span>&gt;
+    &lt;max-file-size&gt;5242880&lt;/max-file-size&gt;        <span class="comment">&lt;!-- 5 MB per file --&gt;</span>
+    &lt;max-request-size&gt;20971520&lt;/max-request-size&gt; <span class="comment">&lt;!-- 20 MB total request --&gt;</span>
+    &lt;file-size-threshold&gt;0&lt;/file-size-threshold&gt;  <span class="comment">&lt;!-- 0 = write to disk immediately, don't buffer in memory --&gt;</span>
+&lt;/multipart-config&gt;
+<span class="comment">// Relevant for something like uploading a product image in an admin panel —
+// without an explicit limit, a single oversized upload can exhaust memory
+// or disk before your own validation code ever runs.</span></code></pre>
+            </section>
 
-    <span class="comment">&lt;!-- Cookie configuration --&gt;</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — SESSION CONFIGURATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Session Configuration</h2>
+                <pre><code>&lt;<span class="keyword">session-config</span>&gt;
+    &lt;session-timeout&gt;30&lt;/session-timeout&gt;   <span class="comment">&lt;!-- minutes; 0 = never expires — almost never what you want --&gt;</span>
     &lt;<span class="keyword">cookie-config</span>&gt;
-        &lt;name&gt;MYAPPSESSIONID&lt;/name&gt;
-        &lt;http-only&gt;true&lt;/http-only&gt;   <span class="comment">&lt;!-- JavaScript cannot access --&gt;</span>
-        &lt;secure&gt;true&lt;/secure&gt;         <span class="comment">&lt;!-- Only send over HTTPS --&gt;</span>
-        &lt;max-age&gt;-1&lt;/max-age&gt;         <span class="comment">&lt;!-- -1 = session cookie --&gt;</span>
+        &lt;name&gt;SHOPSESSIONID&lt;/name&gt;
+        &lt;http-only&gt;true&lt;/http-only&gt;
+        &lt;secure&gt;true&lt;/secure&gt;
     &lt;/cookie-config&gt;
-
-    <span class="comment">&lt;!-- Session tracking modes --&gt;</span>
-    &lt;tracking-mode&gt;COOKIE&lt;/tracking-mode&gt;
+    &lt;tracking-mode&gt;COOKIE&lt;/tracking-mode&gt;   <span class="comment">&lt;!-- never URL rewriting — it exposes the session ID in logs, referrers, history --&gt;</span>
 &lt;/session-config&gt;</code></pre>
 
-            <div class="info-box">
-                <p><strong>Security Best Practices:</strong></p>
-                <ul>
-                    <li><code>http-only="true"</code> - Prevents XSS attacks from stealing cookies</li>
-                    <li><code>secure="true"</code> - Prevents session hijacking over HTTP</li>
-                    <li>Use <code>COOKIE</code> tracking - URL rewriting exposes session ID</li>
-                </ul>
-            </div>
-        </section>
+                <div class="info-box important">
+                    <div class="info-box-title">This is the container-level version of what Session Management and JWT already covered in depth</div>
+                    <p>Every principle behind <code>http-only</code>, <code>secure</code>,
+                        and avoiding URL-based session tracking is explained mechanically —
+                        not just declared — on
+                        <a href="../security/session-mgmt.html">Session Management</a> and
+                        <a href="../security/jwt.html">JWT</a>. A Spring Boot application
+                        configures the equivalent settings via
+                        <code>server.servlet.session.*</code> properties in
+                        <code>application.yml</code> rather than this XML block, but the
+                        underlying security reasoning is identical.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Error Pages</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — SECURITY CONFIGURATION (LEGACY)
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Container-Managed Security — Legacy, Superseded by Spring Security</h2>
+                <p>The Servlet specification defines its own declarative authentication and
+                    authorization mechanism, configured entirely in <code>web.xml</code>.
+                    It's presented here for completeness and for maintaining applications
+                    that still use it — modern Spring applications use Spring Security's
+                    <code>SecurityFilterChain</code>
+                    (see <a href="../security/auth-vs-authz.html">Authentication vs
+                    Authorization</a>) instead, which is more flexible and is where new
+                    development should live.</p>
 
-            <pre><code><span class="comment">&lt;!-- Error page by HTTP status code --&gt;</span>
-&lt;<span class="keyword">error-page</span>&gt;
-    &lt;error-code&gt;404&lt;/error-code&gt;
-    &lt;location&gt;/WEB-INF/errors/not-found.html&lt;/location&gt;
-&lt;/error-page&gt;
-
-&lt;<span class="keyword">error-page</span>&gt;
-    &lt;error-code&gt;500&lt;/error-code&gt;
-    &lt;location&gt;/WEB-INF/errors/server-error.jsp&lt;/location&gt;
-&lt;/error-page&gt;
-
-<span class="comment">&lt;!-- Error page by exception type --&gt;</span>
-&lt;<span class="keyword">error-page</span>&gt;
-    &lt;exception-type&gt;java.lang.NullPointerException&lt;/exception-type&gt;
-    &lt;location&gt;/WEB-INF/errors/null-error.jsp&lt;/location&gt;
-&lt;/error-page&gt;
-
-<span class="comment">&lt;!-- Catch-all for any exception --&gt;</span>
-&lt;<span class="keyword">error-page</span>&gt;
-    &lt;exception-type&gt;java.lang.Throwable&lt;/exception-type&gt;
-    &lt;location&gt;/WEB-INF/errors/generic-error.jsp&lt;/location&gt;
-&lt;/error-page&gt;</code></pre>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Production Security</div>
-                <p>Never expose stack traces or detailed error messages in production! Show friendly messages to users and log details server-side.</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Welcome Files</h2>
-
-            <pre><code>&lt;<span class="keyword">welcome-file-list</span>&gt;
-    <span class="comment">&lt;!-- Checked in order until one is found --&gt;</span>
-    &lt;welcome-file&gt;index.html&lt;/welcome-file&gt;
-    &lt;welcome-file&gt;index.htm&lt;/welcome-file&gt;
-    &lt;welcome-file&gt;index.jsp&lt;/welcome-file&gt;
-    &lt;welcome-file&gt;default.html&lt;/welcome-file&gt;
-&lt;/welcome-file-list&gt;
-
-<span class="comment">&lt;!-- Request: http://localhost:8080/myapp/
-     Container looks for:
-     1. /myapp/index.html
-     2. /myapp/index.htm
-     3. /myapp/index.jsp
-     4. /myapp/default.html
-     Returns 404 if none found --&gt;</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Security Configuration</h2>
-
-            <h3>Protecting Resources</h3>
-            <pre><code><span class="comment">&lt;!-- Define security constraint --&gt;</span>
-&lt;<span class="keyword">security-constraint</span>&gt;
+                <pre><code>&lt;<span class="keyword">security-constraint</span>&gt;
     &lt;<span class="keyword">web-resource-collection</span>&gt;
         &lt;web-resource-name&gt;Admin Area&lt;/web-resource-name&gt;
         &lt;url-pattern&gt;/admin/*&lt;/url-pattern&gt;
-        &lt;http-method&gt;GET&lt;/http-method&gt;
-        &lt;http-method&gt;POST&lt;/http-method&gt;
     &lt;/web-resource-collection&gt;
-
-    <span class="comment">&lt;!-- Who can access --&gt;</span>
     &lt;<span class="keyword">auth-constraint</span>&gt;
         &lt;role-name&gt;admin&lt;/role-name&gt;
     &lt;/auth-constraint&gt;
-
-    <span class="comment">&lt;!-- Require HTTPS --&gt;</span>
     &lt;<span class="keyword">user-data-constraint</span>&gt;
-        &lt;transport-guarantee&gt;CONFIDENTIAL&lt;/transport-guarantee&gt;
+        &lt;transport-guarantee&gt;CONFIDENTIAL&lt;/transport-guarantee&gt;   <span class="comment">&lt;!-- requires HTTPS --&gt;</span>
     &lt;/user-data-constraint&gt;
 &lt;/security-constraint&gt;
 
-<span class="comment">&lt;!-- Authentication method --&gt;</span>
 &lt;<span class="keyword">login-config</span>&gt;
     &lt;auth-method&gt;FORM&lt;/auth-method&gt;
     &lt;<span class="keyword">form-login-config</span>&gt;
@@ -339,126 +251,240 @@
     &lt;/form-login-config&gt;
 &lt;/login-config&gt;
 
-<span class="comment">&lt;!-- Define roles --&gt;</span>
-&lt;<span class="keyword">security-role</span>&gt;
-    &lt;role-name&gt;user&lt;/role-name&gt;
-&lt;/security-role&gt;
-&lt;<span class="keyword">security-role</span>&gt;
-    &lt;role-name&gt;admin&lt;/role-name&gt;
-&lt;/security-role&gt;</code></pre>
+&lt;<span class="keyword">security-role</span>&gt;&lt;role-name&gt;admin&lt;/role-name&gt;&lt;/security-role&gt;</code></pre>
 
-            <h3>Form Login Page Requirements</h3>
-            <pre><code><span class="comment">&lt;!-- login.html - Must use specific form action and field names --&gt;</span>
-&lt;form action="j_security_check" method="POST"&gt;
-    &lt;input type="text" name="j_username" required&gt;
-    &lt;input type="password" name="j_password" required&gt;
-    &lt;button type="submit"&gt;Login&lt;/button&gt;
-&lt;/form&gt;
+                <pre><code><span class="comment">&lt;!-- login.html — these exact names are REQUIRED by the servlet spec,
+     not a convention you can rename --&gt;</span>
+&lt;form action=<span class="string">"j_security_check"</span> method=<span class="string">"POST"</span>&gt;
+    &lt;input type=<span class="string">"text"</span> name=<span class="string">"j_username"</span> required&gt;
+    &lt;input type=<span class="string">"password"</span> name=<span class="string">"j_password"</span> required&gt;
+&lt;/form&gt;</code></pre>
 
-<span class="comment">&lt;!-- These names are REQUIRED by the servlet spec:
-     - Form action: j_security_check
-     - Username field: j_username
-     - Password field: j_password --&gt;</span></code></pre>
-        </section>
+                <div class="info-box warning">
+                    <div class="info-box-title">Why new development shouldn't reach for this</div>
+                    <p>Container-managed security offers only what the Servlet spec defines —
+                        role-based URL protection, four fixed auth methods
+                        (<code>BASIC</code>, <code>DIGEST</code>, <code>FORM</code>,
+                        <code>CLIENT-CERT</code>). It has no native concept of JWT, OAuth2,
+                        method-level <code>@PreAuthorize</code> expressions, or the
+                        fine-grained ABAC policies covered in the Security section of this
+                        Bible. Spring Security implements all of that on top of the same
+                        underlying servlet filter chain, which is why it's the correct
+                        choice for anything beyond maintaining an existing legacy
+                        deployment.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Context Parameters</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — ERROR PAGES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Error Pages</h2>
+                <pre><code>&lt;<span class="keyword">error-page</span>&gt;
+    &lt;error-code&gt;404&lt;/error-code&gt;
+    &lt;location&gt;/WEB-INF/errors/not-found.html&lt;/location&gt;
+&lt;/error-page&gt;
 
-            <pre><code><span class="comment">&lt;!-- Application-wide settings --&gt;</span>
-&lt;<span class="keyword">context-param</span>&gt;
-    &lt;param-name&gt;adminEmail&lt;/param-name&gt;
-    &lt;param-value&gt;admin@example.com&lt;/param-value&gt;
-&lt;/context-param&gt;
+&lt;<span class="keyword">error-page</span>&gt;
+    &lt;exception-type&gt;java.lang.Throwable&lt;/exception-type&gt;
+    &lt;location&gt;/WEB-INF/errors/generic-error.jsp&lt;/location&gt;   <span class="comment">&lt;!-- catch-all --&gt;</span>
+&lt;/error-page&gt;</code></pre>
 
-&lt;<span class="keyword">context-param</span>&gt;
+                <div class="info-box warning">
+                    <div class="info-box-title">Never expose a stack trace to the client in production</div>
+                    <p>Show a generic, friendly message to the caller and log the full
+                        detail server-side. The modern Spring equivalent of this entire
+                        section is a <code>@ControllerAdvice</code> with
+                        <code>@ExceptionHandler</code> methods returning
+                        <code>ProblemDetail</code> (RFC 9457) — declarative per-exception-type
+                        mapping, the same underlying goal as <code>&lt;error-page&gt;</code>,
+                        expressed in code rather than XML, and integrated with the
+                        <code>ProblemDetail</code> convention used consistently across the
+                        Jakarta EE and Spring topics in this Bible.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — CONTEXT PARAMETERS AND LISTENERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Context Parameters and Listeners</h2>
+                <pre><code>&lt;<span class="keyword">context-param</span>&gt;
     &lt;param-name&gt;maxUploadSize&lt;/param-name&gt;
-    &lt;param-value&gt;10485760&lt;/param-value&gt; <span class="comment">&lt;!-- 10 MB --&gt;</span>
-&lt;/context-param&gt;
-
-&lt;<span class="keyword">context-param</span>&gt;
-    &lt;param-name&gt;environment&lt;/param-name&gt;
-    &lt;param-value&gt;production&lt;/param-value&gt;
+    &lt;param-value&gt;10485760&lt;/param-value&gt;
 &lt;/context-param&gt;</code></pre>
+                <pre><code><span class="comment">// Accessing it:</span>
+<span class="class-name">ServletContext</span> context = <span class="function">getServletContext</span>();
+<span class="class-name">String</span> maxUpload = context.<span class="function">getInitParameter</span>(<span class="string">"maxUploadSize"</span>);</code></pre>
 
-            <pre><code><span class="comment">// Accessing context parameters:</span>
-ServletContext context = getServletContext();
-String adminEmail = context.getInitParameter(<span class="string">"adminEmail"</span>);
-String env = context.getInitParameter(<span class="string">"environment"</span>);</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Listeners</h2>
-
-            <pre><code><span class="comment">&lt;!-- Application lifecycle --&gt;</span>
-&lt;<span class="keyword">listener</span>&gt;
-    &lt;listener-class&gt;com.example.AppStartupListener&lt;/listener-class&gt;
-&lt;/listener&gt;
-
-<span class="comment">&lt;!-- Session lifecycle --&gt;</span>
-&lt;<span class="keyword">listener</span>&gt;
-    &lt;listener-class&gt;com.example.SessionTracker&lt;/listener-class&gt;
+                <pre><code>&lt;<span class="keyword">listener</span>&gt;
+    &lt;listener-class&gt;com.shop.InventorySyncListener&lt;/listener-class&gt;
 &lt;/listener&gt;</code></pre>
 
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Listener Interface</th>
-                        <th>Events</th>
-                        <th>Common Use</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>ServletContextListener</td>
-                        <td>App start/stop</td>
-                        <td>Initialize resources</td>
-                    </tr>
-                    <tr>
-                        <td>HttpSessionListener</td>
-                        <td>Session create/destroy</td>
-                        <td>Count active users</td>
-                    </tr>
-                    <tr>
-                        <td>ServletRequestListener</td>
-                        <td>Request start/end</td>
-                        <td>Request timing, logging</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Listener interface</th><th>Events</th><th>Common use</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>ServletContextListener</code></td><td>Application start/stop</td><td>Initialize resources at startup, clean up at shutdown</td></tr>
+                        <tr><td><code>HttpSessionListener</code></td><td>Session create/destroy</td><td>Track active user count</td></tr>
+                        <tr><td><code>ServletRequestListener</code></td><td>Request start/end</td><td>Request timing, logging</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>web.xml:</strong> The main deployment descriptor in WEB-INF/</li>
-                    <li><strong>Annotations vs XML:</strong> Modern apps use annotations; XML for special cases</li>
-                    <li><strong>Filter ordering:</strong> Defined by order in web.xml</li>
-                    <li><strong>URL patterns:</strong> Exact > path > extension > default</li>
-                    <li><strong>Security:</strong> Configure authentication, roles, HTTPS</li>
-                    <li><strong>Session config:</strong> Timeout, cookie options, tracking mode</li>
-                    <li><strong>Error pages:</strong> Custom pages for HTTP codes and exceptions</li>
-                    <li><strong>Context params:</strong> Application-wide configuration</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — THE MODERN EQUIVALENT TABLE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>web.xml → Modern Equivalent, Element by Element</h2>
+                <p>Every capability above still exists in modern Spring applications — it
+                    just moved from XML into annotations and configuration properties. This
+                    table is the direct translation, useful both for reading legacy code
+                    with a modern mental model and for knowing exactly what to search for
+                    when a piece of inherited XML needs to be ported forward.</p>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="war-jar.html" class="related-link">WAR vs JAR Files</a>
-                <a href="servlet-container.html" class="related-link">Servlet Containers</a>
-                <a href="context.html" class="related-link">Context & Deployment</a>
-                <a href="tomcat.html" class="related-link">Apache Tomcat</a>
-            </div>
-        </section>
-    </main>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th><code>web.xml</code> element</th><th>Modern equivalent</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>&lt;servlet&gt;</code> / <code>&lt;servlet-mapping&gt;</code></td><td><code>@WebServlet</code>, or Spring's <code>@RestController</code> + <code>@RequestMapping</code></td></tr>
+                        <tr><td><code>&lt;filter&gt;</code> / <code>&lt;filter-mapping&gt;</code></td><td><code>@WebFilter</code>, or a Spring <code>Filter</code> bean with <code>@Order</code></td></tr>
+                        <tr><td><code>&lt;listener&gt;</code></td><td><code>@WebListener</code>, or Spring's <code>@EventListener</code> / <code>ApplicationListener</code></td></tr>
+                        <tr><td><code>&lt;context-param&gt;</code></td><td><code>application.yml</code> properties, injected via <code>@Value</code> or <code>@ConfigurationProperties</code></td></tr>
+                        <tr><td><code>&lt;session-config&gt;</code></td><td><code>server.servlet.session.*</code> properties — see <a href="../security/session-mgmt.html">Session Management</a></td></tr>
+                        <tr><td><code>&lt;security-constraint&gt;</code> / <code>&lt;login-config&gt;</code></td><td>Spring Security's <code>SecurityFilterChain</code> — see <a href="../security/auth-vs-authz.html">Authentication vs Authorization</a></td></tr>
+                        <tr><td><code>&lt;error-page&gt;</code></td><td><code>@ControllerAdvice</code> + <code>@ExceptionHandler</code> returning <code>ProblemDetail</code></td></tr>
+                        <tr><td><code>&lt;welcome-file-list&gt;</code></td><td>Rarely needed — a REST API has no directory-index concept; for served static content, a default resource handler mapping</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Use annotations for new servlets/filters/listeners; reach for <code>web.xml</code> only for genuine XML-only needs (runtime reconfiguration, overriding a third-party registration, precise cross-cutting filter ordering)</li>
+                        <li>Match the <code>web-app</code> namespace and schema version to your container's actual Servlet spec version</li>
+                        <li>Set an explicit <code>&lt;multipart-config&gt;</code> size limit anywhere file uploads are accepted</li>
+                        <li>Treat <code>&lt;security-constraint&gt;</code>/<code>&lt;login-config&gt;</code> as legacy-maintenance knowledge, not a pattern for new development</li>
+                        <li>Log full exception detail server-side while showing only a generic message to the client, regardless of whether that's done via <code>&lt;error-page&gt;</code> or <code>@ExceptionHandler</code></li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't build new authentication/authorization on container-managed security — Spring Security covers everything it does and far more</li>
+                        <li>Don't assume filter execution order is implicit in an annotation-based or Spring app — declare it explicitly with <code>@Order</code></li>
+                        <li>Don't use URL-rewriting session tracking — it exposes the session identifier in server logs, browser history, and the Referer header</li>
+                        <li>Don't leave <code>&lt;session-timeout&gt;</code> at <code>0</code> (never expires) outside a very deliberate, reviewed exception</li>
+                        <li>Don't let a stack trace reach the client in any environment reachable by real users</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is a deployment descriptor, and is <code>web.xml</code> still required?</strong><br>
+                    It's an XML file at <code>WEB-INF/web.xml</code> that configures how the
+                    servlet container should wire up an application. It was mandatory before
+                    Servlet 3.0 (2009); annotations now cover the common case, but
+                    <code>web.xml</code> remains valid and is still the only option for a
+                    handful of things annotations can't express, plus maintaining
+                    applications written before annotations existed.</p>
+
+                    <p><strong>Q: In what order do filters execute if declared in <code>web.xml</code>?</strong><br>
+                    In exactly the order they're declared in the file, top to bottom — this
+                    is the entire rule, with no separate priority mechanism. An
+                    annotation-based equivalent needs an explicit ordering mechanism instead,
+                    since declaration order in scanned code carries no guaranteed sequence.</p>
+
+                    <p><strong>Q: What are the four URL pattern types in a servlet mapping, from highest to lowest priority?</strong><br>
+                    Exact match (<code>/catalog/products</code>), path match
+                    (<code>/catalog/*</code>), extension match (<code>*.do</code>), and the
+                    default mapping (<code>/</code>), which catches anything not matched by
+                    the others.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A team maintaining a legacy Java EE application wants to migrate its container-managed <code>&lt;security-constraint&gt;</code>/<code>&lt;login-config&gt;</code> setup to Spring Security. What capability gap does this migration typically close, not just modernize?</strong><br>
+                    Container-managed security is limited to the four auth methods the
+                    Servlet spec itself defines and to coarse, URL-pattern-based role checks
+                    — it has no native concept of method-level authorization expressions,
+                    token-based auth (JWT/OAuth2), or attribute-based policies that consider
+                    more than a role name. The migration isn't purely cosmetic: it typically
+                    unlocks <code>@PreAuthorize</code> SpEL expressions evaluated against the
+                    actual method arguments, integration with OAuth2/OIDC providers, and the
+                    ability to express ownership-based rules (a user can only access their
+                    own orders) that a purely URL-pattern-based constraint structurally
+                    cannot represent regardless of how it's configured.</p>
+
+                    <p><strong>Q: Why does a <code>ServletContextListener</code>'s <code>contextDestroyed()</code> matter for correctness, not just cleanliness, in a hot-redeploy scenario?</strong><br>
+                    If a listener starts a background thread, a scheduled task, or holds a
+                    reference to a static resource in <code>contextInitialized()</code>
+                    without releasing it in <code>contextDestroyed()</code>, a hot redeploy —
+                    common in development and in some production blue/green setups — leaves
+                    that thread or resource running against a web application classloader
+                    that the container believes has been unloaded. The old classloader can't
+                    actually be garbage collected while something still references it,
+                    producing a classloader leak that compounds with every redeploy until the
+                    JVM exhausts metaspace. This is the same failure class covered for
+                    <code>static Set&lt;Session&gt;</code> fields on WebSocket endpoints in
+                    <a href="../web-concepts/websocket.html">WebSockets</a> — always release
+                    what a listener acquires, symmetrically, on shutdown.</p>
+
+                    <p><strong>Q: An inherited web.xml configures <code>&lt;tracking-mode&gt;URL&lt;/tracking-mode&gt;</code> instead of <code>COOKIE</code>. What's the concrete security consequence, and why would this configuration exist at all?</strong><br>
+                    URL-based session tracking appends the session identifier directly to
+                    every generated URL (<code>;jsessionid=...</code>), which means it ends
+                    up in server access logs, in the browser's history, and in the
+                    <code>Referer</code> header sent to any third-party resource linked from
+                    the page — any of which can leak a live, authenticated session identifier
+                    to a party that should never have it. This mode exists historically to
+                    support clients with cookies disabled, which was a genuine constraint in
+                    the early 2000s web and is essentially irrelevant today. Finding this
+                    configuration in an inherited application is a strong signal to verify
+                    whether it's still serving a real purpose or is simply an unreviewed
+                    legacy default — in the overwhelming majority of current cases, it should
+                    be switched to <code>COOKIE</code>.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="app-server.html" class="related-link"><span class="related-icon">🖥️</span>What is an Application Server?</a>
+                    <a href="servlet-container.html" class="related-link"><span class="related-icon">📦</span>Servlet Containers</a>
+                    <a href="tomcat.html" class="related-link"><span class="related-icon">🐱</span>Tomcat Overview</a>
+                    <a href="war-jar.html" class="related-link"><span class="related-icon">🗜️</span>WAR vs JAR Files</a>
+                    <a href="context.html" class="related-link"><span class="related-icon">🚀</span>Context &amp; Deployment</a>
+                    <a href="../security/auth-vs-authz.html" class="related-link"><span class="related-icon">🪪</span>Authentication vs Authorization</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.session-mgmt.page-title">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Management - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#security" data-i18n="nav.security">Security &amp; Authentication</a> /
+                Session Management
+            </nav>
+            <h1 data-i18n="topic.session-mgmt.h1">Session Management</h1>
+            <p class="topic-subtitle" data-i18n="topic.session-mgmt.subtitle">Session fixation, hijacking, invalidation, and the stateful/stateless trade-off that motivates everything covered on the next page, JWT</p>
+            <a href="../../index.html#security" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Session Management — and Why Does it Exist?</h2>
+                <p>HTTP is stateless — every request arrives with no memory of the
+                    previous one. A <strong>session</strong> is the mechanism that lets a
+                    server recognize "this request belongs to the same authenticated user as
+                    the last one," so a customer doesn't have to re-enter credentials on
+                    every page of a checkout flow. The server generates a session
+                    identifier, hands it to the client as a cookie, and keeps the actual
+                    authenticated state — who this is, what's in their cart, what roles they
+                    have — on the server side, keyed by that identifier.</p>
+
+                <p>This page is about the security engineering around that mechanism, not
+                    the cookie attributes themselves — <code>Secure</code>,
+                    <code>HttpOnly</code>, and <code>SameSite</code> are covered in depth on
+                    <a href="../web-concepts/sessions-cookies.html">Sessions &amp; Cookies</a>.
+                    What belongs here is what goes wrong when session identifiers are
+                    predictable, when they aren't regenerated at the moment of login, when
+                    logout doesn't actually destroy server-side state, and when a stateful
+                    session model needs to survive more than one server instance.</p>
+
+                <pre><code><span class="comment">// BEFORE — a hand-rolled, predictable session identifier</span>
+<span class="class-name">String</span> sessionId = customer.<span class="function">getId</span>() + <span class="string">"-"</span> + <span class="class-name">System</span>.<span class="function">currentTimeMillis</span>();
+<span class="comment">// An attacker who knows (or can enumerate) a customer ID and a rough login
+// time can construct valid session identifiers directly — no theft required,
+// just guessing within a narrow, predictable search space.</span>
+
+<span class="comment">// AFTER — Spring Security's container-managed session, high-entropy by default</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    <span class="keyword">return</span> http
+        .<span class="function">sessionManagement</span>(session -> session
+            .<span class="function">sessionFixation</span>(fixation -> fixation.<span class="function">changeSessionId</span>())   <span class="comment">// new ID issued on login</span>
+        )
+        .<span class="function">build</span>();
+    <span class="comment">// The session ID itself is a cryptographically random token generated by the
+    // servlet container (SecureRandom-backed) — nothing about it is derivable
+    // from the user's identity, login time, or any other guessable value.</span>
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — SESSION ID ENTROPY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Session Identifier Entropy — Why It Must Be Unguessable, Not Just Unique</h2>
+                <p>A session ID has exactly one job from a security standpoint: an attacker
+                    who doesn't already have it must not be able to compute or predict it. A
+                    UUID is unique, but not every UUID generation strategy is
+                    cryptographically random — version 1 UUIDs embed a timestamp and MAC
+                    address and are absolutely not appropriate as a session identifier.
+                    Servlet containers (Tomcat, and by extension Spring Boot's embedded
+                    server) generate session IDs from <code>SecureRandom</code> with enough
+                    bits of entropy that brute-forcing one is computationally infeasible —
+                    this is not something application code needs to implement, only
+                    something it must not accidentally override with something weaker.</p>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Never put identity or role information inside the session identifier itself</div>
+                    <p>The session ID is a lookup key, nothing more. All of the actual
+                        state — user identity, roles, cart contents — belongs in the
+                        server-side session store, retrieved by that key. If any of that
+                        information leaks into the identifier itself (encoded, encrypted, or
+                        otherwise), you've built a bearer token with extra steps, and lost
+                        the primary advantage of a session model: the ability to instantly
+                        invalidate it server-side without the client's cooperation.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SESSION FIXATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Session Fixation — The Attack That Regeneration Defeats</h2>
+                <p><strong>Session fixation</strong> works by having the attacker set (or
+                    simply know) a session ID <em>before</em> the victim authenticates. If
+                    the application keeps using that same session ID after login — merely
+                    upgrading it from anonymous to authenticated in the store — the attacker,
+                    who already holds that ID, is now authenticated as the victim too.</p>
+
+                <pre><code><span class="comment">/*
+ * The attack, step by step:
+ *
+ * 1. Attacker visits the login page, receives session ID "ABC123" (unauthenticated).
+ * 2. Attacker tricks the victim into using a link that carries that same ID
+ *    (e.g. https://shop.example.com/login;jsessionid=ABC123 on a container
+ *    that accepts session IDs via URL rewriting).
+ * 3. Victim logs in. If the application reuses "ABC123" as-is, it is now an
+ *    AUTHENTICATED session under that identifier.
+ * 4. Attacker, who already has "ABC123", is now logged in as the victim —
+ *    no credential theft occurred at all, only identifier reuse.
+ */</span>
+
+<span class="comment">// THE FIX: issue a brand-new session ID at the moment of authentication,
+// regardless of whether one already existed</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    <span class="keyword">return</span> http
+        .<span class="function">sessionManagement</span>(session -> session
+            .<span class="function">sessionFixation</span>(fixation -> fixation.<span class="function">changeSessionId</span>())
+            <span class="comment">// changeSessionId() is Spring Security's DEFAULT since 4.x — this is shown
+            // explicitly for clarity, not because it needs to be added by hand.
+            // migrateSession() and newSession() are the older, JEE-container-level
+            // alternatives; changeSessionId() is preferred because it preserves
+            // session attributes instead of discarding them.</span>
+        )
+        .<span class="function">build</span>();
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — INVALIDATION AND LOGOUT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Invalidation — Why Deleting the Cookie is Not the Same as Logging Out</h2>
+                <p>Clearing a cookie on the client only stops <em>that browser</em> from
+                    sending the identifier again — it does nothing to the session state
+                    still sitting in the server's store. If an attacker captured the session
+                    ID before the legitimate user "logged out" client-side, that captured ID
+                    remains valid and authenticated until the server-side entry is
+                    explicitly destroyed or expires on its own.</p>
+
+                <pre><code><span class="comment">// Correct logout: invalidate server-side state, THEN clear the client cookie</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    <span class="keyword">return</span> http
+        .<span class="function">logout</span>(logout -> logout
+            .<span class="function">logoutUrl</span>(<span class="string">"/api/auth/logout"</span>)
+            .<span class="function">invalidateHttpSession</span>(<span class="keyword">true</span>)     <span class="comment">// destroys the server-side session entry</span>
+            .<span class="function">clearAuthentication</span>(<span class="keyword">true</span>)      <span class="comment">// clears the SecurityContext for this request</span>
+            .<span class="function">deleteCookies</span>(<span class="string">"JSESSIONID"</span>)   <span class="comment">// tells the browser to stop sending it too</span>
+        )
+        .<span class="function">build</span>();
+}
+
+<span class="comment">// Password change is a security-sensitive event that should kill EVERY OTHER
+// session for that user, not just the current one — otherwise a session an
+// attacker already hijacked survives the victim's own password change.</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">PasswordChangeService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">SessionRegistry</span> sessionRegistry;
+    <span class="keyword">private final</span> <span class="class-name">CustomerRepository</span> customerRepository;
+    <span class="keyword">private final</span> <span class="class-name">PasswordEncoder</span> passwordEncoder;
+
+    <span class="keyword">public</span> <span class="function">PasswordChangeService</span>(<span class="class-name">SessionRegistry</span> sessionRegistry,
+                                <span class="class-name">CustomerRepository</span> customerRepository,
+                                <span class="class-name">PasswordEncoder</span> passwordEncoder) {
+        <span class="keyword">this</span>.sessionRegistry = sessionRegistry;
+        <span class="keyword">this</span>.customerRepository = customerRepository;
+        <span class="keyword">this</span>.passwordEncoder = passwordEncoder;
+    }
+
+    <span class="keyword">public void</span> <span class="function">changePassword</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> newRawPassword) {
+        <span class="class-name">Customer</span> customer = customerRepository.<span class="function">findByUsername</span>(username).<span class="function">orElseThrow</span>();
+        customer.<span class="function">setPasswordHash</span>(passwordEncoder.<span class="function">encode</span>(newRawPassword));
+        customerRepository.<span class="function">save</span>(customer);
+
+        <span class="comment">// Expire every registered session for this principal — including any
+        // session an attacker may currently hold without the user's knowledge</span>
+        sessionRegistry.<span class="function">getAllSessions</span>(username, <span class="keyword">false</span>)
+            .<span class="function">forEach</span>(<span class="class-name">SessionInformation</span>::expireNow);
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — CONCURRENT SESSION CONTROL AND TIMEOUTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Concurrent Session Control and Timeout Policy</h2>
+
+                <pre><code><span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    <span class="keyword">return</span> http
+        .<span class="function">sessionManagement</span>(session -> session
+            .<span class="function">sessionFixation</span>(fixation -> fixation.<span class="function">changeSessionId</span>())
+            .<span class="function">maximumSessions</span>(<span class="number">1</span>)                      <span class="comment">// one active session per account at a time</span>
+                .<span class="function">maxSessionsPreventsLogin</span>(<span class="keyword">false</span>)  <span class="comment">// false = new login WINS, kicks out the old session</span>
+                .<span class="function">expiredUrl</span>(<span class="string">"/login?expired"</span>)      <span class="comment">// where the kicked-out session gets redirected</span>
+        )
+        .<span class="function">build</span>();
+}</code></pre>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Policy</th><th>Controls</th><th>Typical setting</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Idle timeout</strong></td>
+                            <td>Session expires after N minutes of no activity</td>
+                            <td><code>server.servlet.session.timeout=30m</code> for a typical customer-facing app</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Absolute timeout</strong></td>
+                            <td>Session expires N hours after login, regardless of activity</td>
+                            <td>Enforced in application code (compare against a stored login timestamp) — not exposed as a single container property</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Concurrent session limit</strong></td>
+                            <td>How many simultaneous sessions one account may hold</td>
+                            <td><code>maximumSessions(1)</code> for banking-grade apps; higher or unlimited for typical e-commerce, where a customer legitimately shops from phone and laptop at once</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Absolute timeout matters even when idle timeout is generous</div>
+                    <p>Idle timeout alone means a session left open in an actively-used
+                        background tab — the classic shared-computer scenario — never
+                        expires as long as some background request keeps resetting the idle
+                        clock. An absolute timeout guarantees re-authentication is required
+                        periodically no matter how active the session appears, which matters
+                        more for account settings or payment-method changes than for
+                        continuing to browse a product catalog.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SCALING SESSIONS ACROSS INSTANCES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Scaling Sessions — Why In-Memory Storage Breaks Beyond One Instance</h2>
+                <p>The default servlet session store lives in the JVM's heap. That's fine
+                    for a single instance, but it breaks the moment you run more than one:
+                    a load balancer without sticky sessions can route request 2 of the same
+                    user to an instance that has never seen their session ID, and the user
+                    is unexpectedly logged out. Sticky sessions "solve" this by pinning a
+                    user to one instance — at the cost of uneven load distribution and total
+                    session loss if that specific instance restarts or is scaled down.</p>
+
+                <pre><code><span class="comment">// Spring Session backed by Redis: sessions live in a shared, external store
+// that every application instance reads from and writes to identically —
+// no stickiness required, and a rolling deploy doesn't log anyone out.</span>
+
+<span class="comment">// build.gradle / pom.xml: spring-boot-starter-data-redis + spring-session-data-redis</span>
+
+<span class="comment"># application.yml</span>
+spring:
+  session:
+    store-type: redis
+    redis:
+      namespace: shop:sessions
+  data:
+    redis:
+      host: <span class="string">${REDIS_HOST}</span>
+      port: <span class="number">6379</span>
+
+<span class="annotation">@Configuration</span>
+<span class="annotation">@EnableRedisHttpSession</span>(maxInactiveIntervalInSeconds = <span class="number">1800</span>)
+<span class="keyword">public class</span> <span class="class-name">SessionConfig</span> {}
+<span class="comment">// From this point, HttpSession is transparently backed by Redis — application
+// code that calls request.getSession() doesn't change at all. Instance count
+// can now scale horizontally, and any instance can serve any request for any
+// authenticated user.</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">The stateful/stateless trade-off — and why the next page exists</div>
+                    <p>A server-side session, wherever it's stored, gives you one
+                        capability a bearer token fundamentally cannot on its own: instant,
+                        server-side revocation. Delete the entry from the store — or call
+                        <code>SessionInformation.expireNow()</code> as shown above — and that
+                        session is dead everywhere, immediately, no matter how many requests
+                        are already in flight with that identifier. The cost is coordination:
+                        every instance needs access to the same store, and that store is now
+                        a dependency your login flow can't function without.
+                        <a href="jwt.html">JWT</a> inverts this trade-off entirely — no
+                        shared store, no per-request lookup, but no instant revocation
+                        either, without additional infrastructure of its own. Neither model
+                        is universally correct; which one fits depends on whether your
+                        architecture needs the revocation guarantee more than it needs to
+                        avoid a shared session store.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Regenerate the session identifier at the moment of authentication — <code>sessionFixation().changeSessionId()</code> is Spring Security's default; keep it that way</li>
+                        <li>Invalidate the server-side session on logout, not just the client-side cookie</li>
+                        <li>Expire every other active session for an account when its password changes</li>
+                        <li>Set both an idle timeout and, for sensitive actions, an absolute timeout</li>
+                        <li>Move to Spring Session with a shared store (Redis) the moment you run more than one instance behind a load balancer</li>
+                        <li>Choose a concurrent-session policy deliberately based on the product — one active session for a banking app, multiple devices for typical e-commerce</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't construct session identifiers from predictable values (user ID, timestamp) — rely on the container's <code>SecureRandom</code>-backed generation</li>
+                        <li>Don't embed identity, roles, or any authoritative state inside the session identifier itself — it's a lookup key, not a payload</li>
+                        <li>Don't rely on sticky load-balancer routing as a substitute for a shared session store — it doesn't survive instance restarts or scale-down events</li>
+                        <li>Don't assume "the cookie was cleared" means "the session is dead" — verify server-side invalidation independently</li>
+                        <li>Don't leave a session store's inactive-session TTL unset — an unbounded store grows forever and never truly logs anyone out</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is a session, and why does HTTP need one at all?</strong><br>
+                    HTTP is stateless — each request is independent and carries no memory of
+                    previous ones. A session lets the server recognize repeated requests
+                    from the same authenticated client by issuing a unique identifier at
+                    login, stored client-side as a cookie, that maps to server-side state
+                    (identity, roles, cart contents) on every subsequent request.</p>
+
+                    <p><strong>Q: If a user clears their session cookie, are they logged out?</strong><br>
+                    Only from that browser's perspective going forward — the cookie no
+                    longer gets sent, so the server can no longer associate that browser
+                    with the session. But the session entry itself still exists server-side
+                    until it's explicitly invalidated or naturally expires. If someone else
+                    captured that session ID beforehand, clearing the cookie on the original
+                    browser does nothing to stop them.</p>
+
+                    <p><strong>Q: What is session fixation?</strong><br>
+                    An attack where the attacker sets or already knows a session identifier
+                    before the victim logs in, then relies on the application reusing that
+                    same identifier after authentication succeeds. If the ID isn't
+                    regenerated at login, the attacker — who already holds that same ID —
+                    becomes authenticated as the victim without ever stealing a password.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A customer changes their password after noticing suspicious activity on their account, but an attacker's session remains active afterward. What went wrong, and how do you fix it architecturally?</strong><br>
+                    Changing a password by itself only affects future authentication
+                    attempts — it does nothing to sessions that are already established and
+                    authenticated, since those sessions don't re-verify the password on
+                    every request. The fix is to treat password change as a
+                    security-sensitive event that explicitly expires every other active
+                    session for that principal, using something like Spring Security's
+                    <code>SessionRegistry.getAllSessions(username, false)</code> and calling
+                    <code>expireNow()</code> on each. This requires the application to be
+                    tracking sessions per-principal in the first place, which is one of the
+                    capabilities you lose entirely if you migrate to a stateless
+                    bearer-token model without building an equivalent revocation mechanism.</p>
+
+                    <p><strong>Q: You deploy behind a load balancer with three instances and no sticky sessions. Users report being randomly logged out mid-session. Diagnose and fix.</strong><br>
+                    The default servlet session store is per-JVM, in-memory. Without sticky
+                    routing, the load balancer can send consecutive requests from the same
+                    user to different instances, and any instance that never received the
+                    original login request has no record of that session ID — the user
+                    appears logged out from that instance's point of view, even though the
+                    session is perfectly valid on another one. Sticky sessions mask the
+                    symptom but reintroduce uneven load and total session loss whenever that
+                    specific instance restarts or is scaled down. The architectural fix is a
+                    shared, external session store — Spring Session backed by Redis is the
+                    standard solution — so every instance reads and writes the identical
+                    session state regardless of which one handles a given request.</p>
+
+                    <p><strong>Q: What does a session-based architecture guarantee that a stateless JWT architecture does not, and what does JWT gain in exchange?</strong><br>
+                    A server-side session gives you instant, authoritative revocation:
+                    deleting the store entry (or expiring it via the session registry) ends
+                    that session everywhere immediately, because every request must look it
+                    up against the same shared store to be considered valid. JWT trades that
+                    guarantee away — a token, once issued, is self-contained and verifiable
+                    without a lookup, which removes the shared-store dependency and the
+                    per-request I/O cost entirely, but also means a token cannot be
+                    invalidated before its expiry without additional infrastructure (a
+                    revocation list, short-lived tokens with refresh rotation, or similar).
+                    Neither trade-off is universally correct — it depends on whether the
+                    architecture values horizontal scalability without shared state more
+                    than it values the ability to revoke access instantly.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="auth-vs-authz.html" class="related-link"><span class="related-icon">🪪</span>Authentication vs Authorization</a>
+                    <a href="https-ssl.html" class="related-link"><span class="related-icon">🛡️</span>HTTPS &amp; SSL/TLS</a>
+                    <a href="password-hashing.html" class="related-link"><span class="related-icon">🔒</span>Password Hashing</a>
+                    <a href="jwt.html" class="related-link"><span class="related-icon">🔑</span>JWT (JSON Web Tokens)</a>
+                    <a href="oauth.html" class="related-link"><span class="related-icon">🔗</span>OAuth 2.0</a>
+                    <a href="../web-concepts/sessions-cookies.html" class="related-link"><span class="related-icon">🌐</span>Sessions &amp; Cookies — cookie attributes in depth</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/i18n.js"></script>
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>

@@ -1,591 +1,500 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.tomcat.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apache Tomcat Overview - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#servers">Application Servers</a> / Tomcat Overview
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#servers" data-i18n="nav.servers">Application Servers &amp; Deployment</a> /
+                Tomcat Overview
             </nav>
-            <h1>Apache Tomcat Overview</h1>
-            <p class="topic-subtitle">The world's most popular Java servlet container</p>
-            <a href="../../index.html#servers" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.tomcat.h1">Apache Tomcat Overview</h1>
+            <p class="topic-subtitle" data-i18n="topic.tomcat.subtitle">The reference-grade Servlet Container implementation — directory layout, architecture, deployment, and where Virtual Threads fit into a standalone install</p>
+            <a href="../../index.html#servers" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is Apache Tomcat?</h2>
-            <p><strong>Apache Tomcat</strong> is the world's most widely used Java servlet container and web server. It's an open-source implementation of the Jakarta Servlet, Jakarta Server Pages (JSP), and Jakarta WebSocket specifications, developed under the Apache Software Foundation.</p>
+    <div class="topic-layout">
 
-            <p>When people say they're "deploying to Tomcat," they mean they're using Tomcat as the runtime environment for their Java web applications. It's the "home" where your web app lives and runs.</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>Why Tomcat is So Popular</h3>
-            <ul>
-                <li><strong>Free and Open Source:</strong> Apache License 2.0, no cost, widely trusted</li>
-                <li><strong>Reference Implementation:</strong> The standard by which other servlet containers are measured</li>
-                <li><strong>Lightweight:</strong> Starts quickly, uses minimal resources compared to full application servers</li>
-                <li><strong>Well Documented:</strong> Extensive documentation, huge community, countless tutorials</li>
-                <li><strong>Production Proven:</strong> Powers millions of applications worldwide</li>
-                <li><strong>Spring Boot Default:</strong> The default embedded server for Spring Boot applications</li>
-                <li><strong>Easy to Learn:</strong> Simple directory structure and configuration</li>
-            </ul>
+        <main class="topic-content">
 
-            <div class="info-box">
-                <p><strong>Quick Facts about Tomcat:</strong></p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Apache Tomcat — and Why Does it Matter Specifically?</h2>
+                <p>The previous page described the Servlet Container as an abstract
+                    contract — a specification any runtime can implement. <strong>Apache
+                    Tomcat</strong> is the concrete, most widely deployed implementation of
+                    that contract: an open-source project under the Apache Software
+                    Foundation implementing the Jakarta Servlet, Jakarta Server Pages, and
+                    Jakarta WebSocket specifications. Writing a compliant
+                    <code>@RestController</code> or a raw <code>HttpServlet</code> is only
+                    half the picture — something has to actually be the running process that
+                    hosts it, and for the large majority of Java web applications today,
+                    that something is Tomcat, whether installed standalone or embedded
+                    inside a Spring Boot JAR.</p>
+
+                <pre><code><span class="comment">// BEFORE — a perfectly correct, compliant Servlet with nothing running it</span>
+<span class="keyword">public class</span> <span class="class-name">OrderStatusServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> { <span class="comment">/* ... */</span> }
+<span class="comment">// Compiled, packaged into a WAR — and going nowhere until some concrete
+// implementation of the Servlet spec agrees to load and run it.</span>
+
+<span class="comment">// AFTER — Tomcat is that concrete implementation</span>
+<span class="comment">$ ./bin/startup.sh</span>
+<span class="comment">$ cp target/myapp.war /opt/tomcat/webapps/</span>
+<span class="comment">// Tomcat detects the WAR, extracts it, instantiates every Servlet inside it
+// according to the exact lifecycle covered on the previous page, and the
+// application is live at http://localhost:8080/myapp</span></code></pre>
+
+                <div class="info-box">
+                    <p><strong>Quick facts</strong></p>
+                    <ul>
+                        <li><strong>Origin:</strong> Donated to the Apache Software Foundation in 1999, originally from Sun Microsystems — it became the reference implementation for the Servlet/JSP specifications</li>
+                        <li><strong>Written in:</strong> Java — runs anywhere a compatible JVM does</li>
+                        <li><strong>Default ports:</strong> 8080 (HTTP), 8443 (HTTPS), 8005 (shutdown listener)</li>
+                        <li><strong>Why it's the default:</strong> free, extensively documented, production-proven at massive scale, and the embedded server Spring Boot ships with out of the box</li>
+                    </ul>
+                </div>
+
+                <h3>Version, Java baseline, and package namespace</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Tomcat version</th><th>Minimum Java</th><th>Servlet spec</th><th>Package namespace</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Tomcat 8.5</td><td>Java 7+</td><td>Servlet 3.1</td><td><code>javax.servlet.*</code></td></tr>
+                        <tr><td>Tomcat 9</td><td>Java 8+</td><td>Servlet 4.0</td><td><code>javax.servlet.*</code></td></tr>
+                        <tr><td><strong>Tomcat 10</strong></td><td>Java 11+</td><td>Servlet 5.0/6.0</td><td><strong><code>jakarta.servlet.*</code></strong></td></tr>
+                        <tr><td><strong>Tomcat 11</strong></td><td>Java 17+</td><td>Servlet 6.1</td><td><strong><code>jakarta.servlet.*</code></strong></td></tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box note">
+                    <div class="info-box-title">The <code>javax</code>/<code>jakarta</code> split, and why it matters here specifically</div>
+                    <p>The mechanics and history of this migration are covered in full on
+                        <a href="servlet-container.html">Servlet Containers</a>. The
+                        practical consequence for Tomcat specifically: if your application
+                        still imports <code>javax.servlet.*</code>, you need Tomcat 9 or
+                        earlier, or a full migration of your own code and every dependency to
+                        the <code>jakarta</code> namespace before it will run on Tomcat 10+.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — DIRECTORY STRUCTURE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Directory Structure</h2>
+                <pre><code>apache-tomcat-10.1.x/
+├── <span class="keyword">bin/</span>                    <span class="comment">← startup/shutdown scripts</span>
+│   ├── startup.sh / .bat  <span class="comment">(start)</span>
+│   ├── shutdown.sh / .bat <span class="comment">(stop)</span>
+│   ├── catalina.sh        <span class="comment">(main script, more options — "catalina.sh run" for foreground output)</span>
+│   └── setenv.sh          <span class="comment">(YOUR custom JVM options go here — never edit catalina.sh itself)</span>
+│
+├── <span class="keyword">conf/</span>                   <span class="comment">← configuration files</span>
+│   ├── server.xml         <span class="comment">(main server configuration)</span>
+│   ├── context.xml        <span class="comment">(default context/resource settings, shared by every app)</span>
+│   ├── tomcat-users.xml   <span class="comment">(Manager app credentials)</span>
+│   └── logging.properties
+│
+├── <span class="keyword">lib/</span>                   <span class="comment">← Tomcat's own JARs (servlet-api, jsp-api, etc.)</span>
+├── <span class="keyword">logs/</span>                  <span class="comment">← catalina.out is the first place to look for any error</span>
+├── <span class="keyword">webapps/</span>               <span class="comment">← YOUR APPLICATIONS GO HERE — drop a WAR, it auto-deploys</span>
+└── <span class="keyword">work/</span>                  <span class="comment">← compiled JSPs, session data — safe to clear</span></code></pre>
+
                 <ul>
-                    <li><strong>Created:</strong> 1999, originally by Sun Microsystems, donated to Apache</li>
-                    <li><strong>Current Version:</strong> Tomcat 10.1.x (Jakarta EE 10), Tomcat 11 (Jakarta EE 11)</li>
-                    <li><strong>Written In:</strong> Java (so it runs on any platform with JVM)</li>
-                    <li><strong>Default Port:</strong> 8080 (HTTP), 8443 (HTTPS), 8005 (shutdown)</li>
-                    <li><strong>Implements:</strong> Servlet 6.0, JSP 3.1, EL 5.0, WebSocket 2.1</li>
+                    <li><strong><code>webapps/</code>:</strong> drop a WAR here for automatic deployment</li>
+                    <li><strong><code>conf/</code>:</strong> everything configurable; <code>server.xml</code> is the file you'll edit most</li>
+                    <li><strong><code>logs/</code>:</strong> the first place to check when anything goes wrong — <code>catalina.out</code> captures all console output</li>
                 </ul>
-            </div>
+            </section>
 
-            <h3>Tomcat Version History (What You Need to Know)</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Tomcat Version</th>
-                        <th>Java Version</th>
-                        <th>Servlet Spec</th>
-                        <th>Package Names</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Tomcat 8.5</td>
-                        <td>Java 7+</td>
-                        <td>Servlet 3.1</td>
-                        <td>javax.servlet.*</td>
-                    </tr>
-                    <tr>
-                        <td>Tomcat 9</td>
-                        <td>Java 8+</td>
-                        <td>Servlet 4.0</td>
-                        <td>javax.servlet.*</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Tomcat 10</strong></td>
-                        <td>Java 11+</td>
-                        <td>Servlet 5.0/6.0</td>
-                        <td><strong>jakarta.servlet.*</strong></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Tomcat 11</strong></td>
-                        <td>Java 17+</td>
-                        <td>Servlet 6.1</td>
-                        <td><strong>jakarta.servlet.*</strong></td>
-                    </tr>
-                </tbody>
-            </table>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — INSTALLING AND RUNNING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Installing and Running Tomcat</h2>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Important: javax vs jakarta</div>
-                <p>Tomcat 10+ uses <code>jakarta.servlet.*</code> package names instead of <code>javax.servlet.*</code>. This is due to Oracle transferring Java EE to the Eclipse Foundation. If your app uses <code>javax.servlet</code>, you need Tomcat 9 or earlier, OR you need to migrate your imports to <code>jakarta.servlet</code>.</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Tomcat Directory Structure</h2>
-            <p>Understanding Tomcat's directory layout is essential for configuration and troubleshooting. Here's what each folder contains:</p>
-
-            <pre><code>apache-tomcat-10.1.x/
-├── <span class="keyword">bin/</span>                 <span class="comment">← Startup/shutdown scripts</span>
-│   ├── startup.sh       <span class="comment">   (Linux/Mac start)</span>
-│   ├── startup.bat      <span class="comment">   (Windows start)</span>
-│   ├── shutdown.sh      <span class="comment">   (Linux/Mac stop)</span>
-│   ├── shutdown.bat     <span class="comment">   (Windows stop)</span>
-│   ├── catalina.sh      <span class="comment">   (Main script with more options)</span>
-│   └── setenv.sh        <span class="comment">   (YOUR custom JVM options - create this!)</span>
-│
-├── <span class="keyword">conf/</span>                <span class="comment">← Configuration files</span>
-│   ├── server.xml       <span class="comment">   (Main server configuration)</span>
-│   ├── web.xml          <span class="comment">   (Default web app settings)</span>
-│   ├── context.xml      <span class="comment">   (Default context settings)</span>
-│   ├── tomcat-users.xml <span class="comment">   (User accounts for manager)</span>
-│   └── logging.properties <span class="comment">(Logging configuration)</span>
-│
-├── <span class="keyword">lib/</span>                 <span class="comment">← Tomcat's own JAR files + shared libraries</span>
-│   ├── servlet-api.jar  <span class="comment">   (Servlet API)</span>
-│   ├── jsp-api.jar      <span class="comment">   (JSP API)</span>
-│   └── ...              <span class="comment">   (Tomcat implementation JARs)</span>
-│
-├── <span class="keyword">logs/</span>                <span class="comment">← Log files (check here for errors!)</span>
-│   ├── catalina.out     <span class="comment">   (Main log - all console output)</span>
-│   ├── catalina.YYYY-MM-DD.log <span class="comment">(Daily server logs)</span>
-│   ├── localhost.YYYY-MM-DD.log <span class="comment">(Application logs)</span>
-│   └── localhost_access.YYYY-MM-DD.log <span class="comment">(HTTP access logs)</span>
-│
-├── <span class="keyword">temp/</span>                <span class="comment">← Temporary files (can be cleared)</span>
-│
-├── <span class="keyword">webapps/</span>             <span class="comment">← YOUR APPLICATIONS GO HERE!</span>
-│   ├── ROOT/            <span class="comment">   (Default app at http://localhost:8080/)</span>
-│   ├── manager/         <span class="comment">   (Web-based management interface)</span>
-│   ├── host-manager/    <span class="comment">   (Virtual host management)</span>
-│   ├── examples/        <span class="comment">   (Example servlets - remove in production!)</span>
-│   └── myapp.war        <span class="comment">   (Your app! Auto-deploys when dropped here)</span>
-│
-└── <span class="keyword">work/</span>                <span class="comment">← Compiled JSPs and session data</span>
-    └── Catalina/        <span class="comment">   (Generated files - can be cleared)</span></code></pre>
-
-            <h3>The Most Important Directories</h3>
-            <ul>
-                <li><strong>webapps/:</strong> Drop your WAR files here for automatic deployment. This is where your apps live.</li>
-                <li><strong>conf/:</strong> All configuration. <code>server.xml</code> is the main file you'll edit.</li>
-                <li><strong>logs/:</strong> First place to look when something goes wrong. <code>catalina.out</code> has everything.</li>
-                <li><strong>bin/:</strong> Start and stop Tomcat from here.</li>
-            </ul>
-        </section>
-
-        <section class="content-section">
-            <h2>Installing and Running Tomcat</h2>
-
-            <h3>Method 1: Download and Extract</h3>
-            <pre><code><span class="comment"># 1. Download from https://tomcat.apache.org/</span>
-<span class="comment"># 2. Extract the archive</span>
-
-<span class="comment"># Linux/Mac:</span>
-tar -xzf apache-tomcat-10.1.18.tar.gz
-cd apache-tomcat-10.1.18
-
-<span class="comment"># 3. Make scripts executable (Linux/Mac)</span>
+                <h3>Download and extract</h3>
+                <pre><code><span class="comment"># From https://tomcat.apache.org/</span>
+tar -xzf apache-tomcat-10.1.x.tar.gz
+<span class="keyword">cd</span> apache-tomcat-10.1.x
 chmod +x bin/*.sh
-
-<span class="comment"># 4. Start Tomcat</span>
-./bin/startup.sh
-<span class="comment"># Or: ./bin/catalina.sh run (to see output in terminal)</span>
-
-<span class="comment"># 5. Open browser: http://localhost:8080</span>
-<span class="comment"># You should see the Tomcat welcome page!</span>
-
-<span class="comment"># 6. Stop Tomcat</span>
+./bin/startup.sh          <span class="comment"># or: ./bin/catalina.sh run  (foreground, output in terminal)</span>
+<span class="comment"># http://localhost:8080 should now show the Tomcat welcome page</span>
 ./bin/shutdown.sh</code></pre>
 
-            <h3>Method 2: Using Package Manager</h3>
-            <pre><code><span class="comment"># Ubuntu/Debian</span>
+                <h3>Package manager</h3>
+                <pre><code><span class="comment"># Ubuntu/Debian</span>
 sudo apt install tomcat10
 
-<span class="comment"># macOS with Homebrew</span>
-brew install tomcat
+<span class="comment"># macOS (Homebrew)</span>
+brew install tomcat</code></pre>
 
-<span class="comment"># Windows with Chocolatey</span>
-choco install tomcat</code></pre>
+                <h3>Setting JVM options the right way</h3>
+                <pre><code><span class="comment"># bin/setenv.sh — create this file yourself; never edit catalina.sh directly,
+# since that file is replaced on every Tomcat version upgrade</span>
+CATALINA_OPTS=<span class="string">"$CATALINA_OPTS -Xms512m"</span>
+CATALINA_OPTS=<span class="string">"$CATALINA_OPTS -Xmx2048m"</span>
+CATALINA_OPTS=<span class="string">"$CATALINA_OPTS -XX:+UseG1GC"</span>
+CATALINA_OPTS=<span class="string">"$CATALINA_OPTS -Dspring.profiles.active=production"</span>
+<span class="keyword">export</span> CATALINA_OPTS</code></pre>
+            </section>
 
-            <h3>Method 3: IDE Integration (Development)</h3>
-            <pre><code><span class="comment">// IntelliJ IDEA:</span>
-<span class="comment">// 1. Run → Edit Configurations</span>
-<span class="comment">// 2. + → Tomcat Server → Local</span>
-<span class="comment">// 3. Configure Tomcat Home directory</span>
-<span class="comment">// 4. Add your artifact (WAR) to deploy</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — KEY CONFIGURATION FILES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Key Configuration Files</h2>
 
-<span class="comment">// Eclipse:</span>
-<span class="comment">// 1. Window → Preferences → Server → Runtime Environments</span>
-<span class="comment">// 2. Add → Apache Tomcat v10.1</span>
-<span class="comment">// 3. Create new Server in Servers view</span></code></pre>
-
-            <h3>Setting JVM Options</h3>
-            <pre><code><span class="comment"># Create bin/setenv.sh (Linux/Mac) or bin/setenv.bat (Windows)</span>
-<span class="comment"># This file is the RIGHT place for your custom settings</span>
-
-<span class="comment"># bin/setenv.sh example:</span>
-#!/bin/bash
-
-<span class="comment"># Memory settings</span>
-CATALINA_OPTS="$CATALINA_OPTS -Xms512m"      <span class="comment"># Initial heap</span>
-CATALINA_OPTS="$CATALINA_OPTS -Xmx2048m"     <span class="comment"># Maximum heap</span>
-
-<span class="comment"># Garbage collection (for Java 11+)</span>
-CATALINA_OPTS="$CATALINA_OPTS -XX:+UseG1GC"
-
-<span class="comment"># Remote debugging (development only!)</span>
-CATALINA_OPTS="$CATALINA_OPTS -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
-
-<span class="comment"># Application properties</span>
-CATALINA_OPTS="$CATALINA_OPTS -Dspring.profiles.active=production"
-
-export CATALINA_OPTS</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Key Configuration Files</h2>
-
-            <h3>server.xml - The Main Configuration</h3>
-            <pre><code><span class="comment">&lt;!-- conf/server.xml - Core Tomcat configuration --&gt;</span>
-&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;<span class="keyword">Server</span> port="8005" shutdown="SHUTDOWN"&gt;
-
-    &lt;<span class="keyword">Service</span> name="Catalina"&gt;
-
-        <span class="comment">&lt;!-- HTTP Connector - where requests come in --&gt;</span>
+                <h3><code>server.xml</code> — the main configuration</h3>
+                <pre><code><span class="comment">&lt;!-- conf/server.xml --&gt;</span>
+&lt;<span class="keyword">Server</span> port=<span class="string">"8005"</span> shutdown=<span class="string">"SHUTDOWN"</span>&gt;
+    &lt;<span class="keyword">Service</span> name=<span class="string">"Catalina"</span>&gt;
         &lt;<span class="keyword">Connector</span>
-            port="8080"              <span class="comment">&lt;!-- Listen on this port --&gt;</span>
-            protocol="HTTP/1.1"
-            connectionTimeout="20000"
-            maxThreads="200"         <span class="comment">&lt;!-- Max concurrent requests --&gt;</span>
-            minSpareThreads="10"
-            redirectPort="8443" /&gt;
+            port=<span class="string">"8080"</span> protocol=<span class="string">"HTTP/1.1"</span>
+            connectionTimeout=<span class="string">"20000"</span>
+            maxThreads=<span class="string">"200"</span>
+            redirectPort=<span class="string">"8443"</span> /&gt;
 
-        <span class="comment">&lt;!-- HTTPS Connector (uncomment and configure for SSL) --&gt;</span>
-        &lt;!--
-        &lt;Connector
-            port="8443"
-            protocol="org.apache.coyote.http11.Http11NioProtocol"
-            maxThreads="150"
-            SSLEnabled="true"&gt;
-            &lt;SSLHostConfig&gt;
-                &lt;Certificate
-                    certificateKeystoreFile="conf/keystore.jks"
-                    certificateKeystorePassword="changeit"
-                    type="RSA" /&gt;
-            &lt;/SSLHostConfig&gt;
-        &lt;/Connector&gt;
-        --&gt;
-
-        <span class="comment">&lt;!-- Engine processes requests --&gt;</span>
-        &lt;<span class="keyword">Engine</span> name="Catalina" defaultHost="localhost"&gt;
-
-            <span class="comment">&lt;!-- Virtual host --&gt;</span>
-            &lt;<span class="keyword">Host</span> name="localhost"
-                  appBase="webapps"        <span class="comment">&lt;!-- Where apps are --&gt;</span>
-                  unpackWARs="true"        <span class="comment">&lt;!-- Extract WAR files --&gt;</span>
-                  autoDeploy="true"&gt;       <span class="comment">&lt;!-- Auto-deploy new WARs --&gt;</span>
-
-                <span class="comment">&lt;!-- Access logging --&gt;</span>
-                &lt;Valve className="org.apache.catalina.valves.AccessLogValve"
-                       directory="logs"
-                       prefix="localhost_access_log"
-                       suffix=".txt"
-                       pattern="%h %l %u %t &quot;%r&quot; %s %b" /&gt;
+        &lt;<span class="keyword">Engine</span> name=<span class="string">"Catalina"</span> defaultHost=<span class="string">"localhost"</span>&gt;
+            &lt;<span class="keyword">Host</span> name=<span class="string">"localhost"</span> appBase=<span class="string">"webapps"</span> unpackWARs=<span class="string">"true"</span> autoDeploy=<span class="string">"true"</span>&gt;
+                &lt;Valve className=<span class="string">"org.apache.catalina.valves.AccessLogValve"</span>
+                       directory=<span class="string">"logs"</span> pattern=<span class="string">"%h %l %u %t &quot;%r&quot; %s %b"</span> /&gt;
             &lt;/Host&gt;
         &lt;/Engine&gt;
     &lt;/Service&gt;
 &lt;/Server&gt;</code></pre>
 
-            <h3>tomcat-users.xml - User Authentication</h3>
-            <pre><code><span class="comment">&lt;!-- conf/tomcat-users.xml - Users for Manager app --&gt;</span>
-&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+                <h3><code>tomcat-users.xml</code> — Manager authentication</h3>
+                <pre><code><span class="comment">&lt;!-- conf/tomcat-users.xml --&gt;</span>
 &lt;tomcat-users&gt;
-    <span class="comment">&lt;!-- Roles --&gt;</span>
-    &lt;role rolename="manager-gui"/&gt;     <span class="comment">&lt;!-- Access manager web UI --&gt;</span>
-    &lt;role rolename="manager-script"/&gt;  <span class="comment">&lt;!-- Deploy via script/API --&gt;</span>
-    &lt;role rolename="admin-gui"/&gt;       <span class="comment">&lt;!-- Host manager web UI --&gt;</span>
+    &lt;role rolename=<span class="string">"manager-gui"</span>/&gt;
+    &lt;role rolename=<span class="string">"manager-script"</span>/&gt;
+    &lt;user username=<span class="string">"deploy-bot"</span>
+          password=<span class="string">"${MANAGER_PASSWORD}"</span>
+          roles=<span class="string">"manager-script"</span>/&gt;
+&lt;/tomcat-users&gt;</code></pre>
 
-    <span class="comment">&lt;!-- Users --&gt;</span>
-    &lt;user username="admin"
-          password="secretpassword"
-          roles="manager-gui,manager-script,admin-gui"/&gt;
-&lt;/tomcat-users&gt;
+                <div class="info-box warning">
+                    <div class="info-box-title">Plaintext passwords here are only as safe as this file's own access controls — harden both</div>
+                    <p>The password attribute above is a plaintext value by default —
+                        acceptable only because the file itself must already be
+                        filesystem-restricted to the user running Tomcat. Two independent
+                        layers of hardening matter for any Manager-enabled install: first,
+                        never grant <code>manager-gui</code> (the human web UI) to an
+                        automated deploy account — use the narrower
+                        <code>manager-script</code> role and restrict it to CI/CD's specific
+                        IP range in <code>context.xml</code>; second, configure a digesting
+                        <code>CredentialHandler</code> on the Realm
+                        (<code>org.apache.catalina.realm.MessageDigestCredentialHandler</code>
+                        with a modern algorithm) so the password stored on disk is never
+                        plaintext in the first place, exactly the same principle covered on
+                        <a href="../security/password-hashing.html">Password Hashing</a>.
+                        And in production, the Manager app should usually not be
+                        network-reachable at all outside a CI pipeline's specific runner.</p>
+                </div>
 
-<span class="comment">&lt;!-- WARNING: Change the password in production!</span>
-<span class="comment">     Consider using a more secure authentication mechanism --&gt;</span></code></pre>
-
-            <h3>context.xml - Default Context Settings</h3>
-            <pre><code><span class="comment">&lt;!-- conf/context.xml - Default settings for all web apps --&gt;</span>
-&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+                <h3><code>context.xml</code> — shared resources (this is where JNDI actually lives)</h3>
+                <pre><code><span class="comment">&lt;!-- conf/context.xml — this is the concrete, Tomcat-specific home for the
+     JNDI resource-binding pattern referenced on the "What is an Application
+     Server?" page: the server configures the actual connection, application
+     code only ever looks it up by name. --&gt;</span>
 &lt;<span class="keyword">Context</span>&gt;
-
-    <span class="comment">&lt;!-- Database connection pool (shared by all apps) --&gt;</span>
     &lt;<span class="keyword">Resource</span>
-        name="jdbc/mydb"
-        auth="Container"
-        type="javax.sql.DataSource"
-        driverClassName="org.postgresql.Driver"
-        url="jdbc:postgresql://localhost:5432/mydb"
-        username="dbuser"
-        password="dbpassword"
-        maxTotal="100"
-        maxIdle="30"
-        maxWaitMillis="10000"/&gt;
-
-    <span class="comment">&lt;!-- Prevent session persistence across restarts --&gt;</span>
-    &lt;Manager pathname="" /&gt;
-
-    <span class="comment">&lt;!-- Watch web.xml for changes (development only) --&gt;</span>
-    &lt;WatchedResource&gt;WEB-INF/web.xml&lt;/WatchedResource&gt;
-
+        name=<span class="string">"jdbc/shopDB"</span>
+        auth=<span class="string">"Container"</span>
+        type=<span class="string">"javax.sql.DataSource"</span>
+        driverClassName=<span class="string">"org.postgresql.Driver"</span>
+        url=<span class="string">"jdbc:postgresql://db.internal:5432/shop"</span>
+        username=<span class="string">"${DB_USER}"</span>
+        password=<span class="string">"${DB_PASSWORD}"</span>
+        maxTotal=<span class="string">"100"</span> maxIdle=<span class="string">"30"</span> maxWaitMillis=<span class="string">"10000"</span>/&gt;
 &lt;/Context&gt;</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Deploying Applications to Tomcat</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — DEPLOYING APPLICATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Deploying Applications</h2>
 
-            <h3>Method 1: Drop WAR File (Simplest)</h3>
-            <pre><code><span class="comment"># Just copy your WAR file to webapps/</span>
-cp myapp.war /opt/tomcat/webapps/
-
-<span class="comment"># Tomcat automatically:</span>
-<span class="comment"># 1. Detects the new WAR file</span>
-<span class="comment"># 2. Extracts it to webapps/myapp/</span>
-<span class="comment"># 3. Deploys the application</span>
-<span class="comment"># 4. Makes it available at http://localhost:8080/myapp</span>
-
-<span class="comment"># To undeploy: delete the WAR and the extracted folder</span>
+                <h3>Drop the WAR (simplest, fine for a single standalone instance)</h3>
+                <pre><code>cp myapp.war /opt/tomcat/webapps/
+<span class="comment"># Tomcat detects it, extracts to webapps/myapp/, deploys, live at /myapp
+# Undeploy: remove BOTH the WAR and the extracted directory</span>
 rm /opt/tomcat/webapps/myapp.war
 rm -rf /opt/tomcat/webapps/myapp</code></pre>
 
-            <h3>Method 2: Manager Web Interface</h3>
-            <pre><code><span class="comment"># 1. Access: http://localhost:8080/manager/html</span>
-<span class="comment"># 2. Login with credentials from tomcat-users.xml</span>
-<span class="comment"># 3. Scroll to "WAR file to deploy"</span>
-<span class="comment"># 4. Choose file and click "Deploy"</span>
+                <h3>Manager web interface</h3>
+                <pre><code><span class="comment"># http://localhost:8080/manager/html — login with tomcat-users.xml credentials
+# Upload a WAR, or start/stop/reload/undeploy an existing application</span></code></pre>
 
-<span class="comment"># Manager also lets you:</span>
-<span class="comment"># - Start/Stop/Reload applications</span>
-<span class="comment"># - Undeploy applications</span>
-<span class="comment"># - View session statistics</span>
-<span class="comment"># - Check server status</span></code></pre>
+                <div class="info-box note">
+                    <div class="info-box-title">Dedicated Tomcat Maven plugins are largely legacy today</div>
+                    <p>Older guides commonly reference <code>tomcat7-maven-plugin</code> for
+                        <code>mvn tomcat7:deploy</code>-style workflows — it hasn't kept pace
+                        with current Tomcat versions and sees little maintenance today. The
+                        more common modern paths are: build a container image
+                        (<code>FROM tomcat:10.1-jdk21</code>, <code>COPY target/myapp.war
+                        /usr/local/tomcat/webapps/</code>) and let Kubernetes or your
+                        orchestrator handle the actual deployment, or call the Manager's text
+                        interface directly from a CI pipeline via a plain HTTP request rather
+                        than a dedicated build-tool plugin. If you're on Spring Boot, none of
+                        this applies at all — the embedded server ships inside the JAR and
+                        "deployment" is just running it.</p>
+                </div>
 
-            <h3>Method 3: Maven Plugin</h3>
-            <pre><code><span class="comment">&lt;!-- pom.xml - Tomcat Maven Plugin --&gt;</span>
-&lt;plugin&gt;
-    &lt;groupId&gt;org.apache.tomcat.maven&lt;/groupId&gt;
-    &lt;artifactId&gt;tomcat7-maven-plugin&lt;/artifactId&gt;
-    &lt;version&gt;2.2&lt;/version&gt;
-    &lt;configuration&gt;
-        &lt;url&gt;http://localhost:8080/manager/text&lt;/url&gt;
-        &lt;server&gt;tomcat-server&lt;/server&gt;  <span class="comment">&lt;!-- Reference to settings.xml --&gt;</span>
-        &lt;path&gt;/myapp&lt;/path&gt;
-    &lt;/configuration&gt;
-&lt;/plugin&gt;
+                <h3>Context paths — the WAR filename determines the URL</h3>
+                <pre><code>webapps/ROOT.war       → http://localhost:8080/
+webapps/api.war        → http://localhost:8080/api
+webapps/v2<span class="comment">#</span>api.war     → http://localhost:8080/v2/api   <span class="comment">// "#" encodes a nested path segment</span></code></pre>
+            </section>
 
-<span class="comment">&lt;!-- In ~/.m2/settings.xml --&gt;</span>
-&lt;servers&gt;
-    &lt;server&gt;
-        &lt;id&gt;tomcat-server&lt;/id&gt;
-        &lt;username&gt;admin&lt;/username&gt;
-        &lt;password&gt;secretpassword&lt;/password&gt;
-    &lt;/server&gt;
-&lt;/servers&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — ARCHITECTURE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Tomcat's Internal Architecture</h2>
+                <p>This hierarchy maps directly onto the request lifecycle stages covered
+                    on the "What is an Application Server?" page — here's exactly where each
+                    stage lives inside Tomcat's own component model and configuration
+                    files.</p>
 
-<span class="comment"># Deploy command:</span>
-mvn tomcat7:deploy      <span class="comment"># First deployment</span>
-mvn tomcat7:redeploy    <span class="comment"># Update existing</span>
-mvn tomcat7:undeploy    <span class="comment"># Remove</span></code></pre>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Component</th><th>Purpose</th><th>Configured in</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Server</strong></td><td>The entire Tomcat instance — top-level container, exactly one per process</td><td><code>server.xml</code> (root element)</td></tr>
+                        <tr><td><strong>Service</strong></td><td>Groups one or more Connectors with a single Engine</td><td><code>server.xml</code> <code>&lt;Service&gt;</code></td></tr>
+                        <tr><td><strong>Connector</strong></td><td>Listens on a port, handles the network/HTTP protocol layer — a Service can have several (HTTP, HTTPS)</td><td><code>server.xml</code> <code>&lt;Connector&gt;</code></td></tr>
+                        <tr><td><strong>Engine</strong></td><td>Routes a parsed request to the correct virtual Host</td><td><code>server.xml</code> <code>&lt;Engine&gt;</code></td></tr>
+                        <tr><td><strong>Host</strong></td><td>A virtual host — one server can answer for multiple domains</td><td><code>server.xml</code> <code>&lt;Host&gt;</code></td></tr>
+                        <tr><td><strong>Context</strong></td><td>One deployed application — one WAR becomes one Context</td><td><code>context.xml</code>, or <code>META-INF/context.xml</code> inside the WAR itself</td></tr>
+                    </tbody>
+                </table>
 
-            <h3>Understanding Context Paths</h3>
-            <pre><code><span class="comment">// The WAR filename determines the context path (URL)</span>
+                <div class="info-box note">
+                    <div class="info-box-title">Reading this top-down: Server → Service → Connector(s) + Engine → Host(s) → Context(s)</div>
+                    <p>One Server runs one or more Services. Each Service pairs its
+                        Connector(s) — the actual network listeners — with exactly one
+                        Engine, which processes every parsed request and hands it to the
+                        correct Host based on the requested domain. Each Host can run several
+                        Contexts side by side — this is the mechanism that lets one Tomcat
+                        instance serve several independent applications at once, each with
+                        its own isolated classloader.</p>
+                </div>
+            </section>
 
-myapp.war           → http://localhost:8080/myapp
-myapp##2.war        → http://localhost:8080/myapp (version 2, parallel deploy)
-ROOT.war            → http://localhost:8080/ (root context)
-my#app.war          → http://localhost:8080/my/app (nested path)
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — VIRTUAL THREADS IN STANDALONE TOMCAT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Virtual Threads in a Standalone Tomcat Install</h2>
+                <p>The Virtual Threads capacity-planning shift covered on the "What is an
+                    Application Server?" page applies to Tomcat itself, not only to Spring
+                    Boot's embedded usage of it. On Java 21+, Tomcat 10.1+ can back its
+                    request-handling <code>Executor</code> with virtual threads instead of a
+                    bounded platform-thread pool.</p>
 
-<span class="comment">// Examples:</span>
-webapps/
-├── ROOT.war        <span class="comment">→ http://localhost:8080/</span>
-├── api.war         <span class="comment">→ http://localhost:8080/api</span>
-├── admin.war       <span class="comment">→ http://localhost:8080/admin</span>
-└── v2#api.war      <span class="comment">→ http://localhost:8080/v2/api</span></code></pre>
-        </section>
+                <pre><code><span class="comment">// If Tomcat is embedded via Spring Boot 3.2+, this is the supported,
+// well-documented path — covered in full on the previous pages:</span>
+spring.threads.virtual.enabled=<span class="keyword">true</span>
 
-        <section class="content-section">
-            <h2>Tomcat Architecture</h2>
-            <p>Understanding Tomcat's internal architecture helps with configuration and troubleshooting:</p>
+<span class="comment">// For a STANDALONE Tomcat instance (not Spring Boot embedded), the same
+// capability is exposed through server.xml's Executor configuration on
+// Tomcat 10.1.x+ running on Java 21+. The exact element and attribute names
+// have evolved across recent point releases faster than most Tomcat
+// configuration — check the release notes for the specific 10.1.x/11.x
+// version you're running rather than copying a syntax from an older guide.</span></code></pre>
 
-            <pre><code><span class="comment">// Tomcat Component Hierarchy</span>
+                <div class="info-box important">
+                    <div class="info-box-title">Same caveat as before: this helps blocking I/O wait, not CPU-bound work</div>
+                    <p>Enabling a virtual-thread executor removes the platform-thread
+                        ceiling that turns downstream latency into an application-wide
+                        capacity wall — it does not make a slow database query or a
+                        CPU-heavy report generation any faster. Measure where your actual
+                        bottleneck is (thread-pool exhaustion with idle CPU points at
+                        blocking I/O; high CPU with a healthy thread pool points elsewhere)
+                        before treating this as a general performance lever.</p>
+                </div>
+            </section>
 
-┌─────────────────────────────────────────────────────────────────────┐
-│                            SERVER                                    │
-│  (Top-level container - one per Tomcat instance)                    │
-│                                                                      │
-│  ┌───────────────────────────────────────────────────────────────┐  │
-│  │                         SERVICE                                │  │
-│  │  (Groups Connectors with an Engine)                           │  │
-│  │                                                                │  │
-│  │  ┌─────────────┐  ┌─────────────┐                            │  │
-│  │  │ CONNECTOR   │  │ CONNECTOR   │   (Multiple connectors)     │  │
-│  │  │ (HTTP:8080) │  │ (HTTPS:8443)│   (HTTP, HTTPS, AJP)        │  │
-│  │  └──────┬──────┘  └──────┬──────┘                            │  │
-│  │         │                │                                    │  │
-│  │         └────────┬───────┘                                    │  │
-│  │                  │                                            │  │
-│  │         ┌────────▼────────┐                                   │  │
-│  │         │     ENGINE      │  (Request processing)             │  │
-│  │         │   "Catalina"    │                                   │  │
-│  │         └────────┬────────┘                                   │  │
-│  │                  │                                            │  │
-│  │         ┌────────▼────────┐                                   │  │
-│  │         │      HOST       │  (Virtual host: localhost)        │  │
-│  │         │  "localhost"    │  (Can have multiple hosts)        │  │
-│  │         └────────┬────────┘                                   │  │
-│  │                  │                                            │  │
-│  │    ┌─────────────┼─────────────┐                             │  │
-│  │    │             │             │                              │  │
-│  │    ▼             ▼             ▼                              │  │
-│  │ ┌──────┐    ┌──────┐    ┌──────┐                            │  │
-│  │ │CONTXT│    │CONTXT│    │CONTXT│  (Your applications)        │  │
-│  │ │/app1 │    │/app2 │    │ ROOT │                             │  │
-│  │ └──────┘    └──────┘    └──────┘                            │  │
-│  │                                                                │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘</code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — TROUBLESHOOTING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Troubleshooting Common Issues</h2>
 
-            <h3>Component Descriptions</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Component</th>
-                        <th>Purpose</th>
-                        <th>Configuration</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Server</strong></td>
-                        <td>Top-level, represents entire Tomcat instance</td>
-                        <td>server.xml (root element)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Service</strong></td>
-                        <td>Groups Connectors with one Engine</td>
-                        <td>server.xml (&lt;Service&gt;)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Connector</strong></td>
-                        <td>Handles network connections (HTTP, HTTPS)</td>
-                        <td>server.xml (&lt;Connector&gt;)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Engine</strong></td>
-                        <td>Processes requests, routes to correct Host</td>
-                        <td>server.xml (&lt;Engine&gt;)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Host</strong></td>
-                        <td>Virtual host (domain handling)</td>
-                        <td>server.xml (&lt;Host&gt;)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Context</strong></td>
-                        <td>Individual web application</td>
-                        <td>context.xml, META-INF/context.xml</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <h3>Tomcat won't start</h3>
+                <pre><code>lsof -i :8080                       <span class="comment"># Linux/Mac — is the port already taken?</span>
+netstat -ano | findstr 8080         <span class="comment"># Windows equivalent</span>
+tail -f logs/catalina.out           <span class="comment"># the error is almost always right here</span>
+<span class="comment"># Common causes: port conflict, JAVA_HOME unset, insufficient file permissions,
+# a corrupted WAR that fails to extract</span></code></pre>
 
-        <section class="content-section">
-            <h2>Troubleshooting Common Issues</h2>
+                <h3>Application won't load</h3>
+                <pre><code>tail -f logs/localhost.<span class="class-name">YYYY-MM-DD</span>.log
+<span class="comment"># Common causes: missing dependency in WEB-INF/lib, a malformed web.xml,
+# a javax/jakarta package mismatch against this Tomcat version, or the
+# application's own database connection failing on startup</span></code></pre>
 
-            <h3>1. Tomcat Won't Start</h3>
-            <pre><code><span class="comment"># Check if port is already in use</span>
-lsof -i :8080           <span class="comment"># Linux/Mac</span>
-netstat -ano | findstr 8080  <span class="comment"># Windows</span>
+                <h3>Out of memory</h3>
+                <pre><code><span class="comment"># bin/setenv.sh</span>
+CATALINA_OPTS=<span class="string">"-Xms1024m -Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/tomcat/logs/"</span>
+<span class="comment"># The Manager app's "Find leaks" tool can help identify a leaking classloader
+# after repeated hot redeploys — a common source in development environments</span></code></pre>
 
-<span class="comment"># Check logs for errors</span>
-tail -f logs/catalina.out
+                <h3>Slow under load with healthy CPU</h3>
+                <pre><code><span class="comment"># This is the classic thread-pool-exhaustion-while-idle signature covered
+# in the Virtual Threads section above — check thread pool saturation first</span>
+&lt;Connector port=<span class="string">"8080"</span> maxThreads=<span class="string">"500"</span> /&gt;   <span class="comment">// a band-aid; diagnose the real bottleneck first</span></code></pre>
+            </section>
 
-<span class="comment"># Common causes:</span>
-<span class="comment"># - Another Tomcat or app using port 8080</span>
-<span class="comment"># - JAVA_HOME not set</span>
-<span class="comment"># - Insufficient permissions</span>
-<span class="comment"># - Corrupted WAR file</span></code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Production Best Practices</h2>
 
-            <h3>2. Application Not Loading</h3>
-            <pre><code><span class="comment"># Check application-specific log</span>
-tail -f logs/localhost.YYYY-MM-DD.log
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Remove or IP-restrict <code>examples/</code>, <code>docs/</code>, and the Manager app before going to production</li>
+                        <li>Configure a digesting <code>CredentialHandler</code> for Manager credentials rather than relying on plaintext in <code>tomcat-users.xml</code></li>
+                        <li>Put all custom JVM options in <code>bin/setenv.sh</code>, never edit <code>catalina.sh</code> directly — it's replaced on every upgrade</li>
+                        <li>Diagnose thread-pool exhaustion against actual CPU/I/O metrics before raising <code>maxThreads</code> as a reflex fix</li>
+                        <li>Version-control your <code>conf/</code> directory the same way you would application source code</li>
+                        <li>Prefer a container image over a dedicated Maven Tomcat plugin for modern CI/CD pipelines</li>
+                    </ul>
 
-<span class="comment"># Check if WAR was extracted</span>
-ls -la webapps/
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't leave the Manager app reachable from the public internet, even with a strong password — restrict by network/IP as a second, independent layer</li>
+                        <li>Don't assume raising <code>maxThreads</code> fixes a slow application — it often just delays the same downstream bottleneck by a bit more headroom</li>
+                        <li>Don't mix a <code>javax.servlet</code>-based dependency into a Tomcat 10+ deployment and expect a clear compile-time error — it typically fails at runtime instead</li>
+                        <li>Don't hardcode database credentials directly in <code>context.xml</code> — use environment variable substitution or a secrets manager</li>
+                    </ul>
+                </div>
+            </section>
 
-<span class="comment"># Common causes:</span>
-<span class="comment"># - Missing dependencies in WEB-INF/lib</span>
-<span class="comment"># - web.xml errors</span>
-<span class="comment"># - Jakarta vs javax package mismatch (Tomcat 10+)</span>
-<span class="comment"># - Database connection failures</span></code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-            <h3>3. Out of Memory Errors</h3>
-            <pre><code><span class="comment"># Increase heap size in setenv.sh</span>
-CATALINA_OPTS="-Xms1024m -Xmx4096m"
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is Apache Tomcat, and how does it relate to the Servlet specification?</strong><br>
+                    Tomcat is an open-source, Apache Software Foundation project that
+                    implements the Jakarta Servlet, JSP, and WebSocket specifications — it's
+                    the concrete runtime that actually executes code written against those
+                    specs. It also serves as the reference implementation the specifications
+                    themselves are measured against.</p>
 
-<span class="comment"># Check for memory leaks</span>
-<span class="comment"># Manager app → "Find leaks" button</span>
+                    <p><strong>Q: What does the WAR filename determine when dropped into <code>webapps/</code>?</strong><br>
+                    The context path — the URL prefix the application is served under.
+                    <code>myapp.war</code> becomes available at
+                    <code>/myapp</code>, while <code>ROOT.war</code> becomes the root
+                    application, served at <code>/</code>.</p>
 
-<span class="comment"># Enable heap dump on OOM</span>
-CATALINA_OPTS="$CATALINA_OPTS -XX:+HeapDumpOnOutOfMemoryError"
-CATALINA_OPTS="$CATALINA_OPTS -XX:HeapDumpPath=/opt/tomcat/logs/"</code></pre>
+                    <p><strong>Q: Where should custom JVM options (heap size, GC flags) be configured, and why not directly in <code>catalina.sh</code>?</strong><br>
+                    In a separate <code>bin/setenv.sh</code> file, which Tomcat's startup
+                    scripts source automatically if present. <code>catalina.sh</code> itself
+                    ships with Tomcat and gets overwritten on every version upgrade — any
+                    customization made directly to it is silently lost the next time Tomcat
+                    is updated.</p>
+                </div>
 
-            <h3>4. Slow Performance</h3>
-            <pre><code><span class="comment"># Increase thread pool</span>
-&lt;Connector port="8080" maxThreads="500" /&gt;
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: One Tomcat instance hosts three separate applications, each with its own set of dependencies, some of which conflict on version. How does Tomcat's architecture make this safe?</strong><br>
+                    Each deployed WAR becomes its own <code>Context</code>, and each Context
+                    gets its own classloader in Tomcat's classloader hierarchy — a
+                    web-application classloader that loads from that specific
+                    <code>WEB-INF/lib</code> and <code>WEB-INF/classes</code>, delegating
+                    only shared/common classes up to Tomcat's own classloader. Two
+                    applications can depend on conflicting versions of the same library
+                    without interfering, because each Context's classloader resolves that
+                    library from its own isolated WAR contents rather than a single shared
+                    classpath across the whole server instance.</p>
 
-<span class="comment"># Enable connection pooling for database</span>
-<span class="comment"># Check slow queries in application</span>
+                    <p><strong>Q: A production Tomcat instance shows thread-pool exhaustion (all <code>maxThreads</code> busy) while CPU utilization stays low. What's the most likely cause, and what are the two available remedies?</strong><br>
+                    Threads are occupied waiting on something — almost certainly a slow
+                    downstream dependency (a database query, a call to another service) — not
+                    computing, which is why CPU stays low even as the pool saturates. Two
+                    genuinely different remedies exist: fix or bound the actual slow
+                    dependency (add an index, add a timeout, add a circuit breaker so slow
+                    calls fail fast instead of holding a thread indefinitely), or remove the
+                    platform-thread ceiling itself by adopting Virtual Threads on Java 21+, so
+                    a blocked request no longer occupies a scarce pooled resource while it
+                    waits. Raising <code>maxThreads</code> alone treats neither cause — it
+                    only raises the number of concurrently blocked requests the pool can
+                    absorb before the same underlying problem resurfaces at a higher
+                    concurrency level.</p>
 
-<span class="comment"># Monitor with JMX</span>
-CATALINA_OPTS="$CATALINA_OPTS -Dcom.sun.management.jmxremote"
-CATALINA_OPTS="$CATALINA_OPTS -Dcom.sun.management.jmxremote.port=9090"</code></pre>
-        </section>
+                    <p><strong>Q: Why is <code>context.xml</code>'s JNDI <code>&lt;Resource&gt;</code> pattern rarely used in a Spring Boot application, even one embedding Tomcat?</strong><br>
+                    JNDI resource binding solves a specific problem of the external-server
+                    deployment model: the same WAR, deployed unmodified to different
+                    environments, needs each environment's server to supply
+                    environment-specific configuration (a different database URL in dev vs.
+                    prod) without the application code changing. A Spring Boot application
+                    embeds its own server and is built as a single self-contained artifact
+                    per environment (or configured via externalized properties and Spring
+                    profiles at startup) — there's no separately-administered external server
+                    to register a JNDI binding with in the first place, so the problem JNDI
+                    solves doesn't arise the same way. The equivalent goal — same artifact,
+                    environment-specific configuration — is achieved via
+                    <code>application.yml</code> profiles and environment variables instead.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Production Best Practices</h2>
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="app-server.html" class="related-link"><span class="related-icon">🖥️</span>What is an Application Server?</a>
+                    <a href="servlet-container.html" class="related-link"><span class="related-icon">📦</span>Servlet Containers</a>
+                    <a href="war-jar.html" class="related-link"><span class="related-icon">🗜️</span>WAR vs JAR Files</a>
+                    <a href="web-xml.html" class="related-link"><span class="related-icon">📄</span>Deployment Descriptors</a>
+                    <a href="context.html" class="related-link"><span class="related-icon">🚀</span>Context &amp; Deployment</a>
+                </div>
+            </section>
 
-            <div class="best-practices">
-                <h3>Security:</h3>
-                <ul>
-                    <li><strong>Remove default apps:</strong> Delete examples/, docs/, manager/ (or restrict access)</li>
-                    <li><strong>Change shutdown port:</strong> Or disable it entirely</li>
-                    <li><strong>Use HTTPS:</strong> Configure SSL/TLS connector</li>
-                    <li><strong>Hide server info:</strong> Set <code>server="Apache"</code> in Connector</li>
-                    <li><strong>Restrict manager access:</strong> IP-based restrictions in context.xml</li>
-                </ul>
+        </main>
 
-                <h3>Performance:</h3>
-                <ul>
-                    <li><strong>Tune thread pool:</strong> Match maxThreads to expected load</li>
-                    <li><strong>Enable compression:</strong> Add <code>compression="on"</code> to Connector</li>
-                    <li><strong>Use NIO connector:</strong> <code>protocol="org.apache.coyote.http11.Http11NioProtocol"</code></li>
-                    <li><strong>Configure connection pooling:</strong> Proper min/max connections</li>
-                </ul>
-
-                <h3>Reliability:</h3>
-                <ul>
-                    <li><strong>Set up monitoring:</strong> JMX, metrics endpoint, health checks</li>
-                    <li><strong>Configure logging:</strong> Log rotation, appropriate log levels</li>
-                    <li><strong>Graceful shutdown:</strong> Use proper shutdown scripts</li>
-                    <li><strong>Backup configurations:</strong> Version control your conf/ directory</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Tomcat:</strong> World's most popular Java servlet container, open source, lightweight</li>
-                    <li><strong>Directory Structure:</strong> webapps/ (apps), conf/ (config), logs/ (troubleshooting)</li>
-                    <li><strong>Key Config Files:</strong> server.xml (main), tomcat-users.xml (auth), context.xml (resources)</li>
-                    <li><strong>Deployment:</strong> Drop WAR in webapps/, use Manager, or Maven plugin</li>
-                    <li><strong>Context Path:</strong> WAR filename determines URL (myapp.war → /myapp)</li>
-                    <li><strong>Architecture:</strong> Server → Service → Connector + Engine → Host → Context</li>
-                    <li><strong>Tomcat 10+:</strong> Uses jakarta.* packages (not javax.*)</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="app-server.html" class="related-link">What is an Application Server?</a>
-                <a href="servlet-container.html" class="related-link">Servlet Containers</a>
-                <a href="war-jar.html" class="related-link">WAR vs JAR</a>
-                <a href="web-xml.html" class="related-link">Deployment Descriptors</a>
-            </div>
-        </section>
-    </main>
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

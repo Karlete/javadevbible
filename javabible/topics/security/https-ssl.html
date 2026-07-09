@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.https-ssl.page-title">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTPS &amp; SSL/TLS - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#security" data-i18n="nav.security">Security &amp; Authentication</a> /
+                HTTPS &amp; SSL/TLS
+            </nav>
+            <h1 data-i18n="topic.https-ssl.h1">HTTPS &amp; SSL/TLS</h1>
+            <p class="topic-subtitle" data-i18n="topic.https-ssl.subtitle">The transport-layer encryption every authentication mechanism in this section silently depends on — the handshake, the certificate chain, and where TLS termination actually leaves your data unprotected</p>
+            <a href="../../index.html#security" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is HTTPS/TLS — and Why Does Every Other Security Mechanism Depend On It?</h2>
+                <p><strong>HTTPS</strong> is HTTP running over <strong>TLS (Transport Layer
+                    Security)</strong> — the same request/response protocol, but every byte
+                    on the wire is encrypted, integrity-checked, and tied to a verified
+                    server identity before a single header is exchanged. "SSL" is the name
+                    everyone still uses out of habit; the actual protocol has been TLS since
+                    1999, and every version of SSL itself (2.0, 3.0) is now considered
+                    broken and disabled by every modern browser and server.</p>
+
+                <p>This matters to every other page in this section. A password sent over
+                    plain HTTP is readable by anyone on the network path. A JWT in an
+                    <code>Authorization</code> header is a bearer token — whoever has the
+                    bytes has the access, no password needed. A session cookie is exactly
+                    the same. None of the authentication mechanisms covered elsewhere in
+                    this Bible provide any protection on their own if the channel carrying
+                    them is not encrypted — TLS is not one security feature among several,
+                    it is the precondition that makes the others meaningful.</p>
+
+                <pre><code><span class="comment">// BEFORE — checkout form posts over plain HTTP</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/checkout"</span>)
+<span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">OrderConfirmation</span>&gt; <span class="function">checkout</span>(<span class="annotation">@RequestBody</span> <span class="class-name">CheckoutRequest</span> request) {
+    <span class="comment">// The session cookie, the JWT in the Authorization header, and the card
+    // details in the request body all travel as plaintext bytes on the wire.
+    // Any router, ISP, or Wi-Fi eavesdropper between browser and server can
+    // read every one of them — no exploit required, just a packet capture.</span>
+    <span class="keyword">return</span> orderService.<span class="function">process</span>(request);
+}
+
+<span class="comment">// AFTER — the channel itself is the control, enforced at the security layer</span>
+<span class="annotation">@Bean</span>
+<span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    <span class="keyword">return</span> http
+        .<span class="function">requiresChannel</span>(channel -> channel.<span class="function">anyRequest</span>().<span class="function">requiresSecure</span>())
+        .<span class="function">headers</span>(headers -> headers.<span class="function">httpStrictTransportSecurity</span>(hsts -> hsts
+            .<span class="function">includeSubDomains</span>(<span class="keyword">true</span>)
+            .<span class="function">maxAgeInSeconds</span>(<span class="number">31536000</span>)))
+        .<span class="function">build</span>();
+    <span class="comment">// Now the same checkout endpoint rejects plain HTTP outright, and every
+    // subsequent visit is told by HSTS to never even attempt HTTP again.</span>
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE TLS HANDSHAKE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The TLS Handshake — How Two Strangers Agree on a Secret</h2>
+                <p>TLS solves a specific bootstrapping problem: the browser and the server
+                    have never spoken before and share no secret, yet they need to agree on
+                    a symmetric encryption key strong enough to protect an entire session —
+                    without an eavesdropper who sees every message being able to derive that
+                    same key. Asymmetric cryptography (the server's certificate key pair)
+                    solves the bootstrap; a symmetric cipher does the actual bulk encryption,
+                    because asymmetric operations are far too slow to encrypt every request
+                    and response.</p>
+
+                <pre><code><span class="comment">/*
+ * TLS 1.3 handshake (1 round trip — the current standard, RFC 8446):
+ *
+ * Client → Server : ClientHello (supported cipher suites, a key share)
+ * Server → Client : ServerHello (chosen cipher suite, its own key share,
+ *                                its certificate, a "Finished" message)
+ *                   — both sides can now derive the same symmetric session key
+ *                     from the exchanged key shares (Diffie-Hellman)
+ * Client → Server : Finished — handshake complete, application data now flows,
+ *                   already encrypted with the session key
+ *
+ * TLS 1.2 needed 2 round trips for the equivalent negotiation, and permitted
+ * legacy cipher suites (RC4, static RSA key exchange with no forward secrecy)
+ * that TLS 1.3 removed outright. This is why "downgrade attacks" — tricking
+ * a client into negotiating TLS 1.0/1.1 or a weak cipher — were a real class
+ * of vulnerability against 1.2 deployments and are largely closed by 1.3
+ * refusing to offer the weak options at all.
+ */</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Forward secrecy: why a stolen private key shouldn't decrypt yesterday's traffic</div>
+                    <p>Modern TLS uses <strong>ephemeral</strong> Diffie-Hellman key
+                        exchange (ECDHE) — a fresh key pair is generated for every single
+                        handshake and discarded immediately after. Even if the server's
+                        long-term certificate private key is later compromised, an attacker
+                        who recorded encrypted traffic months ago still cannot decrypt it,
+                        because the actual session keys were never derived from — or
+                        recoverable from — that long-term key. This is why the older, static
+                        RSA key-exchange cipher suites (where the session key <em>was</em>
+                        derivable from the certificate's private key) are disabled by
+                        default in every current server and browser.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — CERTIFICATES AND THE TRUST CHAIN
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Certificates and the Chain of Trust</h2>
+                <p>A TLS certificate (X.509 format) binds a public key to a domain name and
+                    is itself signed by a Certificate Authority (CA). The browser doesn't
+                    trust your certificate directly — it trusts a short list of root CAs
+                    baked into the OS or browser, and verifies a signature chain from your
+                    certificate up to one of those roots.</p>
+
+                <pre><code><span class="comment">/*
+ * The chain, leaf to root:
+ *
+ * shop.example.com certificate   ← the "leaf" cert, issued to your domain
+ *        │  signed by
+ *        ▼
+ * Intermediate CA certificate    ← issued by the CA, rarely the root itself
+ *        │  signed by
+ *        ▼
+ * Root CA certificate            ← pre-trusted, shipped with the OS/browser
+ *
+ * A server must send the leaf AND the intermediate certificate(s) — the root
+ * is never sent, since the client already has it. Forgetting to include the
+ * intermediate is one of the most common TLS misconfigurations: it works
+ * fine in browsers that cache the intermediate from a previous visit to any
+ * site using the same CA, and fails mysteriously for API clients, mobile
+ * apps, and curl, which don't have that cache.
+ */</span></code></pre>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Certificate type</th><th>Validation performed by CA</th><th>Typical use</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>DV (Domain Validated)</strong></td>
+                            <td>Proves control of the domain only (DNS record or HTTP file)</td>
+                            <td>Default for most sites — Let's Encrypt issues DV certificates, free, auto-renewable</td>
+                        </tr>
+                        <tr>
+                            <td><strong>OV (Organization Validated)</strong></td>
+                            <td>Domain control plus verified legal business identity</td>
+                            <td>Corporate sites wanting the organization name embedded in the cert</td>
+                        </tr>
+                        <tr>
+                            <td><strong>EV (Extended Validation)</strong></td>
+                            <td>Rigorous legal and operational identity checks</td>
+                            <td>Largely obsolete — browsers stopped giving EV certs distinct UI treatment years ago, so the extra cost rarely buys anything today</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">A self-signed certificate is not "less secure encryption" — it's zero identity verification</div>
+                    <p>The encryption strength of a self-signed certificate is identical to
+                        a CA-issued one — same algorithms, same key sizes. What's missing is
+                        the chain of trust: nobody vouches that the public key actually
+                        belongs to <code>shop.example.com</code> rather than to whoever is
+                        currently sitting in the middle of the connection. Self-signed
+                        certificates are fine for local development and internal
+                        service-to-service traffic on a network you control (see mTLS
+                        below); they are never appropriate for a public-facing endpoint,
+                        because the browser's "not trusted" warning trains users to click
+                        through security warnings — which is precisely the habit that makes
+                        real phishing attacks against them succeed later.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — CONFIGURING HTTPS IN SPRING BOOT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Configuring HTTPS in Spring Boot</h2>
+                <p>Two legitimate topologies exist, and conflating them is the source of
+                    most production TLS confusion.</p>
+
+                <h3>Topology A — Spring Boot terminates TLS directly</h3>
+                <pre><code><span class="comment"># application.yml — the embedded Tomcat/Netty server holds the certificate</span>
+server:
+  port: <span class="number">8443</span>
+  ssl:
+    enabled: <span class="keyword">true</span>
+    key-store: classpath:keystore.p12
+    key-store-password: <span class="string">${KEYSTORE_PASSWORD}</span>   <span class="comment"># never hardcode — inject via environment/secrets manager</span>
+    key-store-type: PKCS12
+    key-alias: shop-example-com
+    protocol: TLS
+    enabled-protocols: TLSv1.3,TLSv1.2   <span class="comment"># explicitly exclude TLS 1.0/1.1</span></code></pre>
+
+                <h3>Topology B — TLS terminates upstream (load balancer / reverse proxy)</h3>
+                <pre><code><span class="comment">## nginx / ALB / Cloudflare terminates HTTPS; the app receives plain HTTP
+## on a private network segment the public internet cannot reach directly.
+## This is the far more common production setup — certificate rotation,
+## OCSP stapling, and cipher policy are centralized at the edge instead of
+## being redeployed with every service.</span>
+
+<span class="comment"># application.yml — tell Spring the original request was HTTPS even though
+# the connection it actually received was plain HTTP from the load balancer</span>
+server:
+  forward-headers-strategy: framework   <span class="comment"># trusts X-Forwarded-Proto / X-Forwarded-For</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">"TLS terminates at the load balancer" does not mean the data is protected end-to-end</div>
+                    <p>Once the load balancer decrypts the request, the hop from load
+                        balancer to application server is a separate connection — and if
+                        that hop runs over plain HTTP because "it's all internal," it is
+                        only as safe as the network it runs on. On a shared cloud VPC, a
+                        compromised neighboring workload or a misconfigured security group
+                        can put an attacker on that internal segment. Two acceptable fixes:
+                        run the internal hop over TLS as well (re-encryption at the load
+                        balancer), or use <strong>mutual TLS</strong> between internal
+                        services so both ends authenticate each other, not just encrypt.
+                        Also: <code>server.forward-headers-strategy=framework</code> means
+                        Spring will trust an <code>X-Forwarded-Proto</code> header from
+                        <em>whatever sent the request</em> — if that setting is enabled on a
+                        server reachable directly from the public internet (bypassing the
+                        load balancer), a client can forge <code>X-Forwarded-Proto:
+                        https</code> and trick the app into treating an actually-insecure
+                        connection as secure, silently defeating <code>requiresSecure()</code>
+                        and Secure-flagged cookies. Only enable it on servers that are
+                        network-unreachable except through the trusted proxy.</p>
+                </div>
+
+                <h3>Enforcing HTTPS and HSTS at the application layer</h3>
+                <pre><code><span class="annotation">@Configuration</span>
+<span class="annotation">@EnableWebSecurity</span>
+<span class="keyword">public class</span> <span class="class-name">SecurityConfig</span> {
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">return</span> http
+            <span class="comment">// Reject any request that didn't arrive over HTTPS (or a trusted
+            // X-Forwarded-Proto: https from the load balancer)</span>
+            .<span class="function">requiresChannel</span>(channel -> channel.<span class="function">anyRequest</span>().<span class="function">requiresSecure</span>())
+
+            <span class="comment">// HSTS tells the browser to never attempt plain HTTP for this domain
+            // again, for the given max-age — this closes the window where a
+            // user typing "example.com" gets an initial plaintext request
+            // that a network attacker could intercept before any redirect.</span>
+            .<span class="function">headers</span>(headers -> headers
+                .<span class="function">httpStrictTransportSecurity</span>(hsts -> hsts
+                    .<span class="function">includeSubDomains</span>(<span class="keyword">true</span>)
+                    .<span class="function">preload</span>(<span class="keyword">true</span>)
+                    .<span class="function">maxAgeInSeconds</span>(<span class="number">31536000</span>)   <span class="comment">// 1 year — the realistic minimum for HSTS preload list eligibility</span>
+                )
+            )
+            .<span class="function">build</span>();
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — MUTUAL TLS (mTLS)
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Mutual TLS (mTLS) — When the Server Also Needs to Verify the Client</h2>
+                <p>Standard TLS only authenticates the server to the client — the browser
+                    verifies it's really talking to <code>shop.example.com</code>, but the
+                    server accepts connections from anyone. <strong>mTLS</strong> adds a
+                    second certificate check in the other direction: the client also
+                    presents a certificate, and the server verifies it against a trusted CA
+                    before accepting the connection. This is the right tool for
+                    service-to-service traffic where both parties are known in advance —
+                    the classic e-commerce example is your order service calling an
+                    internal payment or inventory service, or a payment provider's webhook
+                    endpoint verifying that a callback genuinely originated from the
+                    provider's infrastructure and not from a forged request.</p>
+
+                <pre><code><span class="comment"># application.yml — require and verify a client certificate</span>
+server:
+  ssl:
+    enabled: <span class="keyword">true</span>
+    key-store: classpath:server-keystore.p12
+    key-store-password: <span class="string">${KEYSTORE_PASSWORD}</span>
+    trust-store: classpath:client-truststore.p12   <span class="comment"># the CA that signs YOUR internal services' client certs</span>
+    trust-store-password: <span class="string">${TRUSTSTORE_PASSWORD}</span>
+    client-auth: need   <span class="comment"># NEED = reject the connection outright without a valid client cert</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">mTLS is not a substitute for application-level authorization</div>
+                    <p>A valid client certificate proves <em>which service</em> is calling,
+                        not <em>what that service is allowed to do</em>. In a payment flow,
+                        mTLS correctly establishes that the caller really is the internal
+                        <code>inventory-service</code> and not an impostor on the network —
+                        but the inventory service should still enforce its own authorization
+                        rules on top (does this caller have permission to decrement stock
+                        for this specific warehouse?). Treat the client certificate's
+                        identity the same way you'd treat an authenticated principal
+                        anywhere else in this section: it answers "who," not "what."</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — COMMON MISCONFIGURATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Common Misconfigurations</h2>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Misconfiguration</th><th>Symptom</th><th>Fix</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Missing intermediate certificate</strong></td>
+                            <td>Works in most browsers, fails in curl/mobile apps/some API clients</td>
+                            <td>Serve the full chain (leaf + intermediate), not just the leaf</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Mixed content</strong></td>
+                            <td>Page loads over HTTPS but an image/script/stylesheet is fetched via a hardcoded <code>http://</code> URL — the browser blocks or warns</td>
+                            <td>Use protocol-relative or explicit <code>https://</code> URLs for every asset, never hardcode <code>http://</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Expired certificate</strong></td>
+                            <td>Full-page browser interstitial warning, all traffic effectively stops</td>
+                            <td>Automate renewal (Let's Encrypt/certbot with a cron/systemd timer) and monitor expiry with alerting well before the 90-day window closes</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Trusting <code>X-Forwarded-Proto</code> from an untrusted network</strong></td>
+                            <td><code>requiresSecure()</code> and Secure cookies silently pass even over a real plaintext connection</td>
+                            <td>Only enable <code>forward-headers-strategy</code> on servers unreachable except via the trusted proxy</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Legacy protocol/cipher still enabled</strong></td>
+                            <td>Passes casual testing, fails a security scan (SSLv3, TLS 1.0/1.1, RC4, static RSA key exchange)</td>
+                            <td>Explicitly set <code>enabled-protocols: TLSv1.3,TLSv1.2</code> and let the modern JDK/server defaults choose ciphers rather than hand-picking a legacy list</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Enforce HTTPS at the security layer (<code>requiresSecure()</code>), don't rely on "we just don't link to the HTTP version"</li>
+                        <li>Enable HSTS with a realistic <code>max-age</code> (1 year) and <code>includeSubDomains</code> once you're confident every subdomain also serves HTTPS</li>
+                        <li>Automate certificate renewal and alert on expiry well in advance — a manual renewal process will eventually be forgotten</li>
+                        <li>Serve the full certificate chain (leaf + intermediate), and verify it with an external tool, not just your own browser's cache</li>
+                        <li>Use mTLS for internal service-to-service calls where both sides' identities matter, not just encryption</li>
+                        <li>Explicitly restrict to TLS 1.2/1.3 and let the platform's modern cipher defaults apply, rather than hand-maintaining a cipher list</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't hardcode <code>http://</code> in any asset URL on an HTTPS page — mixed content gets blocked and is a code smell that active-content injection was possible</li>
+                        <li>Don't trust <code>X-Forwarded-Proto</code> from a server reachable directly from the public internet — it lets a client spoof "this connection was secure" over a plaintext request</li>
+                        <li>Don't treat "TLS terminates at the load balancer" as "the data is protected end-to-end" — the internal hop is a separate connection with its own trust requirements</li>
+                        <li>Don't use a self-signed certificate on a public-facing endpoint — it trains users to click through trust warnings</li>
+                        <li>Don't assume mTLS replaces application-level authorization — a valid client certificate answers "who," never "what they're allowed to do"</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What problem does TLS solve that plain HTTP doesn't?</strong><br>
+                    Plain HTTP sends every byte — headers, cookies, tokens, request and
+                    response bodies — as readable plaintext across every network hop
+                    between client and server. TLS encrypts that traffic, verifies the
+                    server's identity via its certificate, and detects tampering in transit.
+                    Without it, any authentication mechanism carried over the connection —
+                    a password, a session cookie, a JWT — is exposed to anyone who can
+                    observe the network path.</p>
+
+                    <p><strong>Q: What is a certificate chain, and why does a server need to send more than just its own certificate?</strong><br>
+                    A certificate chain links the server's certificate (the "leaf") up
+                    through one or more intermediate CA certificates to a root CA that the
+                    browser already trusts. The server must send the leaf and the
+                    intermediate certificate(s) — the root is never sent, since the client
+                    already has it pre-installed. Omitting the intermediate is a common
+                    misconfiguration that happens to work in browsers that cached it from a
+                    prior visit elsewhere, but fails for API clients that have no such
+                    cache.</p>
+
+                    <p><strong>Q: What is HSTS and what attack does it protect against?</strong><br>
+                    HTTP Strict Transport Security is a response header that tells the
+                    browser to never attempt a plain HTTP connection to this domain again
+                    for a specified duration. It protects against SSL-stripping attacks,
+                    where a network attacker intercepts a user's very first plaintext
+                    request (before any redirect to HTTPS can happen) and proxies the rest
+                    of the session over HTTP while presenting HTTPS to the user.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Your load balancer terminates TLS and forwards requests to application servers over plain HTTP inside the VPC. Is this acceptable, and what would make you change it?</strong><br>
+                    It's a common and often acceptable topology, but it relies entirely on
+                    the internal network being a genuine trust boundary — no untrusted
+                    workloads can reach that segment. On shared infrastructure, a
+                    compromised neighboring container, a misconfigured security group, or
+                    an internal actor changes that calculus. I'd re-encrypt the internal
+                    hop (TLS all the way to the application server) or adopt mTLS for
+                    service-to-service traffic once the blast radius of a network compromise
+                    includes systems I don't fully control — a payment or PII-handling
+                    service is exactly where I'd stop treating "it's internal" as
+                    sufficient.</p>
+
+                    <p><strong>Q: Explain why TLS 1.3 reduced the handshake to one round trip, and why downgrade attacks were a real risk against TLS 1.2 deployments.</strong><br>
+                    TLS 1.3 requires the client to send its key share in the very first
+                    message (<code>ClientHello</code>), so the server can respond with its
+                    own key share, certificate, and a Finished message in a single reply —
+                    both sides derive the shared secret from that one exchange. TLS 1.2
+                    negotiated the cipher suite and key exchange method in a separate step
+                    before deriving keys, and — critically — still offered legacy cipher
+                    suites (RC4, static RSA key exchange with no forward secrecy) for
+                    backward compatibility. An attacker positioned on the network path could
+                    manipulate the negotiation to force both sides down to the weakest
+                    mutually supported option. TLS 1.3 closes this by removing the weak
+                    options from the protocol entirely rather than just discouraging their
+                    use.</p>
+
+                    <p><strong>Q: A Spring Boot service sets <code>server.forward-headers-strategy=framework</code> so it can trust <code>X-Forwarded-Proto</code> from its load balancer. What goes wrong if that same service is also reachable directly, bypassing the load balancer?</strong><br>
+                    Any client that reaches the service directly can forge an
+                    <code>X-Forwarded-Proto: https</code> header on a genuinely plaintext
+                    HTTP request. The framework will treat the connection as secure — Spring
+                    Security's <code>requiresSecure()</code> check passes, cookies marked
+                    <code>Secure</code> get set and sent over that "internally trusted"
+                    plaintext connection, and the entire channel-security guarantee is
+                    silently defeated. The fix isn't in application code at all: the
+                    application server must be network-unreachable except through the
+                    trusted proxy — a security group, firewall rule, or private subnet that
+                    makes the direct path physically impossible, not just discouraged.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="auth-vs-authz.html" class="related-link"><span class="related-icon">🪪</span>Authentication vs Authorization</a>
+                    <a href="password-hashing.html" class="related-link"><span class="related-icon">🔒</span>Password Hashing</a>
+                    <a href="session-mgmt.html" class="related-link"><span class="related-icon">🍪</span>Session Management</a>
+                    <a href="jwt.html" class="related-link"><span class="related-icon">🔑</span>JWT (JSON Web Tokens)</a>
+                    <a href="oauth.html" class="related-link"><span class="related-icon">🔗</span>OAuth 2.0</a>
+                    <a href="../web-concepts/sessions-cookies.html" class="related-link"><span class="related-icon">🌐</span>Sessions &amp; Cookies — Secure/HttpOnly/SameSite</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/i18n.js"></script>
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>

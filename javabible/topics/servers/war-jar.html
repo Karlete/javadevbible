@@ -1,443 +1,528 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.war-jar.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WAR vs JAR Files - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#servers">Application Servers</a> / WAR vs JAR Files
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#servers" data-i18n="nav.servers">Application Servers &amp; Deployment</a> /
+                WAR vs JAR Files
             </nav>
-            <h1>WAR vs JAR Files</h1>
-            <p class="topic-subtitle">Java packaging formats explained</p>
-            <a href="../../index.html#servers" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.war-jar.h1">WAR vs JAR Files</h1>
+            <p class="topic-subtitle" data-i18n="topic.war-jar.subtitle">The two packaging formats — what a fat JAR actually contains, why Spring Boot's isn't the same thing as a Maven Shade jar, and how layered JARs speed up Docker builds</p>
+            <a href="../../index.html#servers" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is an Archive File?</h2>
-            <p>An archive file is simply a single file that contains many other files bundled together. Think of it like a <strong>ZIP file</strong>—because that's exactly what Java archives are!</p>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>Moving Box Analogy:</strong></p>
-                <p>Imagine you're moving to a new house. Instead of carrying thousands of individual items one at a time, you pack them into boxes. Each box:</p>
-                <ul>
-                    <li><strong>Contains many items</strong> organized in a specific way</li>
-                    <li><strong>Has a label</strong> describing its contents</li>
-                    <li><strong>Is easy to move</strong> as a single unit</li>
-                    <li><strong>Can be unpacked</strong> to access individual items</li>
-                </ul>
-                <p>Java archives (JAR and WAR) work the same way—they bundle all your application's files into a single, portable package.</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>Why Not Just Use ZIP Files?</h3>
-            <p>Java archives ARE ZIP files with extra features:</p>
-            <ul>
-                <li><strong>Standard structure</strong> - Everyone agrees where files go</li>
-                <li><strong>Manifest file</strong> - Contains metadata about the archive</li>
-                <li><strong>JVM integration</strong> - Java can run code directly from archives</li>
-                <li><strong>Classpath support</strong> - The JVM knows how to find classes in archives</li>
-            </ul>
+        <main class="topic-content">
 
-            <pre><code><span class="comment"># You can actually open any JAR/WAR with a ZIP tool:</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What are JAR and WAR — and Why Package at All?</h2>
+                <p>A compiled Java application is, physically, hundreds of separate
+                    <code>.class</code> files plus resources plus configuration — none of
+                    that is anything you'd want to copy file-by-file to a server or hand to
+                    a container runtime. A <strong>JAR (Java Archive)</strong> is a ZIP file
+                    with a Java-specific structure and metadata that lets the JVM run code
+                    directly from it; a <strong>WAR (Web Application Archive)</strong> is a
+                    JAR with an additional, standardized directory layout that a servlet
+                    container (covered on the previous two pages) knows how to unpack and
+                    deploy as a running web application.</p>
+
+                <pre><code><span class="comment">// BEFORE — deploying an application as loose files</span>
+<span class="comment">$ scp -r target/classes/ user@server:/opt/myapp/
+$ scp -r target/dependency/ user@server:/opt/myapp/lib/
+$ ssh user@server "cd /opt/myapp && java -cp classes:lib/* com.shop.Main"</span>
+<span class="comment">// Every file transferred individually, no single artifact to version, no
+// manifest describing what this even is or how to run it correctly</span>
+
+<span class="comment">// AFTER — one artifact, self-describing, single command to run</span>
+<span class="comment">$ scp target/myapp.jar user@server:/opt/myapp/
+$ ssh user@server "java -jar /opt/myapp/myapp.jar"</span>
+<span class="comment">// One file. The manifest inside it already declares the entry point —
+// java -jar reads META-INF/MANIFEST.MF to find Main-Class automatically.</span></code></pre>
+
+                <pre><code><span class="comment"># A JAR/WAR is a real ZIP file underneath — this always works:</span>
 unzip myapp.jar -d extracted/
+jar -tf myapp.jar        <span class="comment"># list contents</span>
+jar -xf myapp.jar        <span class="comment"># extract contents</span></code></pre>
+            </section>
 
-<span class="comment"># Or use Java's jar command:</span>
-jar -tf myapp.jar        <span class="comment"># List contents</span>
-jar -xf myapp.jar        <span class="comment"># Extract contents</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>JAR Files: Java Archive</h2>
-            <p>A JAR (Java Archive) file is the standard packaging format for Java applications and libraries. It bundles compiled Java classes, resources, and metadata into a single file.</p>
-
-            <h3>JAR File Structure</h3>
-            <pre><code>myapp.jar
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — JAR STRUCTURE AND MANIFEST
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JAR Files — Structure and the Manifest</h2>
+                <pre><code>myapp.jar
 ├── <span class="keyword">META-INF/</span>
-│   ├── MANIFEST.MF          <span class="comment"># Manifest file (metadata)</span>
-│   └── maven/               <span class="comment"># (Optional) Maven info</span>
-├── <span class="keyword">com/</span>
-│   └── example/
-│       ├── Main.class       <span class="comment"># Compiled Java classes</span>
-│       ├── Service.class
-│       └── util/
-│           └── Helper.class
-├── application.properties   <span class="comment"># Configuration files</span>
-└── static/
-    └── logo.png             <span class="comment"># Static resources</span></code></pre>
+│   └── MANIFEST.MF          <span class="comment"># metadata: entry point, classpath, version</span>
+├── <span class="keyword">com/shop/</span>
+│   ├── Main.class
+│   ├── ProductService.class
+│   └── util/Helper.class
+├── application.properties
+└── static/logo.png</code></pre>
 
-            <h3>The MANIFEST.MF File</h3>
-            <p>The manifest is a special file that contains metadata about the JAR:</p>
-            <pre><code><span class="comment"># META-INF/MANIFEST.MF</span>
-
+                <pre><code><span class="comment"># META-INF/MANIFEST.MF</span>
 Manifest-Version: 1.0
-Created-By: 17.0.1 (Oracle Corporation)
-Main-Class: com.example.Main
+Main-Class: com.shop.Main
 Class-Path: lib/gson-2.9.0.jar lib/commons-lang3-3.12.0.jar
-Implementation-Title: My Application
+Implementation-Title: Shop Catalog Service
 Implementation-Version: 1.0.0</code></pre>
 
-            <h3>Types of JAR Files</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Description</th>
-                        <th>How to Run</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Library JAR</strong></td>
-                        <td>Reusable code (no Main-Class)</td>
-                        <td>Add to classpath</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Executable JAR</strong></td>
-                        <td>Has Main-Class in manifest</td>
-                        <td><code>java -jar app.jar</code></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Fat/Uber JAR</strong></td>
-                        <td>Includes all dependencies</td>
-                        <td><code>java -jar app.jar</code></td>
-                    </tr>
-                </tbody>
-            </table>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Type</th><th>Description</th><th>How to run</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Library JAR</strong></td><td>Reusable code, no <code>Main-Class</code></td><td>Add to another project's classpath</td></tr>
+                        <tr><td><strong>Executable JAR</strong></td><td>Has <code>Main-Class</code> in the manifest</td><td><code>java -jar app.jar</code></td></tr>
+                        <tr><td><strong>Fat/Uber JAR</strong></td><td>Bundles dependencies too — covered in detail below, since "bundled" means something different depending on the tool</td><td><code>java -jar app.jar</code></td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-            <h3>Creating JAR Files with Maven</h3>
-            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
-&lt;packaging&gt;jar&lt;/packaging&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — FAT JARS: SHADE vs SPRING BOOT REPACKAGE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Fat JARs — Two Genuinely Different Mechanisms Behind the Same Word</h2>
+                <p>"Fat JAR" gets used as if it describes one technique. It doesn't — the
+                    two common approaches produce structurally different artifacts, and
+                    confusing them is a real source of production bugs, not just
+                    terminology pedantry.</p>
 
-&lt;build&gt;
-    &lt;plugins&gt;
-        <span class="comment">&lt;!-- Standard JAR --&gt;</span>
-        &lt;plugin&gt;
-            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
-            &lt;artifactId&gt;maven-jar-plugin&lt;/artifactId&gt;
-            &lt;configuration&gt;
-                &lt;archive&gt;
-                    &lt;manifest&gt;
-                        &lt;mainClass&gt;com.example.Main&lt;/mainClass&gt;
-                        &lt;addClasspath&gt;true&lt;/addClasspath&gt;
-                    &lt;/manifest&gt;
-                &lt;/archive&gt;
-            &lt;/configuration&gt;
-        &lt;/plugin&gt;
+                <h3>Maven Shade — flattens everything into one namespace</h3>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-shade-plugin&lt;/artifactId&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;phase&gt;package&lt;/phase&gt;
+            &lt;goals&gt;&lt;goal&gt;shade&lt;/goal&gt;&lt;/goals&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+<span class="comment">// Every dependency's .class files are extracted and merged directly into
+// ONE flat package namespace inside the final JAR — as if you'd manually
+// unzipped every dependency JAR into the same directory.</span></code></pre>
 
-        <span class="comment">&lt;!-- Fat JAR with shade plugin --&gt;</span>
-        &lt;plugin&gt;
-            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
-            &lt;artifactId&gt;maven-shade-plugin&lt;/artifactId&gt;
-            &lt;executions&gt;
-                &lt;execution&gt;
-                    &lt;phase&gt;package&lt;/phase&gt;
-                    &lt;goals&gt;&lt;goal&gt;shade&lt;/goal&gt;&lt;/goals&gt;
-                &lt;/execution&gt;
-            &lt;/executions&gt;
-        &lt;/plugin&gt;
-    &lt;/plugins&gt;
-&lt;/build&gt;</code></pre>
-        </section>
+                <div class="info-box warning">
+                    <div class="info-box-title">Shading's real risk: resource collisions, not just class collisions</div>
+                    <p>When two dependencies both ship a file at the same path inside
+                        <code>META-INF/</code> — a common occurrence with SPI registration
+                        files, or with Spring's own <code>META-INF/spring.factories</code> /
+                        <code>META-INF/spring/*.imports</code> auto-configuration
+                        registrations — a naive shade merge keeps only one of them,
+                        silently. The symptom is a dependency that works perfectly in
+                        isolation but mysteriously stops auto-configuring itself once shaded
+                        alongside others. Maven Shade supports transformers
+                        (<code>ServicesResourceTransformer</code> and similar) specifically
+                        to merge rather than overwrite these files correctly — but only if
+                        you configure them; the default behavior silently picks one.</p>
+                </div>
 
-        <section class="content-section">
-            <h2>WAR Files: Web Application Archive</h2>
-            <p>A WAR (Web Application Archive) file is a specialized packaging format for Java web applications. It contains everything needed to deploy a web application to a servlet container.</p>
+                <h3>Spring Boot repackage — nested JARs, not a flattened merge</h3>
+                <pre><code><span class="comment">&lt;!-- pom.xml — this is what spring-boot-starter-parent wires up by default --&gt;</span>
+&lt;plugin&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;goals&gt;&lt;goal&gt;repackage&lt;/goal&gt;&lt;/goals&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
 
-            <div class="info-box">
-                <p><strong>WAR = JAR + Web Structure</strong></p>
-                <p>A WAR file is essentially a JAR file with a <strong>specific directory structure</strong> that servlet containers understand. This structure defines where to find servlets, JSP files, static resources, and dependencies.</p>
-            </div>
+<span class="comment">// The resulting structure is deliberately NOT flattened:</span>
+myapp.jar
+├── <span class="keyword">org/springframework/boot/loader/</span>   <span class="comment"># Spring Boot's own bootstrap classloader</span>
+├── <span class="keyword">BOOT-INF/classes/</span>                  <span class="comment"># YOUR compiled classes, untouched</span>
+└── <span class="keyword">BOOT-INF/lib/</span>                      <span class="comment"># every dependency, as WHOLE, UNMODIFIED jars</span>
+    ├── spring-web-6.1.0.jar
+    ├── gson-2.9.0.jar
+    └── ...</code></pre>
 
-            <h3>WAR File Structure</h3>
-            <pre><code>mywebapp.war
+                <div class="info-box important">
+                    <div class="info-box-title">Why this matters: no resource-merge risk, at the cost of a custom classloader</div>
+                    <p>Because every dependency stays intact as its own nested JAR rather
+                        than being merged into one namespace, the
+                        <code>META-INF/spring.factories</code> collision problem described
+                        above simply doesn't arise — Spring Boot's own
+                        <code>JarLauncher</code> (declared as <code>Main-Class</code> in the
+                        outer manifest) sets up a classloader that reads each nested JAR
+                        independently at startup. The trade-off is that this JAR can no
+                        longer be added directly to another project's classpath the way a
+                        shaded JAR can — its layout is specific to being launched via
+                        <code>java -jar</code> through Spring Boot's own loader, not treated
+                        as a generic library dependency.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — WAR STRUCTURE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>WAR Files — Structure and the <code>WEB-INF</code> Boundary</h2>
+                <pre><code>mywebapp.war
 ├── <span class="keyword">META-INF/</span>
 │   └── MANIFEST.MF
-├── <span class="keyword">WEB-INF/</span>                    <span class="comment"># PROTECTED - Not accessible via URL!</span>
-│   ├── web.xml                 <span class="comment"># Deployment descriptor</span>
-│   ├── <span class="keyword">classes/</span>                <span class="comment"># Compiled Java classes</span>
-│   │   └── com/
-│   │       └── example/
-│   │           ├── HomeServlet.class
-│   │           └── ProductServlet.class
-│   └── <span class="keyword">lib/</span>                    <span class="comment"># JAR dependencies</span>
-│       ├── gson-2.9.0.jar
-│       └── mysql-connector-8.0.jar
-├── index.html                  <span class="comment"># PUBLIC - /mywebapp/index.html</span>
-├── css/
-│   └── style.css               <span class="comment"># PUBLIC - /mywebapp/css/style.css</span>
-├── js/
-│   └── app.js                  <span class="comment"># PUBLIC - /mywebapp/js/app.js</span>
-└── images/
-    └── logo.png                <span class="comment"># PUBLIC - /mywebapp/images/logo.png</span></code></pre>
+├── <span class="keyword">WEB-INF/</span>                    <span class="comment"># PROTECTED — never served directly over HTTP</span>
+│   ├── web.xml                 <span class="comment"># deployment descriptor</span>
+│   ├── <span class="keyword">classes/</span>com/shop/ProductServlet.class
+│   └── <span class="keyword">lib/</span>gson-2.9.0.jar, mysql-connector-8.0.jar
+├── index.html                  <span class="comment"># PUBLIC — /mywebapp/index.html</span>
+└── css/style.css                <span class="comment"># PUBLIC — /mywebapp/css/style.css</span></code></pre>
 
-            <h3>The WEB-INF Directory: Understanding Protection</h3>
-            <p>The <code>WEB-INF</code> directory is special—its contents cannot be accessed directly by clients via HTTP requests:</p>
+                <pre><code><span class="comment"># Reachable directly:</span>
+http://localhost:8080/mywebapp/index.html        ✓
+http://localhost:8080/mywebapp/css/style.css     ✓
 
-            <pre><code><span class="comment"># What users CAN access (outside WEB-INF):</span>
-http://localhost:8080/mywebapp/index.html        ✓ Returns HTML
-http://localhost:8080/mywebapp/css/style.css     ✓ Returns CSS
+<span class="comment"># NEVER reachable directly — the container itself refuses to serve it:</span>
+http://localhost:8080/mywebapp/WEB-INF/web.xml   ✗ 404
+http://localhost:8080/mywebapp/WEB-INF/classes/  ✗ 404
 
-<span class="comment"># What users CANNOT access (inside WEB-INF):</span>
-http://localhost:8080/mywebapp/WEB-INF/web.xml   ✗ 404 or 403
-http://localhost:8080/mywebapp/WEB-INF/classes/  ✗ 404 or 403
+<span class="comment"># This is enforced by the servlet specification itself, not a configurable
+# option — every compliant container treats WEB-INF/ as off-limits to direct
+# requests. That's precisely why compiled code, configuration with database
+# credentials, and dependency JARs all belong inside it.</span></code></pre>
 
-<span class="comment"># WHY? Security! WEB-INF contains:</span>
-<span class="comment"># - Configuration with database credentials</span>
-<span class="comment"># - Compiled code that could be decompiled</span>
-<span class="comment"># - Libraries that could reveal vulnerabilities</span></code></pre>
+                <div class="info-box note">
+                    <div class="info-box-title">Anything meant to be rendered but not directly linkable also belongs under WEB-INF</div>
+                    <p>JSP templates that should only ever be reached by being forwarded to
+                        from a servlet — never requested directly by URL — are conventionally
+                        placed inside <code>WEB-INF/</code> (e.g.
+                        <code>WEB-INF/views/product.jsp</code>) for exactly this reason: the
+                        container's own protection guarantees no client can bypass your
+                        controller logic and hit the template directly.</p>
+                </div>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Security Best Practice</div>
-                <p>Always put sensitive files (JSP templates, configuration) inside <code>WEB-INF/</code>. Use servlets to forward requests to protected resources.</p>
-            </div>
-
-            <h3>Creating WAR Files with Maven</h3>
-            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
 &lt;packaging&gt;war&lt;/packaging&gt;
-
 &lt;dependencies&gt;
-    <span class="comment">&lt;!-- Servlet API - provided by container --&gt;</span>
     &lt;dependency&gt;
         &lt;groupId&gt;jakarta.servlet&lt;/groupId&gt;
         &lt;artifactId&gt;jakarta.servlet-api&lt;/artifactId&gt;
         &lt;version&gt;6.0.0&lt;/version&gt;
-        &lt;scope&gt;provided&lt;/scope&gt;  <span class="comment">&lt;!-- Not included in WAR --&gt;</span>
+        &lt;scope&gt;provided&lt;/scope&gt;   <span class="comment">&lt;!-- the container supplies this — never bundle it --&gt;</span>
     &lt;/dependency&gt;
-&lt;/dependencies&gt;
+&lt;/dependencies&gt;</code></pre>
+            </section>
 
-&lt;build&gt;
-    &lt;plugins&gt;
-        &lt;plugin&gt;
-            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
-            &lt;artifactId&gt;maven-war-plugin&lt;/artifactId&gt;
-            &lt;configuration&gt;
-                &lt;failOnMissingWebXml&gt;false&lt;/failOnMissingWebXml&gt;
-            &lt;/configuration&gt;
-        &lt;/plugin&gt;
-    &lt;/plugins&gt;
-&lt;/build&gt;</code></pre>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — JAR vs WAR COMPARISON
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JAR vs WAR — Side by Side</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Aspect</th><th>JAR</th><th>WAR</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Full name</td><td>Java Archive</td><td>Web Application Archive</td></tr>
+                        <tr><td>Purpose</td><td>General Java apps and libraries</td><td>Web applications deployed to a servlet container</td></tr>
+                        <tr><td>Structure</td><td><code>META-INF/</code> + classes + resources</td><td><code>WEB-INF/</code> (protected) + public resources</td></tr>
+                        <tr><td>Run/deploy</td><td><code>java -jar</code>, or added to another project's classpath</td><td>Deployed into a servlet container, which extracts and manages it</td></tr>
+                        <tr><td>Dependencies</td><td>External classpath, or bundled (fat JAR — two different mechanisms, see above)</td><td>Always in <code>WEB-INF/lib/</code></td></tr>
+                        <tr><td>Hot deployment</td><td>N/A — restart the process</td><td>Supported by the container without restarting the whole server</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-        <section class="content-section">
-            <h2>JAR vs WAR: Complete Comparison</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SPRING BOOT: JAR OR WAR?
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Spring Boot: JAR or WAR?</h2>
 
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Aspect</th>
-                        <th>JAR</th>
-                        <th>WAR</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Full Name</strong></td>
-                        <td>Java Archive</td>
-                        <td>Web Application Archive</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Purpose</strong></td>
-                        <td>General Java apps/libraries</td>
-                        <td>Web applications</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Structure</strong></td>
-                        <td>META-INF/ + classes + resources</td>
-                        <td>WEB-INF/ + public resources</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Deployment</strong></td>
-                        <td><code>java -jar</code> or classpath</td>
-                        <td>Deploy to servlet container</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Dependencies</strong></td>
-                        <td>Optional (fat JAR) or external</td>
-                        <td>Always in WEB-INF/lib</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Protected Area</strong></td>
-                        <td>None</td>
-                        <td>WEB-INF/ (hidden from web)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Hot Deployment</strong></td>
-                        <td>Requires restart</td>
-                        <td>Supported by containers</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <h3>JAR — the default, recommended path</h3>
+                <pre><code>&lt;packaging&gt;jar&lt;/packaging&gt;
+<span class="comment"># java -jar myapp-1.0.0.jar — embedded Tomcat included, no external
+# container to install or configure, natural fit for a Docker image</span></code></pre>
 
-        <section class="content-section">
-            <h2>Spring Boot: JAR or WAR?</h2>
-            <p>Spring Boot applications can be packaged as either JAR or WAR:</p>
-
-            <h3>Spring Boot JAR (Recommended)</h3>
-            <pre><code>&lt;packaging&gt;jar&lt;/packaging&gt;
-
-<span class="comment"># Run with:</span>
-java -jar myapp-1.0.0.jar
-
-<span class="comment"># Benefits:</span>
-<span class="comment"># - Embedded Tomcat included</span>
-<span class="comment"># - Simple deployment</span>
-<span class="comment"># - Cloud-native friendly</span></code></pre>
-
-            <h3>Spring Boot WAR (For External Container)</h3>
-            <pre><code>&lt;packaging&gt;war&lt;/packaging&gt;
-
+                <h3>WAR — only when an external container is a hard requirement</h3>
+                <pre><code>&lt;packaging&gt;war&lt;/packaging&gt;
 &lt;dependency&gt;
     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
     &lt;artifactId&gt;spring-boot-starter-tomcat&lt;/artifactId&gt;
-    &lt;scope&gt;provided&lt;/scope&gt;  <span class="comment">&lt;!-- Don't include Tomcat --&gt;</span>
+    &lt;scope&gt;provided&lt;/scope&gt;   <span class="comment">&lt;!-- the target container supplies its own Tomcat --&gt;</span>
 &lt;/dependency&gt;
 
-<span class="comment">// Main class for WAR deployment</span>
 <span class="annotation">@SpringBootApplication</span>
-<span class="keyword">public class</span> <span class="class-name">MyApplication</span> <span class="keyword">extends</span> SpringBootServletInitializer {
-
+<span class="keyword">public class</span> <span class="class-name">ShopApplication</span> <span class="keyword">extends</span> <span class="class-name">SpringBootServletInitializer</span> {
     <span class="annotation">@Override</span>
-    <span class="keyword">protected</span> SpringApplicationBuilder configure(SpringApplicationBuilder app) {
-        <span class="keyword">return</span> app.sources(MyApplication.<span class="keyword">class</span>);
+    <span class="keyword">protected</span> <span class="class-name">SpringApplicationBuilder</span> <span class="function">configure</span>(<span class="class-name">SpringApplicationBuilder</span> app) {
+        <span class="keyword">return</span> app.<span class="function">sources</span>(<span class="class-name">ShopApplication</span>.<span class="keyword">class</span>);
+        <span class="comment">// This bridge is what lets the SAME application also start correctly
+        // when deployed as a WAR to an external Tomcat, which calls this
+        // instead of your own main() method.</span>
     }
 }</code></pre>
 
-            <h3>When to Use Each Format</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Use Case</th>
-                        <th>Recommended</th>
-                        <th>Reason</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>New Spring Boot app</td>
-                        <td><strong>JAR</strong></td>
-                        <td>Simpler, embedded container</td>
-                    </tr>
-                    <tr>
-                        <td>Cloud deployment</td>
-                        <td><strong>JAR</strong></td>
-                        <td>Better for Docker</td>
-                    </tr>
-                    <tr>
-                        <td>Legacy system</td>
-                        <td><strong>WAR</strong></td>
-                        <td>May require existing container</td>
-                    </tr>
-                    <tr>
-                        <td>Corporate standard</td>
-                        <td><strong>WAR</strong></td>
-                        <td>WebLogic/WebSphere requirement</td>
-                    </tr>
-                    <tr>
-                        <td>Microservices</td>
-                        <td><strong>JAR</strong></td>
-                        <td>Independent deployment</td>
-                    </tr>
-                    <tr>
-                        <td>Reusable library</td>
-                        <td><strong>JAR</strong></td>
-                        <td>Not a web application</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Use case</th><th>Recommended</th><th>Reason</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>New Spring Boot application</td><td><strong>JAR</strong></td><td>Simpler, self-contained, no separate installation step</td></tr>
+                        <tr><td>Cloud/container deployment</td><td><strong>JAR</strong></td><td>One process per container is the natural Docker/Kubernetes fit</td></tr>
+                        <tr><td>Corporate standard requiring WildFly/WebLogic</td><td><strong>WAR</strong></td><td>Existing infrastructure investment, not a technical requirement of Spring Boot itself</td></tr>
+                        <tr><td>Reusable library</td><td><strong>JAR</strong></td><td>Not a deployable web application at all</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-        <section class="content-section">
-            <h2>EAR Files: Enterprise Archive</h2>
-            <p>For completeness, EAR (Enterprise Archive) files bundle multiple modules (WARs, JARs) into a single deployable unit for full application servers:</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — PRODUCTION: LAYERED JARS FOR DOCKER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Production Reality — Layered JARs and Docker Build Caching</h2>
+                <p>Copying one monolithic fat JAR into a Docker image works, but it wastes
+                    the layer cache: any code change — even a single line — invalidates the
+                    entire image layer containing the JAR, forcing Docker to re-push every
+                    dependency on every deploy, even though your dependencies almost never
+                    change between builds. Since Spring Boot 2.3, the executable JAR
+                    supports being split into <strong>layers</strong> along exactly this
+                    boundary.</p>
 
-            <pre><code>enterprise-app.ear
-├── META-INF/
-│   ├── MANIFEST.MF
-│   └── application.xml    <span class="comment"># Defines modules</span>
-├── web-module.war         <span class="comment"># Web tier</span>
-├── ejb-module.jar         <span class="comment"># EJB tier</span>
-└── lib/
-    └── shared-utils.jar   <span class="comment"># Shared libraries</span></code></pre>
+                <pre><code><span class="comment"># Extract the JAR into its constituent layers</span>
+java -Djarmode=layertools -jar myapp.jar extract
+<span class="comment"># Produces (typically): dependencies/, spring-boot-loader/,
+# snapshot-dependencies/, application/ — ordered from LEAST to MOST
+# frequently changing</span></code></pre>
 
-            <div class="info-box">
-                <p><strong>Modern Perspective:</strong> EAR files were common in the Java EE era but are less common today. Modern architectures favor microservices (independent JARs), Spring Boot (embedded containers), or containers (Docker).</p>
-            </div>
-        </section>
+                <pre><code><span class="comment"># Multi-stage Dockerfile using the extracted layers</span>
+<span class="keyword">FROM</span> eclipse-temurin:21-jdk <span class="keyword">AS</span> builder
+<span class="keyword">WORKDIR</span> /app
+<span class="keyword">COPY</span> target/myapp.jar app.jar
+<span class="keyword">RUN</span> java -Djarmode=layertools -jar app.jar extract
 
-        <section class="content-section">
-            <h2>Common Issues and Troubleshooting</h2>
+<span class="keyword">FROM</span> eclipse-temurin:21-jre
+<span class="keyword">WORKDIR</span> /app
+<span class="comment"># Copied in order: layers that rarely change first, so Docker can reuse
+# these cached layers across builds where only your own code changed</span>
+<span class="keyword">COPY</span> --from=builder /app/dependencies/ ./
+<span class="keyword">COPY</span> --from=builder /app/spring-boot-loader/ ./
+<span class="keyword">COPY</span> --from=builder /app/snapshot-dependencies/ ./
+<span class="keyword">COPY</span> --from=builder /app/application/ ./
+<span class="keyword">ENTRYPOINT</span> [<span class="string">"java"</span>, <span class="string">"org.springframework.boot.loader.launch.JarLauncher"</span>]
+<span class="comment"># Check your Spring Boot version's own documentation for the exact
+# launcher class name — it moved packages between major versions, and
+# getting this wrong is a common source of a container that builds fine
+# but fails immediately on "docker run"</span></code></pre>
 
-            <h3>1. "No main manifest attribute"</h3>
-            <pre><code><span class="comment"># Error:</span>
-java -jar myapp.jar
-no main manifest attribute, in myapp.jar
+                <div class="info-box note">
+                    <div class="info-box-title">The dependency ordering is the entire point</div>
+                    <p>A typical deploy changes <code>application/</code> (your own compiled
+                        code) far more often than <code>dependencies/</code> (third-party
+                        libraries, which only change when you bump a version). Copying the
+                        rarely-changing layers first means Docker's build cache serves them
+                        from cache on almost every routine deploy, and only the small
+                        <code>application/</code> layer actually needs to be rebuilt and
+                        re-pushed — a meaningfully faster and lighter CI/CD pipeline than
+                        shipping one undivided JAR as a single layer every time.</p>
+                </div>
+            </section>
 
-<span class="comment"># Solution: Add Main-Class to manifest in pom.xml</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — EAR FILES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>EAR Files — Enterprise Archive, for Completeness</h2>
+                <pre><code>enterprise-app.ear
+├── META-INF/application.xml   <span class="comment"># declares which modules this EAR bundles</span>
+├── web-module.war
+├── ejb-module.jar
+└── lib/shared-utils.jar</code></pre>
+                <p>An EAR bundles multiple WARs and JARs — typically a web tier plus an
+                    EJB tier — into one deployable unit for a full Jakarta EE application
+                    server. It was common in the Java EE era of monolithic enterprise
+                    deployments; today's equivalent goal (multiple coordinated modules
+                    deployed together) is far more often achieved with independent
+                    microservices, each its own JAR or container image, than with a single
+                    EAR bundling everything into one deployment unit.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — TROUBLESHOOTING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Common Issues</h2>
+
+                <h3>"no main manifest attribute"</h3>
+                <pre><code><span class="comment">$ java -jar myapp.jar
+no main manifest attribute, in myapp.jar</span>
+
+<span class="comment">// Cause: the manifest has no Main-Class entry. Fix in pom.xml:</span>
 &lt;manifest&gt;
-    &lt;mainClass&gt;com.example.Main&lt;/mainClass&gt;
+    &lt;mainClass&gt;com.shop.Main&lt;/mainClass&gt;
 &lt;/manifest&gt;</code></pre>
 
-            <h3>2. ClassNotFoundException in Fat JAR</h3>
-            <pre><code><span class="comment"># Error: Dependency classes not found at runtime</span>
-
-<span class="comment"># Cause: Dependencies not included in JAR</span>
-<span class="comment"># Solution: Use maven-shade-plugin for fat JAR</span>
-
-<span class="comment"># Check what's in your JAR:</span>
+                <h3><code>ClassNotFoundException</code> in what should be a fat JAR</h3>
+                <pre><code><span class="comment"># Verify what actually got bundled:</span>
 jar -tf myapp.jar | grep gson
-<span class="comment"># Should show com/google/gson/... if using fat JAR</span></code></pre>
+<span class="comment"># Nothing printed → dependencies were never included. Check that the
+# repackage/shade execution actually ran during the build (mvn package,
+# not mvn compile), and that the plugin is bound to the "package" phase.</span></code></pre>
 
-            <h3>3. javax vs jakarta Package Issues</h3>
-            <pre><code><span class="comment"># Error in Tomcat 10+:</span>
-java.lang.NoClassDefFoundError: javax/servlet/Servlet
+                <h3><code>javax</code> vs <code>jakarta</code> package mismatch</h3>
+                <pre><code>java.lang.NoClassDefFoundError: javax/servlet/Servlet
+<span class="comment">// A javax.servlet-based WAR deployed to Tomcat 10+. Full explanation of
+// this migration is on Servlet Containers and Tomcat Overview — the fix
+// here is updating every affected import and dependency to jakarta.*.</span></code></pre>
+            </section>
 
-<span class="comment"># Cause: Using javax.servlet with Tomcat 10+ (requires jakarta)</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-<span class="comment"># Solution: Update imports and dependencies</span>
-<span class="comment"># OLD: import javax.servlet.*;</span>
-<span class="comment"># NEW: import jakarta.servlet.*;</span></code></pre>
-        </section>
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Use <code>spring-boot-maven-plugin</code>'s <code>repackage</code> goal for Spring Boot applications — it's already wired up by <code>spring-boot-starter-parent</code> and avoids the resource-collision risk of a shaded jar</li>
+                        <li>Configure Maven Shade's resource transformers explicitly (e.g. <code>ServicesResourceTransformer</code>) whenever shading a project that includes SPI-registering dependencies</li>
+                        <li>Place JSP templates and anything not meant to be requested directly under <code>WEB-INF/</code>, relying on the container's own protection rather than application-level checks</li>
+                        <li>Use layered JAR extraction in multi-stage Dockerfiles to keep CI/CD builds fast and image layers cache-friendly</li>
+                        <li>Mark the servlet API dependency as <code>provided</code> in a WAR project — the container supplies it; bundling your own copy risks a version conflict with the container's own classes</li>
+                    </ul>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>JAR:</strong> General-purpose Java archive for applications and libraries</li>
-                    <li><strong>WAR:</strong> Web application archive with specific structure for servlet containers</li>
-                    <li><strong>WEB-INF/:</strong> Protected directory in WAR, inaccessible via HTTP</li>
-                    <li><strong>Fat JAR:</strong> JAR with all dependencies bundled inside</li>
-                    <li><strong>Embedded containers:</strong> Modern approach, container inside your JAR</li>
-                    <li><strong>Spring Boot JAR:</strong> Preferred for new applications</li>
-                    <li><strong>WAR for legacy:</strong> Use when external container is required</li>
-                    <li><strong>MANIFEST.MF:</strong> Contains metadata, Main-Class for executables</li>
-                </ul>
-            </div>
-        </section>
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't assume "fat JAR" means one specific mechanism — a Maven Shade jar and a Spring Boot repackaged jar have fundamentally different internal structures and different failure modes</li>
+                        <li>Don't shade a Spring Boot project with Maven Shade instead of the Boot plugin's own repackage goal — you'll very likely lose auto-configuration registrations to silent resource-file collisions</li>
+                        <li>Don't copy a single monolithic fat JAR into a Docker image as one layer — you lose the build-cache benefit that layered extraction was specifically built to provide</li>
+                        <li>Don't try to protect a JSP or config file with only application-level logic when placing it under <code>WEB-INF/</code> gives you a specification-guaranteed 404 for free</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="servlet-container.html" class="related-link">Servlet Containers</a>
-                <a href="tomcat.html" class="related-link">Apache Tomcat</a>
-                <a href="web-xml.html" class="related-link">Deployment Descriptors</a>
-                <a href="context.html" class="related-link">Context & Deployment</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is the difference between a JAR and a WAR file?</strong><br>
+                    Both are Java archive formats (ZIP files with extra structure and
+                    metadata), but a JAR is general-purpose — libraries or standalone
+                    executable applications — while a WAR has an additional, standardized
+                    structure (<code>WEB-INF/</code>) specifically so a servlet container
+                    knows how to deploy it as a web application.</p>
+
+                    <p><strong>Q: Why can't a client request <code>WEB-INF/web.xml</code> directly by URL?</strong><br>
+                    The Servlet specification itself requires every compliant container to
+                    treat <code>WEB-INF/</code> as off-limits to direct HTTP requests. This
+                    protects configuration files, compiled classes, and dependency JARs from
+                    ever being served as plain content, regardless of how the application
+                    itself is written.</p>
+
+                    <p><strong>Q: What does the manifest's <code>Main-Class</code> entry do?</strong><br>
+                    It tells <code>java -jar</code> which class contains the
+                    <code>public static void main</code> method to execute. Without it,
+                    running <code>java -jar</code> on that archive fails with "no main
+                    manifest attribute."</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A team shades a Spring Boot application with maven-shade-plugin instead of using spring-boot-maven-plugin, and several auto-configured starters silently stop working. Explain the mechanism.</strong><br>
+                    Spring Boot's auto-configuration relies on registration files under
+                    <code>META-INF/</code> (such as <code>spring.factories</code> or the
+                    newer <code>META-INF/spring/*.imports</code> files) — and multiple
+                    starter dependencies each ship their own copy of these files at the
+                    exact same path. Maven Shade's default merge behavior, when it encounters
+                    two files at an identical path across different source JARs, keeps only
+                    one and silently discards the rest — there's no build failure, no
+                    warning, just missing auto-configuration for whichever starters lost
+                    that collision. Spring Boot's own repackage mechanism avoids this
+                    entirely by never merging dependency contents in the first place — each
+                    dependency stays a whole, separate JAR nested under
+                    <code>BOOT-INF/lib/</code>, so there's no shared namespace for these
+                    registration files to collide in at all.</p>
+
+                    <p><strong>Q: Why does Spring Boot's executable JAR need its own custom classloader (<code>JarLauncher</code>) instead of relying on the standard JVM classpath mechanism?</strong><br>
+                    The standard JVM classpath and the <code>Class-Path</code> manifest
+                    attribute both expect referenced JARs to exist as separate files on the
+                    filesystem or be flatly present in the same archive — neither mechanism
+                    understands "a JAR nested inside another JAR" as a valid classpath entry.
+                    Since Spring Boot's structure deliberately keeps every dependency as an
+                    intact, separate JAR under <code>BOOT-INF/lib/</code> rather than
+                    flattening them, something has to teach the JVM how to load classes from
+                    those nested archives at runtime — that's exactly what
+                    <code>org.springframework.boot.loader.launch.JarLauncher</code>
+                    (declared as the outer <code>Main-Class</code>) does: it constructs a
+                    custom <code>ClassLoader</code> capable of reading class bytes directly
+                    out of each nested JAR, before ever handing control to your own
+                    application's actual main method.</p>
+
+                    <p><strong>Q: A Docker image build takes just as long on every deploy even though only application code changed, not dependencies. The Dockerfile copies one fat JAR with a single <code>COPY</code> instruction. What's the fix, and why does instruction order matter?</strong><br>
+                    Docker caches image layers and only rebuilds a layer (and everything
+                    after it) when its own inputs change. A single <code>COPY</code> of one
+                    monolithic JAR means the entire layer — dependencies included — is
+                    invalidated by even a one-line code change, since Docker has no way to
+                    see "inside" the JAR to know only a small part of it actually changed.
+                    The fix is extracting the JAR into Spring Boot's layered structure
+                    (<code>java -Djarmode=layertools -jar app.jar extract</code>) and
+                    copying each resulting layer into the image with separate
+                    <code>COPY</code> instructions, ordered from least to most frequently
+                    changing — dependencies first, your own compiled application last. Docker
+                    then only needs to rebuild and re-push the small, fast-changing
+                    application layer on a typical deploy, reusing its cache for every layer
+                    above it that didn't change.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="app-server.html" class="related-link"><span class="related-icon">🖥️</span>What is an Application Server?</a>
+                    <a href="servlet-container.html" class="related-link"><span class="related-icon">📦</span>Servlet Containers</a>
+                    <a href="tomcat.html" class="related-link"><span class="related-icon">🐱</span>Tomcat Overview</a>
+                    <a href="web-xml.html" class="related-link"><span class="related-icon">📄</span>Deployment Descriptors</a>
+                    <a href="context.html" class="related-link"><span class="related-icon">🚀</span>Context &amp; Deployment</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

@@ -1,685 +1,489 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.jwt.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JWT (JSON Web Tokens) - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#security">Security & Authentication</a> / JWT
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#security" data-i18n="nav.security">Security &amp; Authentication</a> /
+                JWT (JSON Web Tokens)
             </nav>
-            <h1>JWT (JSON Web Tokens)</h1>
-            <p class="topic-subtitle">Stateless authentication for modern applications</p>
-            <a href="../../index.html#security" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.jwt.h1">JWT — JSON Web Tokens</h1>
+            <p class="topic-subtitle" data-i18n="topic.jwt.subtitle">A signed, self-contained claim — not an encrypted one — and the specific vulnerabilities and storage decisions that follow directly from that fact</p>
+            <a href="../../index.html#security" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is JWT?</h2>
-            <p><strong>JWT (JSON Web Token)</strong> is an open standard (RFC 7519) for securely transmitting information between parties as a JSON object. JWTs are commonly used for authentication and authorization in web applications, especially in stateless architectures like REST APIs.</p>
+    <div class="topic-layout">
 
-            <div class="info-box">
-                <p><strong>Key Insight:</strong> Unlike traditional sessions where the server stores user state, JWTs contain all the information needed to verify the user. The server doesn't need to remember anything - the token itself is the proof of authentication.</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>JWT vs Session-Based Authentication</h3>
-            <pre><code><span class="comment">// Session-Based (Stateful):</span>
-┌──────────┐     Login      ┌──────────┐
-│  Client  │ ─────────────▶ │  Server  │
-└──────────┘                └──────────┘
-     │                           │
-     │    Session ID: abc123     │ Stores session in DB/memory
-     │ ◀─────────────────────────│ session["abc123"] = {user: "john"}
-     │                           │
-     │    Cookie: sessionId=abc123│
-     │ ──────────────────────────▶│ Lookup session["abc123"]
-     │                           │ Returns user data
+        <main class="topic-content">
 
-<span class="comment">// JWT-Based (Stateless):</span>
-┌──────────┐     Login      ┌──────────┐
-│  Client  │ ─────────────▶ │  Server  │
-└──────────┘                └──────────┘
-     │                           │
-     │    JWT: eyJhbGci...       │ Creates signed token
-     │ ◀─────────────────────────│ Contains: {user: "john", exp: ...}
-     │                           │
-     │    Authorization: Bearer eyJ...│
-     │ ──────────────────────────▶│ Verifies signature
-     │                           │ Extracts user from token
-     │                           │ NO database lookup needed!</code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is a JWT — and Why Does it Exist?</h2>
+                <p>A <strong>JWT (JSON Web Token)</strong> is a signed, self-contained
+                    claim about an identity — the token itself carries enough information
+                    (who the subject is, what roles they have, when it expires) that a
+                    server can verify it's authentic and act on it <em>without looking
+                    anything up</em>. This is the direct answer to the scaling problem
+                    described on the previous page: a session requires every instance to
+                    query a shared store on every request; a JWT only requires verifying a
+                    cryptographic signature, which needs no network call and no shared
+                    infrastructure at all. That's exactly why JWTs are the default choice
+                    for authenticating calls between microservices — an inventory service
+                    receiving a request from an order service can verify the caller's claims
+                    using only a public key it already has, with zero coupling to whatever
+                    system originally issued the token.</p>
 
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Aspect</th>
-                        <th>Session-Based</th>
-                        <th>JWT-Based</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>State</strong></td>
-                        <td>Stateful (server stores sessions)</td>
-                        <td>Stateless (token contains everything)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Storage</strong></td>
-                        <td>Server: Database/Memory, Client: Cookie</td>
-                        <td>Client only: localStorage/Cookie</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Scalability</strong></td>
-                        <td>Requires shared session store</td>
-                        <td>Easy horizontal scaling</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Revocation</strong></td>
-                        <td>Easy (delete from store)</td>
-                        <td>Difficult (needs blocklist)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Cross-domain</strong></td>
-                        <td>Complex (CORS cookies)</td>
-                        <td>Easy (Authorization header)</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <p>The trade-off, covered in full at the end of this page, is the one
+                    already previewed on the Session Management page: no shared store means
+                    no instant server-side revocation. Everything else about how JWTs are
+                    built, signed, and stored follows from a single fact worth stating
+                    plainly up front: <strong>a JWT is signed, not encrypted</strong>. Its
+                    payload is base64url-encoded — trivially readable by anyone who
+                    intercepts it — and the signature only proves the claims weren't
+                    tampered with after issuance, not that they're secret.</p>
 
-        <section class="content-section">
-            <h2>JWT Structure</h2>
-            <p>A JWT consists of three parts separated by dots: <code>header.payload.signature</code></p>
-
-            <pre><code><span class="comment">// Example JWT (line breaks added for readability):</span>
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
-eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4iLCJpYXQiOjE1MTYyMzkwMjJ9.
-SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
-
-<span class="comment">// Structure visualization:</span>
-┌───────────────────────────────────────────────────────────────────┐
-│                         JWT Token                                  │
-├─────────────────┬──────────────────────┬──────────────────────────┤
-│     HEADER      │       PAYLOAD        │       SIGNATURE          │
-│   (Algorithm)   │    (Claims/Data)     │     (Verification)       │
-├─────────────────┼──────────────────────┼──────────────────────────┤
-│ {               │ {                    │ HMACSHA256(              │
-│   "alg": "HS256"│   "sub": "123",      │   base64(header) + "." + │
-│   "typ": "JWT"  │   "name": "John",    │   base64(payload),       │
-│ }               │   "iat": 1516239022, │   secret                 │
-│                 │   "exp": 1516242622  │ )                        │
-│                 │ }                    │                          │
-└─────────────────┴──────────────────────┴──────────────────────────┘
-     Base64URL          Base64URL              Base64URL</code></pre>
-
-            <h3>1. Header</h3>
-            <pre><code><span class="comment">// The header typically contains:</span>
-{
-    <span class="string">"alg"</span>: <span class="string">"HS256"</span>,    <span class="comment">// Algorithm used for signing</span>
-    <span class="string">"typ"</span>: <span class="string">"JWT"</span>       <span class="comment">// Type of token</span>
+                <pre><code><span class="comment">// BEFORE — every request pays for a network round-trip to a shared session store
+// just to answer "who is this and what are they allowed to do?"</span>
+<span class="class-name">SessionData</span> session = redisTemplate.<span class="function">opsForValue</span>().<span class="function">get</span>(<span class="string">"session:"</span> + sessionId);
+<span class="keyword">if</span> (session == <span class="keyword">null</span> || session.<span class="function">isExpired</span>()) {
+    <span class="keyword">throw new</span> <span class="class-name">BadCredentialsException</span>(<span class="string">"Invalid or expired session"</span>);
 }
+<span class="comment">// Every service in the chain (order-service, inventory-service, shipping-service)
+// needs network access to the SAME Redis instance to answer this question.</span>
 
-<span class="comment">// Common algorithms:</span>
-<span class="comment">// HS256 - HMAC with SHA-256 (symmetric)</span>
-<span class="comment">// RS256 - RSA with SHA-256 (asymmetric)</span>
-<span class="comment">// ES256 - ECDSA with SHA-256 (asymmetric)</span></code></pre>
+<span class="comment">// AFTER — verification is a local, offline cryptographic operation</span>
+<span class="class-name">Claims</span> claims = <span class="class-name">Jwts</span>.<span class="function">parser</span>()
+    .<span class="function">verifyWith</span>(publicKey)          <span class="comment">// only needs the ISSUER's public key — never a shared secret store</span>
+    .<span class="function">build</span>()
+    .<span class="function">parseSignedClaims</span>(token)
+    .<span class="function">getPayload</span>();
+<span class="comment">// No network call. No shared store. Any service holding the public key can
+// verify this independently — that's the entire point.</span></code></pre>
+            </section>
 
-            <h3>2. Payload (Claims)</h3>
-            <pre><code><span class="comment">// The payload contains claims (statements about the user)</span>
-{
-    <span class="comment">// Registered Claims (standard, optional but recommended)</span>
-    <span class="string">"iss"</span>: <span class="string">"https://myapp.com"</span>,    <span class="comment">// Issuer</span>
-    <span class="string">"sub"</span>: <span class="string">"user123"</span>,              <span class="comment">// Subject (user ID)</span>
-    <span class="string">"aud"</span>: <span class="string">"https://api.myapp.com"</span>,<span class="comment">// Audience</span>
-    <span class="string">"exp"</span>: 1700000000,             <span class="comment">// Expiration (Unix timestamp)</span>
-    <span class="string">"nbf"</span>: 1699990000,             <span class="comment">// Not Before</span>
-    <span class="string">"iat"</span>: 1699990000,             <span class="comment">// Issued At</span>
-    <span class="string">"jti"</span>: <span class="string">"unique-token-id"</span>,     <span class="comment">// JWT ID (for revocation)</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — ANATOMY OF A JWT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Anatomy of a JWT — Three Base64url Segments, Not Encryption</h2>
+                <pre><code><span class="comment">/*
+ * A JWT is three base64url-encoded segments joined by dots:
+ *
+ *   eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI0MjIiLCJyb2xlIjoiQ1VTVE9NRVIi...}.dBjftJeZ4CVP-mB92K...
+ *   └──────────── header ────────────┘ └──────────── payload ────────────┘ └── signature ──┘
+ *
+ * HEADER (decoded):     {"alg": "RS256", "typ": "JWT"}
+ * PAYLOAD (decoded):    {"sub": "422", "role": "CUSTOMER", "iat": 1751000000, "exp": 1751003600}
+ * SIGNATURE:            RSA-SHA256(base64url(header) + "." + base64url(payload), privateKey)
+ *
+ * base64url is an ENCODING, not encryption. Anyone can decode the header and
+ * payload with zero cryptographic knowledge — paste any JWT into a decoder and
+ * read every claim in plaintext. The signature's only job is proving the
+ * header+payload weren't modified after the issuer signed them.
+ */</span></code></pre>
 
-    <span class="comment">// Public Claims (custom, should avoid collision)</span>
-    <span class="string">"name"</span>: <span class="string">"John Doe"</span>,
-    <span class="string">"email"</span>: <span class="string">"john@example.com"</span>,
+                <div class="info-box warning">
+                    <div class="info-box-title">Never put anything in a JWT payload you wouldn't put in a URL query parameter</div>
+                    <p>Because the payload is trivially decodable, a JWT must never carry a
+                        password, a card number, a full address, or any other value that
+                        needs confidentiality. Standard claims (<code>sub</code>,
+                        <code>iat</code>, <code>exp</code>, <code>iss</code>) plus a role or
+                        a small set of authorization-relevant identifiers is the appropriate
+                        scope of what belongs in a token.</p>
+                </div>
 
-    <span class="comment">// Private Claims (application-specific)</span>
-    <span class="string">"roles"</span>: [<span class="string">"ADMIN"</span>, <span class="string">"USER"</span>],
-    <span class="string">"permissions"</span>: [<span class="string">"read"</span>, <span class="string">"write"</span>],
-    <span class="string">"tenant_id"</span>: <span class="string">"acme-corp"</span>
-}</code></pre>
+                <h3>Standard Claims</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Claim</th><th>Meaning</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>sub</code></td><td>Subject — the principal this token is about (typically a user or account ID)</td></tr>
+                        <tr><td><code>iss</code></td><td>Issuer — which authorization server or service issued this token</td></tr>
+                        <tr><td><code>aud</code></td><td>Audience — which service(s) this token is intended for; a resource server should reject tokens not meant for it</td></tr>
+                        <tr><td><code>iat</code></td><td>Issued-at timestamp</td></tr>
+                        <tr><td><code>exp</code></td><td>Expiration timestamp — a verifier must reject any token past this instant</td></tr>
+                        <tr><td><code>jti</code></td><td>JWT ID — a unique identifier for this specific token, useful for tracking or one-time-use revocation lists</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-            <h3>3. Signature</h3>
-            <pre><code><span class="comment">// The signature ensures the token hasn't been tampered with</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SIGNING: HMAC vs RSA/EC
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Signing Algorithms — Symmetric (HMAC) vs Asymmetric (RSA/EC)</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Family</th><th>Example algorithms</th><th>Key model</th><th>Fits</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>HMAC</strong></td>
+                            <td>HS256, HS384, HS512</td>
+                            <td>One shared secret used for both signing and verifying</td>
+                            <td>A single service that issues and verifies its own tokens</td>
+                        </tr>
+                        <tr>
+                            <td><strong>RSA / EC</strong></td>
+                            <td>RS256, RS384, ES256</td>
+                            <td>Private key signs, public key verifies — never the same key</td>
+                            <td>Microservices: any number of services verify tokens using only a distributed public key, and only the authorization server holds the private key</td>
+                        </tr>
+                    </tbody>
+                </table>
 
-<span class="comment">// For HS256 (symmetric - same key for signing and verifying):</span>
-signature = HMACSHA256(
-    base64UrlEncode(header) + <span class="string">"."</span> + base64UrlEncode(payload),
-    <span class="string">"your-256-bit-secret"</span>
-)
-
-<span class="comment">// For RS256 (asymmetric - private key signs, public key verifies):</span>
-signature = RSASHA256(
-    base64UrlEncode(header) + <span class="string">"."</span> + base64UrlEncode(payload),
-    privateKey
-)
-<span class="comment">// Verification uses the public key</span></code></pre>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Security Warning</div>
-                <p><strong>The payload is NOT encrypted!</strong> Anyone can decode a JWT and read its contents. Never put sensitive information (passwords, credit cards, etc.) in a JWT. The signature only prevents tampering, not reading.</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>JWT Implementation in Java</h2>
-
-            <h3>Dependencies (Maven)</h3>
-            <pre><code><span class="comment">&lt;!-- JJWT library (most popular) --&gt;</span>
-&lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;io.jsonwebtoken&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;jjwt-api&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;0.12.5&lt;/<span class="keyword">version</span>&gt;
-&lt;/<span class="keyword">dependency</span>&gt;
-&lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;io.jsonwebtoken&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;jjwt-impl&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;0.12.5&lt;/<span class="keyword">version</span>&gt;
-    &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;
-&lt;/<span class="keyword">dependency</span>&gt;
-&lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;io.jsonwebtoken&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;jjwt-jackson&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;0.12.5&lt;/<span class="keyword">version</span>&gt;
-    &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;
-&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
-
-            <h3>JWT Service Implementation</h3>
-            <pre><code><span class="annotation">@Service</span>
+                <pre><code><span class="annotation">@Service</span>
 <span class="keyword">public class</span> <span class="class-name">JwtService</span> {
 
-    <span class="annotation">@Value</span>(<span class="string">"${jwt.secret}"</span>)
-    <span class="keyword">private</span> <span class="class-name">String</span> secretKey;
+    <span class="keyword">private final</span> <span class="class-name">PrivateKey</span> signingKey;      <span class="comment">// held ONLY by the issuing service</span>
+    <span class="keyword">private final</span> <span class="class-name">PublicKey</span> verificationKey;
 
-    <span class="annotation">@Value</span>(<span class="string">"${jwt.expiration:3600000}"</span>)  <span class="comment">// 1 hour default</span>
-    <span class="keyword">private long</span> jwtExpiration;
-
-    <span class="annotation">@Value</span>(<span class="string">"${jwt.refresh-expiration:604800000}"</span>)  <span class="comment">// 7 days</span>
-    <span class="keyword">private long</span> refreshExpiration;
-
-    <span class="keyword">private</span> <span class="class-name">SecretKey</span> <span class="function">getSigningKey</span>() {
-        <span class="keyword">byte</span>[] keyBytes = <span class="class-name">Decoders</span>.BASE64.<span class="function">decode</span>(secretKey);
-        <span class="keyword">return</span> <span class="class-name">Keys</span>.<span class="function">hmacShaKeyFor</span>(keyBytes);
+    <span class="keyword">public</span> <span class="function">JwtService</span>(<span class="class-name">PrivateKey</span> signingKey, <span class="class-name">PublicKey</span> verificationKey) {
+        <span class="keyword">this</span>.signingKey = signingKey;
+        <span class="keyword">this</span>.verificationKey = verificationKey;
     }
 
-    <span class="comment">// Generate access token</span>
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateToken</span>(<span class="class-name">UserDetails</span> userDetails) {
-        <span class="keyword">return</span> <span class="function">generateToken</span>(<span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;(), userDetails);
-    }
-
-    <span class="comment">// Generate token with extra claims</span>
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateToken</span>(
-            <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; extraClaims,
-            <span class="class-name">UserDetails</span> userDetails) {
-
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateToken</span>(<span class="class-name">Authentication</span> auth) {
+        <span class="class-name">Instant</span> now = <span class="class-name">Instant</span>.<span class="function">now</span>();
         <span class="keyword">return</span> <span class="class-name">Jwts</span>.<span class="function">builder</span>()
-            .<span class="function">claims</span>(extraClaims)
-            .<span class="function">subject</span>(userDetails.<span class="function">getUsername</span>())
-            .<span class="function">issuedAt</span>(<span class="keyword">new</span> <span class="class-name">Date</span>())
-            .<span class="function">expiration</span>(<span class="keyword">new</span> <span class="class-name">Date</span>(<span class="class-name">System</span>.<span class="function">currentTimeMillis</span>() + jwtExpiration))
-            .<span class="function">signWith</span>(<span class="function">getSigningKey</span>())
+            .<span class="function">subject</span>(auth.<span class="function">getName</span>())
+            .<span class="function">claim</span>(<span class="string">"role"</span>, <span class="function">extractRole</span>(auth))
+            .<span class="function">issuer</span>(<span class="string">"https://auth.shop.example.com"</span>)
+            .<span class="function">audience</span>().<span class="function">add</span>(<span class="string">"order-service"</span>).<span class="function">and</span>()
+            .<span class="function">issuedAt</span>(<span class="class-name">Date</span>.<span class="function">from</span>(now))
+            .<span class="function">expiration</span>(<span class="class-name">Date</span>.<span class="function">from</span>(now.<span class="function">plus</span>(<span class="class-name">Duration</span>.<span class="function">ofMinutes</span>(<span class="number">15</span>))))   <span class="comment">// short-lived access token</span>
+            .<span class="function">signWith</span>(signingKey, <span class="class-name">Jwts.SIG</span>.RS256)
             .<span class="function">compact</span>();
     }
 
-    <span class="comment">// Generate refresh token (longer expiry, minimal claims)</span>
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateRefreshToken</span>(<span class="class-name">UserDetails</span> userDetails) {
-        <span class="keyword">return</span> <span class="class-name">Jwts</span>.<span class="function">builder</span>()
-            .<span class="function">subject</span>(userDetails.<span class="function">getUsername</span>())
-            .<span class="function">issuedAt</span>(<span class="keyword">new</span> <span class="class-name">Date</span>())
-            .<span class="function">expiration</span>(<span class="keyword">new</span> <span class="class-name">Date</span>(<span class="class-name">System</span>.<span class="function">currentTimeMillis</span>() + refreshExpiration))
-            .<span class="function">claim</span>(<span class="string">"type"</span>, <span class="string">"refresh"</span>)
-            .<span class="function">signWith</span>(<span class="function">getSigningKey</span>())
-            .<span class="function">compact</span>();
-    }
-
-    <span class="comment">// Extract username from token</span>
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">extractUsername</span>(<span class="class-name">String</span> token) {
-        <span class="keyword">return</span> <span class="function">extractClaim</span>(token, <span class="class-name">Claims</span>::getSubject);
-    }
-
-    <span class="comment">// Extract expiration date</span>
-    <span class="keyword">public</span> <span class="class-name">Date</span> <span class="function">extractExpiration</span>(<span class="class-name">String</span> token) {
-        <span class="keyword">return</span> <span class="function">extractClaim</span>(token, <span class="class-name">Claims</span>::getExpiration);
-    }
-
-    <span class="comment">// Generic claim extraction</span>
-    <span class="keyword">public</span> &lt;T&gt; T <span class="function">extractClaim</span>(<span class="class-name">String</span> token, <span class="class-name">Function</span>&lt;<span class="class-name">Claims</span>, T&gt; claimsResolver) {
-        <span class="keyword">final</span> <span class="class-name">Claims</span> claims = <span class="function">extractAllClaims</span>(token);
-        <span class="keyword">return</span> claimsResolver.<span class="function">apply</span>(claims);
-    }
-
-    <span class="comment">// Extract all claims</span>
-    <span class="keyword">private</span> <span class="class-name">Claims</span> <span class="function">extractAllClaims</span>(<span class="class-name">String</span> token) {
+    <span class="keyword">public</span> <span class="class-name">Claims</span> <span class="function">parseAndValidate</span>(<span class="class-name">String</span> token) {
         <span class="keyword">return</span> <span class="class-name">Jwts</span>.<span class="function">parser</span>()
-            .<span class="function">verifyWith</span>(<span class="function">getSigningKey</span>())
+            .<span class="function">verifyWith</span>(verificationKey)
+            .<span class="function">requireIssuer</span>(<span class="string">"https://auth.shop.example.com"</span>)
+            .<span class="function">requireAudience</span>(<span class="string">"order-service"</span>)
             .<span class="function">build</span>()
             .<span class="function">parseSignedClaims</span>(token)
-            .<span class="function">getPayload</span>();
-    }
-
-    <span class="comment">// Validate token</span>
-    <span class="keyword">public boolean</span> <span class="function">isTokenValid</span>(<span class="class-name">String</span> token, <span class="class-name">UserDetails</span> userDetails) {
-        <span class="keyword">final</span> <span class="class-name">String</span> username = <span class="function">extractUsername</span>(token);
-        <span class="keyword">return</span> username.<span class="function">equals</span>(userDetails.<span class="function">getUsername</span>())
-            && !<span class="function">isTokenExpired</span>(token);
-    }
-
-    <span class="comment">// Check if token is expired</span>
-    <span class="keyword">private boolean</span> <span class="function">isTokenExpired</span>(<span class="class-name">String</span> token) {
-        <span class="keyword">return</span> <span class="function">extractExpiration</span>(token).<span class="function">before</span>(<span class="keyword">new</span> <span class="class-name">Date</span>());
+            .<span class="function">getPayload</span>();   <span class="comment">// throws ExpiredJwtException / SignatureException on any failure — never swallow these</span>
     }
 }</code></pre>
+            </section>
 
-            <h3>JWT Authentication Filter</h3>
-            <pre><code><span class="annotation">@Component</span>
-<span class="keyword">public class</span> <span class="class-name">JwtAuthenticationFilter</span> <span class="keyword">extends</span> <span class="class-name">OncePerRequestFilter</span> {
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — CLASSIC JWT VULNERABILITIES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Two Vulnerabilities That Come Directly From How JWTs Are Structured</h2>
 
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">JwtService</span> jwtService;
+                <h3>1. The <code>"alg": "none"</code> Trap</h3>
+                <pre><code><span class="comment">/*
+ * The JWT spec permits an "none" algorithm for genuinely unsecured use cases.
+ * Some early JWT libraries honored whatever "alg" the ATTACKER put in the
+ * header — including "none" — and skipped signature verification entirely.
+ *
+ * Attack: take a legitimate token, change the header to {"alg":"none"},
+ * change any claim (e.g. "role":"CUSTOMER" → "role":"ADMIN"), drop the
+ * signature segment entirely. A vulnerable verifier accepts it as valid.
+ */</span>
 
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">UserDetailsService</span> userDetailsService;
+<span class="comment">// THE FIX: never let the token's own header dictate which algorithm verifies
+// it — pin the expected algorithm explicitly at verification time</span>
+<span class="class-name">Claims</span> claims = <span class="class-name">Jwts</span>.<span class="function">parser</span>()
+    .<span class="function">verifyWith</span>(verificationKey)
+    <span class="comment">// Modern JJWT (and most current libraries) require you to configure the
+    // accepted algorithm(s) up front via the key type — an RSA PublicKey here
+    // means ONLY RS256/RS384/RS512 signatures are ever accepted, "none" and
+    // HS256 are rejected outright rather than silently trusted from the header.</span>
+    .<span class="function">build</span>()
+    .<span class="function">parseSignedClaims</span>(token)
+    .<span class="function">getPayload</span>();</code></pre>
 
-    <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> <span class="function">doFilterInternal</span>(
-            <span class="class-name">HttpServletRequest</span> request,
-            <span class="class-name">HttpServletResponse</span> response,
-            <span class="class-name">FilterChain</span> filterChain) <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
+                <h3>2. Algorithm Confusion — RS256 Downgraded to HS256</h3>
+                <pre><code><span class="comment">/*
+ * If a verifier is written to accept "whatever alg the token header claims"
+ * rather than a fixed expected algorithm, a second attack becomes possible:
+ *
+ * 1. The legitimate system signs with RS256 (private key signs, public key
+ *    verifies) and publishes its RSA PUBLIC key openly, as intended.
+ * 2. An attacker crafts a forged token with header {"alg":"HS256"} and signs
+ *    it using an HMAC secret equal to... the RSA public key's bytes.
+ * 3. A verifier that naively does "look at alg in the header, then verify
+ *    using whatever key I have configured, treating it as that algorithm's
+ *    key type" ends up computing HMAC-SHA256(header.payload, publicKeyBytes)
+ *    — and since the public key is, by definition, public, the attacker CAN
+ *    compute that exact same HMAC and produce a signature that validates.
+ */</span>
 
-        <span class="comment">// Get Authorization header</span>
-        <span class="keyword">final</span> <span class="class-name">String</span> authHeader = request.<span class="function">getHeader</span>(<span class="string">"Authorization"</span>);
+<span class="comment">// THE FIX is the same discipline as above: the verifier must hardcode which
+// algorithm family it expects for a given key, never derive it from the
+// token's own header. This is precisely why modern JWT libraries tie key
+// TYPE to algorithm — an RSA PublicKey object simply cannot be handed to an
+// HMAC verification path in a well-designed API.</span></code></pre>
+            </section>
 
-        <span class="comment">// Check for Bearer token</span>
-        <span class="keyword">if</span> (authHeader == <span class="keyword">null</span> || !authHeader.<span class="function">startsWith</span>(<span class="string">"Bearer "</span>)) {
-            filterChain.<span class="function">doFilter</span>(request, response);
-            <span class="keyword">return</span>;
-        }
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — WHERE TO STORE THE TOKEN CLIENT-SIDE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Client-Side Storage — <code>localStorage</code> vs an HttpOnly Cookie</h2>
+                <p>This decision gets debated constantly, and the honest answer is that
+                    both options trade one risk for a different one — there is no
+                    zero-risk choice, only an explicit one.</p>
 
-        <span class="comment">// Extract token</span>
-        <span class="keyword">final</span> <span class="class-name">String</span> jwt = authHeader.<span class="function">substring</span>(7);
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Storage</th><th>Vulnerable to</th><th>Not vulnerable to</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>localStorage</code> / <code>sessionStorage</code></td>
+                            <td>XSS — any injected script can read <code>localStorage</code> directly and exfiltrate the token in full</td>
+                            <td>CSRF — the token must be attached manually via JavaScript, so a forged cross-site request has no way to include it automatically</td>
+                        </tr>
+                        <tr>
+                            <td><code>HttpOnly</code> + <code>Secure</code> + <code>SameSite=Strict</code> cookie</td>
+                            <td>CSRF, if <code>SameSite</code> is misconfigured or absent</td>
+                            <td>XSS — JavaScript cannot read an <code>HttpOnly</code> cookie's value at all, even with a successful script injection</td>
+                        </tr>
+                    </tbody>
+                </table>
 
-        <span class="keyword">try</span> {
-            <span class="comment">// Extract username from token</span>
-            <span class="keyword">final</span> <span class="class-name">String</span> username = jwtService.<span class="function">extractUsername</span>(jwt);
+                <pre><code><span class="comment">// Issue the JWT as an HttpOnly, Secure, SameSite=Strict cookie rather than a
+// JSON field the client is expected to store itself</span>
+<span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
+<span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">Void</span>&gt; <span class="function">login</span>(<span class="annotation">@RequestBody</span> <span class="class-name">LoginRequest</span> request) {
+    <span class="class-name">Authentication</span> auth = authManager.<span class="function">authenticate</span>(
+        <span class="keyword">new</span> <span class="class-name">UsernamePasswordAuthenticationToken</span>(request.username(), request.password())
+    );
+    <span class="class-name">String</span> token = jwtService.<span class="function">generateToken</span>(auth);
 
-            <span class="comment">// If username exists and not already authenticated</span>
-            <span class="keyword">if</span> (username != <span class="keyword">null</span> &&
-                <span class="class-name">SecurityContextHolder</span>.<span class="function">getContext</span>().<span class="function">getAuthentication</span>() == <span class="keyword">null</span>) {
-
-                <span class="comment">// Load user details</span>
-                <span class="class-name">UserDetails</span> userDetails = userDetailsService
-                    .<span class="function">loadUserByUsername</span>(username);
-
-                <span class="comment">// Validate token</span>
-                <span class="keyword">if</span> (jwtService.<span class="function">isTokenValid</span>(jwt, userDetails)) {
-                    <span class="comment">// Create authentication token</span>
-                    <span class="class-name">UsernamePasswordAuthenticationToken</span> authToken =
-                        <span class="keyword">new</span> <span class="class-name">UsernamePasswordAuthenticationToken</span>(
-                            userDetails,
-                            <span class="keyword">null</span>,
-                            userDetails.<span class="function">getAuthorities</span>()
-                        );
-
-                    <span class="comment">// Add request details</span>
-                    authToken.<span class="function">setDetails</span>(
-                        <span class="keyword">new</span> <span class="class-name">WebAuthenticationDetailsSource</span>()
-                            .<span class="function">buildDetails</span>(request)
-                    );
-
-                    <span class="comment">// Set authentication in context</span>
-                    <span class="class-name">SecurityContextHolder</span>.<span class="function">getContext</span>()
-                        .<span class="function">setAuthentication</span>(authToken);
-                }
-            }
-        } <span class="keyword">catch</span> (<span class="class-name">ExpiredJwtException</span> e) {
-            response.<span class="function">setStatus</span>(<span class="class-name">HttpServletResponse</span>.SC_UNAUTHORIZED);
-            response.<span class="function">getWriter</span>().<span class="function">write</span>(<span class="string">"Token expired"</span>);
-            <span class="keyword">return</span>;
-        } <span class="keyword">catch</span> (<span class="class-name">JwtException</span> e) {
-            response.<span class="function">setStatus</span>(<span class="class-name">HttpServletResponse</span>.SC_UNAUTHORIZED);
-            response.<span class="function">getWriter</span>().<span class="function">write</span>(<span class="string">"Invalid token"</span>);
-            <span class="keyword">return</span>;
-        }
-
-        filterChain.<span class="function">doFilter</span>(request, response);
-    }
-}</code></pre>
-
-            <h3>Authentication Controller</h3>
-            <pre><code><span class="annotation">@RestController</span>
-<span class="annotation">@RequestMapping</span>(<span class="string">"/api/auth"</span>)
-<span class="keyword">public class</span> <span class="class-name">AuthController</span> {
-
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">AuthenticationManager</span> authManager;
-
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">JwtService</span> jwtService;
-
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">UserDetailsService</span> userDetailsService;
-
-    <span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">AuthResponse</span>&gt; <span class="function">login</span>(
-            <span class="annotation">@RequestBody</span> <span class="class-name">LoginRequest</span> request) {
-
-        <span class="comment">// Authenticate credentials</span>
-        authManager.<span class="function">authenticate</span>(
-            <span class="keyword">new</span> <span class="class-name">UsernamePasswordAuthenticationToken</span>(
-                request.<span class="function">getUsername</span>(),
-                request.<span class="function">getPassword</span>()
-            )
-        );
-
-        <span class="comment">// Load user details</span>
-        <span class="class-name">UserDetails</span> user = userDetailsService
-            .<span class="function">loadUserByUsername</span>(request.<span class="function">getUsername</span>());
-
-        <span class="comment">// Generate tokens</span>
-        <span class="class-name">String</span> accessToken = jwtService.<span class="function">generateToken</span>(user);
-        <span class="class-name">String</span> refreshToken = jwtService.<span class="function">generateRefreshToken</span>(user);
-
-        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(<span class="keyword">new</span> <span class="class-name">AuthResponse</span>(
-            accessToken,
-            refreshToken,
-            jwtService.<span class="function">extractExpiration</span>(accessToken).<span class="function">getTime</span>()
-        ));
-    }
-
-    <span class="annotation">@PostMapping</span>(<span class="string">"/refresh"</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">AuthResponse</span>&gt; <span class="function">refresh</span>(
-            <span class="annotation">@RequestBody</span> <span class="class-name">RefreshRequest</span> request) {
-
-        <span class="class-name">String</span> refreshToken = request.<span class="function">getRefreshToken</span>();
-
-        <span class="comment">// Validate refresh token</span>
-        <span class="class-name">String</span> username = jwtService.<span class="function">extractUsername</span>(refreshToken);
-        <span class="class-name">UserDetails</span> user = userDetailsService.<span class="function">loadUserByUsername</span>(username);
-
-        <span class="keyword">if</span> (!jwtService.<span class="function">isTokenValid</span>(refreshToken, user)) {
-            <span class="keyword">throw new</span> <span class="class-name">InvalidTokenException</span>(<span class="string">"Invalid refresh token"</span>);
-        }
-
-        <span class="comment">// Generate new access token</span>
-        <span class="class-name">String</span> newAccessToken = jwtService.<span class="function">generateToken</span>(user);
-
-        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(<span class="keyword">new</span> <span class="class-name">AuthResponse</span>(
-            newAccessToken,
-            refreshToken,  <span class="comment">// Keep same refresh token</span>
-            jwtService.<span class="function">extractExpiration</span>(newAccessToken).<span class="function">getTime</span>()
-        ));
-    }
-}
-
-<span class="comment">// Response DTO</span>
-<span class="keyword">public record</span> <span class="class-name">AuthResponse</span>(
-    <span class="class-name">String</span> accessToken,
-    <span class="class-name">String</span> refreshToken,
-    <span class="keyword">long</span> expiresAt
-) {}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Token Storage Best Practices</h2>
-
-            <h3>Where to Store JWTs</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Storage</th>
-                        <th>XSS Risk</th>
-                        <th>CSRF Risk</th>
-                        <th>Best For</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>localStorage</strong></td>
-                        <td>High (accessible via JS)</td>
-                        <td>None</td>
-                        <td>SPAs with XSS protection</td>
-                    </tr>
-                    <tr>
-                        <td><strong>sessionStorage</strong></td>
-                        <td>High (accessible via JS)</td>
-                        <td>None</td>
-                        <td>Single-tab sessions</td>
-                    </tr>
-                    <tr>
-                        <td><strong>HttpOnly Cookie</strong></td>
-                        <td>None (not accessible via JS)</td>
-                        <td>High (needs CSRF token)</td>
-                        <td>Traditional web apps</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Memory only</strong></td>
-                        <td>Low</td>
-                        <td>None</td>
-                        <td>High-security SPAs</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <h3>Secure Cookie Configuration</h3>
-            <pre><code><span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
-<span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">Void</span>&gt; <span class="function">login</span>(
-        <span class="annotation">@RequestBody</span> <span class="class-name">LoginRequest</span> request,
-        <span class="class-name">HttpServletResponse</span> response) {
-
-    <span class="comment">// ... authenticate and generate token ...</span>
-    <span class="class-name">String</span> token = jwtService.<span class="function">generateToken</span>(user);
-
-    <span class="comment">// Set token in HttpOnly cookie</span>
-    <span class="class-name">ResponseCookie</span> cookie = <span class="class-name">ResponseCookie</span>.<span class="function">from</span>(<span class="string">"jwt"</span>, token)
-        .<span class="function">httpOnly</span>(<span class="keyword">true</span>)         <span class="comment">// Not accessible via JavaScript</span>
-        .<span class="function">secure</span>(<span class="keyword">true</span>)           <span class="comment">// Only sent over HTTPS</span>
-        .<span class="function">sameSite</span>(<span class="string">"Strict"</span>)     <span class="comment">// Prevents CSRF</span>
-        .<span class="function">path</span>(<span class="string">"/"</span>)               <span class="comment">// Available for all paths</span>
-        .<span class="function">maxAge</span>(<span class="class-name">Duration</span>.<span class="function">ofHours</span>(1))
+    <span class="class-name">ResponseCookie</span> cookie = <span class="class-name">ResponseCookie</span>.<span class="function">from</span>(<span class="string">"access_token"</span>, token)
+        .<span class="function">httpOnly</span>(<span class="keyword">true</span>)          <span class="comment">// unreachable from JavaScript, even via a successful XSS payload</span>
+        .<span class="function">secure</span>(<span class="keyword">true</span>)            <span class="comment">// never sent over a plain HTTP connection</span>
+        .<span class="function">sameSite</span>(<span class="string">"Strict"</span>)     <span class="comment">// not attached to cross-site requests — this is what mitigates CSRF here</span>
+        .<span class="function">path</span>(<span class="string">"/"</span>)
+        .<span class="function">maxAge</span>(<span class="class-name">Duration</span>.<span class="function">ofMinutes</span>(<span class="number">15</span>))
         .<span class="function">build</span>();
 
-    response.<span class="function">addHeader</span>(<span class="class-name">HttpHeaders</span>.SET_COOKIE, cookie.<span class="function">toString</span>());
+    <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>().<span class="function">header</span>(<span class="class-name">HttpHeaders</span>.SET_COOKIE, cookie.<span class="function">toString</span>()).<span class="function">build</span>();
+}</code></pre>
 
+                <div class="info-box important">
+                    <div class="info-box-title">Being honest about the trade-off: <code>SameSite=Strict</code> is doing real work here</div>
+                    <p><code>HttpOnly</code> closes the XSS exfiltration path completely —
+                        this is the stronger, more decisive protection of the two, since XSS
+                        vulnerabilities are common and a full token theft is a total account
+                        compromise. <code>SameSite=Strict</code> is what keeps this choice
+                        from reopening CSRF as a consequence: without it, the browser would
+                        still attach the cookie automatically to a forged cross-site request,
+                        and unlike the <code>localStorage</code> approach, the attacker
+                        wouldn't even need to read the token's value to abuse it — just
+                        trigger the request. Strict mode does mean the cookie won't be sent
+                        on a top-level navigation arriving from an external site either (a
+                        user clicking a link from an email lands logged out and has to sign
+                        in again) — <code>Lax</code> is the common compromise when that
+                        specific UX cost isn't acceptable, at the cost of allowing the cookie
+                        on top-level GET navigations from other origins.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — ACCESS + REFRESH TOKENS AND REVOCATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Access + Refresh Tokens — Living With No Instant Revocation</h2>
+                <p>A stateless token can't be individually revoked before its expiry
+                    without reintroducing some form of shared state — which is exactly the
+                    dependency JWTs exist to avoid. The practical mitigation is to keep the
+                    <strong>access token</strong> short-lived (minutes, as shown above) and
+                    pair it with a longer-lived <strong>refresh token</strong> that is itself
+                    tracked and revocable, since it's checked against a store on every use
+                    rather than trusted purely on its signature.</p>
+
+                <pre><code><span class="annotation">@PostMapping</span>(<span class="string">"/refresh"</span>)
+<span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">Void</span>&gt; <span class="function">refresh</span>(<span class="annotation">@CookieValue</span>(<span class="string">"refresh_token"</span>) <span class="class-name">String</span> refreshToken) {
+    <span class="comment">// Refresh tokens ARE looked up against a store — this is the deliberate
+    // point where revocability re-enters the design, in exchange for one
+    // lookup per refresh instead of one lookup per request.</span>
+    <span class="class-name">RefreshTokenRecord</span> record = refreshTokenRepository.<span class="function">findByToken</span>(refreshToken)
+        .<span class="function">filter</span>(r -> !r.<span class="function">isRevoked</span>() && r.<span class="function">getExpiresAt</span>().<span class="function">isAfter</span>(<span class="class-name">Instant</span>.<span class="function">now</span>()))
+        .<span class="function">orElseThrow</span>(() -> <span class="keyword">new</span> <span class="class-name">BadCredentialsException</span>(<span class="string">"Invalid or expired refresh token"</span>));
+
+    <span class="comment">// Rotate on every use: revoke the old refresh token, issue a new one.
+    // This limits the damage of a stolen refresh token to a single use window
+    // and makes reuse of an already-rotated token a detectable signal of theft.</span>
+    record.<span class="function">revoke</span>();
+    refreshTokenRepository.<span class="function">save</span>(record);
+    <span class="class-name">String</span> newAccessToken = jwtService.<span class="function">generateToken</span>(record.<span class="function">toAuthentication</span>());
+    <span class="class-name">String</span> newRefreshToken = refreshTokenService.<span class="function">issue</span>(record.<span class="function">getUsername</span>());
+
+    <span class="comment">// ... set both as HttpOnly/Secure/SameSite cookies, same as login</span>
     <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>().<span class="function">build</span>();
-}
-
-<span class="comment">// Read JWT from cookie in filter</span>
-<span class="keyword">private</span> <span class="class-name">String</span> <span class="function">extractTokenFromCookie</span>(<span class="class-name">HttpServletRequest</span> request) {
-    <span class="keyword">if</span> (request.<span class="function">getCookies</span>() != <span class="keyword">null</span>) {
-        <span class="keyword">return</span> <span class="class-name">Arrays</span>.<span class="function">stream</span>(request.<span class="function">getCookies</span>())
-            .<span class="function">filter</span>(c -> <span class="string">"jwt"</span>.<span class="function">equals</span>(c.<span class="function">getName</span>()))
-            .<span class="function">map</span>(<span class="class-name">Cookie</span>::getValue)
-            .<span class="function">findFirst</span>()
-            .<span class="function">orElse</span>(<span class="keyword">null</span>);
-    }
-    <span class="keyword">return null</span>;
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Token Revocation Strategies</h2>
-
-            <p>JWTs are stateless and can't be invalidated before expiration by default. Here are strategies to handle revocation:</p>
-
-            <h3>1. Short Expiration + Refresh Tokens</h3>
-            <pre><code><span class="comment">// Access token: 15 minutes</span>
-<span class="comment">// Refresh token: 7 days (stored in database)</span>
-
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">RefreshToken</span> {
-    <span class="annotation">@Id</span>
-    <span class="keyword">private</span> <span class="class-name">String</span> token;
-
-    <span class="annotation">@ManyToOne</span>
-    <span class="keyword">private</span> <span class="class-name">User</span> user;
-
-    <span class="keyword">private</span> <span class="class-name">Instant</span> expiryDate;
-
-    <span class="keyword">private boolean</span> revoked = <span class="keyword">false</span>;
-}
-
-<span class="comment">// Revoke all user's refresh tokens on logout or password change</span>
-<span class="annotation">@Transactional</span>
-<span class="keyword">public void</span> <span class="function">revokeAllUserTokens</span>(<span class="class-name">User</span> user) {
-    refreshTokenRepository.<span class="function">revokeAllByUser</span>(user);
 }</code></pre>
 
-            <h3>2. Token Blocklist</h3>
-            <pre><code><span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">TokenBlocklistService</span> {
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Token</th><th>Lifetime</th><th>Revocable before expiry?</th><th>Verified by</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Access token</strong></td><td>Minutes</td><td>No — signature-only, stateless verification</td><td>Any resource server holding the public key</td></tr>
+                        <tr><td><strong>Refresh token</strong></td><td>Days to weeks</td><td>Yes — looked up against a store on every use</td><td>The issuing authorization server only</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">RedisTemplate</span>&lt;<span class="class-name">String</span>, <span class="class-name">String</span>&gt; redisTemplate;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-    <span class="comment">// Add token to blocklist with TTL matching token expiry</span>
-    <span class="keyword">public void</span> <span class="function">blockToken</span>(<span class="class-name">String</span> token) {
-        <span class="class-name">Date</span> expiry = jwtService.<span class="function">extractExpiration</span>(token);
-        <span class="keyword">long</span> ttl = expiry.<span class="function">getTime</span>() - <span class="class-name">System</span>.<span class="function">currentTimeMillis</span>();
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Treat JWT payloads as visible, not secret — never put a password, card number, or other confidential value in a claim</li>
+                        <li>Use RS256/ES256 (asymmetric) for tokens verified by more than one service; reserve HS256 for a single service issuing and verifying its own tokens</li>
+                        <li>Pin the expected signing algorithm at verification time — never derive it from the token's own header</li>
+                        <li>Always validate <code>exp</code>, <code>iss</code>, and <code>aud</code> on every verification, not just the signature</li>
+                        <li>Store the token in an <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite</code> cookie rather than <code>localStorage</code> when the client is a browser</li>
+                        <li>Keep access tokens short-lived and pair them with a rotating, store-backed refresh token for the revocability a pure JWT can't provide</li>
+                    </ul>
 
-        <span class="keyword">if</span> (ttl > 0) {
-            redisTemplate.<span class="function">opsForValue</span>()
-                .<span class="function">set</span>(<span class="string">"blocked:"</span> + token, <span class="string">"revoked"</span>,
-                    ttl, <span class="class-name">TimeUnit</span>.MILLISECONDS);
-        }
-    }
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't store a JWT in <code>localStorage</code> "for simplicity" — any successful XSS on the page reads it directly and exfiltrates full account access</li>
+                        <li>Don't accept <code>"alg":"none"</code> or let the token header dictate the verification algorithm</li>
+                        <li>Don't issue long-lived access tokens "to avoid refresh calls" — that's directly trading away the one mitigation available for the lack of instant revocation</li>
+                        <li>Don't skip <code>aud</code> validation in a microservices setup — a token legitimately issued for one service should not be accepted by another that never should have trusted it</li>
+                        <li>Don't confuse "the signature is valid" with "this token should be trusted" — expiry, issuer, and audience all still need explicit checks</li>
+                    </ul>
+                </div>
+            </section>
 
-    <span class="comment">// Check if token is blocked</span>
-    <span class="keyword">public boolean</span> <span class="function">isBlocked</span>(<span class="class-name">String</span> token) {
-        <span class="keyword">return</span> redisTemplate.<span class="function">hasKey</span>(<span class="string">"blocked:"</span> + token);
-    }
-}
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-<span class="comment">// In JWT filter, add blocklist check</span>
-<span class="keyword">if</span> (tokenBlocklistService.<span class="function">isBlocked</span>(jwt)) {
-    response.<span class="function">setStatus</span>(401);
-    response.<span class="function">getWriter</span>().<span class="function">write</span>(<span class="string">"Token has been revoked"</span>);
-    <span class="keyword">return</span>;
-}</code></pre>
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: Is a JWT encrypted?</strong><br>
+                    No. A JWT's header and payload are base64url-<em>encoded</em>, which is
+                    a reversible text representation, not encryption — anyone who has the
+                    token can decode and read every claim. The signature only proves the
+                    contents weren't altered after the issuer signed them; it provides
+                    integrity, not confidentiality.</p>
 
-            <h3>3. Token Versioning</h3>
-            <pre><code><span class="comment">// Store token version in user record</span>
-<span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> {
-    <span class="comment">// ...</span>
-    <span class="keyword">private int</span> tokenVersion = 0;  <span class="comment">// Increment to invalidate all tokens</span>
-}
+                    <p><strong>Q: What are the three parts of a JWT?</strong><br>
+                    Header (algorithm and token type), payload (the claims — subject,
+                    expiration, custom data), and signature (computed over the header and
+                    payload using the issuer's signing key), joined by dots and each
+                    base64url-encoded.</p>
 
-<span class="comment">// Include version in JWT</span>
-<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateToken</span>(<span class="class-name">User</span> user) {
-    <span class="keyword">return</span> <span class="class-name">Jwts</span>.<span class="function">builder</span>()
-        .<span class="function">subject</span>(user.<span class="function">getUsername</span>())
-        .<span class="function">claim</span>(<span class="string">"version"</span>, user.<span class="function">getTokenVersion</span>())
-        .<span class="function">signWith</span>(<span class="function">getSigningKey</span>())
-        .<span class="function">compact</span>();
-}
+                    <p><strong>Q: What's the difference between HS256 and RS256?</strong><br>
+                    HS256 is symmetric — the same secret both signs and verifies the token,
+                    so every party that needs to verify must also be trusted with the secret
+                    that could forge one. RS256 is asymmetric — a private key signs, and a
+                    public key verifies; the public key can be distributed freely to any
+                    number of verifying services without ever exposing the ability to forge
+                    a token.</p>
+                </div>
 
-<span class="comment">// Validate version during authentication</span>
-<span class="keyword">public boolean</span> <span class="function">isTokenValid</span>(<span class="class-name">String</span> token, <span class="class-name">User</span> user) {
-    <span class="class-name">Integer</span> tokenVersion = <span class="function">extractClaim</span>(token,
-        claims -> claims.<span class="function">get</span>(<span class="string">"version"</span>, <span class="class-name">Integer</span>.<span class="keyword">class</span>));
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Explain the RS256-to-HS256 algorithm confusion attack and why it's the verifier's fault, not the algorithm's.</strong><br>
+                    If a service signs tokens with RS256 and publishes its RSA public key
+                    (as intended, so other services can verify), a poorly written verifier
+                    that trusts the "alg" field from the token's own header rather than
+                    hardcoding the expected algorithm can be tricked: an attacker crafts a
+                    token with header <code>{"alg":"HS256"}</code> and computes an
+                    HMAC-SHA256 signature using the RSA public key's bytes as the HMAC
+                    secret. Since the public key is, by definition, public, the attacker can
+                    compute that exact signature, and the naive verifier — configured only
+                    with "here's a key, verify using whatever algorithm the header says" —
+                    accepts it as valid. The fix is architectural: the verifier must bind a
+                    specific expected algorithm to a specific key type at configuration time,
+                    never derive the algorithm from attacker-controlled input.</p>
 
-    <span class="keyword">return</span> <span class="function">extractUsername</span>(token).<span class="function">equals</span>(user.<span class="function">getUsername</span>())
-        && !<span class="function">isTokenExpired</span>(token)
-        && tokenVersion.<span class="function">equals</span>(user.<span class="function">getTokenVersion</span>());
-}
+                    <p><strong>Q: A team decides to store JWTs in localStorage because it's simpler than managing cookies, and mitigates the risk by aggressively sanitizing all user input to prevent XSS. Is this an acceptable trade-off?</strong><br>
+                    It's a bet on a single control never failing, in an application large
+                    enough that "aggressively sanitizing all user input" is a continuously
+                    maintained property, not a one-time achievement — every new feature,
+                    every third-party library, every markdown renderer or rich-text editor
+                    added later is a fresh opportunity to reintroduce an XSS gap. An
+                    <code>HttpOnly</code> cookie removes the token from JavaScript's reach
+                    entirely, so a single XSS bug doesn't equal full account takeover even if
+                    the sanitization layer eventually fails somewhere. The trade you take on
+                    instead is CSRF exposure, which <code>SameSite=Strict</code>
+                    (or <code>Lax</code>, with the UX trade-off noted) addresses directly. In
+                    most real applications, defense against a category of bug that
+                    inevitably recurs (XSS, across a growing codebase) is worth more than
+                    defense against one that's fully closed by a single, static
+                    configuration flag (CSRF, via SameSite).</p>
 
-<span class="comment">// Invalidate all user's tokens</span>
-<span class="keyword">public void</span> <span class="function">invalidateAllTokens</span>(<span class="class-name">User</span> user) {
-    user.<span class="function">setTokenVersion</span>(user.<span class="function">getTokenVersion</span>() + 1);
-    userRepository.<span class="function">save</span>(user);
-}</code></pre>
-        </section>
+                    <p><strong>Q: Your resource servers verify JWTs entirely offline using a cached public key, with no call back to the authorization server. A customer's account is compromised and you need to immediately cut off their access. What can you actually do, and what can't you?</strong><br>
+                    You cannot invalidate already-issued access tokens before their natural
+                    expiry — that capability was traded away for the offline verification
+                    property in the first place. What you can do: revoke the customer's
+                    refresh token(s) immediately in the store that tracks them, which
+                    prevents any new access token from being minted going forward; rely on
+                    short access-token lifetimes (minutes) to bound how long the compromised
+                    access is still usable regardless; and if the threat model genuinely
+                    requires instant, hard revocation even mid-lifetime, that requires adding
+                    back a check the offline model was designed to avoid — a lightweight
+                    denylist of revoked <code>jti</code> values that resource servers
+                    consult, accepting the shared-state dependency for that specific,
+                    rare case rather than for every request.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Security Best Practices</h2>
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="auth-vs-authz.html" class="related-link"><span class="related-icon">🪪</span>Authentication vs Authorization</a>
+                    <a href="https-ssl.html" class="related-link"><span class="related-icon">🛡️</span>HTTPS &amp; SSL/TLS</a>
+                    <a href="password-hashing.html" class="related-link"><span class="related-icon">🔒</span>Password Hashing</a>
+                    <a href="session-mgmt.html" class="related-link"><span class="related-icon">🍪</span>Session Management</a>
+                    <a href="oauth.html" class="related-link"><span class="related-icon">🔗</span>OAuth 2.0</a>
+                </div>
+            </section>
 
-            <div class="best-practices">
-                <h3>JWT Security Checklist</h3>
-                <ul>
-                    <li><strong>Use strong secrets:</strong> At least 256 bits for HS256, properly generated keys for RS256</li>
-                    <li><strong>Set short expiration:</strong> Access tokens should expire in 15-60 minutes</li>
-                    <li><strong>Validate all claims:</strong> Check issuer, audience, expiration, not-before</li>
-                    <li><strong>Use HTTPS only:</strong> Never transmit JWTs over unencrypted connections</li>
-                    <li><strong>Don't store sensitive data:</strong> JWTs are not encrypted by default</li>
-                    <li><strong>Implement refresh token rotation:</strong> Issue new refresh token on each use</li>
-                    <li><strong>Validate algorithm:</strong> Prevent "none" algorithm attacks</li>
-                </ul>
-            </div>
+        </main>
 
-            <h3>Common Vulnerabilities to Avoid</h3>
-            <pre><code><span class="comment">// VULNERABILITY 1: Algorithm confusion attack</span>
-<span class="comment">// Attacker changes alg to "none" or HS256 when RS256 expected</span>
-
-<span class="comment">// SECURE: Explicitly specify expected algorithm</span>
-<span class="class-name">Jwts</span>.<span class="function">parser</span>()
-    .<span class="function">verifyWith</span>(key)  <span class="comment">// This enforces the correct algorithm</span>
-    .<span class="function">build</span>()
-    .<span class="function">parseSignedClaims</span>(token);
-
-<span class="comment">// VULNERABILITY 2: Weak secret</span>
-<span class="comment">// DON'T: String secret = "secret123";</span>
-<span class="comment">// DO: Use cryptographically secure random bytes</span>
-<span class="class-name">SecretKey</span> key = <span class="class-name">Keys</span>.<span class="function">secretKeyFor</span>(<span class="class-name">SignatureAlgorithm</span>.HS256);
-
-<span class="comment">// VULNERABILITY 3: Token in URL</span>
-<span class="comment">// DON'T: /api/data?token=eyJ...</span>
-<span class="comment">// DO: Use Authorization header</span>
-
-<span class="comment">// VULNERABILITY 4: Missing expiration validation</span>
-<span class="comment">// Always check exp claim</span>
-<span class="keyword">if</span> (<span class="function">isTokenExpired</span>(token)) {
-    <span class="keyword">throw new</span> <span class="class-name">TokenExpiredException</span>();
-}</code></pre>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Never Trust Client Input</div>
-                <p>Always validate JWTs on the server. The signature verification is what makes JWTs secure - without it, anyone could create a fake token with any claims they want.</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>JWT</strong> = Header + Payload + Signature (three Base64URL parts)</li>
-                    <li><strong>Stateless:</strong> Server doesn't store session data</li>
-                    <li><strong>Claims:</strong> Standard (iss, sub, exp) and custom (roles, permissions)</li>
-                    <li><strong>Not encrypted:</strong> Anyone can read the payload; signature prevents tampering</li>
-                    <li><strong>Short-lived:</strong> Access tokens should expire quickly (15-60 min)</li>
-                    <li><strong>Refresh tokens:</strong> Longer-lived, used to get new access tokens</li>
-                    <li><strong>Revocation:</strong> Use blocklists, short expiry, or token versioning</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="auth-vs-authz.html" class="related-link">Authentication vs Authorization</a>
-                <a href="oauth2.html" class="related-link">OAuth 2.0</a>
-                <a href="session-management.html" class="related-link">Session Management</a>
-                <a href="https-ssl.html" class="related-link">HTTPS & SSL/TLS</a>
-            </div>
-        </section>
-    </main>
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

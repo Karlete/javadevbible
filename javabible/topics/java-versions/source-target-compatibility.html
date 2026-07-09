@@ -1,264 +1,392 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.source-target-compatibility.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Source/Target Compatibility - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#java-versions">Java Versions</a> / Source/Target Compatibility
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#versions" data-i18n="nav.versions">Java Versions &amp; Compatibility</a> /
+                Source/Target Compatibility
             </nav>
-            <h1>Source/Target Compatibility</h1>
-            <p class="topic-subtitle">Controlling Java Compilation Version Settings</p>
-            <a href="../../index.html#java-versions" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.source-target-compatibility.h1">Source/Target Compatibility</h1>
+            <p class="topic-subtitle" data-i18n="topic.source-target-compatibility.subtitle">Controlling exactly which language syntax the compiler accepts and which bytecode version it produces — and why --release is the only option that actually protects you</p>
+            <a href="../../index.html#versions" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>Understanding Source and Target</h2>
-            <p>When compiling Java code, you can control which language features are allowed (source) and which JVM version the bytecode should be compatible with (target).</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">Key Concepts</div>
-                <ul>
-                    <li><strong>Source</strong> - Which Java language version syntax to accept</li>
-                    <li><strong>Target</strong> - Which JVM version the bytecode should run on</li>
-                    <li><strong>Release</strong> (Java 9+) - Combined source, target, and API compatibility</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Compiler Options</h2>
+        <main class="topic-content">
 
-            <h3>Using javac Directly</h3>
-            <pre><code><span class="comment"># Compile for Java 11 source, targeting Java 11 bytecode</span>
-javac --source 11 --target 11 MyClass.java
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Source/Target Compatibility Controls — and Why It's Not One Setting</h2>
+                <p>The previous page established that compile time and runtime are
+                    genuinely separate phases. Source/target compatibility is where that
+                    distinction becomes a compiler flag: <strong>source</strong> controls
+                    which language syntax <code>javac</code> will accept from your
+                    <code>.java</code> files, and <strong>target</strong> controls which
+                    bytecode version it emits for the JVM to run later — potentially a much
+                    older JVM than the one doing the compiling. Developing on JDK 21 while
+                    deploying to a fleet of Java 11 servers is the ordinary case this exists
+                    to handle, and getting it wrong doesn't always fail loudly.</p>
 
-<span class="comment"># Short form</span>
-javac -source 11 -target 11 MyClass.java
-
-<span class="comment"># Using --release (recommended for Java 9+)</span>
-javac --release 11 MyClass.java</code></pre>
-
-            <h3>Source vs Target Explained</h3>
-            <pre><code><span class="comment">// With --source 8, this code FAILS (var not available in Java 8)</span>
-<span class="keyword">var</span> list = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">String</span>&gt;();  <span class="comment">// Error!</span>
-
-<span class="comment">// With --source 11, this code compiles</span>
-<span class="keyword">var</span> list = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">String</span>&gt;();  <span class="comment">// OK</span>
-
-<span class="comment">// --target controls the bytecode version</span>
-<span class="comment">// Compiled with --target 11, runs on Java 11+ JVM only</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>The --release Option (Recommended)</h2>
-            <p>Java 9 introduced the <code>--release</code> option which is the preferred way to specify compatibility. It sets source, target, AND restricts the available APIs to that version.</p>
-
-            <pre><code><span class="comment"># Using --release ensures API compatibility</span>
-javac --release 11 MyClass.java
-
-<span class="comment"># Equivalent to (but safer than):</span>
-javac --source 11 --target 11 -bootclasspath &lt;path-to-jdk11-rt.jar&gt; MyClass.java</code></pre>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Why --release is Better</div>
-                <p>Using only <code>--source</code> and <code>--target</code> doesn't prevent you from using APIs that don't exist in the target version. The <code>--release</code> flag ensures you only use APIs available in that Java version.</p>
-            </div>
-
-            <h3>Example: API Compatibility Issue</h3>
-            <pre><code><span class="comment">// Compiling with JDK 17: --source 8 --target 8</span>
-<span class="keyword">public class</span> <span class="class-name">Example</span> {
-    <span class="keyword">public void</span> <span class="function">test</span>() {
-        <span class="comment">// This compiles! But String.isBlank() doesn't exist in Java 8!</span>
-        <span class="keyword">boolean</span> blank = <span class="string">"test"</span>.isBlank();  <span class="comment">// Compiles but fails at runtime on Java 8</span>
+                <pre><code><span class="comment">// BEFORE — compiling on JDK 17 for a Java 8 target, using only -source/-target</span>
+<span class="comment">$ javac -source 8 -target 8 OrderService.java</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="keyword">public boolean</span> <span class="function">isValidCode</span>(<span class="class-name">String</span> code) {
+        <span class="keyword">return</span> !code.isBlank();   <span class="comment">// COMPILES — javac only checks syntax against Java 8,
+                                     // it never checks whether isBlank() actually EXISTS
+                                     // in Java 8's API. It doesn't; isBlank() is Java 11.</span>
     }
 }
+<span class="comment">// This class compiles cleanly, ships, and throws NoSuchMethodError the moment
+// it actually runs on a real Java 8 JVM — a failure -source/-target can't see
+// coming, because JDK 17's own bootclasspath was silently used to resolve
+// String during compilation.</span>
 
-<span class="comment">// Compiling with JDK 17: --release 8</span>
-<span class="comment">// This correctly FAILS at compile time:</span>
-<span class="comment">// error: cannot find symbol - method isBlank()</span></code></pre>
-        </section>
+<span class="comment">// AFTER — using --release, which restricts the API surface too</span>
+<span class="comment">$ javac --release 8 OrderService.java</span>
+<span class="comment">// error: cannot find symbol
+//   symbol: method isBlank()
+// Caught at compile time — the build fails HERE, not in production on a
+// server that doesn't have this method at all.</span></code></pre>
 
-        <section class="content-section">
-            <h2>Maven Configuration</h2>
+                <div class="info-box note">
+                    <div class="info-box-title">Three related but distinct settings</div>
+                    <ul>
+                        <li><strong>Source</strong> — which language version's syntax is accepted (can I write <code>var</code>? a <code>record</code>? a sealed class?)</li>
+                        <li><strong>Target</strong> — which class file version is produced (which minimum JVM can load the result at all)</li>
+                        <li><strong><code>--release</code></strong> (Java 9+) — sets source and target together, <em>and</em> restricts which JDK APIs are visible to exactly that version's actual API surface</li>
+                    </ul>
+                </div>
+            </section>
 
-            <h3>Using maven-compiler-plugin</h3>
-            <pre><code><span class="comment">&lt;!-- Recommended: Using release (Java 9+) --&gt;</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — COMPILER OPTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Compiler Options</h2>
+
+                <h3>Using <code>javac</code> directly</h3>
+                <pre><code><span class="comment"># Compile Java 11 syntax, targeting Java 11 bytecode</span>
+javac --source <span class="number">11</span> --target <span class="number">11</span> OrderService.java
+javac -source <span class="number">11</span> -target <span class="number">11</span> OrderService.java   <span class="comment"># short form, same effect</span>
+
+<span class="comment"># The recommended form since Java 9 — see below for why</span>
+javac --release <span class="number">11</span> OrderService.java</code></pre>
+
+                <h3>Source restricts syntax; target restricts bytecode — independently</h3>
+                <pre><code><span class="comment">// With --source 8: this fails — var didn't exist yet</span>
+<span class="keyword">var</span> orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">Order</span>&gt;();   <span class="comment">// Error!</span>
+
+<span class="comment">// With --source 11: this compiles fine</span>
+<span class="keyword">var</span> orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">Order</span>&gt;();   <span class="comment">// OK</span>
+
+<span class="comment">// --target independently controls the produced class file version —
+// a class compiled with --target 11 simply refuses to load on a Java 8 JVM,
+// regardless of whether its source used any Java 9+ syntax at all</span></code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">A compiler warning you should never silence without understanding it</div>
+                    <p>Using <code>-source</code>/<code>-target</code> without also pointing
+                        <code>-bootclasspath</code> at the actual target JDK's API classes
+                        triggers: <code>warning: [options] bootstrap class path not set in
+                        conjunction with -source 8</code>. This warning exists precisely
+                        because of the failure mode shown in Section 0 — the compiler is
+                        telling you it's resolving standard library classes from whatever
+                        JDK is running <code>javac</code> right now, not from the target
+                        version, and it cannot verify API compatibility as a result.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — THE --release OPTION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The <code>--release</code> Option — Why It's the Only Safe Default</h2>
+                <p>Introduced in Java 9, <code>--release</code> sets source and target
+                    together, <em>and</em> — this is the part <code>-source</code>/<code>-target</code>
+                    cannot do — restricts the visible JDK API surface to exactly what
+                    existed in that version, using a bundled symbol table rather than
+                    whatever JDK happens to be running the compiler.</p>
+
+                <pre><code><span class="comment"># Equivalent in intent to this, but built in and verified — not something
+# you'd want to hand-maintain a matching bootclasspath JAR for yourself</span>
+javac --release <span class="number">11</span> OrderService.java
+<span class="comment"># vs. the old, fragile manual equivalent:</span>
+<span class="comment"># javac -source 11 -target 11 -bootclasspath &lt;path-to-jdk11-rt.jar&gt; OrderService.java</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Preview features add an even stricter pin than --release</div>
+                    <p>Compiling with <code>--enable-preview</code> (to use a feature still
+                        in preview, like the String Templates covered on
+                        <a href="version-history.html">Java Version History</a> before their
+                        withdrawal) does more than set the class file's major version — it
+                        sets the <strong>minor version to <code>0xFFFF</code></strong>,
+                        a special marker meaning "only the exact same JDK feature-version
+                        build that compiled this may run it." This is stricter than ordinary
+                        target compatibility: a normal Java 17-targeted class runs on any
+                        Java 17+ JVM, but a preview-compiled class won't run on a
+                        <em>different build</em> of the very same major version unless that
+                        build is also invoked with <code>--enable-preview</code>. It's a
+                        deliberate, structural reminder that preview features are not
+                        production-stable — the JVM itself refuses to treat them as such.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — BUILD TOOL CONFIGURATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Build Tool Configuration</h2>
+
+                <h3>Maven — <code>maven-compiler-plugin</code></h3>
+                <pre><code><span class="comment">&lt;!-- Recommended: release (Java 9+) --&gt;</span>
 &lt;plugin&gt;
     &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
     &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
-    &lt;version&gt;3.11.0&lt;/version&gt;
+    &lt;version&gt;3.13.0&lt;/version&gt;
     &lt;configuration&gt;
         &lt;release&gt;17&lt;/release&gt;
     &lt;/configuration&gt;
 &lt;/plugin&gt;
 
-<span class="comment">&lt;!-- Alternative: Using source and target --&gt;</span>
-&lt;plugin&gt;
-    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
-    &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
-    &lt;version&gt;3.11.0&lt;/version&gt;
-    &lt;configuration&gt;
-        &lt;source&gt;17&lt;/source&gt;
-        &lt;target&gt;17&lt;/target&gt;
-    &lt;/configuration&gt;
-&lt;/plugin&gt;</code></pre>
-
-            <h3>Using Properties (Shorthand)</h3>
-            <pre><code><span class="comment">&lt;!-- In pom.xml properties section --&gt;</span>
+<span class="comment">&lt;!-- Shorthand: properties section --&gt;</span>
 &lt;properties&gt;
-    <span class="comment">&lt;!-- Recommended for Java 9+ --&gt;</span>
     &lt;maven.compiler.release&gt;17&lt;/maven.compiler.release&gt;
-
-    <span class="comment">&lt;!-- OR for older approach --&gt;</span>
-    &lt;maven.compiler.source&gt;17&lt;/maven.compiler.source&gt;
-    &lt;maven.compiler.target&gt;17&lt;/maven.compiler.target&gt;
 &lt;/properties&gt;</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Gradle Configuration</h2>
-
-            <h3>Kotlin DSL (build.gradle.kts)</h3>
-            <pre><code><span class="comment">// Using toolchain (recommended)</span>
+                <h3>Gradle — Kotlin DSL</h3>
+                <pre><code><span class="comment">// Toolchain — recommended; also selects a matching JDK if one isn't already installed</span>
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(<span class="number">17</span>))
     }
 }
 
-<span class="comment">// OR using sourceCompatibility/targetCompatibility</span>
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
-<span class="comment">// OR using release option</span>
+<span class="comment">// Direct release option on the compile task</span>
 tasks.withType&lt;JavaCompile&gt; {
     options.release.set(<span class="number">17</span>)
 }</code></pre>
 
-            <h3>Groovy DSL (build.gradle)</h3>
-            <pre><code><span class="comment">// Using toolchain</span>
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(<span class="number">17</span>)
-    }
-}
+                <div class="info-box note">
+                    <div class="info-box-title">Prefer a Gradle toolchain over bare <code>sourceCompatibility</code>/<code>targetCompatibility</code></div>
+                    <p>The older <code>sourceCompatibility</code>/<code>targetCompatibility</code>
+                        properties are the Gradle equivalent of raw
+                        <code>-source</code>/<code>-target</code> — same API-surface gap
+                        described above. A toolchain block additionally guarantees the build
+                        uses an actual JDK of that version to compile, rather than
+                        whatever JDK happens to be running Gradle itself, which matters the
+                        moment a CI runner's default JDK doesn't match your project's
+                        target.</p>
+                </div>
+            </section>
 
-<span class="comment">// Using source/target compatibility</span>
-sourceCompatibility = <span class="string">'17'</span>
-targetCompatibility = <span class="string">'17'</span>
-
-<span class="comment">// Using release option</span>
-compileJava {
-    options.release = <span class="number">17</span>
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Cross-Compilation Scenarios</h2>
-
-            <h3>Compiling for Older JVM</h3>
-            <pre><code><span class="comment">// Scenario: Develop on JDK 21, deploy on Java 11</span>
-<span class="comment">// Use --release to ensure compatibility</span>
-
-<span class="comment">&lt;!-- Maven --&gt;</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — CROSS-COMPILATION SCENARIOS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Cross-Compilation — Developing Ahead of Your Deployment Target</h2>
+                <pre><code><span class="comment">// Scenario: develop on JDK 21, deploy to a fleet still running Java 11</span>
 &lt;properties&gt;
     &lt;maven.compiler.release&gt;11&lt;/maven.compiler.release&gt;
 &lt;/properties&gt;
 
-<span class="comment">// This prevents using Java 17+ features like:</span>
-<span class="comment">// - Records</span>
-<span class="comment">// - Sealed classes</span>
-<span class="comment">// - Pattern matching</span>
-<span class="comment">// - Text blocks</span></code></pre>
+<span class="comment">// --release 11 rejects every Java 12+ addition at compile time, not deploy time:
+// records, sealed classes, pattern matching, text blocks, virtual threads —
+// all become compile errors immediately, rather than runtime surprises</span></code></pre>
 
-            <h3>Feature Availability by Version</h3>
-            <pre><code><span class="comment">// Features require minimum source version:</span>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Feature</th><th>Minimum <code>--release</code></th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Lambdas, Streams, <code>Optional</code></td><td>8</td></tr>
+                        <tr><td><code>var</code> for local variables</td><td>10</td></tr>
+                        <tr><td>Records (standard)</td><td>16</td></tr>
+                        <tr><td>Sealed classes, text blocks (standard)</td><td>17</td></tr>
+                        <tr><td>Virtual threads, record patterns, sequenced collections</td><td>21</td></tr>
+                        <tr><td>Flexible constructor bodies, module import declarations, scoped values</td><td>25</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-<span class="comment">// Java 8: Lambda, Streams, Optional</span>
-names.stream().filter(n -&gt; n.startsWith(<span class="string">"A"</span>));
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — TROUBLESHOOTING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Troubleshooting</h2>
 
-<span class="comment">// Java 10: var for local variables</span>
-<span class="keyword">var</span> list = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">String</span>&gt;();
+                <pre><code><span class="comment">// "source release X requires target release X or later"
+// Cause: target is set lower than source</span>
+javac --source <span class="number">17</span> --target <span class="number">11</span> OrderService.java   <span class="comment">// Error — target can't be older than source</span>
 
-<span class="comment">// Java 14+: Records (preview in 14-15, standard in 16+)</span>
-<span class="keyword">record</span> <span class="class-name">Person</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> age) {}
+<span class="comment">// "class file has wrong version X.0, should be Y.0"
+// Cause: running bytecode on a JVM OLDER than the target it was compiled for
+// — this is the JVM enforcing the class file version check covered in full
+// on Version Compatibility</span>
 
-<span class="comment">// Java 15+: Text blocks</span>
-<span class="class-name">String</span> json = <span class="string">"""
-    {"name": "test"}
-    """</span>;
+<span class="comment">// "cannot find symbol" for an API that clearly exists in your JDK's docs
+// Cause: --release is doing its job — that API doesn't exist in the release
+// version you specified, even though it exists in the JDK actually running javac</span></code></pre>
 
-<span class="comment">// Java 17+: Sealed classes</span>
-<span class="keyword">sealed class</span> <span class="class-name">Shape</span> <span class="keyword">permits</span> <span class="class-name">Circle</span>, <span class="class-name">Rectangle</span> {}</code></pre>
-        </section>
+                <h3>Checking effective settings</h3>
+                <pre><code><span class="comment"># Maven</span>
+mvn help:effective-pom | grep -A5 <span class="string">"maven-compiler-plugin"</span>
 
-        <section class="content-section">
-            <h2>Troubleshooting</h2>
-
-            <h3>Common Errors</h3>
-            <pre><code><span class="comment">// Error: "source release X requires target release X or later"</span>
-<span class="comment">// Cause: Target version is lower than source version</span>
-javac --source 17 --target 11 MyClass.java  <span class="comment">// Error!</span>
-
-<span class="comment">// Error: "class file has wrong version X.0, should be Y.0"</span>
-<span class="comment">// Cause: Running bytecode on older JVM than it was compiled for</span>
-
-<span class="comment">// Error: "cannot find symbol" for newer APIs</span>
-<span class="comment">// Cause: Using --release restricts available APIs</span>
-<span class="comment">// Solution: Use APIs available in target version</span></code></pre>
-
-            <h3>Checking Effective Settings</h3>
-            <pre><code><span class="comment"># Maven - show effective compiler settings</span>
-mvn help:effective-pom | grep -A5 "maven-compiler-plugin"
-
-<span class="comment"># Gradle - show Java configuration</span>
+<span class="comment"># Gradle</span>
 ./gradlew properties | grep -i java
 
-<span class="comment"># Check compiled class version</span>
-javap -verbose MyClass.class | grep "major version"</code></pre>
-        </section>
+<span class="comment"># The actual class file version that was produced</span>
+javap -verbose OrderService.class | grep <span class="string">"major version"</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Recommendations</div>
-                <ul>
-                    <li>Always use <code>--release</code> instead of separate source/target for Java 9+</li>
-                    <li>Match your development JDK with the minimum supported runtime version when possible</li>
-                    <li>Test on the actual JVM versions you plan to support</li>
-                    <li>Use Java Toolchains in Gradle for consistent builds across environments</li>
-                    <li>Document the minimum Java version in your README</li>
-                </ul>
-            </div>
-        </section>
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Use <code>--release</code> (or its Maven/Gradle equivalents) instead of separate source/target for any Java 9+ toolchain</li>
+                        <li>Use a Gradle toolchain, or pin an explicit JDK version in CI, rather than relying on whatever JDK happens to be installed on the build agent</li>
+                        <li>Actually test on the real minimum JVM version you claim to support — a successful <code>--release</code> compile catches API mismatches, but not runtime behavior differences</li>
+                        <li>Document the minimum supported Java version explicitly in the project's README or build file comments</li>
+                        <li>Treat any <code>--enable-preview</code>-compiled artifact as inherently non-portable across JDK builds, not just across major versions</li>
+                    </ul>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="version-compatibility.html" class="related-link">Version Compatibility</a>
-                <a href="runtime-compile-time.html" class="related-link">Runtime vs Compile Time</a>
-                <a href="../build-tools/maven.html" class="related-link">What is Maven?</a>
-            </div>
-        </section>
-    </main>
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't rely on <code>-source</code>/<code>-target</code> alone and assume it protects you from using APIs unavailable in your deployment target — it only checks syntax, never the API surface</li>
+                        <li>Don't ignore the "bootstrap class path not set" warning — it's telling you exactly the gap that causes runtime <code>NoSuchMethodError</code>s in production</li>
+                        <li>Don't set target lower than source — the compiler rejects this combination outright, and for good reason: newer syntax can't be expressed in older bytecode</li>
+                        <li>Don't ship a preview-feature-compiled artifact expecting it to run on any JVM matching the major version — it's pinned to the exact build that compiled it</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's the difference between <code>--source</code> and <code>--target</code>?</strong><br>
+                    <code>--source</code> controls which language syntax the compiler
+                    accepts — whether <code>var</code> or records are allowed in your
+                    <code>.java</code> files. <code>--target</code> controls which class
+                    file (bytecode) version is produced, which determines the minimum JVM
+                    version that can load and run the result.</p>
+
+                    <p><strong>Q: Why is <code>--release</code> preferred over separate <code>--source</code>/<code>--target</code> flags?</strong><br>
+                    <code>--source</code>/<code>--target</code> only check language syntax
+                    and set the output bytecode version — they don't verify that the APIs
+                    you call actually existed in that target version. <code>--release</code>
+                    additionally restricts the visible JDK API surface to exactly that
+                    version, so calling a method that was added later becomes a compile
+                    error instead of a runtime crash on the actual deployment target.</p>
+
+                    <p><strong>Q: Can you set target to an older version than source?</strong><br>
+                    No — the compiler rejects it with "source release X requires target
+                    release X or later." Bytecode for an older JVM can't represent language
+                    constructs newer than that JVM's own class file format supports.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A team compiles with JDK 17 using <code>-source 8 -target 8</code>, and the build succeeds. In production on an actual Java 8 server, it throws <code>NoSuchMethodError</code>. Explain exactly why the compiler didn't catch this.</strong><br>
+                    <code>-source</code> and <code>-target</code> only control which
+                    language syntax is accepted and which class file version is emitted —
+                    neither one restricts which JDK API methods are visible during
+                    compilation. Without an explicit <code>-bootclasspath</code> pointing at
+                    a real Java 8 <code>rt.jar</code>, the compiler resolves standard library
+                    classes like <code>String</code> from whatever JDK is actually running
+                    <code>javac</code> — JDK 17 in this case — which includes methods like
+                    <code>isBlank()</code> that didn't exist in Java 8 at all. The code
+                    compiles cleanly because JDK 17's <code>String</code> genuinely has that
+                    method; it fails at runtime because the actual Java 8 JVM's
+                    <code>String</code> class doesn't. <code>--release 8</code> would have
+                    caught this at compile time by using a curated symbol table for Java 8's
+                    actual API surface instead of the running JDK's.</p>
+
+                    <p><strong>Q: Why does a class compiled with <code>--enable-preview</code> fail to run even on a JVM of the exact same major version, unless that JVM is also invoked with <code>--enable-preview</code>?</strong><br>
+                    Preview-compiled class files set their minor version field to the
+                    special value <code>0xFFFF</code>, distinct from the ordinary minor
+                    version used by stable class files. A JVM checks for this marker
+                    specifically and refuses to load such a class unless it was itself
+                    started with <code>--enable-preview</code> — this is a deliberate,
+                    structural safeguard, not a version-numbering coincidence. It exists
+                    precisely because preview features are, by design, unstable and subject
+                    to change or withdrawal between even minor point releases of the same
+                    major version — the JVM enforces that these artifacts can never
+                    accidentally be mistaken for, or run as, production-stable bytecode.</p>
+
+                    <p><strong>Q: A CI pipeline's build agent has JDK 21 installed by default, but the project specifies <code>maven.compiler.release=17</code>. Is this configuration sufficient to guarantee the build behaves identically to a machine with JDK 17 actually installed?</strong><br>
+                    <code>maven.compiler.release</code> guarantees source syntax and API
+                    surface restriction to Java 17 — the compiled bytecode and any
+                    compile-time API check will be correct regardless of which JDK invokes
+                    <code>javac</code>. What it does NOT guarantee is that the build runs
+                    the compiler itself using a JDK 17 toolchain, or that any
+                    annotation-processing or build-plugin code that inspects the running
+                    JDK's own version behaves as if it were JDK 17 — those still see JDK 21.
+                    For full parity, pair <code>release</code> with an explicit Maven
+                    toolchain (or Gradle's <code>languageVersion</code> toolchain
+                    configuration) that provisions and invokes an actual JDK 17 to run the
+                    build, rather than relying on the release flag alone to paper over a
+                    mismatched build-agent JDK.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="jdk-jre-jvm.html" class="related-link"><span class="related-icon">☕</span>JDK vs JRE vs JVM</a>
+                    <a href="version-history.html" class="related-link"><span class="related-icon">🕰️</span>Java Version History</a>
+                    <a href="runtime-compile-time.html" class="related-link"><span class="related-icon">⚙️</span>Runtime vs Compile Time</a>
+                    <a href="version-compatibility.html" class="related-link"><span class="related-icon">🔗</span>Version Compatibility</a>
+                    <a href="backward-compatibility.html" class="related-link"><span class="related-icon">⏮️</span>Backward Compatibility</a>
+                    <a href="../build-tools/maven.html" class="related-link"><span class="related-icon">📦</span>What is Maven?</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

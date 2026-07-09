@@ -1,135 +1,187 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.version-compatibility.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Version Compatibility - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#java-versions">Java Versions</a> / Version Compatibility
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#versions" data-i18n="nav.versions">Java Versions &amp; Compatibility</a> /
+                Version Compatibility
             </nav>
-            <h1>Version Compatibility</h1>
-            <p class="topic-subtitle">Understanding Java Binary and API Compatibility</p>
-            <a href="../../index.html#java-versions" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.version-compatibility.h1">Version Compatibility</h1>
+            <p class="topic-subtitle" data-i18n="topic.version-compatibility.subtitle">How the JVM actually enforces the class file version it will and won't load — the exact mechanism behind UnsupportedClassVersionError</p>
+            <a href="../../index.html#versions" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is Version Compatibility?</h2>
-            <p>Version compatibility in Java refers to the ability of code compiled with one version of Java to run on different versions of the JVM. Java maintains strong backward compatibility, but understanding the nuances is essential for multi-version environments.</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">Key Compatibility Types</div>
-                <ul>
-                    <li><strong>Binary Compatibility</strong> - Can compiled bytecode run on a different JVM version?</li>
-                    <li><strong>Source Compatibility</strong> - Can source code compile with a different JDK version?</li>
-                    <li><strong>API Compatibility</strong> - Are the same classes and methods available?</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Class File Version Numbers</h2>
-            <p>Each Java version produces class files with a specific major version number. The JVM uses this to determine compatibility.</p>
+        <main class="topic-content">
 
-            <pre><code><span class="comment">// Check class file version with javap</span>
-<span class="comment">// javap -verbose MyClass.class | grep "major version"</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Version Compatibility — and What Actually Enforces It?</h2>
+                <p>The previous page showed how <code>--release</code> controls what
+                    <code>javac</code> is willing to compile. This page is about the other
+                    side of that same coin: what the <strong>JVM</strong> does the moment it
+                    actually tries to load a compiled class file, and exactly why it accepts
+                    some and rejects others. Every class file carries an explicit major
+                    version number, and the rule the JVM enforces is strict and
+                    one-directional — a JVM runs class files from its own version or
+                    <em>earlier</em>, never later. There's no negotiation, no partial
+                    compatibility, no "it might work" — the check happens at class-loading
+                    time, before a single instruction of your code executes.</p>
 
-<span class="comment">// Major version numbers:</span>
-<span class="comment">// Java 8  = 52</span>
-<span class="comment">// Java 11 = 55</span>
-<span class="comment">// Java 17 = 61</span>
-<span class="comment">// Java 21 = 65</span></code></pre>
+                <pre><code><span class="comment">// BEFORE — deploying without checking the target JVM at all</span>
+<span class="comment">$ java -jar order-service.jar
+Error: A JNI error has occurred, please check your installation and try again
+Exception in thread "main" java.lang.UnsupportedClassVersionError:
+  com/shop/OrderService has been compiled by a more recent version of the
+  Java Runtime (class file version 65.0), this version of the Java Runtime
+  only recognizes class file versions up to 61.0</span>
+<span class="comment">// Compiled with --release 21 (class file major version 65), deployed to a
+// server still running Java 17 (which only accepts up to major version 61).
+// This fails at the exact moment the JVM tries to load the class — not on
+// the first line of actual application logic.</span>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Forward Compatibility Limitation</div>
-                <p>A JVM can run class files from its version or <em>earlier</em>, but NOT later versions. Java 11 cannot run classes compiled with Java 17.</p>
-            </div>
+<span class="comment">// AFTER — verifying the class file version BEFORE shipping</span>
+<span class="comment">$ javap -verbose OrderService.class | grep "major version"
+  major version: 65</span>
+<span class="comment">// 65 means Java 21+ only. Compare directly against `java -version` on the
+// actual target server before deploying — this one check would have caught
+// the mismatch in a five-second local command, not a production incident.</span></code></pre>
 
-            <h3>Version Number Reference Table</h3>
-            <pre><code><span class="comment">Java Version    Class File Version    Major Number</span>
-Java 1.1        45.0                  45
-Java 1.2        46.0                  46
-Java 1.3        47.0                  47
-Java 1.4        48.0                  48
-Java 5          49.0                  49
-Java 6          50.0                  50
-Java 7          51.0                  51
-Java 8          52.0                  52
-Java 9          53.0                  53
-Java 10         54.0                  54
-Java 11         55.0                  55
-Java 12         56.0                  56
-Java 17         61.0                  61
-Java 21         65.0                  65</code></pre>
-        </section>
+                <div class="info-box note">
+                    <div class="info-box-title">Three distinct kinds of compatibility</div>
+                    <ul>
+                        <li><strong>Binary compatibility</strong> — will this compiled <code>.class</code> file load on that JVM?</li>
+                        <li><strong>Source compatibility</strong> — will this <code>.java</code> file compile against that JDK?</li>
+                        <li><strong>API compatibility</strong> — do the classes and methods this code calls actually exist in that version? (covered in depth on <a href="source-target-compatibility.html">Source/Target Compatibility</a>)</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Checking Compatibility</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — CLASS FILE VERSION NUMBERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Class File Version Numbers — the Mechanism Itself</h2>
+                <p>Every <code>.class</code> file's first eight bytes are structural: the
+                    4-byte magic number <code>0xCAFEBABE</code> (identifying it as Java
+                    bytecode at all), followed by a 2-byte minor version and a 2-byte major
+                    version. The major version is what the JVM checks against its own
+                    maximum supported version before doing anything else — the pattern is a
+                    flat, predictable increment: Java 8 is major version 52, and every
+                    release since adds exactly 1.</p>
 
-            <h3>Determine Class File Version</h3>
-            <pre><code><span class="comment">// Using javap command</span>
-$ javap -verbose MyClass.class | grep "major version"
-  major version: 61
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Java version</th><th>Class file major version</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>8</td><td>52</td></tr>
+                        <tr><td>9</td><td>53</td></tr>
+                        <tr><td>10</td><td>54</td></tr>
+                        <tr><td>11</td><td>55</td></tr>
+                        <tr><td>17</td><td>61</td></tr>
+                        <tr><td>21</td><td>65</td></tr>
+                        <tr><td><strong>25</strong></td><td><strong>69</strong></td></tr>
+                        <tr><td>26</td><td>70</td></tr>
+                    </tbody>
+                </table>
 
-<span class="comment">// Programmatically in Java</span>
-<span class="keyword">public class</span> <span class="class-name">ClassVersionChecker</span> {
+                <div class="info-box warning">
+                    <div class="info-box-title">Forward compatibility does not exist — and the JVM checks this before loading a single instruction</div>
+                    <p>A JVM accepts its own major version or lower, and nothing higher —
+                        full stop. Java 17 (major version 61) cannot run a class compiled
+                        for Java 21 (major version 65), regardless of whether the actual
+                        code inside that class uses any Java 21-specific language feature at
+                        all. The check is purely numeric and happens during class loading,
+                        before verification, before linking, before <code>main()</code> ever
+                        runs — which is exactly why the failure in Section 0 happens
+                        instantly, with an empty stack trace pointing at nothing in your own
+                        business logic.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — CHECKING COMPATIBILITY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Checking Compatibility Before You Deploy</h2>
+
+                <h3>From the command line</h3>
+                <pre><code>javap -verbose OrderService.class | grep <span class="string">"major version"</span>
+<span class="comment">#   major version: 61</span>
+
+java -version
+<span class="comment"># openjdk version "17.0.9" ...  — compare this directly against the class file's major version</span></code></pre>
+
+                <h3>Programmatically — reading the raw bytes yourself</h3>
+                <pre><code><span class="keyword">public class</span> <span class="class-name">ClassVersionChecker</span> {
     <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
         <span class="keyword">try</span> (<span class="class-name">DataInputStream</span> dis = <span class="keyword">new</span> <span class="class-name">DataInputStream</span>(
-                <span class="keyword">new</span> <span class="class-name">FileInputStream</span>(<span class="string">"MyClass.class"</span>))) {
-
-            <span class="keyword">int</span> magic = dis.readInt();  <span class="comment">// 0xCAFEBABE</span>
+                <span class="keyword">new</span> <span class="class-name">FileInputStream</span>(<span class="string">"OrderService.class"</span>))) {
+            <span class="keyword">int</span> magic = dis.readInt();               <span class="comment">// must be 0xCAFEBABE</span>
             <span class="keyword">int</span> minor = dis.readUnsignedShort();
             <span class="keyword">int</span> major = dis.readUnsignedShort();
-
             <span class="class-name">System</span>.out.println(<span class="string">"Major version: "</span> + major);
         }
     }
 }</code></pre>
 
-            <h3>Check Runtime Version</h3>
-            <pre><code><span class="comment">// Get current Java runtime version</span>
-<span class="class-name">String</span> version = <span class="class-name">System</span>.getProperty(<span class="string">"java.version"</span>);
-<span class="class-name">System</span>.out.println(<span class="string">"Java version: "</span> + version);
+                <h3>Checking the running JVM's own version</h3>
+                <pre><code><span class="class-name">String</span> version = <span class="class-name">System</span>.getProperty(<span class="string">"java.version"</span>);
 
-<span class="comment">// Java 9+ - More detailed version info</span>
-<span class="class-name">Runtime</span>.<span class="class-name">Version</span> runtimeVersion = <span class="class-name">Runtime</span>.version();
-<span class="class-name">System</span>.out.println(<span class="string">"Feature: "</span> + runtimeVersion.feature());  <span class="comment">// e.g., 17</span>
-<span class="class-name">System</span>.out.println(<span class="string">"Interim: "</span> + runtimeVersion.interim());  <span class="comment">// e.g., 0</span>
-<span class="class-name">System</span>.out.println(<span class="string">"Update: "</span> + runtimeVersion.update());    <span class="comment">// e.g., 1</span></code></pre>
-        </section>
+<span class="comment">// Java 9+ — structured version access, no string parsing needed</span>
+<span class="class-name">Runtime.Version</span> runtimeVersion = <span class="class-name">Runtime</span>.version();
+<span class="class-name">System</span>.out.println(<span class="string">"Feature: "</span> + runtimeVersion.feature());   <span class="comment">// e.g. 17</span>
+<span class="class-name">System</span>.out.println(<span class="string">"Update: "</span> + runtimeVersion.update());     <span class="comment">// e.g. 9</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Multi-Release JAR Files</h2>
-            <p>Java 9 introduced Multi-Release JARs (MRJAR) that can contain version-specific implementations, allowing a single JAR to work optimally on multiple Java versions.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — MULTI-RELEASE JARs
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Multi-Release JARs — One Artifact, Several Bytecode Versions</h2>
+                <p>Java 9 introduced Multi-Release JARs (JEP 238): a single JAR that ships
+                    a baseline class alongside version-specific overrides, letting a
+                    library use a newer, better implementation automatically on newer JVMs
+                    while still working correctly on older ones.</p>
 
-            <pre><code><span class="comment">// Multi-Release JAR structure</span>
-myapp.jar
-├── META-INF
-│   ├── MANIFEST.MF        <span class="comment"># Contains "Multi-Release: true"</span>
-│   └── versions
-│       ├── 9
-│       │   └── com/example/Helper.class  <span class="comment"># Java 9+ version</span>
-│       ├── 11
-│       │   └── com/example/Helper.class  <span class="comment"># Java 11+ version</span>
-│       └── 17
-│           └── com/example/Helper.class  <span class="comment"># Java 17+ version</span>
-└── com
-    └── example
-        └── Helper.class    <span class="comment"># Base version (Java 8 compatible)</span></code></pre>
+                <pre><code>catalog-utils.jar
+├── META-INF/
+│   ├── MANIFEST.MF              <span class="comment"># declares Multi-Release: true</span>
+│   └── versions/
+│       ├── 11/com/shop/Helper.class   <span class="comment"># used on Java 11+</span>
+│       └── 17/com/shop/Helper.class   <span class="comment"># used on Java 17+ — takes priority over the 11 version there</span>
+└── com/shop/Helper.class        <span class="comment"># base version — used on anything below 11</span></code></pre>
 
-            <h3>Creating Multi-Release JAR with Maven</h3>
-            <pre><code><span class="comment">&lt;!-- pom.xml configuration --&gt;</span>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
 &lt;plugin&gt;
     &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
     &lt;artifactId&gt;maven-jar-plugin&lt;/artifactId&gt;
-    &lt;version&gt;3.3.0&lt;/version&gt;
     &lt;configuration&gt;
         &lt;archive&gt;
             &lt;manifestEntries&gt;
@@ -138,116 +190,209 @@ myapp.jar
         &lt;/archive&gt;
     &lt;/configuration&gt;
 &lt;/plugin&gt;</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Common Compatibility Issues</h2>
+                <div class="info-box note">
+                    <div class="info-box-title">A real caveat: not every tool understands Multi-Release JARs</div>
+                    <p><code>java -jar</code> and a compliant classloader handle version
+                        selection automatically per JEP 238 — but older build tools, some
+                        static analyzers, and naive "unzip and scan every .class file"
+                        tooling built before MRJARs existed can see only the base version,
+                        or worse, get confused by multiple classes sharing the same fully
+                        qualified name across <code>versions/</code> directories. Verify any
+                        MRJAR dependency against the actual tools in your pipeline, not just
+                        against <code>java -jar</code> working correctly by itself.</p>
+                </div>
+            </section>
 
-            <h3>1. Removed APIs</h3>
-            <pre><code><span class="comment">// Java EE modules removed in Java 11</span>
-<span class="comment">// These no longer work without adding explicit dependencies:</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — COMMON COMPATIBILITY ISSUES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Common Compatibility Issues</h2>
 
-<span class="comment">// JAXB (XML Binding) - removed in Java 11</span>
-<span class="keyword">import</span> javax.xml.bind.JAXBContext;  <span class="comment">// Won't compile!</span>
+                <h3>Removed APIs</h3>
+                <pre><code><span class="comment">// javax.xml.bind (JAXB) was removed from the JDK itself in Java 11</span>
+<span class="keyword">import</span> javax.xml.bind.JAXBContext;   <span class="comment">// won't compile on 11+ without an explicit dependency</span>
 
-<span class="comment">// Solution: Add Maven dependency</span>
-<span class="comment">// &lt;dependency&gt;</span>
-<span class="comment">//     &lt;groupId&gt;jakarta.xml.bind&lt;/groupId&gt;</span>
-<span class="comment">//     &lt;artifactId&gt;jakarta.xml.bind-api&lt;/artifactId&gt;</span>
-<span class="comment">//     &lt;version&gt;4.0.0&lt;/version&gt;</span>
-<span class="comment">// &lt;/dependency&gt;</span></code></pre>
+<span class="comment">// Migration: add the Jakarta EE equivalent explicitly</span>
+<span class="comment">// &lt;dependency&gt;
+//     &lt;groupId&gt;jakarta.xml.bind&lt;/groupId&gt;
+//     &lt;artifactId&gt;jakarta.xml.bind-api&lt;/artifactId&gt;
+// &lt;/dependency&gt;</span></code></pre>
 
-            <h3>2. Deprecated for Removal</h3>
-            <pre><code><span class="comment">// Check for deprecation warnings</span>
-<span class="annotation">@Deprecated</span>(since = <span class="string">"9"</span>, forRemoval = <span class="keyword">true</span>)
-<span class="keyword">public void</span> <span class="function">oldMethod</span>() {
-    <span class="comment">// Will be removed in future version</span>
-}
+                <div class="info-box important">
+                    <div class="info-box-title">The full removal timeline — not every API disappears the same way</div>
+                    <p>Some APIs go from deprecated to gone within one release; others take
+                        decades, with an intermediate "degrade to throw an exception" stage
+                        in between. <code>Thread.stop()</code> was deprecated in Java 1.2
+                        (1998) and only fully removed in Java 26 — the complete, verified
+                        timeline for that and other real APIs (Security Manager, the Applet
+                        API) is covered in depth on
+                        <a href="backward-compatibility.html">Backward Compatibility</a>.</p>
+                </div>
 
-<span class="comment">// Compile with -Xlint:deprecation to see warnings</span>
-<span class="comment">// javac -Xlint:deprecation MyClass.java</span></code></pre>
+                <h3>Reflective access under the module system (Java 9+)</h3>
+                <pre><code><span class="comment">// Worked without complaint on Java 8:</span>
+<span class="class-name">Field</span> field = <span class="class-name">SomeClass</span>.<span class="keyword">class</span>.getDeclaredField(<span class="string">"internalCache"</span>);
+field.setAccessible(<span class="keyword">true</span>);   <span class="comment">// may now fail — strong encapsulation restricts this by default</span>
 
-            <h3>3. Reflection Access (Java 9+)</h3>
-            <pre><code><span class="comment">// Strong encapsulation in Java 9+ modules</span>
-<span class="comment">// Illegal reflective access will generate warnings or errors</span>
-
-<span class="comment">// Old code that worked in Java 8:</span>
-<span class="class-name">Field</span> field = <span class="class-name">SomeClass</span>.<span class="keyword">class</span>.getDeclaredField(<span class="string">"privateField"</span>);
-field.setAccessible(<span class="keyword">true</span>);  <span class="comment">// May fail in Java 9+!</span>
-
-<span class="comment">// Solution: Add JVM arguments</span>
+<span class="comment">// Explicit opt-in required:</span>
 <span class="comment">// --add-opens java.base/java.lang=ALL-UNNAMED</span></code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Compatibility Testing Strategies</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — COMPATIBILITY TESTING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Compatibility Testing Strategies</h2>
 
-            <h3>Running Tests Against Multiple JDKs</h3>
-            <pre><code><span class="comment">&lt;!-- Maven Toolchains Plugin --&gt;</span>
+                <h3>Maven Toolchains — build against a specific, real JDK</h3>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
 &lt;plugin&gt;
     &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
     &lt;artifactId&gt;maven-toolchains-plugin&lt;/artifactId&gt;
-    &lt;version&gt;3.1.0&lt;/version&gt;
     &lt;executions&gt;
-        &lt;execution&gt;
-            &lt;goals&gt;
-                &lt;goal&gt;toolchain&lt;/goal&gt;
-            &lt;/goals&gt;
-        &lt;/execution&gt;
+        &lt;execution&gt;&lt;goals&gt;&lt;goal&gt;toolchain&lt;/goal&gt;&lt;/goals&gt;&lt;/execution&gt;
     &lt;/executions&gt;
     &lt;configuration&gt;
-        &lt;toolchains&gt;
-            &lt;jdk&gt;
-                &lt;version&gt;17&lt;/version&gt;
-            &lt;/jdk&gt;
-        &lt;/toolchains&gt;
+        &lt;toolchains&gt;&lt;jdk&gt;&lt;version&gt;17&lt;/version&gt;&lt;/jdk&gt;&lt;/toolchains&gt;
     &lt;/configuration&gt;
 &lt;/plugin&gt;</code></pre>
 
-            <h3>CI/CD Matrix Testing</h3>
-            <pre><code><span class="comment"># GitHub Actions example</span>
+                <h3>CI matrix testing — every LTS you actually claim to support</h3>
+                <pre><code><span class="comment"># GitHub Actions</span>
 jobs:
   test:
     strategy:
       matrix:
-        java: [11, 17, 21]
+        java: [<span class="number">17</span>, <span class="number">21</span>, <span class="number">25</span>]
     steps:
-      - uses: actions/setup-java@v3
+      - uses: actions/setup-java@v4
         with:
-          java-version: ${{ matrix.java }}
+          java-version: <span class="string">${{ matrix.java }}</span>
+          distribution: <span class="string">'temurin'</span>
       - run: mvn test</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Best Practices</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Compatibility Guidelines</div>
-                <ul>
-                    <li>Always specify source and target versions explicitly in build configuration</li>
-                    <li>Test on all JVM versions you intend to support</li>
-                    <li>Use dependency analysis tools to detect incompatible libraries</li>
-                    <li>Monitor deprecation warnings and plan for removed APIs</li>
-                    <li>Consider Multi-Release JARs for libraries that need to work across versions</li>
-                </ul>
-            </div>
-        </section>
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Verify a JAR's class file major version against the actual target JVM's version before every deployment, not just before the first one</li>
+                        <li>Specify <code>--release</code> explicitly in build configuration (see Source/Target Compatibility) rather than relying on the build agent's default JDK</li>
+                        <li>Test against every JVM version you claim to support, in CI, not just locally</li>
+                        <li>Verify a Multi-Release JAR dependency against every tool in your actual build/scan pipeline, not just against running it directly</li>
+                        <li>Monitor deprecation warnings continuously and check the full removal timeline (not just "is it removed yet") before upgrading</li>
+                    </ul>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="version-history.html" class="related-link">Java Version History</a>
-                <a href="source-target-compatibility.html" class="related-link">Source/Target Compatibility</a>
-                <a href="backward-compatibility.html" class="related-link">Backward Compatibility</a>
-            </div>
-        </section>
-    </main>
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't assume a successful local build guarantees the artifact will run on the production JVM — the class file version check happens independently, at deploy time, on a potentially different machine</li>
+                        <li>Don't treat <code>UnsupportedClassVersionError</code> as a mysterious failure — it names the exact class file version and the exact maximum the running JVM supports, right in the message</li>
+                        <li>Don't expect any forward compatibility whatsoever — an older JVM will never run a newer class file, regardless of what language features that class file's source actually used</li>
+                        <li>Don't rely on reflective access to internals across a Java 9+ upgrade without testing it explicitly — strong encapsulation changes real, working Java 8 code</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What does a class file's major version number represent, and who checks it?</strong><br>
+                    It identifies which Java version's bytecode format the class was
+                    compiled to. The JVM checks it against its own maximum supported version
+                    the moment it attempts to load the class — before verification, before
+                    linking, before any of the class's own code executes.</p>
+
+                    <p><strong>Q: Can a Java 11 JVM run a class file compiled for Java 17?</strong><br>
+                    No. A JVM only runs class files at its own major version or lower —
+                    there is no forward compatibility at all. Java 11 (major version 55)
+                    rejects anything at major version 56 or higher outright, with
+                    <code>UnsupportedClassVersionError</code>.</p>
+
+                    <p><strong>Q: How do you check a compiled class's major version from the command line?</strong><br>
+                    <code>javap -verbose MyClass.class | grep "major version"</code> — this
+                    prints the exact number, which you can then compare directly against
+                    the target JVM's own <code>java -version</code> output.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A deployment fails instantly with <code>UnsupportedClassVersionError</code>, with no application stack trace at all. Explain precisely why the failure looks like this rather than a normal exception from inside the code.</strong><br>
+                    The major version check happens during class loading, which is a JVM
+                    bootstrapping step that occurs before the class is verified, linked, or
+                    initialized — meaning before any application code, including static
+                    initializers, has run at all. There is no call stack inside your
+                    application to report, because your application never started
+                    executing; the failure is the JVM itself refusing to load the bytecode
+                    in the first place. This is why the error message names the specific
+                    class file version and the running JVM's own maximum, rather than
+                    pointing at any line of business logic — there's no business logic
+                    context to point at yet.</p>
+
+                    <p><strong>Q: A library ships a Multi-Release JAR with a Java 17-specific implementation, but a static analysis tool in your pipeline reports only the base (Java 8) implementation's code paths. Is this a bug in the tool, and what should you actually verify?</strong><br>
+                    Not necessarily a bug — plenty of tooling built before, or without
+                    explicit support for, JEP 238's Multi-Release JAR format simply reads a
+                    JAR as a flat archive and has no concept of version-specific overrides
+                    under <code>META-INF/versions/</code>. This isn't a defect in the JAR;
+                    it's a gap in that specific tool's JAR-reading logic. What actually
+                    needs verifying is whether the tool's blind spot matters for its
+                    purpose — a security scanner missing the Java 17-specific code path
+                    could miss a real vulnerability that only exists in that version's
+                    implementation, which is a meaningfully different risk than simply "the
+                    tool shows outdated info." The fix is confirming MRJAR support in each
+                    pipeline tool specifically, not assuming JEP 238 compliance is universal
+                    across the whole toolchain just because the JVM itself handles it
+                    correctly.</p>
+
+                    <p><strong>Q: Why does the class file version check happen at the byte level (magic number, then minor, then major version) rather than the JVM simply trusting a file's <code>.class</code> extension?</strong><br>
+                    The <code>.class</code> extension is a filesystem convention with zero
+                    enforcement — anything could be named that way. The JVM specification
+                    requires validating the actual structural header (the 4-byte
+                    <code>0xCAFEBABE</code> magic number, confirming this is genuinely a
+                    Java class file at all, followed by the minor and major version fields)
+                    before treating the byte stream as loadable bytecode at all. This is a
+                    basic integrity and safety check independent of version compatibility —
+                    a corrupted file, a renamed non-class file, or a deliberately malformed
+                    file all get rejected at this same structural check, before the
+                    separate major-version compatibility check discussed throughout this
+                    page even runs.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="jdk-jre-jvm.html" class="related-link"><span class="related-icon">☕</span>JDK vs JRE vs JVM</a>
+                    <a href="version-history.html" class="related-link"><span class="related-icon">🕰️</span>Java Version History</a>
+                    <a href="runtime-compile-time.html" class="related-link"><span class="related-icon">⚙️</span>Runtime vs Compile Time</a>
+                    <a href="source-target-compatibility.html" class="related-link"><span class="related-icon">🎯</span>Source/Target Compatibility</a>
+                    <a href="backward-compatibility.html" class="related-link"><span class="related-icon">⏮️</span>Backward Compatibility</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

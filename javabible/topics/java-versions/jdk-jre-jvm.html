@@ -1,361 +1,446 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.jdk-jre-jvm.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JDK vs JRE vs JVM - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#java-versions">Java Versions & Compatibility</a> / JDK vs JRE vs JVM
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#versions" data-i18n="nav.versions">Java Versions &amp; Compatibility</a> /
+                JDK vs JRE vs JVM
             </nav>
-            <h1>JDK vs JRE vs JVM</h1>
-            <p class="topic-subtitle">Understanding the Java Development Kit, Runtime Environment, and Virtual Machine</p>
-            <a href="../../index.html#java-versions" class="back-btn">← Back to Index</a>
+            <h1 data-i18n="topic.jdk-jre-jvm.h1">JDK vs JRE vs JVM</h1>
+            <p class="topic-subtitle" data-i18n="topic.jdk-jre-jvm.subtitle">Three nested layers, not three alternatives — what each actually contains, what's been removed or renamed in recent years, and where a native image changes the equation entirely</p>
+            <a href="../../index.html#versions" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <!-- What It Is -->
-        <section class="content-section">
-            <h2>The Three Key Components</h2>
-            <p>Java's architecture consists of three main components that work together to enable Java development and execution:</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">Quick Summary</div>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What are JDK, JRE, and JVM — and Why Three Names for "Java"?</h2>
+                <p>"Install Java" is not one action — it's shorthand for one of three
+                    genuinely different things, nested inside each other, each solving a
+                    different problem: the <strong>JVM</strong> is the abstract machine that
+                    executes bytecode, the <strong>JRE</strong> is a JVM plus the class
+                    libraries needed to actually run a program, and the <strong>JDK</strong>
+                    is a JRE plus the compiler and tools needed to build one in the first
+                    place. Confusing them is how a production server ends up with a full
+                    development toolchain it doesn't need, or a developer's machine ends up
+                    unable to compile anything at all.</p>
+
+                <pre><code><span class="comment">// BEFORE — treating "Java" as one indivisible thing</span>
+<span class="comment">$ javac MyApp.java
+bash: javac: command not found</span>
+<span class="comment">// A JRE-only installation has no compiler at all — "I installed Java" doesn't
+// specify WHICH of the three things was actually installed.</span>
+
+<span class="comment">// AFTER — knowing exactly which tool does which job in the pipeline</span>
+<span class="class-name">MyApp.java</span>  <span class="comment">──javac (JDK)──▶</span>  <span class="class-name">MyApp.class</span>  <span class="comment">──java (JVM, inside JRE, inside JDK)──▶</span>  running program
+<span class="comment">// javac only exists in the JDK. java (the launcher) exists in both the JDK
+// and a standalone JRE — but a standalone JRE download hasn't existed as a
+// separate artifact from Oracle since Java 11 (more on this below).</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">The relationship, in one line each</div>
+                    <ul>
+                        <li><strong>JDK</strong> = JRE + compiler (<code>javac</code>) + development tools</li>
+                        <li><strong>JRE</strong> = JVM + core class libraries (<code>java.lang</code>, <code>java.util</code>, etc.)</li>
+                        <li><strong>JVM</strong> = the abstract machine that loads, verifies, and executes bytecode</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — JDK
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JDK — Java Development Kit</h2>
+                <p>The complete kit for writing, compiling, packaging, and debugging Java
+                    applications. If you're developing, you always need the JDK — a JRE
+                    alone has no compiler and can't build anything.</p>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Tool</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>javac</code></td><td>Compiles <code>.java</code> source into <code>.class</code> bytecode</td></tr>
+                        <tr><td><code>java</code></td><td>Launches the JVM to run a compiled class or JAR</td></tr>
+                        <tr><td><code>jar</code></td><td>Packages classes and resources into a JAR (see <a href="../servers/war-jar.html">WAR vs JAR Files</a>)</td></tr>
+                        <tr><td><code>javadoc</code></td><td>Generates HTML API documentation from source comments</td></tr>
+                        <tr><td><code>javap</code></td><td>Disassembles a class file — inspect bytecode and constant pool directly</td></tr>
+                        <tr><td><code>jlink</code></td><td>Builds a custom, minimal runtime image containing only the modules an application actually needs</td></tr>
+                    </tbody>
+                </table>
+
+                <pre><code>javac MyApp.java              <span class="comment"># compile</span>
+java MyApp                    <span class="comment"># run</span>
+jar cf myapp.jar *.class      <span class="comment"># package</span>
+javap -c MyApp.class          <span class="comment"># inspect the generated bytecode</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title"><code>jvisualvm</code> is no longer bundled with the JDK</div>
+                    <p>Prior to Java 9, VisualVM shipped inside the JDK as
+                        <code>jvisualvm</code>. It was decoupled and is now a separate
+                        download at <code>visualvm.github.io</code> — a common source of "the
+                        tutorial said it would be here and it isn't" confusion on any
+                        reasonably current JDK.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — JRE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JRE — Java Runtime Environment</h2>
+                <p>Everything needed to <em>run</em> a compiled Java application, and
+                    nothing to build one: the JVM plus the core class libraries a program
+                    depends on at runtime.</p>
+
                 <ul>
-                    <li><strong>JDK</strong> (Java Development Kit) - Complete development environment (includes JRE + development tools)</li>
-                    <li><strong>JRE</strong> (Java Runtime Environment) - Runtime environment for executing Java applications (includes JVM + libraries)</li>
-                    <li><strong>JVM</strong> (Java Virtual Machine) - Abstract machine that executes Java bytecode</li>
-                </ul>
-            </div>
-
-            <h3>The Relationship</h3>
-            <div style="background: #F5F7FA; padding: 2rem; border-radius: 8px; text-align: center; margin: 2rem 0;">
-                <p style="font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">JDK = JRE + Development Tools</p>
-                <p style="font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">JRE = JVM + Libraries</p>
-                <p style="font-size: 1.2rem; font-weight: 600;">JVM = Bytecode Executor</p>
-            </div>
-        </section>
-
-        <!-- JDK -->
-        <section class="content-section">
-            <h2>JDK (Java Development Kit)</h2>
-            <p>The JDK is a complete software development kit required for developing Java applications. It includes everything you need to write, compile, and run Java programs.</p>
-
-            <h3>What's Included in the JDK?</h3>
-            <ul>
-                <li><strong>JRE</strong> - The runtime environment (included within JDK)</li>
-                <li><strong>Java Compiler (javac)</strong> - Converts .java source files to .class bytecode</li>
-                <li><strong>Java Archive Tool (jar)</strong> - Packages classes into JAR files</li>
-                <li><strong>Javadoc</strong> - Documentation generator</li>
-                <li><strong>Debugger (jdb)</strong> - Debug Java applications</li>
-                <li><strong>Additional Development Tools</strong> - jconsole, jvisualvm, etc.</li>
-            </ul>
-
-            <h3>Common JDK Tools</h3>
-            <pre><code><span class="comment"># Compile Java source code</span>
-javac MyProgram.java
-
-<span class="comment"># Run Java application</span>
-java MyProgram
-
-<span class="comment"># Create JAR file</span>
-jar cf myapp.jar *.class
-
-<span class="comment"># Generate documentation</span>
-javadoc -d docs MyProgram.java
-
-<span class="comment"># View class file contents</span>
-javap -c MyProgram.class
-
-<span class="comment"># Monitor JVM</span>
-jconsole</code></pre>
-
-            <h3>When Do You Need the JDK?</h3>
-            <ul>
-                <li>Developing Java applications</li>
-                <li>Compiling Java source code</li>
-                <li>Building and packaging applications</li>
-                <li>Working with IDEs (IntelliJ IDEA, Eclipse, VS Code)</li>
-            </ul>
-
-            <div class="info-box tip">
-                <div class="info-box-title">For Developers</div>
-                <p>If you're a Java developer, you <strong>always need the JDK</strong>. The JRE alone is not sufficient for development work.</p>
-            </div>
-        </section>
-
-        <!-- JRE -->
-        <section class="content-section">
-            <h2>JRE (Java Runtime Environment)</h2>
-            <p>The JRE provides the minimum requirements for executing a Java application. It's designed for end-users who need to run Java programs but don't need development tools.</p>
-
-            <h3>What's Included in the JRE?</h3>
-            <ul>
-                <li><strong>JVM</strong> - The Java Virtual Machine</li>
-                <li><strong>Core Libraries</strong> - java.lang, java.util, java.io, etc.</li>
-                <li><strong>Runtime Libraries</strong> - Supporting files and JAR files</li>
-                <li><strong>Java Plugin</strong> - For running Java in browsers (deprecated)</li>
-                <li><strong>Java Web Start</strong> - For deploying applications (deprecated)</li>
-            </ul>
-
-            <h3>When Do You Need the JRE?</h3>
-            <ul>
-                <li>Running compiled Java applications (.jar or .class files)</li>
-                <li>Deploying applications on production servers</li>
-                <li>End-user machines that only need to execute Java programs</li>
-            </ul>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Important Note (Java 11+)</div>
-                <p>Starting with Java 11, Oracle no longer provides a separate JRE download. The JDK is now the primary distribution. For deployment, you can create custom runtime images using <span class="inline-code">jlink</span>.</p>
-            </div>
-        </section>
-
-        <!-- JVM -->
-        <section class="content-section">
-            <h2>JVM (Java Virtual Machine)</h2>
-            <p>The JVM is an abstract computing machine that enables a computer to run Java programs. It's the core component that provides the "write once, run anywhere" capability.</p>
-
-            <h3>What Does the JVM Do?</h3>
-            <ul>
-                <li><strong>Loads Code</strong> - Loads .class files</li>
-                <li><strong>Verifies Code</strong> - Ensures bytecode is valid and secure</li>
-                <li><strong>Executes Code</strong> - Interprets or compiles bytecode to native machine code</li>
-                <li><strong>Manages Memory</strong> - Handles memory allocation and garbage collection</li>
-                <li><strong>Provides Runtime Environment</strong> - Thread management, security, etc.</li>
-            </ul>
-
-            <h3>JVM Architecture</h3>
-            <div style="background: #F5F7FA; padding: 1.5rem; border-radius: 8px; margin: 1rem 0;">
-                <h4>1. Class Loader Subsystem</h4>
-                <p>Loads .class files into memory</p>
-
-                <h4>2. Runtime Data Areas</h4>
-                <ul>
-                    <li><strong>Heap</strong> - Object memory (shared among all threads)</li>
-                    <li><strong>Stack</strong> - Method calls and local variables (per thread)</li>
-                    <li><strong>Method Area</strong> - Class structures, constant pool</li>
-                    <li><strong>PC Register</strong> - Current instruction address (per thread)</li>
-                    <li><strong>Native Method Stack</strong> - Native method calls</li>
+                    <li><strong>JVM</strong> — the execution engine itself</li>
+                    <li><strong>Core libraries</strong> — <code>java.lang</code>, <code>java.util</code>, <code>java.io</code>, and the rest of the standard library</li>
+                    <li><strong>Supporting runtime files</strong> — property files, resource bundles the libraries depend on</li>
                 </ul>
 
-                <h4>3. Execution Engine</h4>
+                <div class="info-box warning">
+                    <div class="info-box-title">Java Plugin and Java Web Start are not deprecated — they're removed</div>
+                    <p>The browser Java Plugin was removed in JDK 9; Java Web Start was
+                        removed entirely in JDK 11. Neither is coming back, and no current
+                        JDK/JRE distribution includes them — treat any tutorial referencing
+                        them as describing a JDK 8-era environment specifically.</p>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Since Java 11, there's no separate JRE download from Oracle</div>
+                    <p>The JDK became the sole primary distribution. For a minimal
+                        deployment footprint without shipping a full JDK, build a custom
+                        runtime image with <code>jlink</code> — it strips the toolchain down
+                        to exactly the modules an application actually needs, often smaller
+                        than a full JDK by a wide margin.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — JVM
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JVM — Java Virtual Machine</h2>
+                <p>The abstract machine that actually loads, verifies, and executes
+                    bytecode — the component that makes "write once, run anywhere" real,
+                    since the same <code>.class</code> file runs unmodified on any platform
+                    with a compliant JVM.</p>
+
+                <h3>What the JVM does</h3>
                 <ul>
-                    <li><strong>Interpreter</strong> - Executes bytecode line by line</li>
-                    <li><strong>JIT Compiler</strong> - Compiles frequently used code to native code</li>
-                    <li><strong>Garbage Collector</strong> - Automatically reclaims memory</li>
+                    <li><strong>Loads</strong> <code>.class</code> files via the classloader subsystem</li>
+                    <li><strong>Verifies</strong> bytecode is structurally valid and doesn't violate the language's safety guarantees before ever executing it</li>
+                    <li><strong>Executes</strong> — interpreting bytecode directly, or JIT-compiling hot paths to native machine code</li>
+                    <li><strong>Manages memory</strong> — allocation and garbage collection, entirely transparent to application code</li>
                 </ul>
-            </div>
 
-            <h3>Platform Independence</h3>
-            <pre><code><span class="comment">// Java source code (.java)</span>
-<span class="keyword">public class</span> <span class="class-name">Hello</span> {
-    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Hello, World!"</span>);
-    }
-}
+                <h3>Runtime data areas</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Area</th><th>Scope</th><th>Holds</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Heap</strong></td><td>Shared across all threads</td><td>Every object instance</td></tr>
+                        <tr><td><strong>Stack</strong></td><td>Per thread</td><td>Method call frames, local variables</td></tr>
+                        <tr><td><strong>Method Area (Metaspace)</strong></td><td>Shared across all threads</td><td>Class structures, the constant pool</td></tr>
+                        <tr><td><strong>PC Register</strong></td><td>Per thread</td><td>The address of the currently executing instruction</td></tr>
+                        <tr><td><strong>Native Method Stack</strong></td><td>Per thread</td><td>Native (non-Java) method calls</td></tr>
+                    </tbody>
+                </table>
 
-<span class="comment">// Compile to bytecode (.class) - Platform Independent</span>
-<span class="comment">// javac Hello.java</span>
+                <div class="info-box important">
+                    <div class="info-box-title">Metaspace replaced PermGen in Java 8 — and this matters when you hit an OOM</div>
+                    <p>Before Java 8, the Method Area lived inside a fixed-size region of
+                        the heap called <strong>PermGen</strong>, with its own dedicated
+                        failure mode: <code>OutOfMemoryError: PermGen space</code>, commonly
+                        triggered by exactly the classloader leaks described on
+                        <a href="../servers/context.html">Context &amp; Deployment</a> — an
+                        application server hot-redeploying repeatedly without releasing old
+                        classloaders. Since Java 8, this area is <strong>Metaspace</strong>,
+                        allocated from native (off-heap) memory rather than the JVM heap,
+                        and its own failure mode is
+                        <code>OutOfMemoryError: Metaspace</code>. Same underlying leak
+                        mechanism, different memory region, different tuning flags
+                        (<code>-XX:MaxMetaspaceSize</code> rather than
+                        <code>-XX:MaxPermSize</code>) — recognizing which one you're looking
+                        at in a stack trace tells you immediately which Java version-era
+                        mental model applies.</p>
+                </div>
 
-<span class="comment">// JVM executes bytecode on ANY platform</span>
-<span class="comment">// Windows JVM, Linux JVM, Mac JVM all understand the same bytecode</span></code></pre>
+                <h3>Execution engine</h3>
+                <ul>
+                    <li><strong>Interpreter</strong> — executes bytecode instruction by instruction, no upfront compilation cost</li>
+                    <li><strong>JIT compiler</strong> — profiles execution and compiles frequently-run ("hot") code paths to native machine code for the rest of that run</li>
+                    <li><strong>Garbage collector</strong> — reclaims heap memory no longer reachable from any live reference</li>
+                </ul>
+            </section>
 
-            <div class="info-box note">
-                <div class="info-box-title">Write Once, Run Anywhere</div>
-                <p>Java code is compiled to platform-independent bytecode. The JVM translates this bytecode to native machine instructions specific to the underlying operating system and hardware.</p>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — SIDE BY SIDE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Side by Side</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Aspect</th><th>JDK</th><th>JRE</th><th>JVM</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Contains</td><td>JRE + dev tools</td><td>JVM + libraries</td><td>Execution engine only</td></tr>
+                        <tr><td>Has a compiler</td><td>Yes (<code>javac</code>)</td><td>No</td><td>No</td></tr>
+                        <tr><td>Can run programs</td><td>Yes</td><td>Yes</td><td>Yes — it's the part that actually does it</td></tr>
+                        <tr><td>Target user</td><td>Developers</td><td>End users, legacy deployment target</td><td>Internal component, not installed alone</td></tr>
+                        <tr><td>Standalone download today</td><td>Yes — the primary distribution</td><td>Not from Oracle since Java 11 — build one with <code>jlink</code> instead</td><td>Never installed independently</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-        <!-- Comparison Table -->
-        <section class="content-section">
-            <h2>Side-by-Side Comparison</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Feature</th>
-                        <th>JDK</th>
-                        <th>JRE</th>
-                        <th>JVM</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Full Name</strong></td>
-                        <td>Java Development Kit</td>
-                        <td>Java Runtime Environment</td>
-                        <td>Java Virtual Machine</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Purpose</strong></td>
-                        <td>Development</td>
-                        <td>Running applications</td>
-                        <td>Executing bytecode</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Includes</strong></td>
-                        <td>JRE + Dev Tools</td>
-                        <td>JVM + Libraries</td>
-                        <td>Execution engine</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Contains Compiler</strong></td>
-                        <td>Yes (javac)</td>
-                        <td>No</td>
-                        <td>No</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Can Run Programs</strong></td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Can Compile Code</strong></td>
-                        <td>Yes</td>
-                        <td>No</td>
-                        <td>No</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Target Users</strong></td>
-                        <td>Developers</td>
-                        <td>End users</td>
-                        <td>Internal component</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Size</strong></td>
-                        <td>Largest (~150-300 MB)</td>
-                        <td>Medium (~50-100 MB)</td>
-                        <td>Part of JRE</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — DISTRIBUTIONS AND VENDORS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JDK Distributions and Vendors</h2>
+                <p>All major distributions implement the same OpenJDK-derived
+                    specification; they differ in support terms, release cadence, and
+                    licensing.</p>
 
-        <!-- Practical Examples -->
-        <section class="content-section">
-            <h2>Practical Scenarios</h2>
+                <ul>
+                    <li><strong>Oracle JDK</strong> — Oracle's own build; licensing terms for production use have changed more than once (No-Fee Terms and Conditions for recent versions vs. the older subscription-based model for earlier ones) — always verify Oracle's current terms directly before a production deployment, since this has real cost implications that shift by version</li>
+                    <li><strong>OpenJDK</strong> — the open-source reference implementation everything else derives from</li>
+                    <li><strong>Eclipse Temurin</strong> — formerly branded AdoptOpenJDK; renamed in 2021 under the Eclipse Adoptium project. Same lineage, new name — not two competing distributions</li>
+                    <li><strong>Amazon Corretto</strong> — free, production-ready, no-cost long-term support from AWS</li>
+                    <li><strong>Azul Zulu</strong> — enterprise-support-focused OpenJDK build</li>
+                    <li><strong>GraalVM</strong> — covered separately below; adds ahead-of-time native compilation on top of a standard JDK</li>
+                </ul>
 
-            <h3>Scenario 1: Java Developer</h3>
-            <div class="info-box tip">
-                <p><strong>You need:</strong> JDK</p>
-                <p><strong>Why:</strong> You need to write, compile, and test Java code. The JDK includes the compiler (javac) and all development tools.</p>
-                <pre><code><span class="comment"># Download and install JDK</span>
-<span class="comment"># Write code</span>
-MyApp.java
+                <pre><code>java -version
+<span class="comment"># openjdk version "21.0.1" 2023-10-17 LTS
+# OpenJDK Runtime Environment Temurin-21.0.1+12 (build 21.0.1+12-LTS)
+# OpenJDK 64-Bit Server VM Temurin-21.0.1+12 (build 21.0.1+12-LTS, mixed mode, sharing)</span>
 
-<span class="comment"># Compile with JDK's javac</span>
-javac MyApp.java
-
-<span class="comment"># Run with JDK's java</span>
-java MyApp</code></pre>
-            </div>
-
-            <h3>Scenario 2: Production Server</h3>
-            <div class="info-box tip">
-                <p><strong>You need:</strong> JRE (or custom runtime with jlink)</p>
-                <p><strong>Why:</strong> You only need to run compiled Java applications. No development or compilation happens on production servers.</p>
-                <pre><code><span class="comment"># Production server setup</span>
-<span class="comment"># Install JRE or use Docker with JRE base image</span>
-
-<span class="comment"># Run your compiled JAR</span>
-java -jar myapp.jar</code></pre>
-            </div>
-
-            <h3>Scenario 3: End User Running Desktop App</h3>
-            <div class="info-box tip">
-                <p><strong>They need:</strong> JRE</p>
-                <p><strong>Why:</strong> They just want to run the Java application, not develop it.</p>
-            </div>
-        </section>
-
-        <!-- Versions and Vendors -->
-        <section class="content-section">
-            <h2>JDK Distributions and Vendors</h2>
-            <p>Multiple vendors provide JDK distributions, all implementing the same Java specifications:</p>
-
-            <h3>Major JDK Distributions</h3>
-            <ul>
-                <li><strong>Oracle JDK</strong> - Official Oracle distribution (commercial license for production)</li>
-                <li><strong>OpenJDK</strong> - Open-source reference implementation</li>
-                <li><strong>Amazon Corretto</strong> - Free, production-ready distribution by AWS</li>
-                <li><strong>Azul Zulu</strong> - Enterprise-ready distribution</li>
-                <li><strong>AdoptOpenJDK / Eclipse Temurin</strong> - Community-maintained builds</li>
-                <li><strong>GraalVM</strong> - High-performance JDK with ahead-of-time compilation</li>
-            </ul>
-
-            <h3>Checking Your Java Version</h3>
-            <pre><code><span class="comment"># Check JDK/JRE version</span>
-java -version
-
-<span class="comment"># Output example:</span>
-<span class="comment"># openjdk version "17.0.2" 2022-01-18</span>
-<span class="comment"># OpenJDK Runtime Environment (build 17.0.2+8-86)</span>
-<span class="comment"># OpenJDK 64-Bit Server VM (build 17.0.2+8-86, mixed mode)</span>
-
-<span class="comment"># Check compiler version</span>
 javac -version
+<span class="comment"># javac 21.0.1</span></code></pre>
+            </section>
 
-<span class="comment"># Output example:</span>
-<span class="comment"># javac 17.0.2</span></code></pre>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — GRAALVM NATIVE IMAGE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Production Reality — GraalVM Native Image Changes the Equation</h2>
+                <p>Everything above assumes a JVM is present and running at all times —
+                    interpreting or JIT-compiling bytecode as the program executes.
+                    <strong>GraalVM Native Image</strong> takes a fundamentally different
+                    approach: it ahead-of-time compiles a Java application, at build time,
+                    into a single standalone native executable that needs <strong>no
+                    JVM at runtime whatsoever</strong>.</p>
 
-        <!-- Common Questions -->
-        <section class="content-section">
-            <h2>Common Questions</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Aspect</th><th>Standard JVM (interpreted + JIT)</th><th>GraalVM Native Image</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Startup time</td><td>JVM warm-up, JIT profiling ramp-up</td><td>Near-instant — the executable is already machine code</td></tr>
+                        <tr><td>Memory footprint</td><td>JVM overhead plus the application</td><td>Substantially lower — no JVM to host</td></tr>
+                        <tr><td>Build time</td><td>Fast — <code>javac</code> alone</td><td>Much slower — whole-program ahead-of-time analysis</td></tr>
+                        <tr><td>Reflection, dynamic class loading</td><td>Fully supported</td><td>Requires explicit configuration — the AOT analysis must know about it at build time</td></tr>
+                        <tr><td>Best fit</td><td>Long-running services where JIT eventually reaches peak throughput</td><td>Serverless functions, CLI tools, containers valuing fast cold-start over peak throughput</td></tr>
+                    </tbody>
+                </table>
 
-            <h3>Q: Can I have multiple JDKs installed?</h3>
-            <p><strong>A:</strong> Yes! You can have multiple JDK versions installed simultaneously. Use environment variables (JAVA_HOME) or tools like SDKMAN! or jEnv to manage them.</p>
+                <div class="info-box note">
+                    <div class="info-box-title">Why this matters for the microservices/Kubernetes context already covered in this Bible</div>
+                    <p>Spring Boot 3's native image support (built on GraalVM) exists
+                        specifically for the cold-start-sensitive scenarios described on
+                        <a href="../servers/app-server.html">What is an Application
+                        Server?</a> — a pod that needs to be ready to serve traffic within
+                        milliseconds of starting, rather than after several seconds of JVM
+                        and Spring context warm-up. The trade-off is real: heavy reflection
+                        use (common in some older libraries) and dynamic proxying can require
+                        explicit native-image configuration or simply not work unmodified,
+                        which is why this is an opt-in build profile, not a universal
+                        default.</p>
+                </div>
+            </section>
 
-            <h3>Q: Do I need both JDK and JRE?</h3>
-            <p><strong>A:</strong> No. The JDK includes the JRE. If you have the JDK, you don't need a separate JRE installation.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — PRACTICAL SCENARIOS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Practical Scenarios — What Do You Actually Need?</h2>
 
-            <h3>Q: Can I run Java applications without installing anything?</h3>
-            <p><strong>A:</strong> No. At minimum, you need the JRE (or JDK) to run Java applications. However, you can bundle a JRE with your application using tools like jpackage.</p>
+                <div class="info-box tip">
+                    <p><strong>Writing and compiling code:</strong> the JDK. There's no
+                        substitute — the compiler only exists there.</p>
+                </div>
+                <div class="info-box tip">
+                    <p><strong>Running a compiled application in production:</strong> a JRE
+                        (if you can still find one for your version), a full JDK (fine, just
+                        heavier than necessary), or — the current best practice — a custom
+                        runtime image built with <code>jlink</code> containing only the
+                        modules the application actually uses.</p>
+                </div>
+                <div class="info-box tip">
+                    <p><strong>Fastest possible cold start in a container/serverless
+                        context:</strong> consider a GraalVM Native Image build instead of
+                        shipping any JVM at all — covered above.</p>
+                </div>
+            </section>
 
-            <h3>Q: Is the JVM the same across all operating systems?</h3>
-            <p><strong>A:</strong> The JVM specification is the same, but implementations are platform-specific. Oracle provides different JVM implementations for Windows, Linux, and macOS.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-            <h3>Q: What's the difference between JRE and JVM?</h3>
-            <p><strong>A:</strong> JVM is just the execution engine. JRE = JVM + Java class libraries + supporting files. You can't run Java with just the JVM; you need the complete JRE.</p>
-        </section>
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Use <code>jlink</code> to build a minimal runtime image for production deployment rather than shipping a full JDK unnecessarily</li>
+                        <li>Verify Oracle's current licensing terms directly before choosing Oracle JDK for a production deployment — terms have changed multiple times and vary by version</li>
+                        <li>Recognize <code>OutOfMemoryError: Metaspace</code> as today's equivalent of the old PermGen exhaustion — same underlying classloader-leak class of bug, different memory region</li>
+                        <li>Consider GraalVM Native Image for genuinely cold-start-sensitive deployments (serverless, scale-to-zero containers), not as a default choice for every service</li>
+                        <li>Manage multiple installed JDK versions with a tool like SDKMAN! or jEnv rather than manually juggling <code>JAVA_HOME</code></li>
+                    </ul>
 
-        <!-- Why It Matters -->
-        <section class="content-section">
-            <h2>Why Understanding These Differences Matters</h2>
-            <ul>
-                <li><strong>Correct Installation</strong> - Know what to download for your needs</li>
-                <li><strong>Optimization</strong> - Production servers don't need full JDK</li>
-                <li><strong>Troubleshooting</strong> - Understand error messages and where issues occur</li>
-                <li><strong>Performance Tuning</strong> - JVM parameters for memory and performance</li>
-                <li><strong>Deployment</strong> - Create minimal runtime images with jlink</li>
-            </ul>
-        </section>
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't assume "I installed Java" specifies which of JDK/JRE/JVM is actually present — a JRE-only environment has no compiler</li>
+                        <li>Don't follow a tutorial referencing the Java Plugin or Java Web Start as if they're available today — both are fully removed, not merely deprecated</li>
+                        <li>Don't assume AdoptOpenJDK and Eclipse Temurin are two different distributions to choose between — they're the same lineage under a 2021 rename</li>
+                        <li>Don't reach for GraalVM Native Image by default — the build-time cost and reflection limitations are real trade-offs, not free wins</li>
+                    </ul>
+                </div>
+            </section>
 
-        <!-- Related Topics -->
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="version-history.html" class="related-link">Java Version History</a>
-                <a href="compatibility.html" class="related-link">Version Compatibility</a>
-                <a href="../advanced/jvm-internals.html" class="related-link">JVM Internals</a>
-                <a href="../advanced/garbage-collection.html" class="related-link">Garbage Collection</a>
-                <a href="../build-tools/maven.html" class="related-link">Maven</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's the relationship between JDK, JRE, and JVM?</strong><br>
+                    They're nested, not alternatives: the JVM executes bytecode; the JRE is
+                    a JVM plus the core class libraries needed to actually run a program;
+                    the JDK is a JRE plus the compiler and development tools needed to build
+                    one. Having the JDK means you already have everything the JRE and JVM
+                    provide.</p>
+
+                    <p><strong>Q: Why can't you compile Java code with only a JRE installed?</strong><br>
+                    The JRE contains the JVM and runtime libraries, but not
+                    <code>javac</code>, the compiler — that tool exists only in the JDK. A
+                    JRE-only environment can run already-compiled <code>.class</code> files
+                    and JARs, but has no way to turn <code>.java</code> source into
+                    bytecode.</p>
+
+                    <p><strong>Q: What makes Java "write once, run anywhere"?</strong><br>
+                    Source code compiles to platform-independent bytecode, not native
+                    machine code. Any platform with a compliant JVM can load and execute
+                    that same bytecode, translating it to that platform's native
+                    instructions internally — the bytecode itself never changes across
+                    platforms.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A long-running application server repeatedly throws <code>OutOfMemoryError: Metaspace</code> after many hot redeployments. What does this tell you about the JVM version and the likely root cause?</strong><br>
+                    Metaspace only exists as a concept since Java 8 — an application still
+                    reporting PermGen-related errors would indicate an older JVM. The
+                    underlying cause is almost always a classloader leak: each hot redeploy
+                    should make the previous deployment's entire classloader — and every
+                    class structure loaded through it, which lives in Metaspace — eligible
+                    for garbage collection, but something outside that deployment's own
+                    lifecycle (an unreleased thread, a registered JDBC driver, a
+                    <code>ThreadLocal</code> on a shared pool thread) still references it.
+                    This is the exact mechanism covered in depth on Context &amp;
+                    Deployment; the fix is a symmetric cleanup in
+                    <code>contextDestroyed()</code>, not simply raising
+                    <code>-XX:MaxMetaspaceSize</code>, which only delays the same failure.</p>
+
+                    <p><strong>Q: Why does building a GraalVM Native Image require explicit configuration for reflection-heavy code, when the same code runs fine on a standard JVM?</strong><br>
+                    A standard JVM resolves reflective calls dynamically at runtime — the
+                    class being reflected on doesn't need to be known in advance. Native
+                    Image performs a whole-program, ahead-of-time analysis at build time to
+                    determine exactly which classes, methods, and fields the final
+                    executable needs, and anything reached only through reflection is
+                    invisible to that static analysis unless explicitly declared via
+                    reflection configuration metadata. Frameworks and libraries built around
+                    heavy runtime reflection (older ORM proxies, some AOP implementations)
+                    can silently fail at native-image runtime — not at build time — if this
+                    configuration is incomplete, which is why native-image adoption requires
+                    validating the full dependency tree, not just the application's own
+                    code.</p>
+
+                    <p><strong>Q: Why did Oracle move the Method Area out of the heap and into native memory (Metaspace) in Java 8, rather than simply resizing PermGen?</strong><br>
+                    PermGen had a fixed maximum size that had to be set upfront
+                    (<code>-XX:MaxPermSize</code>) and was difficult to size correctly in
+                    advance — applications with many classes or heavy dynamic class
+                    generation (common with certain frameworks and application servers
+                    hosting multiple deployments) routinely exhausted it regardless of how
+                    generously it was configured. Moving class metadata to Metaspace, backed
+                    by native memory that grows dynamically up to the available system
+                    memory (or an optional cap), removed the need to pre-size this region at
+                    all for most applications and eliminated an entire historically common
+                    class of tuning-related outage — at the cost of needing to actively
+                    monitor native memory consumption instead, since "unbounded by default"
+                    cuts both ways.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="version-history.html" class="related-link"><span class="related-icon">🕰️</span>Java Version History</a>
+                    <a href="runtime-compile-time.html" class="related-link"><span class="related-icon">⚙️</span>Runtime vs Compile Time</a>
+                    <a href="source-target-compatibility.html" class="related-link"><span class="related-icon">🎯</span>Source/Target Compatibility</a>
+                    <a href="version-compatibility.html" class="related-link"><span class="related-icon">🔗</span>Version Compatibility</a>
+                    <a href="backward-compatibility.html" class="related-link"><span class="related-icon">⏮️</span>Backward Compatibility</a>
+                    <a href="../advanced/jvm-internals.html" class="related-link"><span class="related-icon">🧠</span>JVM Internals</a>
+                    <a href="../advanced/garbage-collection.html" class="related-link"><span class="related-icon">🗑️</span>Garbage Collection</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

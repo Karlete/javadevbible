@@ -1,308 +1,456 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.runtime-compile-time.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Runtime vs Compile Time - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#java-versions">Java Versions</a> / Runtime vs Compile Time
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#versions" data-i18n="nav.versions">Java Versions &amp; Compatibility</a> /
+                Runtime vs Compile Time
             </nav>
-            <h1>Runtime vs Compile Time</h1>
-            <p class="topic-subtitle">Understanding When Things Happen in Java</p>
-            <a href="../../index.html#java-versions" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.runtime-compile-time.h1">Runtime vs Compile Time</h1>
+            <p class="topic-subtitle" data-i18n="topic.runtime-compile-time.subtitle">Which phase actually catches which mistake — and the foundational distinction the next page, Source/Target Compatibility, builds directly on</p>
+            <a href="../../index.html#versions" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>The Two Phases of Java</h2>
-            <p>Java programs go through two distinct phases: compilation (when source code becomes bytecode) and runtime (when bytecode executes on the JVM). Understanding what happens in each phase is fundamental to Java development.</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">Key Distinction</div>
-                <ul>
-                    <li><strong>Compile Time</strong> - Source code (.java) &rarr; Bytecode (.class)</li>
-                    <li><strong>Runtime</strong> - JVM executes the bytecode</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Compile Time</h2>
-            <p>Compile time is when the Java compiler (javac) processes your source code. The compiler performs syntax checking, type checking, and generates bytecode.</p>
+        <main class="topic-content">
 
-            <h3>What Happens at Compile Time</h3>
-            <pre><code><span class="comment">// 1. Syntax checking</span>
-<span class="keyword">int</span> x = <span class="number">5</span>  <span class="comment">// Error: missing semicolon</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Compile Time vs Runtime — and Why the Line Between Them Matters</h2>
+                <p>Every Java program passes through two genuinely separate phases:
+                    <strong>compile time</strong>, when <code>javac</code> turns
+                    <code>.java</code> source into <code>.class</code> bytecode, and
+                    <strong>runtime</strong>, when the JVM actually executes that bytecode.
+                    Knowing which phase catches which category of mistake isn't academic —
+                    it determines whether a bug surfaces as a build failure your CI pipeline
+                    stops on, or as an exception in production at 3 AM. Generics are the
+                    clearest example: they feel like a runtime safety net, but they are
+                    purely a compile-time construct — the type information is erased before
+                    the bytecode is ever generated, which is exactly why certain checks that
+                    look like they should be possible at runtime simply aren't.</p>
+
+                <pre><code><span class="comment">// BEFORE — assuming generics protect you everywhere, including through reflection</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; skus = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="class-name">Method</span> addMethod = skus.getClass().getMethod(<span class="string">"add"</span>, <span class="class-name">Object</span>.<span class="keyword">class</span>);
+addMethod.invoke(skus, <span class="number">12345</span>);   <span class="comment">// compiles and runs fine — reflection bypasses compile-time generics entirely</span>
+<span class="class-name">String</span> firstSku = skus.get(<span class="number">0</span>);    <span class="comment">// ClassCastException — an Integer where a String was "guaranteed"</span>
+
+<span class="comment">// AFTER — knowing generics are erased at runtime, defend where it actually matters</span>
+<span class="keyword">if</span> (!(rawValue <span class="keyword">instanceof</span> <span class="class-name">String</span>)) {
+    <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Expected a String SKU, got "</span> + rawValue.getClass());
+}
+<span class="comment">// A runtime check, because the compiler's generic type check cannot follow you
+// through reflection, raw types, or unchecked casts — it only ever existed at
+// compile time in the first place.</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">The two phases, in one line each</div>
+                    <ul>
+                        <li><strong>Compile time</strong> — source (<code>.java</code>) becomes bytecode (<code>.class</code>); syntax, types, and symbols are checked against the full source, then most of that information is discarded</li>
+                        <li><strong>Runtime</strong> — the JVM loads and executes that bytecode; anything that depends on actual data, actual object identity, or actual timing can only be known here</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — COMPILE TIME
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Compile Time — What <code>javac</code> Actually Checks</h2>
+                <pre><code><span class="comment">// 1. Syntax checking</span>
+<span class="keyword">int</span> x = <span class="number">5</span>   <span class="comment">// Error: ';' expected</span>
 
 <span class="comment">// 2. Type checking</span>
-<span class="class-name">String</span> name = <span class="number">42</span>;  <span class="comment">// Error: incompatible types</span>
+<span class="class-name">String</span> sku = <span class="number">42</span>;   <span class="comment">// Error: incompatible types</span>
 
 <span class="comment">// 3. Symbol resolution</span>
-<span class="class-name">System</span>.out.printn(<span class="string">"Hi"</span>);  <span class="comment">// Error: cannot find symbol 'printn'</span>
+<span class="class-name">System</span>.out.printn(<span class="string">"Hi"</span>);   <span class="comment">// Error: cannot find symbol 'printn'</span>
 
 <span class="comment">// 4. Access checking</span>
-<span class="keyword">private</span> <span class="keyword">int</span> secret = <span class="number">10</span>;
-obj.secret = <span class="number">20</span>;  <span class="comment">// Error: secret has private access</span>
+<span class="keyword">private int</span> internalStock;
+product.internalStock = <span class="number">20</span>;   <span class="comment">// Error: internalStock has private access</span>
 
-<span class="comment">// 5. Constant folding (optimization)</span>
-<span class="keyword">int</span> result = <span class="number">2</span> + <span class="number">3</span>;  <span class="comment">// Compiled as: int result = 5;</span></code></pre>
+<span class="comment">// 5. Constant folding (an optimization, not just a check)</span>
+<span class="keyword">int</span> total = <span class="number">2</span> + <span class="number">3</span>;   <span class="comment">// compiled directly as: int total = 5;</span></code></pre>
 
-            <h3>Compile-Time Constants</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">Constants</span> {
-    <span class="comment">// Compile-time constant (known at compilation)</span>
-    <span class="keyword">static final int</span> MAX_SIZE = <span class="number">100</span>;
-
-    <span class="comment">// NOT a compile-time constant (computed at runtime)</span>
-    <span class="keyword">static final int</span> RANDOM = <span class="keyword">new</span> <span class="class-name">Random</span>().nextInt();
-
-    <span class="comment">// Compile-time constant expression</span>
-    <span class="keyword">static final int</span> DOUBLE_MAX = MAX_SIZE * <span class="number">2</span>;  <span class="comment">// Evaluated at compile time</span>
+                <h3>Compile-time constants — inlined, not just evaluated</h3>
+                <pre><code><span class="keyword">public class</span> <span class="class-name">CatalogConstants</span> {
+    <span class="keyword">static final int</span> MAX_ITEMS_PER_ORDER = <span class="number">100</span>;         <span class="comment">// compile-time constant</span>
+    <span class="keyword">static final int</span> RANDOM_ID = <span class="keyword">new</span> <span class="class-name">Random</span>().nextInt();   <span class="comment">// NOT one — computed at runtime, every time</span>
+    <span class="keyword">static final int</span> ABSOLUTE_MAX = MAX_ITEMS_PER_ORDER * <span class="number">2</span>;   <span class="comment">// still a compile-time constant expression</span>
 }
 
-<span class="comment">// Usage - MAX_SIZE is inlined at compile time</span>
-<span class="keyword">int</span> limit = <span class="class-name">Constants</span>.MAX_SIZE;  <span class="comment">// Compiled as: int limit = 100;</span></code></pre>
+<span class="comment">// Calling code doesn't reference CatalogConstants at runtime for this value —
+// the literal is inlined directly into the caller's own bytecode:</span>
+<span class="keyword">int</span> limit = <span class="class-name">CatalogConstants</span>.MAX_ITEMS_PER_ORDER;   <span class="comment">// compiled as: int limit = 100;</span></code></pre>
 
-            <h3>Compile-Time Errors</h3>
-            <pre><code><span class="comment">// These errors prevent compilation:</span>
+                <div class="info-box warning">
+                    <div class="info-box-title">Inlining is why a compile-time constant needs a recompile to update, not just a redeploy of the constant's own class</div>
+                    <p>Because the literal value is copied directly into every caller's
+                        bytecode at compile time, changing <code>MAX_ITEMS_PER_ORDER</code>
+                        and redeploying only <code>CatalogConstants.class</code> does
+                        nothing for callers compiled against the old value — they still have
+                        <code>100</code> baked into their own bytecode until they're
+                        recompiled against the new constant. This is a real, recurring
+                        production surprise in multi-module builds where one module's JAR
+                        gets updated independently of its callers.</p>
+                </div>
 
-<span class="comment">// Syntax error</span>
-<span class="keyword">public class</span> { }  <span class="comment">// Missing class name</span>
+                <h3>Compile-time errors — these stop the build entirely</h3>
+                <pre><code><span class="comment">// Type mismatch on a generic</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; skus = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">Integer</span>&gt;();   <span class="comment">// Error!</span>
 
-<span class="comment">// Type mismatch</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; names = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;<span class="class-name">Integer</span>&gt;();  <span class="comment">// Error!</span>
-
-<span class="comment">// Unchecked exception not caught</span>
-<span class="keyword">public void</span> <span class="function">read</span>() {
-    <span class="keyword">new</span> <span class="class-name">FileReader</span>(<span class="string">"file.txt"</span>);  <span class="comment">// Error: unhandled IOException</span>
+<span class="comment">// Unhandled checked exception</span>
+<span class="keyword">public void</span> <span class="function">readCatalog</span>() {
+    <span class="keyword">new</span> <span class="class-name">FileReader</span>(<span class="string">"catalog.csv"</span>);   <span class="comment">// Error: unhandled IOException</span>
 }
 
 <span class="comment">// Missing return statement</span>
-<span class="keyword">public int</span> <span class="function">getValue</span>() {
-    <span class="keyword">int</span> x = <span class="number">5</span>;
+<span class="keyword">public int</span> <span class="function">getStockLevel</span>() {
+    <span class="keyword">int</span> level = <span class="number">5</span>;
     <span class="comment">// Error: missing return statement</span>
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Runtime</h2>
-            <p>Runtime is when the JVM loads and executes the compiled bytecode. Many operations that can't be checked at compile time happen here.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — RUNTIME
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Runtime — What the JVM Handles That the Compiler Can't</h2>
+                <pre><code><span class="comment">// 1. Object creation — memory is only actually allocated here</span>
+<span class="class-name">Order</span> order = <span class="keyword">new</span> <span class="class-name">Order</span>();
 
-            <h3>What Happens at Runtime</h3>
-            <pre><code><span class="comment">// 1. Object creation</span>
-<span class="class-name">Object</span> obj = <span class="keyword">new</span> <span class="class-name">MyClass</span>();  <span class="comment">// Memory allocated at runtime</span>
-
-<span class="comment">// 2. Method dispatch (polymorphism)</span>
-<span class="class-name">Animal</span> animal = getAnimal();  <span class="comment">// Could be Dog, Cat, etc.</span>
-animal.speak();  <span class="comment">// Actual method determined at runtime</span>
+<span class="comment">// 2. Method dispatch — which override actually runs depends on the real object</span>
+<span class="class-name">PaymentMethod</span> payment = resolvePaymentMethod(request);   <span class="comment">// could be CreditCard, PayPal, ...</span>
+payment.charge(amount);   <span class="comment">// the ACTUAL method is only known once this line runs</span>
 
 <span class="comment">// 3. Array bounds checking</span>
-<span class="keyword">int</span>[] arr = <span class="keyword">new int</span>[<span class="number">5</span>];
-arr[<span class="number">10</span>] = <span class="number">1</span>;  <span class="comment">// ArrayIndexOutOfBoundsException at runtime</span>
+<span class="keyword">int</span>[] slots = <span class="keyword">new int</span>[<span class="number">5</span>];
+slots[<span class="number">10</span>] = <span class="number">1</span>;   <span class="comment">// ArrayIndexOutOfBoundsException — the compiler has no way to know this in advance</span>
 
 <span class="comment">// 4. Null checks</span>
-<span class="class-name">String</span> s = <span class="keyword">null</span>;
-s.length();  <span class="comment">// NullPointerException at runtime</span>
+<span class="class-name">String</span> code = <span class="keyword">null</span>;
+code.length();   <span class="comment">// NullPointerException — nullability isn't tracked by the type system</span>
 
 <span class="comment">// 5. Class loading</span>
-<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Class</span>.forName(<span class="string">"com.example.MyClass"</span>);  <span class="comment">// Loaded at runtime</span></code></pre>
+<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Class</span>.forName(<span class="string">"com.shop.PromotionEngine"</span>);   <span class="comment">// resolved from a string, only possible at runtime</span></code></pre>
 
-            <h3>Runtime Exceptions</h3>
-            <pre><code><span class="comment">// These errors occur during execution:</span>
-
-<span class="comment">// NullPointerException</span>
-<span class="class-name">String</span> name = <span class="keyword">null</span>;
-name.toUpperCase();  <span class="comment">// Crashes at runtime</span>
+                <h3>Runtime exceptions — the compiler had no way to catch these</h3>
+                <pre><code><span class="comment">// NullPointerException</span>
+<span class="class-name">String</span> code = <span class="keyword">null</span>;
+code.toUpperCase();
 
 <span class="comment">// ClassCastException</span>
-<span class="class-name">Object</span> obj = <span class="string">"Hello"</span>;
-<span class="class-name">Integer</span> num = (<span class="class-name">Integer</span>) obj;  <span class="comment">// Crashes at runtime</span>
+<span class="class-name">Object</span> obj = <span class="string">"discount-code"</span>;
+<span class="class-name">Integer</span> num = (<span class="class-name">Integer</span>) obj;
 
 <span class="comment">// ArithmeticException</span>
-<span class="keyword">int</span> result = <span class="number">10</span> / <span class="number">0</span>;  <span class="comment">// Crashes at runtime</span>
+<span class="keyword">int</span> result = <span class="number">10</span> / <span class="number">0</span>;
 
-<span class="comment">// OutOfMemoryError</span>
-<span class="class-name">List</span>&lt;<span class="keyword">byte</span>[]&gt; list = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-<span class="keyword">while</span> (<span class="keyword">true</span>) {
-    list.add(<span class="keyword">new byte</span>[<span class="number">1_000_000</span>]);  <span class="comment">// Eventually crashes</span>
-}</code></pre>
-        </section>
+<span class="comment">// OutOfMemoryError — a resource limit, not a logic error the compiler could flag</span>
+<span class="class-name">List</span>&lt;<span class="keyword">byte</span>[]&gt; buffers = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="keyword">while</span> (<span class="keyword">true</span>) { buffers.add(<span class="keyword">new byte</span>[<span class="number">1_000_000</span>]); }</code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Type Erasure: Compile Time vs Runtime</h2>
-            <p>Generics in Java are a compile-time feature. Due to type erasure, generic type information is removed at runtime.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — TYPE ERASURE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Type Erasure — Where "Compile-Time-Only" Has Real Consequences</h2>
+                <p>Generics exist purely at compile time. By the time bytecode is
+                    generated, the type parameter is erased — this is precisely why the
+                    Section 0 example above compiles and runs without a single warning until
+                    the moment it actually reads a mistyped value back out.</p>
 
-            <pre><code><span class="comment">// At compile time - type checking happens</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; strings = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-strings.add(<span class="string">"hello"</span>);
-strings.add(<span class="number">42</span>);  <span class="comment">// Compile error!</span>
+                <pre><code><span class="comment">// At compile time — fully type-checked</span>
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; skus = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; quantities = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 
-<span class="comment">// At runtime - type is erased</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; strings = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; ints = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="comment">// At runtime — both are just "List". The type parameter is gone.</span>
+<span class="class-name">System</span>.out.println(skus.getClass() == quantities.getClass());   <span class="comment">// true!</span>
 
-<span class="comment">// At runtime, both are just "List" (raw type)</span>
-<span class="class-name">System</span>.out.println(strings.getClass() == ints.getClass());  <span class="comment">// true!</span>
+<span class="comment">// This is exactly why you can't do this:</span>
+<span class="comment">// if (list instanceof List&lt;String&gt;) { }   // compile error — no type info left to check</span>
+<span class="keyword">if</span> (list <span class="keyword">instanceof</span> <span class="class-name">List</span>&lt;?&gt;) { }   <span class="comment">// OK — the unbounded wildcard makes no claim about the erased type</span></code></pre>
 
-<span class="comment">// This is why you can't do:</span>
-<span class="keyword">if</span> (list <span class="keyword">instanceof</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt;) { }  <span class="comment">// Compile error!</span>
-<span class="keyword">if</span> (list <span class="keyword">instanceof</span> <span class="class-name">List</span>&lt;?&gt;) { }      <span class="comment">// OK - unbounded wildcard</span></code></pre>
+                <div class="info-box warning">
+                    <div class="info-box-title">Practical implications</div>
+                    <p>Generic type parameters aren't available at runtime: you can't
+                        create a generic array (<code>new T[10]</code>), you can't
+                        <code>instanceof</code> against a parameterized type, and reflection
+                        can't recover the original type argument without extra machinery
+                        (like inspecting a subclass's own generic superclass signature —
+                        the "super type token" trick). Any framework that appears to "know"
+                        your generic type at runtime (Jackson deserializing into
+                        <code>List&lt;Product&gt;</code>, for example) is doing exactly this
+                        kind of extra work, not defying erasure.</p>
+                </div>
+            </section>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Type Erasure Implications</div>
-                <p>Generic type parameters are not available at runtime. You cannot create generic arrays, check instanceof with generic types, or get generic type info via reflection (without extra tricks).</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Annotations: Compile vs Runtime</h2>
-            <p>Annotations can be retained for different phases based on their retention policy.</p>
-
-            <pre><code><span class="comment">// SOURCE - discarded after compilation</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — ANNOTATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Annotations — Retained for a Specific Phase, by Design</h2>
+                <pre><code><span class="comment">// SOURCE — discarded after compilation, never reaches the .class file</span>
 <span class="annotation">@Retention</span>(<span class="class-name">RetentionPolicy</span>.SOURCE)
-<span class="keyword">public @interface</span> <span class="class-name">Todo</span> { }  <span class="comment">// Not in .class file</span>
+<span class="keyword">public @interface</span> <span class="class-name">Todo</span> { }
 
-<span class="comment">// CLASS - in .class file, not available at runtime (default)</span>
+<span class="comment">// CLASS — present in the .class file, but not accessible via reflection (this is the default)</span>
 <span class="annotation">@Retention</span>(<span class="class-name">RetentionPolicy</span>.CLASS)
 <span class="keyword">public @interface</span> <span class="class-name">InBytecode</span> { }
 
-<span class="comment">// RUNTIME - available via reflection at runtime</span>
+<span class="comment">// RUNTIME — readable via reflection while the program runs</span>
 <span class="annotation">@Retention</span>(<span class="class-name">RetentionPolicy</span>.RUNTIME)
-<span class="keyword">public @interface</span> <span class="class-name">MyAnnotation</span> { }
+<span class="keyword">public @interface</span> <span class="class-name">AuditLogged</span> { }
 
-<span class="comment">// Common examples:</span>
-<span class="annotation">@Override</span>      <span class="comment">// SOURCE - compiler checks, then discarded</span>
-<span class="annotation">@Deprecated</span>   <span class="comment">// RUNTIME - available for reflection</span>
-<span class="annotation">@Entity</span>       <span class="comment">// RUNTIME - JPA reads at runtime</span></code></pre>
-        </section>
+<span class="comment">// Familiar examples, by actual retention:</span>
+<span class="annotation">@Override</span>       <span class="comment">// SOURCE — the compiler checks it, then it's gone</span>
+<span class="annotation">@Deprecated</span>    <span class="comment">// RUNTIME — tools and reflection can query it</span>
+<span class="annotation">@Entity</span>        <span class="comment">// RUNTIME — Hibernate/JPA reads this while the application is running</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Static vs Dynamic Binding</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — STATIC VS DYNAMIC BINDING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Static vs Dynamic Binding</h2>
 
-            <h3>Static Binding (Compile Time)</h3>
-            <pre><code><span class="keyword">public class</span> <span class="class-name">Example</span> {
-    <span class="comment">// Method overloading - resolved at compile time</span>
-    <span class="keyword">public void</span> <span class="function">print</span>(<span class="class-name">String</span> s) {
-        <span class="class-name">System</span>.out.println(<span class="string">"String: "</span> + s);
-    }
+                <h3>Static binding — resolved at compile time</h3>
+                <pre><code><span class="keyword">public class</span> <span class="class-name">Formatter</span> {
+    <span class="comment">// Overloading — the compiler picks the matching signature</span>
+    <span class="keyword">public void</span> <span class="function">print</span>(<span class="class-name">String</span> s) { <span class="class-name">System</span>.out.println(<span class="string">"String: "</span> + s); }
+    <span class="keyword">public void</span> <span class="function">print</span>(<span class="class-name">Integer</span> i) { <span class="class-name">System</span>.out.println(<span class="string">"Integer: "</span> + i); }
 
-    <span class="keyword">public void</span> <span class="function">print</span>(<span class="class-name">Integer</span> i) {
-        <span class="class-name">System</span>.out.println(<span class="string">"Integer: "</span> + i);
-    }
-
-    <span class="comment">// Static methods - bound at compile time</span>
-    <span class="keyword">public static void</span> <span class="function">staticMethod</span>() { }
-
-    <span class="comment">// Private methods - bound at compile time</span>
-    <span class="keyword">private void</span> <span class="function">privateMethod</span>() { }
-
-    <span class="comment">// Final methods - bound at compile time</span>
-    <span class="keyword">public final void</span> <span class="function">finalMethod</span>() { }
+    <span class="keyword">public static void</span> <span class="function">staticMethod</span>() { }    <span class="comment">// bound at compile time</span>
+    <span class="keyword">private void</span> <span class="function">privateMethod</span>() { }    <span class="comment">// bound at compile time — can't be overridden at all</span>
+    <span class="keyword">public final void</span> <span class="function">finalMethod</span>() { }   <span class="comment">// bound at compile time — the compiler knows no override can exist</span>
 }</code></pre>
 
-            <h3>Dynamic Binding (Runtime)</h3>
-            <pre><code><span class="keyword">class</span> <span class="class-name">Animal</span> {
-    <span class="keyword">public void</span> <span class="function">speak</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Animal speaks"</span>);
-    }
+                <h3>Dynamic binding — resolved at runtime</h3>
+                <pre><code><span class="keyword">class</span> <span class="class-name">Animal</span> {
+    <span class="keyword">public void</span> <span class="function">speak</span>() { <span class="class-name">System</span>.out.println(<span class="string">"Animal speaks"</span>); }
 }
 
 <span class="keyword">class</span> <span class="class-name">Dog</span> <span class="keyword">extends</span> <span class="class-name">Animal</span> {
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">speak</span>() {
-        <span class="class-name">System</span>.out.println(<span class="string">"Dog barks"</span>);
-    }
+    <span class="keyword">public void</span> <span class="function">speak</span>() { <span class="class-name">System</span>.out.println(<span class="string">"Dog barks"</span>); }
 }
 
-<span class="comment">// Dynamic binding - actual method determined at runtime</span>
 <span class="class-name">Animal</span> animal = <span class="keyword">new</span> <span class="class-name">Dog</span>();
-animal.speak();  <span class="comment">// Prints "Dog barks" (determined at runtime)</span></code></pre>
-        </section>
+animal.speak();   <span class="comment">// prints "Dog barks" — the ACTUAL runtime type decides which override runs,
+                  // regardless of the compile-time declared type (Animal)</span></code></pre>
 
-        <section class="content-section">
-            <h2>Reflection: Runtime Introspection</h2>
-            <pre><code><span class="comment">// Reflection provides runtime access to class information</span>
+                <div class="info-box note">
+                    <div class="info-box-title">Sealed classes narrow this gap — partially back into compile time</div>
+                    <p>A <code>switch</code> over a <code>sealed</code> hierarchy (Java 17+)
+                        lets the compiler verify exhaustiveness — every possible subtype is
+                        known at compile time, so a missing <code>case</code> is now a
+                        compile error rather than a silent runtime gap. Dynamic dispatch
+                        still happens at runtime exactly as shown above; what sealed classes
+                        add is compile-time certainty about the <em>complete set</em> of
+                        types that dispatch could ever resolve to.</p>
+                </div>
+            </section>
 
-<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">MyClass</span>.<span class="keyword">class</span>;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — REFLECTION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Reflection — Runtime Introspection of Compile-Time Structure</h2>
+                <pre><code><span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">PromotionEngine</span>.<span class="keyword">class</span>;
 
-<span class="comment">// Get methods at runtime</span>
+<span class="comment">// Discover methods at runtime that were fixed at compile time</span>
 <span class="class-name">Method</span>[] methods = clazz.getDeclaredMethods();
 
-<span class="comment">// Create instance at runtime</span>
+<span class="comment">// Create an instance without a compile-time `new` expression</span>
 <span class="class-name">Object</span> instance = clazz.getDeclaredConstructor().newInstance();
 
-<span class="comment">// Invoke method at runtime</span>
-<span class="class-name">Method</span> method = clazz.getMethod(<span class="string">"myMethod"</span>);
-method.invoke(instance);
+<span class="comment">// Invoke a method resolved entirely by name, at runtime</span>
+<span class="class-name">Method</span> apply = clazz.getMethod(<span class="string">"applyDiscount"</span>, <span class="class-name">Order</span>.<span class="keyword">class</span>);
+apply.invoke(instance, order);
 
-<span class="comment">// Check annotations at runtime</span>
-<span class="keyword">if</span> (clazz.isAnnotationPresent(<span class="class-name">MyAnnotation</span>.<span class="keyword">class</span>)) {
-    <span class="class-name">MyAnnotation</span> ann = clazz.getAnnotation(<span class="class-name">MyAnnotation</span>.<span class="keyword">class</span>);
+<span class="comment">// Read a RUNTIME-retention annotation — SOURCE/CLASS-retention ones are invisible here</span>
+<span class="keyword">if</span> (clazz.isAnnotationPresent(<span class="class-name">AuditLogged</span>.<span class="keyword">class</span>)) {
+    <span class="class-name">AuditLogged</span> ann = clazz.getAnnotation(<span class="class-name">AuditLogged</span>.<span class="keyword">class</span>);
 }</code></pre>
-        </section>
+                <p>Reflection is exactly why the Section 0 example bypasses generic type
+                    safety: <code>Method.invoke()</code> accepts an <code>Object</code>, so
+                    the compile-time type check that would have stopped
+                    <code>skus.add(12345)</code> directly never gets a chance to run at
+                    all.</p>
+            </section>
 
-        <section class="content-section">
-            <h2>Practical Comparison</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — PRACTICAL COMPARISON
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Practical Comparison</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Aspect</th><th>Compile time</th><th>Runtime</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Type checking</td><td>Generics, method signatures</td><td><code>instanceof</code>, explicit casts</td></tr>
+                        <tr><td>Method resolution</td><td>Overloading, static/private/final methods</td><td>Overriding (dynamic dispatch)</td></tr>
+                        <tr><td>Typical errors</td><td>Syntax errors, type mismatches</td><td><code>NullPointerException</code>, <code>ArrayIndexOutOfBoundsException</code></td></tr>
+                        <tr><td>Optimization</td><td>Constant folding, dead code elimination</td><td>JIT compilation, method inlining</td></tr>
+                        <tr><td>Information available</td><td>Full source, full generic type parameters</td><td>Bytecode only — generics erased</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-            <table class="info-table">
-                <thead>
-                    <tr>
-                        <th>Aspect</th>
-                        <th>Compile Time</th>
-                        <th>Runtime</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Type Checking</td>
-                        <td>Generics, method signatures</td>
-                        <td>instanceof, casting</td>
-                    </tr>
-                    <tr>
-                        <td>Method Resolution</td>
-                        <td>Overloading, static methods</td>
-                        <td>Overriding (polymorphism)</td>
-                    </tr>
-                    <tr>
-                        <td>Errors</td>
-                        <td>Syntax, type mismatches</td>
-                        <td>Null pointers, out of bounds</td>
-                    </tr>
-                    <tr>
-                        <td>Optimization</td>
-                        <td>Constant folding, dead code</td>
-                        <td>JIT compilation, inlining</td>
-                    </tr>
-                    <tr>
-                        <td>Information</td>
-                        <td>Full source code</td>
-                        <td>Bytecode, limited generics</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="jdk-jre-jvm.html" class="related-link">JDK vs JRE vs JVM</a>
-                <a href="../advanced/jvm-internals.html" class="related-link">JVM Internals</a>
-                <a href="../fundamentals/generics.html" class="related-link">Generics</a>
-            </div>
-        </section>
-    </main>
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Add an explicit runtime type check at any boundary where reflection, raw types, or an unchecked cast can bypass the compiler's generic type safety</li>
+                        <li>Recompile every caller after changing a compile-time constant's value — updating only the constant's own class silently doesn't propagate</li>
+                        <li>Use <code>@Retention(RUNTIME)</code> only for annotations something genuinely needs to read via reflection — every other case can use <code>SOURCE</code> or the default <code>CLASS</code></li>
+                        <li>Prefer sealed hierarchies with exhaustive <code>switch</code> when you want a missing case to be a compile error instead of a runtime gap</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't assume a generic type parameter is available at runtime for anything — reflection, logging, or serialization all only see the erased raw type</li>
+                        <li>Don't treat <code>@Deprecated(forRemoval = true)</code> or similar compile-time signals as optional style hints — some are enforced at compile time specifically so they can't be silently ignored</li>
+                        <li>Don't assume overloaded methods resolve the way you'd expect with autoboxing or <code>null</code> arguments — overload resolution is a compile-time decision based on the declared, not actual, argument types</li>
+                        <li>Don't forget that a checked exception is a compile-time contract — it must be declared or handled, unlike an unchecked one that can silently propagate at runtime</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's the difference between a compile-time error and a runtime exception?</strong><br>
+                    A compile-time error stops the build entirely — the program never
+                    produces a runnable artifact until it's fixed. A runtime exception
+                    occurs while the compiled program is already executing, and the
+                    compiler had no way to detect it in advance — a <code>null</code>
+                    reference, an out-of-bounds array index, a division by zero.</p>
+
+                    <p><strong>Q: Why can't you check <code>if (list instanceof List&lt;String&gt;)</code>?</strong><br>
+                    Generics are erased at runtime — by the time this check would execute,
+                    the JVM only sees a raw <code>List</code>, with no record of what type
+                    parameter it was declared with at compile time. There's nothing left to
+                    check against, which is why this specific form is a compile error rather
+                    than something that would simply always return false.</p>
+
+                    <p><strong>Q: What determines which overridden method actually runs when you call a method through a superclass reference?</strong><br>
+                    The object's actual runtime type, not its compile-time declared type —
+                    this is dynamic binding. <code>Animal a = new Dog(); a.speak();</code>
+                    calls <code>Dog</code>'s override, because the JVM dispatches based on
+                    what the object actually is at the moment the call executes.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A team changes a <code>public static final int</code> constant in a shared library JAR and redeploys only that JAR. Callers still behave as if the old value is in effect. Explain why, precisely.</strong><br>
+                    A compile-time constant expression is inlined directly into every
+                    caller's own bytecode at the moment those callers were compiled — the
+                    literal value, not a reference to the constant's class, is what actually
+                    ends up in the caller's <code>.class</code> file. Redeploying the
+                    updated library changes what a fresh compile would produce, but every
+                    already-compiled caller still contains the old literal baked in from its
+                    last compilation. The fix requires recompiling and redeploying every
+                    affected caller, not just the constant's own module — or, if this
+                    coupling is unacceptable, deliberately not declaring the value as a
+                    compile-time constant expression (e.g., initializing it via a method
+                    call instead of a literal) so callers read it at runtime instead.</p>
+
+                    <p><strong>Q: Why does invoking a method via reflection bypass the type safety that generics would normally enforce at a direct call site?</strong><br>
+                    <code>Method.invoke(Object target, Object... args)</code> is itself
+                    declared using raw <code>Object</code> types — the reflective API has no
+                    way to express "this parameter must be a <code>String</code> because
+                    that's this specific list's erased-away type argument," since that
+                    information genuinely no longer exists in the bytecode by the time
+                    reflection operates on it. The compiler's generic type check only ever
+                    ran once, at the original compile time, against source code that
+                    explicitly called <code>list.add(someString)</code>. A reflective call
+                    is a completely different code path that was never subject to that
+                    specific check, which is exactly why it can insert a value of the wrong
+                    type without any compiler or runtime generics error — the resulting
+                    <code>ClassCastException</code> only surfaces later, at the point
+                    something reads the value back out and implicitly casts it.</p>
+
+                    <p><strong>Q: Overload resolution is a compile-time decision. What's a concrete case where this produces a surprising result with autoboxing or null?</strong><br>
+                    Given overloads <code>print(Object o)</code> and
+                    <code>print(Integer i)</code>, calling <code>print(null)</code> resolves
+                    to <code>print(Integer)</code> at compile time, because the compiler
+                    picks the most specific applicable overload based on the declared
+                    parameter types — not based on any runtime value, since there is no
+                    runtime value yet at the moment this decision is made. Similarly, given
+                    <code>process(int i)</code> and <code>process(Integer i)</code>, calling
+                    <code>process(someInt)</code> with a primitive always prefers the
+                    primitive overload over autoboxing to the wrapper type, because the
+                    compiler only autoboxes when no exact or widening match exists among the
+                    primitive overloads. Both outcomes are entirely determined before the
+                    program ever runs — understanding overload resolution as a purely
+                    compile-time algorithm, evaluated once against static, declared types,
+                    is what makes these results predictable rather than surprising.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="jdk-jre-jvm.html" class="related-link"><span class="related-icon">☕</span>JDK vs JRE vs JVM</a>
+                    <a href="version-history.html" class="related-link"><span class="related-icon">🕰️</span>Java Version History</a>
+                    <a href="source-target-compatibility.html" class="related-link"><span class="related-icon">🎯</span>Source/Target Compatibility</a>
+                    <a href="version-compatibility.html" class="related-link"><span class="related-icon">🔗</span>Version Compatibility</a>
+                    <a href="../advanced/jvm-internals.html" class="related-link"><span class="related-icon">🧠</span>JVM Internals</a>
+                    <a href="../fundamentals/generics.html" class="related-link"><span class="related-icon">📐</span>Generics</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

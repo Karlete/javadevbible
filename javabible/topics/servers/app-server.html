@@ -1,603 +1,480 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.app-server.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>What is an Application Server? - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#servers">Application Servers</a> / What is an Application Server?
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#servers" data-i18n="nav.servers">Application Servers &amp; Deployment</a> /
+                What is an Application Server?
             </nav>
-            <h1>What is an Application Server?</h1>
-            <p class="topic-subtitle">Understanding the runtime environment for your Java applications</p>
-            <a href="../../index.html#servers" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.app-server.h1">What is an Application Server?</h1>
+            <p class="topic-subtitle" data-i18n="topic.app-server.subtitle">The runtime that turns raw TCP bytes into a method call on your code — the taxonomy, the request lifecycle, and how Virtual Threads just changed its oldest tuning problem</p>
+            <a href="../../index.html#servers" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>Introduction: Where Does Your Code Actually Run?</h2>
-            <p>When you write a Java web application, you create classes, controllers, services, and HTML templates. But have you ever wondered: <strong>what actually runs your code?</strong> When a user visits your website, something needs to:</p>
-            <ul>
-                <li>Listen for incoming HTTP requests on a network port</li>
-                <li>Parse the HTTP protocol and extract the request details</li>
-                <li>Route the request to your code</li>
-                <li>Execute your code and get the response</li>
-                <li>Send the HTTP response back to the user's browser</li>
-            </ul>
+    <div class="topic-layout">
 
-            <p>This "something" is an <strong>Application Server</strong> (or a simpler variant called a <strong>Web Server</strong> or <strong>Servlet Container</strong>). It's the runtime environment that hosts your application and handles all the low-level networking, protocol parsing, and lifecycle management so you can focus on writing business logic.</p>
-
-            <h3>A Simple Analogy: The Restaurant</h3>
-            <p>Think of deploying a web application like opening a restaurant:</p>
-            <ul>
-                <li><strong>Your Application (The Menu & Recipes):</strong> This is what YOU create—the dishes, recipes, and dining experience. In software terms, your controllers, services, business logic.</li>
-                <li><strong>The Application Server (The Restaurant Building):</strong> The physical infrastructure—kitchen equipment, tables, plumbing, electricity, ventilation. You don't build these from scratch; you rent or buy a space that has them.</li>
-                <li><strong>HTTP Requests (Customers):</strong> People come to the door wanting food. The building receives them.</li>
-                <li><strong>The Server's Role:</strong> The building provides everything needed to serve customers—you just provide the food and service.</li>
-            </ul>
-
-            <div class="info-box">
-                <p><strong>An Application Server</strong> is software that provides the runtime environment for applications. For Java web applications, it:</p>
-                <ul>
-                    <li><strong>Listens</strong> for incoming network connections (typically HTTP on port 80/443 or 8080)</li>
-                    <li><strong>Manages</strong> the lifecycle of your application (loading, starting, stopping)</li>
-                    <li><strong>Provides</strong> services like connection pooling, transactions, security, and more</li>
-                    <li><strong>Executes</strong> your code when requests arrive</li>
-                    <li><strong>Handles</strong> multiple concurrent users efficiently</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Web Server vs Application Server vs Servlet Container</h2>
-            <p>These terms are often used interchangeably, but they have distinct meanings. Understanding the differences helps you choose the right tool.</p>
+        <main class="topic-content">
 
-            <h3>Web Server</h3>
-            <p>A <strong>Web Server</strong> serves static content (HTML, CSS, JavaScript, images) and handles HTTP protocol basics. It's like a file server that speaks HTTP.</p>
-            <pre><code><span class="comment">// Web servers serve STATIC content</span>
-<span class="comment">// They read files from disk and send them over HTTP</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is an Application Server — and Why Does it Exist?</h2>
+                <p>A Java method — <code>public Product getProduct(Long id)</code> — knows
+                    nothing about TCP sockets, HTTP framing, or concurrent connections. Every
+                    one of those concerns has to be handled by <em>something</em> before your
+                    code ever gets called, and handled correctly for thousands of
+                    simultaneous requests without your business logic knowing any of it
+                    happened. An <strong>application server</strong> (or the lighter-weight
+                    <strong>servlet container</strong> that most modern Java systems actually
+                    run) is that something: it owns the network listener, the HTTP protocol
+                    parsing, the thread that runs your code, and the lifecycle of your
+                    application as a whole, so your controller can be exactly one line of
+                    business logic and nothing else.</p>
 
-User requests: GET /index.html
-Web server: Reads /var/www/index.html from disk
-Web server: Sends file content back with HTTP headers
-
-<span class="comment">// Examples of pure web servers:</span>
-<span class="comment">// - Apache HTTP Server (httpd)</span>
-<span class="comment">// - Nginx</span>
-<span class="comment">// - Microsoft IIS (for static content)</span>
-
-<span class="comment">// Web servers are FAST for static files</span>
-<span class="comment">// But they can't run your Java code!</span></code></pre>
-
-            <h3>Servlet Container (Web Container)</h3>
-            <p>A <strong>Servlet Container</strong> extends the web server concept by adding the ability to run Java Servlets. It implements the Java Servlet specification, allowing dynamic content generation.</p>
-            <pre><code><span class="comment">// Servlet containers can run Java code!</span>
-<span class="comment">// They implement the Servlet specification</span>
-
-User requests: GET /api/users
-Servlet container:
-  1. Parses HTTP request
-  2. Creates HttpServletRequest object
-  3. Finds matching Servlet (@WebServlet or mapping in web.xml)
-  4. Calls servlet.service(request, response)
-  5. Your Java code executes!
-  6. Sends HttpServletResponse back to user
-
-<span class="comment">// Examples of Servlet containers:</span>
-<span class="comment">// - Apache Tomcat (most popular)</span>
-<span class="comment">// - Eclipse Jetty</span>
-<span class="comment">// - Undertow (used in WildFly)</span>
-
-<span class="comment">// Servlet containers implement:</span>
-<span class="comment">// - Jakarta Servlet specification</span>
-<span class="comment">// - Jakarta Server Pages (JSP)</span>
-<span class="comment">// - Jakarta WebSocket</span></code></pre>
-
-            <h3>Application Server (Full Jakarta EE)</h3>
-            <p>A <strong>Full Application Server</strong> includes everything a servlet container has, PLUS additional enterprise services defined by the Jakarta EE (formerly Java EE) specification.</p>
-            <pre><code><span class="comment">// Application servers provide the FULL Jakarta EE stack</span>
-
-<span class="comment">// Everything in a Servlet Container, PLUS:</span>
-<span class="comment">// - EJB (Enterprise JavaBeans) container</span>
-<span class="comment">// - JPA (Java Persistence API) integration</span>
-<span class="comment">// - JTA (Java Transaction API)</span>
-<span class="comment">// - JMS (Java Message Service)</span>
-<span class="comment">// - CDI (Contexts and Dependency Injection)</span>
-<span class="comment">// - JAX-RS (RESTful Web Services)</span>
-<span class="comment">// - Jakarta Security</span>
-<span class="comment">// - And much more...</span>
-
-<span class="comment">// Examples of full application servers:</span>
-<span class="comment">// - WildFly (formerly JBoss)</span>
-<span class="comment">// - Payara (GlassFish fork)</span>
-<span class="comment">// - IBM WebSphere Liberty</span>
-<span class="comment">// - Oracle WebLogic</span>
-<span class="comment">// - Apache TomEE (Tomcat + EE)</span></code></pre>
-
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Feature</th>
-                        <th>Web Server</th>
-                        <th>Servlet Container</th>
-                        <th>Application Server</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Static Content</strong></td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Servlets/JSP</strong></td>
-                        <td>No</td>
-                        <td>Yes</td>
-                        <td>Yes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>EJB</strong></td>
-                        <td>No</td>
-                        <td>No</td>
-                        <td>Yes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>JMS</strong></td>
-                        <td>No</td>
-                        <td>No</td>
-                        <td>Yes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>JTA Transactions</strong></td>
-                        <td>No</td>
-                        <td>No</td>
-                        <td>Yes</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Examples</strong></td>
-                        <td>Nginx, Apache</td>
-                        <td>Tomcat, Jetty</td>
-                        <td>WildFly, WebLogic</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Complexity</strong></td>
-                        <td>Low</td>
-                        <td>Medium</td>
-                        <td>High</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Resource Usage</strong></td>
-                        <td>Low</td>
-                        <td>Medium</td>
-                        <td>High</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="content-section">
-            <h2>What About Spring Boot?</h2>
-            <p>If you've used Spring Boot, you might be confused—you don't deploy to an external server; you just run a JAR file! This is because Spring Boot takes a different approach: <strong>embedded servers</strong>.</p>
-
-            <h3>Traditional Deployment (External Server)</h3>
-            <pre><code><span class="comment">// Traditional approach: Deploy WAR to external server</span>
-
-<span class="comment">// 1. You build a WAR file</span>
-mvn package
-<span class="comment">// Output: myapp.war</span>
-
-<span class="comment">// 2. You have a server installed separately</span>
-<span class="comment">//    /opt/tomcat/</span>
-
-<span class="comment">// 3. You deploy by copying WAR to server</span>
-cp myapp.war /opt/tomcat/webapps/
-
-<span class="comment">// 4. Server detects and deploys your app</span>
-<span class="comment">//    Available at: http://localhost:8080/myapp</span>
-
-<span class="comment">// The server exists OUTSIDE your application</span>
-┌─────────────────────────────────────────┐
-│           TOMCAT SERVER                  │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
-│  │ myapp   │ │ other   │ │ another │   │
-│  │  .war   │ │  .war   │ │  .war   │   │
-│  └─────────┘ └─────────┘ └─────────┘   │
-│                                         │
-│  One server hosts MULTIPLE applications │
-└─────────────────────────────────────────┘</code></pre>
-
-            <h3>Spring Boot (Embedded Server)</h3>
-            <pre><code><span class="comment">// Spring Boot approach: Server is INSIDE your application</span>
-
-<span class="comment">// 1. You build an executable JAR</span>
-mvn package
-<span class="comment">// Output: myapp.jar (includes Tomcat inside!)</span>
-
-<span class="comment">// 2. You just run it!</span>
-java -jar myapp.jar
-<span class="comment">// Available at: http://localhost:8080</span>
-
-<span class="comment">// The server is EMBEDDED in your application</span>
-┌─────────────────────────────────────────┐
-│              myapp.jar                   │
-│  ┌─────────────────────────────────┐    │
-│  │     YOUR APPLICATION CODE       │    │
-│  │   (Controllers, Services, etc.) │    │
-│  └─────────────────────────────────┘    │
-│  ┌─────────────────────────────────┐    │
-│  │     EMBEDDED TOMCAT             │    │
-│  │   (Inside your JAR file!)       │    │
-│  └─────────────────────────────────┘    │
-│                                         │
-│  Self-contained, runs anywhere with JVM │
-└─────────────────────────────────────────┘</code></pre>
-
-            <h3>Why Embedded Servers Became Popular</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Aspect</th>
-                        <th>External Server</th>
-                        <th>Embedded Server (Spring Boot)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Deployment</strong></td>
-                        <td>Copy WAR to server</td>
-                        <td>Just run the JAR</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Configuration</strong></td>
-                        <td>Server + App configured separately</td>
-                        <td>All in one place</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Server Version</strong></td>
-                        <td>Whatever's installed on server</td>
-                        <td>You control it (in pom.xml)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Multiple Apps</strong></td>
-                        <td>Many apps on one server</td>
-                        <td>One app per process</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Docker Friendly</strong></td>
-                        <td>More complex</td>
-                        <td>Very easy</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Cloud Native</strong></td>
-                        <td>Traditional</td>
-                        <td>Modern, 12-factor</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Startup Time</strong></td>
-                        <td>Server already running</td>
-                        <td>Server starts with app</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div class="info-box note">
-                <div class="info-box-title">Modern Reality</div>
-                <p>Today, most new Java applications use <strong>embedded servers</strong> (Spring Boot, Quarkus, Micronaut). External application servers are still used in large enterprises with existing infrastructure, or when you need full Jakarta EE features that embedded servers don't provide.</p>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>How an Application Server Handles Requests</h2>
-            <p>Let's trace what happens when a user requests a page from your Java web application:</p>
-
-            <pre><code><span class="comment">// User types: http://myapp.com/products/123</span>
-<span class="comment">// Here's what happens inside the application server:</span>
-
-┌─────────────────────────────────────────────────────────────────────┐
-│                     APPLICATION SERVER                               │
-│                                                                      │
-│  1. CONNECTOR (Listens on port 8080)                                │
-│     ┌─────────────────────────────────────────────────────────┐     │
-│     │  - Accepts TCP connection from browser                   │     │
-│     │  - Reads raw bytes from network                         │     │
-│     │  - Parses HTTP protocol                                 │     │
-│     │  - Creates internal request object                       │     │
-│     └─────────────────────────────────────────────────────────┘     │
-│                              │                                       │
-│                              ▼                                       │
-│  2. ENGINE (Request Processing)                                      │
-│     ┌─────────────────────────────────────────────────────────┐     │
-│     │  - Determines which Host (virtual host) handles request │     │
-│     │  - Determines which Context (application) handles it    │     │
-│     │  - Determines which Servlet handles the URL pattern     │     │
-│     └─────────────────────────────────────────────────────────┘     │
-│                              │                                       │
-│                              ▼                                       │
-│  3. FILTER CHAIN                                                     │
-│     ┌─────────────────────────────────────────────────────────┐     │
-│     │  Security Filter → Logging Filter → CORS Filter → ...   │     │
-│     └─────────────────────────────────────────────────────────┘     │
-│                              │                                       │
-│                              ▼                                       │
-│  4. YOUR SERVLET (or Spring Controller)                              │
-│     ┌─────────────────────────────────────────────────────────┐     │
-│     │  @GetMapping("/products/{id}")                          │     │
-│     │  public Product getProduct(@PathVariable Long id) {     │     │
-│     │      return productService.findById(id);                │     │
-│     │  }                                                       │     │
-│     └─────────────────────────────────────────────────────────┘     │
-│                              │                                       │
-│                              ▼                                       │
-│  5. RESPONSE (travels back through filters, connector, to browser)  │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘</code></pre>
-
-            <h3>Key Components Explained</h3>
-            <ul>
-                <li><strong>Connector:</strong> The network listener. Handles TCP connections and HTTP parsing. You can have multiple connectors (HTTP on 8080, HTTPS on 8443, etc.)</li>
-                <li><strong>Engine:</strong> The request processor. Routes requests to the correct application and servlet.</li>
-                <li><strong>Host:</strong> Virtual host support. One server can handle requests for multiple domains (app1.com, app2.com).</li>
-                <li><strong>Context:</strong> Your application. Each WAR file becomes a context.</li>
-                <li><strong>Servlet:</strong> Your code that handles specific URL patterns.</li>
-            </ul>
-        </section>
-
-        <section class="content-section">
-            <h2>Services Provided by Application Servers</h2>
-            <p>Application servers do much more than just route HTTP requests. They provide many services that your application can use:</p>
-
-            <h3>1. Connection Pooling</h3>
-            <pre><code><span class="comment">// Problem: Creating database connections is SLOW (100-500ms each)</span>
-<span class="comment">// Solution: Server maintains a pool of ready connections</span>
-
-<span class="comment">// Without pooling:</span>
-<span class="keyword">public</span> List&lt;User&gt; getUsers() {
-    Connection conn = DriverManager.getConnection(url, user, pass); <span class="comment">// SLOW!</span>
-    <span class="comment">// ... query ...</span>
-    conn.close(); <span class="comment">// Connection destroyed, next request creates new one</span>
+                <pre><code><span class="comment">// BEFORE — handling HTTP without any container at all</span>
+<span class="keyword">try</span> (<span class="class-name">ServerSocket</span> serverSocket = <span class="keyword">new</span> <span class="class-name">ServerSocket</span>(<span class="number">8080</span>)) {
+    <span class="keyword">while</span> (<span class="keyword">true</span>) {
+        <span class="class-name">Socket</span> client = serverSocket.<span class="function">accept</span>();   <span class="comment">// blocks until a connection arrives</span>
+        <span class="keyword">new</span> <span class="class-name">Thread</span>(() -> {
+            <span class="keyword">try</span> (<span class="class-name">BufferedReader</span> in = <span class="keyword">new</span> <span class="class-name">BufferedReader</span>(<span class="keyword">new</span> <span class="class-name">InputStreamReader</span>(client.<span class="function">getInputStream</span>()))) {
+                <span class="class-name">String</span> requestLine = in.<span class="function">readLine</span>();          <span class="comment">// "GET /products/123 HTTP/1.1" — parse this yourself</span>
+                <span class="comment">// ... parse headers, parse the path, extract "123", find the right handler,
+                // build a raw HTTP response by hand, manage this thread's lifetime,
+                // decide what happens past your configured thread limit, handle
+                // malformed requests, handle slow clients holding the socket open ...</span>
+            } <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) { <span class="comment">/* now you're also writing your own error handling */</span> }
+        }).<span class="function">start</span>();   <span class="comment">// one raw OS thread per connection, no pooling, no limit</span>
+    }
 }
 
-<span class="comment">// With pooling (configured in server):</span>
-<span class="annotation">@Resource</span>
-DataSource dataSource;  <span class="comment">// Server manages the pool</span>
+<span class="comment">// AFTER — the container has already done all of the above by the time this runs</span>
+<span class="annotation">@RestController</span>
+<span class="keyword">public class</span> <span class="class-name">ProductController</span> {
 
-<span class="keyword">public</span> List&lt;User&gt; getUsers() {
-    Connection conn = dataSource.getConnection(); <span class="comment">// FAST! Gets existing connection</span>
-    <span class="comment">// ... query ...</span>
-    conn.close(); <span class="comment">// Returns to pool, doesn't destroy</span>
-}
+    <span class="keyword">private final</span> <span class="class-name">ProductService</span> productService;
 
-<span class="comment">// Server configuration (context.xml in Tomcat):</span>
-&lt;Resource name="jdbc/mydb"
-          type="javax.sql.DataSource"
-          maxTotal="100"           <span class="comment">&lt;!-- Max 100 connections --&gt;</span>
-          maxIdle="30"             <span class="comment">&lt;!-- Keep 30 ready --&gt;</span>
-          maxWaitMillis="10000"/&gt;  <span class="comment">&lt;!-- Wait max 10s for connection --&gt;</span></code></pre>
+    <span class="keyword">public</span> <span class="function">ProductController</span>(<span class="class-name">ProductService</span> productService) {
+        <span class="keyword">this</span>.productService = productService;
+    }
 
-            <h3>2. Thread Management</h3>
-            <pre><code><span class="comment">// Server manages a thread pool for handling requests</span>
+    <span class="annotation">@GetMapping</span>(<span class="string">"/products/{id}"</span>)
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> productService.<span class="function">findById</span>(id);
+        <span class="comment">// The container already: accepted the connection, parsed the HTTP request,
+        // assigned a pooled thread, ran the filter chain, matched the route, bound
+        // "123" to id — and will serialize whatever this returns back to JSON and
+        // write the HTTP response. None of that is this method's problem.</span>
+    }
+}</code></pre>
+            </section>
 
-<span class="comment">// Each request gets a thread from the pool</span>
-<span class="comment">// You don't create threads manually!</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE TAXONOMY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Taxonomy — Web Server, Servlet Container, Application Server</h2>
+                <p>These three terms get used loosely, but they describe genuinely
+                    different scopes of responsibility, each a superset of the previous
+                    one.</p>
 
-┌─────────────────────────────────────────┐
-│           THREAD POOL                    │
-│  ┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐        │
-│  │ T1│ │ T2│ │ T3│ │...│ │T200│        │
-│  └───┘ └───┘ └───┘ └───┘ └───┘        │
-│    │     │     │                        │
-│    ▼     ▼     ▼                        │
-│  Req1  Req2  Req3   (requests assigned) │
-└─────────────────────────────────────────┘
+                <h3>Web Server — static content only</h3>
+                <pre><code><span class="comment">// Reads a file from disk, sends it over HTTP. No code execution involved.</span>
+<span class="comment">// GET /index.html  →  reads /var/www/index.html  →  sends bytes back</span>
+<span class="comment">// Examples: Nginx, Apache HTTP Server (httpd), IIS serving static files</span>
+<span class="comment">// Extremely fast for exactly this job — and structurally unable to run your Java code</span></code></pre>
 
-<span class="comment">// Tomcat default: 200 threads max</span>
-<span class="comment">// If 201 requests come simultaneously, one waits</span>
+                <h3>Servlet Container — adds the ability to run Java code</h3>
+                <pre><code><span class="comment">// Implements the Jakarta Servlet specification: parses the request into an
+// HttpServletRequest, finds the matching Servlet, calls service(), takes the
+// HttpServletResponse and writes it back.</span>
+<span class="comment">// Examples: Apache Tomcat, Eclipse Jetty, Undertow</span></code></pre>
 
-<span class="comment">// Configuration (server.xml):</span>
-&lt;Connector port="8080"
-           maxThreads="200"
-           minSpareThreads="10"
-           acceptCount="100"/&gt;</code></pre>
+                <h3>Full Application Server — adds the rest of Jakarta EE</h3>
+                <pre><code><span class="comment">// Everything a servlet container has, plus: EJB, JPA, JTA, JMS, CDI, JAX-RS,
+// Jakarta Security — the full enterprise specification stack.</span>
+<span class="comment">// Examples: WildFly, Payara, IBM WebSphere Liberty, Oracle WebLogic, Apache TomEE</span></code></pre>
 
-            <h3>3. Session Management</h3>
-            <pre><code><span class="comment">// Server tracks user sessions across requests</span>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Capability</th><th>Web Server</th><th>Servlet Container</th><th>Application Server</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Static content</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+                        <tr><td>Servlets / JSP</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+                        <tr><td>EJB, JTA, JMS</td><td>No</td><td>No</td><td>Yes</td></tr>
+                        <tr><td>Typical footprint</td><td>Very low</td><td>Low–medium</td><td>High</td></tr>
+                        <tr><td>Examples</td><td>Nginx, Apache httpd</td><td>Tomcat, Jetty, Undertow</td><td>WildFly, Payara, WebLogic</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-<span class="annotation">@GetMapping</span>(<span class="string">"/cart"</span>)
-<span class="keyword">public</span> Cart getCart(HttpSession session) {
-    <span class="comment">// Server automatically:</span>
-    <span class="comment">// 1. Reads JSESSIONID cookie from request</span>
-    <span class="comment">// 2. Looks up session data in memory</span>
-    <span class="comment">// 3. Provides it to your code</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — REQUEST LIFECYCLE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Life of a Request Inside the Container</h2>
+                <p>Tracing what actually happens between "browser sends bytes" and "your
+                    controller method runs" makes the earlier before/after concrete:</p>
 
-    Cart cart = (Cart) session.getAttribute(<span class="string">"cart"</span>);
-    <span class="keyword">return</span> cart;
-}
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Stage</th><th>Component</th><th>Responsibility</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1</td><td><strong>Connector</strong></td><td>Accepts the TCP connection on a configured port, reads raw bytes, parses HTTP framing. A server can run several connectors at once (HTTP on 8080, HTTPS on 8443)</td></tr>
+                        <tr><td>2</td><td><strong>Engine / Host</strong></td><td>Determines which virtual host and which deployed application (context) should handle this request — relevant when one server hosts several apps or domains</td></tr>
+                        <tr><td>3</td><td><strong>Context</strong></td><td>Your application, as deployed. Traditionally one WAR = one context; covered in depth on <a href="context.html">Context &amp; Deployment</a></td></tr>
+                        <tr><td>4</td><td><strong>Filter chain</strong></td><td>Cross-cutting concerns applied before your code runs — security, logging, CORS, compression</td></tr>
+                        <tr><td>5</td><td><strong>Servlet / Controller</strong></td><td>Your actual code — a <code>Servlet</code> directly, or (in practice today) Spring's <code>DispatcherServlet</code> routing into your <code>@RestController</code></td></tr>
+                        <tr><td>6</td><td><strong>Response</strong></td><td>Travels back out through the filter chain and the connector to the client</td></tr>
+                    </tbody>
+                </table>
 
-<span class="comment">// Session configuration (web.xml):</span>
-&lt;session-config&gt;
-    &lt;session-timeout&gt;30&lt;/session-timeout&gt;  <span class="comment">&lt;!-- 30 minutes --&gt;</span>
-    &lt;cookie-config&gt;
-        &lt;http-only&gt;true&lt;/http-only&gt;
-        &lt;secure&gt;true&lt;/secure&gt;
-    &lt;/cookie-config&gt;
-&lt;/session-config&gt;</code></pre>
+                <div class="info-box note">
+                    <div class="info-box-title">A modern Spring Boot app still goes through every one of these stages</div>
+                    <p><code>@RestController</code> and <code>@GetMapping</code> don't
+                        replace the servlet model — <code>DispatcherServlet</code> is
+                        itself a <code>Servlet</code> registered with the container, and it
+                        performs the routing to your annotated methods internally.
+                        Understanding this layer matters the moment something needs
+                        container-level configuration — a custom filter, a connector
+                        timeout, or a thread-pool size that Spring Boot's defaults don't
+                        cover for your traffic pattern.</p>
+                </div>
+            </section>
 
-            <h3>4. Security</h3>
-            <pre><code><span class="comment">// Server can handle authentication and authorization</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — EMBEDDED vs EXTERNAL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Embedded vs External — Where Does the Server Actually Live?</h2>
+                <p>If you've only ever used Spring Boot, the mental model above can feel
+                    backwards — you never install a server or copy a file into it, you just
+                    run a JAR. That's because Spring Boot packages the servlet container
+                    <strong>inside</strong> your application artifact rather than deploying
+                    your artifact <strong>into</strong> a separately-installed server. Both
+                    models run the exact same request lifecycle described above; they differ
+                    in where the container process lives and how it's provisioned.</p>
 
-<span class="comment">// web.xml security configuration:</span>
-&lt;security-constraint&gt;
-    &lt;web-resource-collection&gt;
-        &lt;url-pattern&gt;/admin/*&lt;/url-pattern&gt;
-    &lt;/web-resource-collection&gt;
-    &lt;auth-constraint&gt;
-        &lt;role-name&gt;admin&lt;/role-name&gt;
-    &lt;/auth-constraint&gt;
-&lt;/security-constraint&gt;
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Aspect</th><th>External server (traditional WAR)</th><th>Embedded server (Spring Boot)</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Deployment artifact</td><td><code>myapp.war</code>, copied into <code>/opt/tomcat/webapps/</code></td><td><code>myapp.jar</code>, self-contained, includes Tomcat/Netty inside</td></tr>
+                        <tr><td>Run command</td><td>Server already running as its own process; deploying just drops in the WAR</td><td><code>java -jar myapp.jar</code> — the server starts <em>with</em> the app</td></tr>
+                        <tr><td>Server version</td><td>Whatever's installed on the shared server</td><td>Pinned in your build file, versioned with the app itself</td></tr>
+                        <tr><td>Multiple apps per server</td><td>Common — several WARs share one Tomcat instance</td><td>One application per process, by design</td></tr>
+                        <tr><td>Container-native fit</td><td>Requires more setup to containerize correctly</td><td>Natural fit for a single-process Docker image</td></tr>
+                    </tbody>
+                </table>
 
-&lt;login-config&gt;
-    &lt;auth-method&gt;FORM&lt;/auth-method&gt;
-    &lt;form-login-config&gt;
-        &lt;form-login-page&gt;/login.html&lt;/form-login-page&gt;
-        &lt;form-error-page&gt;/error.html&lt;/form-error-page&gt;
-    &lt;/form-login-config&gt;
-&lt;/login-config&gt;</code></pre>
+                <div class="info-box important">
+                    <div class="info-box-title">Which one is "modern" today</div>
+                    <p>Embedded servers are the default starting point for new Java
+                        systems — cloud-native deployment, Kubernetes, and 12-factor
+                        principles all assume one process per container, which is exactly
+                        the embedded model. External application servers haven't
+                        disappeared, but their remaining use case has narrowed
+                        considerably: large enterprises with existing WildFly/WebLogic
+                        infrastructure, regulated environments with support-contract
+                        requirements, or genuine multi-tenant hosting where several
+                        applications deliberately share one runtime's resources. Starting a
+                        brand-new project with an external application server today is a
+                        decision that needs a specific reason, not a default.</p>
+                </div>
+            </section>
 
-            <h3>5. JNDI (Java Naming and Directory Interface)</h3>
-            <pre><code><span class="comment">// Server provides a registry for looking up resources</span>
-<span class="comment">// Your app doesn't hardcode connection strings!</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — SERVICES PROVIDED BY THE CONTAINER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Services the Container Provides Beyond Routing</h2>
 
-<span class="comment">// In your code - just look up by name:</span>
+                <h3>Connection pooling</h3>
+                <pre><code><span class="comment">// Modern Spring Boot: HikariCP is the default pool, configured directly —
+// no JNDI lookup involved at all, because there's no external server to
+// register a resource with in the first place.</span>
+<span class="comment"># application.yml</span>
+spring:
+  datasource:
+    url: jdbc:postgresql://db.internal:5432/shop
+    hikari:
+      maximum-pool-size: <span class="number">20</span>
+      minimum-idle: <span class="number">5</span>
+      connection-timeout: <span class="number">10000</span>
+
+<span class="comment">// Traditional Java EE deployment to an EXTERNAL server: the DataSource is
+// configured once in the server, and application code looks it up by name —
+// this is what JNDI is actually for, and it's specific to that deployment
+// model, not something a Spring Boot embedded app typically does.</span>
 <span class="annotation">@Resource</span>(name = <span class="string">"jdbc/productionDB"</span>)
-DataSource dataSource;
+<span class="keyword">private</span> <span class="class-name">DataSource</span> dataSource;
+<span class="comment">// Same WAR, deployed to a dev server or a prod server, each configured with
+// its OWN jdbc/productionDB binding pointing at a different database — the
+// application code never changes, only the server-side JNDI configuration.</span></code></pre>
 
-<span class="comment">// Server configures the ACTUAL connection:</span>
-<span class="comment">// Development server → points to dev database</span>
-<span class="comment">// Production server → points to production database</span>
-<span class="comment">// Same code, different configuration!</span></code></pre>
-        </section>
+                <h3>Thread management</h3>
+                <p>Every incoming request needs a thread to execute on. The traditional
+                    model — one platform (OS) thread per request, drawn from a bounded pool
+                    — is covered here at a high level; the production consequences of that
+                    model, and how Virtual Threads change them, are covered next.</p>
 
-        <section class="content-section">
-            <h2>Popular Application Servers</h2>
+                <h3>Session management &amp; security</h3>
+                <p>The container tracks session state via a cookie-keyed lookup and can
+                    enforce authentication/authorization declaratively before your code
+                    runs at all. Both topics have dedicated, far deeper coverage in
+                    <a href="../security/session-mgmt.html">Session Management</a> and
+                    <a href="../security/auth-vs-authz.html">Authentication vs
+                    Authorization</a> — this page only needs you to know that the
+                    container, not your application code, is where these concerns are
+                    enforced.</p>
+            </section>
 
-            <h3>Servlet Containers (Lightweight)</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Server</th>
-                        <th>Description</th>
-                        <th>Best For</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Apache Tomcat</strong></td>
-                        <td>Most popular, reference implementation</td>
-                        <td>Most Java web apps, Spring Boot default</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Eclipse Jetty</strong></td>
-                        <td>Lightweight, embeddable, fast startup</td>
-                        <td>Microservices, embedded scenarios</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Undertow</strong></td>
-                        <td>High performance, non-blocking</td>
-                        <td>High-concurrency applications</td>
-                    </tr>
-                </tbody>
-            </table>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — PRODUCTION REALITY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Production Reality — Virtual Threads and Graceful Shutdown</h2>
 
-            <h3>Full Application Servers (Jakarta EE)</h3>
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Server</th>
-                        <th>Description</th>
-                        <th>Best For</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>WildFly</strong></td>
-                        <td>Free, open source, formerly JBoss AS</td>
-                        <td>Full Jakarta EE, enterprise apps</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Payara</strong></td>
-                        <td>GlassFish fork, production-focused</td>
-                        <td>Jakarta EE with support options</td>
-                    </tr>
-                    <tr>
-                        <td><strong>IBM WebSphere Liberty</strong></td>
-                        <td>Commercial, modular, fast</td>
-                        <td>Enterprise, IBM ecosystem</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Oracle WebLogic</strong></td>
-                        <td>Commercial, full-featured</td>
-                        <td>Large enterprise, Oracle ecosystem</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Apache TomEE</strong></td>
-                        <td>Tomcat + Jakarta EE</td>
-                        <td>Familiar Tomcat with EE features</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <h3>Virtual Threads (Java 21+) rewrite the oldest Tomcat tuning problem</h3>
+                <pre><code><span class="comment">/*
+ * The traditional model: Tomcat's default connector caps at maxThreads=200
+ * platform threads. Each platform thread costs real OS resources (megabytes
+ * of stack, kernel scheduling overhead), so 200 is a genuine ceiling — the
+ * 201st concurrent request queues and waits, even if every one of those 200
+ * threads is just IDLE, blocked waiting on a slow database call or a remote
+ * HTTP call to another service. This is the single most common capacity
+ * bottleneck in traditional blocking Java web applications: the app isn't
+ * CPU-bound at all, it's thread-pool-bound while doing nothing but waiting.
+ *
+ * Virtual threads (Project Loom, standard since Java 21) are cheap enough —
+ * kilobytes, not megabytes, and scheduled by the JVM rather than the OS —
+ * that you can run hundreds of thousands of them. A blocking call on a
+ * virtual thread doesn't tie up an OS thread while it waits; the JVM parks
+ * the virtual thread and frees the underlying "carrier" platform thread to
+ * run other work in the meantime.
+ */</span>
 
-        <section class="content-section">
-            <h2>Choosing the Right Server</h2>
+<span class="comment"># application.properties — enable virtual threads for the embedded Tomcat's
+# request-handling executor (Spring Boot 3.2+, requires Java 21+)</span>
+spring.threads.virtual.enabled=<span class="keyword">true</span>
 
-            <div class="best-practices">
-                <h3>Use a Servlet Container (Tomcat/Jetty) when:</h3>
-                <ul>
-                    <li>Building with Spring Boot (embedded server)</li>
-                    <li>You don't need EJB or JMS</li>
-                    <li>You want lightweight and simple</li>
-                    <li>Building microservices</li>
-                    <li>Deploying to containers (Docker, Kubernetes)</li>
-                </ul>
+<span class="comment">// No code changes required — @RestController methods run exactly as before.
+// The capacity conversation changes from "how many platform threads can we
+// afford" to "how many blocking I/O calls can our downstream dependencies
+// (database, other services) actually sustain" — which was the real
+// constraint all along.</span></code></pre>
 
-                <h3>Use a Full Application Server when:</h3>
-                <ul>
-                    <li>Required by company policy/infrastructure</li>
-                    <li>Need full Jakarta EE features (EJB, JMS, etc.)</li>
-                    <li>Multiple applications sharing resources</li>
-                    <li>Enterprise support contracts required</li>
-                    <li>Migrating legacy Java EE applications</li>
-                </ul>
+                <div class="info-box warning">
+                    <div class="info-box-title">Virtual threads help blocking I/O, not CPU-bound work — and pinning is a real caveat</div>
+                    <p>If a request is slow because it's doing heavy in-JVM computation
+                        (image processing, complex serialization, cryptographic hashing),
+                        virtual threads don't help at all — that work still consumes a real
+                        CPU core for its full duration regardless of which kind of thread
+                        runs it. Virtual threads specifically address the case where a
+                        thread is blocked <em>waiting</em>, not computing. There's also a
+                        known caveat: a virtual thread that executes inside a
+                        <code>synchronized</code> block gets "pinned" to its carrier platform
+                        thread for that block's duration, temporarily losing the scalability
+                        benefit — this matters if your code (or a library you depend on)
+                        relies heavily on <code>synchronized</code> rather than
+                        <code>java.util.concurrent</code> locks around blocking calls.</p>
+                </div>
 
-                <h3>Use Embedded Server (Spring Boot) when:</h3>
-                <ul>
-                    <li>Building new applications</li>
-                    <li>Want simple deployment (just run JAR)</li>
-                    <li>Building for the cloud</li>
-                    <li>Want to control server version</li>
-                    <li>Doing microservices architecture</li>
-                </ul>
-            </div>
-        </section>
+                <h3>Graceful shutdown — the difference that decides whether a rolling deploy drops requests</h3>
+                <pre><code><span class="comment">// Kubernetes sends SIGTERM to a pod before killing it during a rolling
+// deployment. Without graceful shutdown, the JVM exits immediately —
+// in-flight requests get connection-reset errors, right in the middle of a
+// routine deploy.</span>
+<span class="comment"># application.properties</span>
+server.shutdown=graceful
+spring.lifecycle.timeout-per-shutdown-phase=<span class="number">20</span>s
+<span class="comment">// On SIGTERM: the connector stops accepting NEW requests immediately, but
+// requests already in flight are allowed to finish (up to the configured
+// timeout) before the process actually exits. Combined with a Kubernetes
+// readiness probe that flips to "not ready" during this window, the load
+// balancer stops routing new traffic to this pod while it finishes existing
+// work — the standard shape of a zero-downtime rolling deploy.</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Application Server:</strong> Runtime environment that hosts and executes your Java web applications</li>
-                    <li><strong>Web Server:</strong> Serves static content only (Nginx, Apache HTTP Server)</li>
-                    <li><strong>Servlet Container:</strong> Runs Servlets/JSP (Tomcat, Jetty)</li>
-                    <li><strong>Full Application Server:</strong> Complete Jakarta EE implementation (WildFly, WebLogic)</li>
-                    <li><strong>Embedded Server:</strong> Server packaged inside your application (Spring Boot approach)</li>
-                    <li><strong>Services:</strong> Connection pooling, thread management, sessions, security, JNDI</li>
-                    <li><strong>Modern Trend:</strong> Embedded servers for cloud-native, microservices applications</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — CHOOSING THE RIGHT SERVER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Choosing the Right Server</h2>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="tomcat.html" class="related-link">Tomcat Overview</a>
-                <a href="servlet-container.html" class="related-link">Servlet Containers</a>
-                <a href="war-jar.html" class="related-link">WAR vs JAR</a>
-                <a href="../jakarta-ee/servlets-jsp.html" class="related-link">Servlets & JSP</a>
-            </div>
-        </section>
-    </main>
+                <div class="best-practices">
+                    <h3>Use a servlet container (Tomcat/Jetty/Undertow), typically embedded, when:</h3>
+                    <ul>
+                        <li>Building with Spring Boot — this is the default and requires no extra decision</li>
+                        <li>You don't need EJB, JMS, or other full Jakarta EE services</li>
+                        <li>You're building microservices deployed as containers (Docker/Kubernetes)</li>
+                    </ul>
+
+                    <h3>Use a full application server when:</h3>
+                    <ul>
+                        <li>Required by existing enterprise infrastructure or a support contract</li>
+                        <li>You genuinely need EJB, JTA, or JMS as specified, not a Spring equivalent</li>
+                        <li>You're migrating or maintaining a legacy Java EE application, not writing a new one</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Default to an embedded server for new projects unless there's a specific reason not to</li>
+                        <li>Configure connection pool sizing (HikariCP) based on measured concurrent database load, not a copy-pasted default</li>
+                        <li>Enable Virtual Threads (<code>spring.threads.virtual.enabled=true</code>) on Java 21+ for I/O-heavy, blocking workloads before reaching for a reactive rewrite</li>
+                        <li>Configure graceful shutdown and a Kubernetes readiness probe together — one without the other still drops in-flight requests during deploys</li>
+                        <li>Size the thread pool (or evaluate virtual threads) based on what your actual downstream dependencies can sustain, not an arbitrary round number</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't reach for a full Jakarta EE application server "just in case" — it's real operational overhead for services you may never use</li>
+                        <li>Don't assume Virtual Threads speed up CPU-bound work — they specifically address blocking I/O wait time</li>
+                        <li>Don't deploy to Kubernetes without graceful shutdown configured — routine rolling deploys will intermittently drop live requests</li>
+                        <li>Don't use JNDI resource lookups in a Spring Boot application that was never deployed to an external container — it's solving a problem that setup doesn't have</li>
+                        <li>Don't raise <code>maxThreads</code> as a first response to thread-pool exhaustion without checking whether the real bottleneck is a slow downstream dependency</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's the difference between a Web Server and a Servlet Container?</strong><br>
+                    A Web Server serves static content — HTML, CSS, images — and cannot
+                    execute Java code. A Servlet Container implements the Jakarta Servlet
+                    specification and can run your Java code to generate dynamic responses.
+                    Every Servlet Container also serves static content; a plain Web Server
+                    cannot do what a Servlet Container does.</p>
+
+                    <p><strong>Q: What does "embedded server" mean in Spring Boot, and how is it different from traditional deployment?</strong><br>
+                    Traditionally, a servlet container (Tomcat, for example) is installed
+                    separately, and you deploy your application into it by copying a WAR
+                    file. An embedded server is packaged inside your application's own JAR —
+                    running <code>java -jar myapp.jar</code> starts both the server and your
+                    application together as one process, with no separate installation
+                    step.</p>
+
+                    <p><strong>Q: What is a Connector, and why might a server run more than one?</strong><br>
+                    A Connector is the component that listens on a network port and handles
+                    the raw TCP/HTTP protocol details before a request reaches your
+                    application. A server commonly runs more than one to listen on multiple
+                    ports or protocols at once — HTTP on 8080 and HTTPS on 8443, for
+                    example.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Your Spring Boot service is timing out under load. Monitoring shows CPU usage is low, but the thread pool is consistently maxed out. What's likely happening, and how does enabling Virtual Threads address it?</strong><br>
+                    Low CPU with a maxed-out thread pool is the signature of a blocking
+                    I/O bottleneck, not a compute bottleneck — requests are almost certainly
+                    spending most of their time waiting on a slow database query or a call to
+                    another service, and every waiting request occupies a full platform
+                    thread from a bounded pool (200 by default) until that call returns. Once
+                    all 200 are occupied waiting, additional requests queue regardless of how
+                    idle the CPU actually is. Enabling
+                    <code>spring.threads.virtual.enabled=true</code> on Java 21+ replaces
+                    that bounded platform-thread pool with virtual threads, which are cheap
+                    enough to allocate one per request without a practical ceiling; a
+                    virtual thread blocked on I/O releases its carrier platform thread rather
+                    than occupying a scarce pooled resource. This doesn't make the downstream
+                    call any faster — it removes the artificial thread-count ceiling that was
+                    turning a downstream latency problem into an application-wide outage.</p>
+
+                    <p><strong>Q: A team removes all JNDI-based resource lookups from a legacy application being migrated to Spring Boot, replacing them with HikariCP configuration in application.yml. Is anything lost in that migration, and what should replace it?</strong><br>
+                    What's lost is the specific capability JNDI provided in the external-server
+                    model: the same deployed artifact (WAR) running unmodified against
+                    different environment-specific resource bindings configured entirely on
+                    the server side, with zero difference in the deployed code between
+                    environments. In the embedded model, that same goal — identical build
+                    artifact, environment-specific configuration — is achieved differently:
+                    externalized configuration via environment variables or a config server,
+                    together with Spring profiles, so the JAR itself never changes between
+                    dev and production, only the configuration injected into it at startup.
+                    The capability isn't lost, it's relocated from server-side JNDI bindings
+                    to environment-injected Spring configuration — which is the more
+                    container/cloud-native-friendly mechanism for the exact same underlying
+                    requirement.</p>
+
+                    <p><strong>Q: A rolling Kubernetes deployment of a Spring Boot service causes a brief spike in 5xx errors on every deploy, even though the new pods pass their health checks quickly. What's the most likely misconfiguration?</strong><br>
+                    Almost certainly missing or misconfigured graceful shutdown on the
+                    outgoing pods, the readiness probe timing on the incoming ones, or both.
+                    Without <code>server.shutdown=graceful</code>, a pod receiving
+                    <code>SIGTERM</code> terminates immediately, dropping any request still
+                    in flight rather than finishing it — that's the direct source of dropped
+                    requests during the exact window a pod is being replaced. The fix pairs
+                    two settings: <code>server.shutdown=graceful</code> with a reasonable
+                    <code>spring.lifecycle.timeout-per-shutdown-phase</code> so in-flight
+                    requests get a real chance to complete, and a Kubernetes readiness probe
+                    that flips to not-ready as soon as shutdown begins, so the load balancer
+                    stops sending new traffic to that pod during its drain window rather than
+                    continuing to route to a pod that's already refusing new connections.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="servlet-container.html" class="related-link"><span class="related-icon">📦</span>Servlet Containers</a>
+                    <a href="tomcat.html" class="related-link"><span class="related-icon">🐱</span>Tomcat Overview</a>
+                    <a href="war-jar.html" class="related-link"><span class="related-icon">🗜️</span>WAR vs JAR Files</a>
+                    <a href="web-xml.html" class="related-link"><span class="related-icon">📄</span>Deployment Descriptors</a>
+                    <a href="context.html" class="related-link"><span class="related-icon">🚀</span>Context &amp; Deployment</a>
+                    <a href="../jakarta-ee/servlets-jsp.html" class="related-link"><span class="related-icon">☕</span>Servlets &amp; JSP</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

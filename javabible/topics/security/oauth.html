@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.oauth.page-title">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth 2.0 - JavaDev Bible</title>
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#security" data-i18n="nav.security">Security &amp; Authentication</a> /
+                OAuth 2.0
+            </nav>
+            <h1 data-i18n="topic.oauth.h1">OAuth 2.0</h1>
+            <p class="topic-subtitle" data-i18n="topic.oauth.subtitle">A delegated authorization protocol, not a login mechanism — the four roles, the one flow you should actually use, and where OpenID Connect adds the identity layer OAuth2 deliberately leaves out</p>
+            <a href="../../index.html#security" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is OAuth 2.0 — and Why Does it Exist?</h2>
+                <p><strong>OAuth 2.0</strong> solves one specific problem: letting a
+                    third-party application act on a user's behalf against some resource —
+                    their Google contacts, their GitHub repositories, their shipping
+                    address stored with a carrier — without that application ever seeing
+                    the user's actual password for that resource, and with access limited
+                    to exactly the scope the user consented to. It is a delegated
+                    <strong>authorization</strong> protocol. It is explicitly <em>not</em> an
+                    authentication protocol, and conflating the two is the single most
+                    common OAuth2 mistake — "Login with Google" as most developers use it is
+                    actually built on <strong>OpenID Connect (OIDC)</strong>, a thin identity
+                    layer added on top of OAuth2 specifically because OAuth2 alone never
+                    tells the client <em>who</em> the user is, only that the client was
+                    granted some access token.</p>
+
+                <pre><code><span class="comment">// BEFORE — the "integration" asks the user to hand over their real password</span>
+<span class="keyword">public class</span> <span class="class-name">ShippingSyncService</span> {
+    <span class="keyword">public void</span> <span class="function">connectCarrierAccount</span>(<span class="class-name">String</span> carrierUsername, <span class="class-name">String</span> carrierPassword) {
+        <span class="comment">// Our e-commerce backend now holds the customer's actual carrier password,
+        // in full, indefinitely. It can do ANYTHING that account can do — not
+        // just "read shipping addresses" — and a breach of OUR database now
+        // compromises the customer's account on a system we don't even own.</span>
+        carrierApiClient.<span class="function">login</span>(carrierUsername, carrierPassword);
+    }
+}
+
+<span class="comment">// AFTER — the user authorizes a SCOPED, REVOCABLE token, never sharing a password</span>
+<span class="keyword">public class</span> <span class="class-name">ShippingSyncService</span> {
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">buildAuthorizationUrl</span>(<span class="class-name">String</span> state, <span class="class-name">String</span> codeChallenge) {
+        <span class="keyword">return</span> <span class="class-name">UriComponentsBuilder</span>.<span class="function">fromHttpUrl</span>(<span class="string">"https://carrier.example.com/oauth2/authorize"</span>)
+            .<span class="function">queryParam</span>(<span class="string">"client_id"</span>, <span class="string">"shop-example-com"</span>)
+            .<span class="function">queryParam</span>(<span class="string">"scope"</span>, <span class="string">"shipments:read"</span>)   <span class="comment">// exactly this, nothing more</span>
+            .<span class="function">queryParam</span>(<span class="string">"response_type"</span>, <span class="string">"code"</span>)
+            .<span class="function">queryParam</span>(<span class="string">"state"</span>, state)
+            .<span class="function">queryParam</span>(<span class="string">"code_challenge"</span>, codeChallenge)
+            .<span class="function">queryParam</span>(<span class="string">"code_challenge_method"</span>, <span class="string">"S256"</span>)
+            .<span class="function">toUriString</span>();
+        <span class="comment">// The customer authenticates directly with the carrier, on the carrier's
+        // own login page — our application never sees their credentials at all,
+        // only ever receives a token scoped to "read shipments," revocable by
+        // the customer at any time from the carrier's own account settings.</span>
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE FOUR ROLES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Four Roles</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Role</th><th>Who this is</th><th>E-commerce example</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Resource Owner</strong></td>
+                            <td>The user who owns the data and can grant access to it</td>
+                            <td>The customer, who owns their carrier shipping account</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Client</strong></td>
+                            <td>The application requesting access on the resource owner's behalf</td>
+                            <td>Our e-commerce backend, wanting to read shipment tracking data</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Authorization Server</strong></td>
+                            <td>Authenticates the resource owner and issues tokens after consent</td>
+                            <td>The carrier's OAuth2 login/consent server</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Resource Server</strong></td>
+                            <td>Hosts the protected data and accepts the issued access token</td>
+                            <td>The carrier's shipment-tracking API</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p>Very often the Authorization Server and Resource Server are operated by
+                    the same organization (as in this example) or even the same physical
+                    service — the roles are still worth separating conceptually, because
+                    it's what makes sense of every flow diagram you'll encounter.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — AUTHORIZATION CODE FLOW WITH PKCE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Authorization Code Flow with PKCE — the Only Flow You Should Use for User-Facing Clients</h2>
+                <p>Of the several grant types OAuth2 originally defined, exactly one
+                    remains the current recommendation for anything a human logs into — a
+                    browser SPA, a mobile app, or a traditional server-rendered web app:
+                    <strong>Authorization Code with PKCE</strong> (Proof Key for Code
+                    Exchange, RFC 7636). Current best practice (RFC 9700) recommends PKCE
+                    for every client type, not just the traditionally "public" ones without
+                    a client secret — it closes an authorization-code-interception window
+                    that a client secret alone doesn't fully protect against.</p>
+
+                <pre><code><span class="comment">/*
+ * 1. Client generates a random "code_verifier", derives a "code_challenge"
+ *    from it (SHA-256, base64url), and redirects the user's browser to the
+ *    authorization server with that challenge attached.
+ *
+ * 2. User authenticates directly with the authorization server (never with
+ *    the client) and consents to the requested scope.
+ *
+ * 3. Authorization server redirects back to the client's redirect_uri with a
+ *    short-lived, single-use "authorization code."
+ *
+ * 4. Client exchanges the code for tokens by calling the authorization
+ *    server's token endpoint DIRECTLY (server-to-server, not via the
+ *    browser) — presenting the ORIGINAL code_verifier alongside the code.
+ *
+ * 5. Authorization server re-derives the challenge from the presented
+ *    verifier and checks it matches what it received in step 1. If an
+ *    attacker intercepted the authorization code in step 3 (e.g. via a
+ *    misconfigured redirect_uri or a logged referrer), they still can't
+ *    redeem it — they never had the original code_verifier, only the code.
+ */</span>
+
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">PkceService</span> {
+
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateCodeVerifier</span>() {
+        <span class="keyword">byte</span>[] bytes = <span class="keyword">new byte</span>[<span class="number">32</span>];
+        <span class="keyword">new</span> <span class="class-name">SecureRandom</span>().<span class="function">nextBytes</span>(bytes);
+        <span class="keyword">return</span> <span class="class-name">Base64</span>.<span class="function">getUrlEncoder</span>().<span class="function">withoutPadding</span>().<span class="function">encodeToString</span>(bytes);
+    }
+
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">deriveCodeChallenge</span>(<span class="class-name">String</span> codeVerifier) <span class="keyword">throws</span> <span class="class-name">NoSuchAlgorithmException</span> {
+        <span class="class-name">MessageDigest</span> digest = <span class="class-name">MessageDigest</span>.<span class="function">getInstance</span>(<span class="string">"SHA-256"</span>);
+        <span class="keyword">byte</span>[] hash = digest.<span class="function">digest</span>(codeVerifier.<span class="function">getBytes</span>(<span class="class-name">StandardCharsets</span>.US_ASCII));
+        <span class="keyword">return</span> <span class="class-name">Base64</span>.<span class="function">getUrlEncoder</span>().<span class="function">withoutPadding</span>().<span class="function">encodeToString</span>(hash);
+    }
+}</code></pre>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">The deprecated Implicit and Resource Owner Password Credentials grants</div>
+                    <p>The <strong>Implicit</strong> grant returned the access token
+                        directly in the browser's URL fragment, with no code-exchange step
+                        at all — it exposed the token to browser history, referrer headers,
+                        and any script on the page, and current OAuth2 security guidance
+                        deprecates it outright in favor of Authorization Code with PKCE, even
+                        for pure single-page applications. The <strong>Resource Owner
+                        Password Credentials</strong> grant has the client collect the
+                        user's actual username and password directly and exchange them for a
+                        token — which defeats the entire premise of OAuth2 (the client never
+                        sees the password) and should only ever appear, if at all, in a
+                        first-party migration path being actively phased out.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — CLIENT CREDENTIALS FLOW (SERVICE-TO-SERVICE)
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Client Credentials Flow — When There is No User in the Loop</h2>
+                <p>A nightly batch job that reconciles inventory counts against a supplier's
+                    API isn't acting on behalf of any specific customer — it's the
+                    e-commerce backend itself that needs authorization. The
+                    <strong>Client Credentials</strong> grant fits exactly this case: the
+                    client authenticates directly with its own client ID and secret, no
+                    resource owner or browser redirect involved at all.</p>
+
+                <pre><code><span class="comment"># application.yml — a client registered purely for machine-to-machine calls</span>
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          supplier-api:
+            provider: supplier
+            client-id: <span class="string">${SUPPLIER_CLIENT_ID}</span>
+            client-secret: <span class="string">${SUPPLIER_CLIENT_SECRET}</span>
+            authorization-grant-type: client_credentials
+            scope: inventory:sync
+        provider:
+          supplier:
+            token-uri: https://api.supplier.example.com/oauth2/token
+
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">SupplierInventorySync</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">OAuth2AuthorizedClientManager</span> clientManager;
+    <span class="keyword">private final</span> <span class="class-name">RestClient</span> restClient;
+
+    <span class="keyword">public</span> <span class="function">SupplierInventorySync</span>(<span class="class-name">OAuth2AuthorizedClientManager</span> clientManager, <span class="class-name">RestClient.Builder</span> builder) {
+        <span class="keyword">this</span>.clientManager = clientManager;
+        <span class="keyword">this</span>.restClient = builder.<span class="function">build</span>();
+    }
+
+    <span class="keyword">public void</span> <span class="function">syncInventory</span>() {
+        <span class="class-name">OAuth2AuthorizeRequest</span> request = <span class="class-name">OAuth2AuthorizeRequest</span>
+            .<span class="function">withClientRegistrationId</span>(<span class="string">"supplier-api"</span>)
+            .<span class="function">principal</span>(<span class="string">"inventory-sync-job"</span>)
+            .<span class="function">build</span>();
+
+        <span class="class-name">OAuth2AuthorizedClient</span> client = clientManager.<span class="function">authorize</span>(request);
+        <span class="class-name">String</span> accessToken = client.<span class="function">getAccessToken</span>().<span class="function">getTokenValue</span>();
+        <span class="comment">// Spring's manager transparently handles requesting and caching this token
+        // for its lifetime — application code never manually re-implements the
+        // token request/refresh cycle.</span>
+
+        restClient.<span class="function">get</span>().<span class="function">uri</span>(<span class="string">"https://api.supplier.example.com/inventory"</span>)
+            .<span class="function">header</span>(<span class="class-name">HttpHeaders</span>.AUTHORIZATION, <span class="string">"Bearer "</span> + accessToken)
+            .<span class="function">retrieve</span>().<span class="function">body</span>(<span class="class-name">InventorySnapshot</span>.<span class="keyword">class</span>);
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — OIDC: WHERE IDENTITY ACTUALLY COMES FROM
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>OpenID Connect — the Identity Layer OAuth2 Doesn't Provide</h2>
+                <p>An OAuth2 access token tells a resource server "this bearer is
+                    authorized for this scope." It says nothing about who the human behind
+                    the request actually is, in a standardized, verifiable way — which is
+                    exactly the gap <strong>OpenID Connect</strong> fills, by adding a
+                    third token type to the Authorization Code response: the
+                    <strong>ID token</strong>, a JWT (see the previous page) whose claims
+                    describe the authenticated user directly (<code>sub</code>,
+                    <code>email</code>, <code>name</code>), signed by the identity
+                    provider.</p>
+
+                <pre><code><span class="comment"># application.yml — "Sign in with Google" is OIDC, layered on top of OAuth2</span>
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: <span class="string">${GOOGLE_CLIENT_ID}</span>
+            client-secret: <span class="string">${GOOGLE_CLIENT_SECRET}</span>
+            scope: openid, profile, email   <span class="comment"># "openid" scope is what makes this OIDC, not bare OAuth2</span>
+
+<span class="annotation">@Configuration</span>
+<span class="annotation">@EnableWebSecurity</span>
+<span class="keyword">public class</span> <span class="class-name">SecurityConfig</span> {
+
+    <span class="annotation">@Bean</span>
+    <span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">return</span> http
+            .<span class="function">oauth2Login</span>(oauth2 -> oauth2
+                .<span class="function">userInfoEndpoint</span>(userInfo -> userInfo.<span class="function">oidcUserService</span>(<span class="function">customOidcUserService</span>()))
+            )
+            .<span class="function">build</span>();
+    }
+}</code></pre>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Token</th><th>Defined by</th><th>Format</th><th>Purpose</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Access token</strong></td><td>OAuth2</td><td>Opaque or JWT — format not mandated by the spec</td><td>Presented to a resource server to authorize a specific API call</td></tr>
+                        <tr><td><strong>ID token</strong></td><td>OpenID Connect</td><td>Always a JWT</td><td>Tells the <em>client</em> who the authenticated user is — never sent to a resource server</td></tr>
+                        <tr><td><strong>Refresh token</strong></td><td>OAuth2</td><td>Opaque, store-verified</td><td>Exchanged for a new access token without re-prompting the user</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Never use an access token to identify the user in your own application</div>
+                    <p>An access token's job is authorizing calls to whatever resource
+                        server issued it scope for — it may be entirely opaque, and even when
+                        it happens to be a JWT, its claims are not standardized to describe
+                        identity and the resource server it targets may not even be your own
+                        application. Use the ID token's claims — validated the same way any
+                        JWT is validated, per the previous page — to establish who the user
+                        is inside your own system. Conflating the two is the root cause of a
+                        long list of real vulnerabilities where an application accepted an
+                        access token meant for one API as if it were proof of identity.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SCOPES AND COMMON MISCONFIGURATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Scopes and Common Misconfigurations</h2>
+                <p>A <strong>scope</strong> is the unit of consent — request the narrowest
+                    scope that accomplishes the task, since every scope granted is
+                    permanent standing access until the user or the authorization server
+                    revokes it. Requesting broad scopes "in case we need them later" is the
+                    OAuth2 equivalent of the over-privileged database credentials it was
+                    specifically designed to help avoid.</p>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Misconfiguration</th><th>Consequence</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Loose <code>redirect_uri</code> validation (wildcard or prefix matching)</td>
+                            <td>An attacker registers or finds a similar-looking redirect target and captures authorization codes intended for the legitimate client</td>
+                        </tr>
+                        <tr>
+                            <td>Storing a confidential client's secret in a public client (mobile app, SPA bundle)</td>
+                            <td>The secret is trivially extracted from the shipped binary/bundle — it was never actually secret; use PKCE with a public client instead of pretending it can hold a secret</td>
+                        </tr>
+                        <tr>
+                            <td>Using the Implicit or Resource Owner Password Credentials grant</td>
+                            <td>Token exposure via browser history/referrers, or reintroducing direct password handling that OAuth2 exists to eliminate</td>
+                        </tr>
+                        <tr>
+                            <td>Skipping <code>state</code> parameter validation</td>
+                            <td>Opens a CSRF window on the OAuth2 callback itself — an attacker can trick a victim into completing an authorization flow bound to the attacker's own account</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Use Authorization Code with PKCE for every user-facing client, public or confidential</li>
+                        <li>Use Client Credentials for service-to-service calls with no user in the loop</li>
+                        <li>Request the narrowest scope that accomplishes the task, not the broadest one "for future flexibility"</li>
+                        <li>Validate the <code>state</code> parameter on every callback to prevent CSRF against the authorization flow itself</li>
+                        <li>Use the ID token, not the access token, to establish user identity inside your own application</li>
+                        <li>Register exact-match <code>redirect_uri</code> values — never wildcards or prefix matches</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't use the Implicit or Resource Owner Password Credentials grants for anything new — both are deprecated for real, specific security reasons</li>
+                        <li>Don't treat OAuth2 alone as authentication — without OpenID Connect's ID token, an access token proves authorization, not identity</li>
+                        <li>Don't embed a client secret in a mobile app or SPA bundle — it isn't secret once shipped; use PKCE instead</li>
+                        <li>Don't accept an access token as proof of identity in your own application — it may not even be a JWT, and its claims aren't standardized for that purpose</li>
+                        <li>Don't request scopes beyond what the current feature actually needs</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: Is OAuth 2.0 an authentication protocol?</strong><br>
+                    No — it's a delegated authorization protocol. It lets a client obtain
+                    scoped access to a resource on a user's behalf without ever seeing their
+                    password, but it doesn't, by itself, tell the client who the user is in
+                    a standardized way. "Login with Google" style features are built on
+                    OpenID Connect, a separate identity layer added on top of OAuth2.</p>
+
+                    <p><strong>Q: What are the four roles in OAuth2?</strong><br>
+                    The Resource Owner (the user granting access), the Client (the
+                    application requesting it), the Authorization Server (which
+                    authenticates the user and issues tokens), and the Resource Server
+                    (which hosts the protected data and accepts the token).</p>
+
+                    <p><strong>Q: What is a scope, and why should you request the narrowest one possible?</strong><br>
+                    A scope defines exactly what a token authorizes — read-only access to
+                    shipping data, for example, rather than full account access. Requesting
+                    only what's needed limits the damage if that specific token is ever
+                    leaked or misused, and it's also what the user is actually consenting
+                    to when they approve the authorization request.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Why does current best practice recommend PKCE even for confidential clients that already have a client secret?</strong><br>
+                    A client secret protects the token exchange step — proving to the
+                    authorization server that the entity redeeming the authorization code is
+                    the legitimate registered client. It does nothing to protect the
+                    authorization code itself in transit between steps, which can still be
+                    intercepted (a misconfigured redirect, a logged referrer, a compromised
+                    network) regardless of whether the client is confidential or public.
+                    PKCE adds a second, independent proof — possession of the original
+                    <code>code_verifier</code>, generated fresh per authorization attempt and
+                    never transmitted until the final exchange — that closes this gap
+                    regardless of client type. RFC 9700 formalizes this: PKCE is now
+                    recommended universally, not as a public-client-only workaround.</p>
+
+                    <p><strong>Q: A mobile app team wants to embed their OAuth2 client secret in the app binary to use the standard Authorization Code flow "the same way the web app does." What's wrong with this, and what should they do instead?</strong><br>
+                    A secret embedded in a shipped binary is not a secret — it can be
+                    extracted through basic reverse engineering (the binary has to contain it
+                    in some retrievable form for the app to use it), so it provides no actual
+                    protection while creating a false sense that the client is
+                    "confidential." The correct approach is to register the mobile app as a
+                    public client with no secret at all, relying entirely on PKCE for the
+                    proof-of-possession the secret would otherwise have provided. This is
+                    precisely the scenario PKCE was originally designed for before RFC 9700
+                    extended the recommendation to all client types.</p>
+
+                    <p><strong>Q: An API endpoint validates an incoming Bearer token by checking its JWT signature and treats the "sub" claim as the authenticated user's identity. The token was originally an OAuth2 access token issued for a completely different resource server. What's the vulnerability, and how do you close it?</strong><br>
+                    The access token was never intended to prove identity to this
+                    application at all — its claims and its intended audience belong to
+                    whatever resource server originally requested it, and OAuth2 access
+                    tokens have no standardized identity semantics or audience guarantee
+                    unless the API explicitly enforces one. If this API accepts any
+                    validly-signed token regardless of its intended audience, a token
+                    legitimately issued for an entirely unrelated service — one the
+                    attacker separately has legitimate access to — can be replayed here and
+                    accepted as proof of identity for a user who never authorized this
+                    application at all. The fix is twofold: this application should be
+                    using the OpenID Connect ID token — which does carry standardized
+                    identity claims and is meant for exactly this — for establishing
+                    identity, and any access token accepted for authorization purposes must
+                    have its <code>aud</code> claim validated against this specific resource
+                    server's expected identifier, rejecting anything issued for a different
+                    audience.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="auth-vs-authz.html" class="related-link"><span class="related-icon">🪪</span>Authentication vs Authorization</a>
+                    <a href="https-ssl.html" class="related-link"><span class="related-icon">🛡️</span>HTTPS &amp; SSL/TLS</a>
+                    <a href="password-hashing.html" class="related-link"><span class="related-icon">🔒</span>Password Hashing</a>
+                    <a href="session-mgmt.html" class="related-link"><span class="related-icon">🍪</span>Session Management</a>
+                    <a href="jwt.html" class="related-link"><span class="related-icon">🔑</span>JWT (JSON Web Tokens)</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/i18n.js"></script>
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>

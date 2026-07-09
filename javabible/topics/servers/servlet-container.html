@@ -1,414 +1,446 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.servlet-container.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Servlet Containers - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#servers">Application Servers</a> / Servlet Containers
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#servers" data-i18n="nav.servers">Application Servers &amp; Deployment</a> /
+                Servlet Containers
             </nav>
-            <h1>Servlet Containers</h1>
-            <p class="topic-subtitle">The heart of Java web applications</p>
-            <a href="../../index.html#servers" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.servlet-container.h1">Servlet Containers</h1>
+            <p class="topic-subtitle" data-i18n="topic.servlet-container.subtitle">The Servlet contract every Java web framework sits on top of — lifecycle, thread safety, filters, and how async servlets solved the problem Virtual Threads now solve differently</p>
+            <a href="../../index.html#servers" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is a Servlet Container?</h2>
-            <p>A <strong>Servlet Container</strong> (also called a "Servlet Engine" or "Web Container") is the runtime environment that manages the lifecycle and execution of Java Servlets. It's the essential component that transforms your Java code into a web application capable of handling HTTP requests and generating dynamic responses.</p>
+    <div class="topic-layout">
 
-            <p>Understanding servlet containers is fundamental to Java web development because every Java web framework—from raw servlets to Spring Boot—ultimately relies on this core technology.</p>
-
-            <h3>Why Do Servlet Containers Exist?</h3>
-            <p>In the early days of web development, creating dynamic web applications in Java was challenging. You needed to:</p>
-            <ul>
-                <li><strong>Handle raw TCP/IP connections</strong> - Managing socket programming for HTTP</li>
-                <li><strong>Parse HTTP requests</strong> - Manually reading headers, query parameters, form data</li>
-                <li><strong>Manage concurrent users</strong> - Creating and managing threads for each request</li>
-                <li><strong>Handle sessions</strong> - Tracking users across stateless HTTP requests</li>
-                <li><strong>Manage security</strong> - Authentication, authorization, SSL/TLS</li>
-                <li><strong>Deploy and update code</strong> - Hot-deploying without server restarts</li>
-            </ul>
-
-            <p>The servlet specification and servlet containers emerged to provide a standardized solution, letting developers focus on business logic instead of plumbing.</p>
-
-            <div class="info-box">
-                <p><strong>The Restaurant Kitchen Analogy:</strong></p>
-                <p>Think of a servlet container like the <em>kitchen management system</em> in a restaurant:</p>
-                <ul>
-                    <li>Takes orders from waiters → Receives HTTP requests</li>
-                    <li>Routes orders to the right chef station → Routes requests to the right servlet</li>
-                    <li>Manages multiple orders simultaneously → Handles concurrent requests with threads</li>
-                    <li>Provides cooking tools and ingredients → Provides APIs (request, response, session objects)</li>
-                    <li>Ensures dishes are prepared correctly → Manages servlet lifecycle (init, service, destroy)</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>What is a Servlet?</h2>
-            <p>Before diving deeper into containers, let's understand what they contain. A <strong>Servlet</strong> is a Java class that handles HTTP requests and generates responses. It's the fundamental building block of Java web applications.</p>
+        <main class="topic-content">
 
-            <h3>A Simple Servlet Example</h3>
-            <pre><code><span class="keyword">import</span> jakarta.servlet.*;
-<span class="keyword">import</span> jakarta.servlet.http.*;
-<span class="keyword">import</span> java.io.*;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is a Servlet Container — and Why Does it Exist?</h2>
+                <p>The previous page described a servlet container from the outside — what
+                    it accepts, routes, and executes. This page goes one level deeper: a
+                    <strong>Servlet Container</strong> is, specifically, the runtime that
+                    implements the <strong>Jakarta Servlet specification</strong> — a
+                    contract defining exactly what a <code>Servlet</code> is, how the
+                    container must call its lifecycle methods, and what objects
+                    (<code>HttpServletRequest</code>, <code>HttpServletResponse</code>,
+                    <code>HttpSession</code>) it must hand your code. Every Java web
+                    framework you'll ever use — Spring MVC, Spring Boot, JAX-RS
+                    implementations — is, underneath its annotations, a layer of code that
+                    itself runs as a <code>Servlet</code> and delegates down to your
+                    handler methods. Understanding this contract is what lets you reason
+                    about what a framework is actually doing when its abstractions leak.</p>
 
-<span class="comment">// A servlet is just a Java class that extends HttpServlet</span>
-<span class="keyword">public class</span> <span class="class-name">HelloServlet</span> <span class="keyword">extends</span> HttpServlet {
+                <pre><code><span class="comment">// BEFORE — implementing the Servlet contract directly</span>
+<span class="keyword">public class</span> <span class="class-name">OrderStatusServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
 
-    <span class="comment">// Called once when the servlet is first loaded</span>
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> init() <span class="keyword">throws</span> ServletException {
-        System.out.println(<span class="string">"HelloServlet initialized!"</span>);
-        <span class="comment">// Initialize resources: database connections, load config, etc.</span>
-    }
+    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> resp)
+            <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
+        <span class="class-name">String</span> orderId = req.<span class="function">getParameter</span>(<span class="string">"orderId"</span>);
+        <span class="class-name">Order</span> order = orderService.<span class="function">findById</span>(<span class="class-name">Long</span>.<span class="function">valueOf</span>(orderId));
 
-    <span class="comment">// Called for every GET request</span>
-    <span class="annotation">@Override</span>
-    <span class="keyword">protected void</span> doGet(HttpServletRequest request,
-                         HttpServletResponse response)
-            <span class="keyword">throws</span> ServletException, IOException {
-
-        <span class="comment">// Get data from the request</span>
-        String name = request.getParameter(<span class="string">"name"</span>);
-        <span class="keyword">if</span> (name == <span class="keyword">null</span>) name = <span class="string">"World"</span>;
-
-        <span class="comment">// Set response type</span>
-        response.setContentType(<span class="string">"text/html"</span>);
-
-        <span class="comment">// Write the response</span>
-        PrintWriter out = response.getWriter();
-        out.println(<span class="string">"&lt;html&gt;&lt;body&gt;"</span>);
-        out.println(<span class="string">"&lt;h1&gt;Hello, "</span> + name + <span class="string">"!&lt;/h1&gt;"</span>);
-        out.println(<span class="string">"&lt;/body&gt;&lt;/html&gt;"</span>);
-    }
-
-    <span class="comment">// Called once when the servlet is being unloaded</span>
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> destroy() {
-        System.out.println(<span class="string">"HelloServlet destroyed!"</span>);
-        <span class="comment">// Clean up resources: close connections, release memory</span>
-    }
-}</code></pre>
-
-            <h3>The Servlet Lifecycle</h3>
-            <p>The servlet container manages the complete lifecycle of every servlet:</p>
-            <ol>
-                <li><strong>Loading:</strong> Container loads the servlet class into memory (on first request or at startup)</li>
-                <li><strong>Instantiation:</strong> Container creates exactly ONE instance of the servlet class</li>
-                <li><strong>Initialization:</strong> Container calls <code>init()</code> method once—set up resources here</li>
-                <li><strong>Service:</strong> Container calls <code>service()</code> (doGet/doPost) for EVERY request (multi-threaded!)</li>
-                <li><strong>Destruction:</strong> Container calls <code>destroy()</code> once before unloading—cleanup here</li>
-            </ol>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Critical: Single Instance, Multiple Threads</div>
-                <p>The servlet container creates only <strong>one instance</strong> of each servlet, but calls its service methods from <strong>multiple threads simultaneously</strong>. This means:</p>
-                <ul>
-                    <li>Servlets must be <strong>thread-safe</strong></li>
-                    <li>Never store request-specific data in instance variables</li>
-                    <li>Use local variables or synchronized blocks for shared mutable state</li>
-                </ul>
-            </div>
-
-            <pre><code><span class="comment">// BAD - NOT thread-safe!</span>
-<span class="keyword">public class</span> <span class="class-name">UnsafeServlet</span> <span class="keyword">extends</span> HttpServlet {
-    <span class="keyword">private</span> String username; <span class="comment">// Instance variable shared by all threads!</span>
-
-    <span class="keyword">protected void</span> doGet(HttpServletRequest req, HttpServletResponse resp) {
-        username = req.getParameter(<span class="string">"user"</span>); <span class="comment">// Thread A writes "Alice"</span>
-        <span class="comment">// ... meanwhile Thread B writes "Bob"</span>
-        resp.getWriter().println(<span class="string">"Hello, "</span> + username); <span class="comment">// Could print wrong name!</span>
+        resp.<span class="function">setContentType</span>(<span class="string">"application/json"</span>);
+        resp.<span class="function">getWriter</span>().<span class="function">write</span>(objectMapper.<span class="function">writeValueAsString</span>(order));
+        <span class="comment">// You are directly responsible for parsing the parameter, choosing the
+        // content type, and serializing the response body by hand.</span>
     }
 }
 
-<span class="comment">// GOOD - Thread-safe</span>
-<span class="keyword">public class</span> <span class="class-name">SafeServlet</span> <span class="keyword">extends</span> HttpServlet {
-    <span class="keyword">protected void</span> doGet(HttpServletRequest req, HttpServletResponse resp) {
-        String username = req.getParameter(<span class="string">"user"</span>); <span class="comment">// Local variable - thread-safe</span>
-        resp.getWriter().println(<span class="string">"Hello, "</span> + username);
-    }
+<span class="comment">// AFTER — Spring MVC's DispatcherServlet is ITSELF a Servlet that implements
+// this exact contract, and delegates down to your annotated method</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/orders/{orderId}"</span>)
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">getOrderStatus</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> orderId) {
+    <span class="keyword">return</span> orderService.<span class="function">findById</span>(orderId);
+    <span class="comment">// Same servlet lifecycle underneath — init/service/destroy still happen,
+    // parameter binding and JSON serialization are handled by the framework
+    // layer sitting on top of that same contract, not by a different mechanism.</span>
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>What Does a Servlet Container Do?</h2>
-            <p>The servlet container provides a rich set of services that your application relies on.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE SERVLET LIFECYCLE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Servlet Lifecycle — One Instance, Three Lifecycle Methods</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Phase</th><th>Method</th><th>Called</th><th>Typical use</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1</td><td><code>init()</code></td><td>Once, when the servlet is first loaded</td><td>Acquire resources — database connections, load configuration</td></tr>
+                        <tr><td>2</td><td><code>service()</code> → <code>doGet()</code>/<code>doPost()</code></td><td>Once per request, on whichever thread the container assigns</td><td>Handle the actual request — this is where your logic runs</td></tr>
+                        <tr><td>3</td><td><code>destroy()</code></td><td>Once, when the servlet is being unloaded</td><td>Release resources — close connections, stop background work</td></tr>
+                    </tbody>
+                </table>
 
-            <h3>1. HTTP Protocol Handling</h3>
-            <pre><code><span class="comment">// You write this simple code...</span>
-String name = request.getParameter(<span class="string">"name"</span>);
+                <div class="info-box warning">
+                    <div class="info-box-title">Critical: one instance, many threads — servlets must be thread-safe</div>
+                    <p>The container creates exactly <strong>one instance</strong> of each
+                        servlet class and calls its <code>service()</code> method from
+                        <strong>multiple threads simultaneously</strong> as concurrent
+                        requests arrive. An instance field on a servlet is shared mutable
+                        state across every concurrent request being handled — this is the
+                        single most common source of a bug that only appears under real
+                        concurrent load, not in local single-request testing.</p>
+                </div>
 
-<span class="comment">// The container already did all of this:</span>
-<span class="comment">// 1. Opened a TCP socket on port 8080</span>
-<span class="comment">// 2. Read raw bytes from the network</span>
-<span class="comment">// 3. Parsed the HTTP request line: "GET /hello?name=John HTTP/1.1"</span>
-<span class="comment">// 4. Parsed all headers: Content-Type, Cookie, Accept, etc.</span>
-<span class="comment">// 5. Decoded URL-encoded parameters (%20 → space)</span>
-<span class="comment">// 6. Created the HttpServletRequest object wrapping all this data</span>
-<span class="comment">// 7. Created a thread to handle this request</span>
-<span class="comment">// 8. Found and invoked your servlet's doGet method</span></code></pre>
-
-            <h3>2. Request Routing (URL Mapping)</h3>
-            <pre><code><span class="comment">// In web.xml or using annotations</span>
-<span class="annotation">@WebServlet</span>(<span class="string">"/products/*"</span>)      <span class="comment">// Matches /products, /products/123</span>
-<span class="annotation">@WebServlet</span>(<span class="string">"*.do"</span>)             <span class="comment">// Matches /login.do, /checkout.do</span>
-<span class="annotation">@WebServlet</span>(<span class="string">"/api/v1/users"</span>)    <span class="comment">// Matches exactly this URL</span>
-<span class="annotation">@WebServlet</span>(<span class="string">""</span>)                 <span class="comment">// Default servlet for the context root</span>
-
-<span class="comment">// URL Pattern Matching Rules (in order of precedence):</span>
-<span class="comment">// 1. Exact match:     /catalog/products</span>
-<span class="comment">// 2. Path match:      /catalog/*</span>
-<span class="comment">// 3. Extension match: *.jsp</span>
-<span class="comment">// 4. Default:         /</span></code></pre>
-
-            <h3>3. Thread Management</h3>
-            <pre><code><span class="comment">// Tomcat's default thread pool configuration (server.xml)</span>
-&lt;Connector port=<span class="string">"8080"</span> protocol=<span class="string">"HTTP/1.1"</span>
-           maxThreads=<span class="string">"200"</span>        <span class="comment">&lt;!-- Maximum concurrent requests --&gt;</span>
-           minSpareThreads=<span class="string">"10"</span>    <span class="comment">&lt;!-- Threads kept ready --&gt;</span>
-           acceptCount=<span class="string">"100"</span>       <span class="comment">&lt;!-- Queue size when all threads busy --&gt;</span>
-           connectionTimeout=<span class="string">"20000"</span> /&gt;</code></pre>
-
-            <h3>4. Session Management</h3>
-            <pre><code><span class="comment">// Getting/creating a session - container does the heavy lifting</span>
-HttpSession session = request.getSession(); <span class="comment">// true = create if doesn't exist</span>
-
-<span class="comment">// Behind the scenes, the container:</span>
-<span class="comment">// 1. Checks for JSESSIONID cookie in the request</span>
-<span class="comment">// 2. If found, looks up existing session in memory</span>
-<span class="comment">// 3. If not found or expired, creates new session</span>
-<span class="comment">// 4. Generates unique session ID (cryptographically random)</span>
-<span class="comment">// 5. Sets JSESSIONID cookie in response</span>
-<span class="comment">// 6. Returns HttpSession object to your code</span>
-
-<span class="comment">// Store data in session</span>
-session.setAttribute(<span class="string">"user"</span>, currentUser);
-session.setAttribute(<span class="string">"cart"</span>, shoppingCart);
-
-<span class="comment">// Retrieve data later (even in different servlet)</span>
-User user = (User) session.getAttribute(<span class="string">"user"</span>);</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Filters and Listeners</h2>
-            <p>Beyond servlets, containers support two other powerful components.</p>
-
-            <h3>Servlet Filters</h3>
-            <p>Filters intercept requests <em>before</em> they reach servlets and responses <em>after</em> servlets generate them. They're perfect for cross-cutting concerns.</p>
-
-            <pre><code><span class="keyword">import</span> jakarta.servlet.*;
-<span class="keyword">import</span> jakarta.servlet.annotation.*;
-
-<span class="annotation">@WebFilter</span>(<span class="string">"/*"</span>)  <span class="comment">// Apply to all URLs</span>
-<span class="keyword">public class</span> <span class="class-name">LoggingFilter</span> <span class="keyword">implements</span> Filter {
+                <pre><code><span class="comment">// BAD — instance field shared across every concurrent request</span>
+<span class="keyword">public class</span> <span class="class-name">UnsafeOrderServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> currentCustomer;   <span class="comment">// ONE field, shared by every thread calling doGet concurrently</span>
 
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> doFilter(ServletRequest request,
-                         ServletResponse response,
-                         FilterChain chain)
-            <span class="keyword">throws</span> IOException, ServletException {
+    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> resp) <span class="keyword">throws</span> <span class="class-name">IOException</span> {
+        currentCustomer = req.<span class="function">getParameter</span>(<span class="string">"customer"</span>);   <span class="comment">// Thread A sets "alice"...</span>
+        <span class="comment">// ...Thread B overwrites it with "bob" before Thread A reads it back below...</span>
+        resp.<span class="function">getWriter</span>().<span class="function">println</span>(<span class="string">"Orders for: "</span> + currentCustomer);   <span class="comment">// could print the WRONG customer</span>
+    }
+}
 
-        HttpServletRequest req = (HttpServletRequest) request;
-        <span class="keyword">long</span> startTime = System.currentTimeMillis();
-
-        <span class="comment">// Log before processing</span>
-        System.out.println(<span class="string">"Request: "</span> + req.getMethod() + <span class="string">" "</span> + req.getRequestURI());
-
-        <span class="comment">// Pass to next filter or servlet</span>
-        chain.doFilter(request, response);
-
-        <span class="comment">// Log after processing</span>
-        <span class="keyword">long</span> duration = System.currentTimeMillis() - startTime;
-        System.out.println(<span class="string">"Response completed in "</span> + duration + <span class="string">"ms"</span>);
+<span class="comment">// GOOD — local variable, scoped to this single request/thread invocation</span>
+<span class="keyword">public class</span> <span class="class-name">SafeOrderServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> resp) <span class="keyword">throws</span> <span class="class-name">IOException</span> {
+        <span class="class-name">String</span> currentCustomer = req.<span class="function">getParameter</span>(<span class="string">"customer"</span>);   <span class="comment">// local — each thread gets its own</span>
+        resp.<span class="function">getWriter</span>().<span class="function">println</span>(<span class="string">"Orders for: "</span> + currentCustomer);
     }
 }</code></pre>
 
-            <p><strong>Common uses for filters:</strong></p>
-            <ul>
-                <li><strong>Authentication/Authorization</strong> - Check login status before protected resources</li>
-                <li><strong>Logging</strong> - Log all requests and responses</li>
-                <li><strong>Compression</strong> - GZIP compress responses</li>
-                <li><strong>Character Encoding</strong> - Set UTF-8 for all requests</li>
-                <li><strong>CORS Headers</strong> - Add cross-origin headers to responses</li>
-            </ul>
+                <div class="info-box note">
+                    <div class="info-box-title">This is exactly why Spring's request-scoped injection matters</div>
+                    <p>A Spring <code>@RestController</code> is, by default, a
+                        <strong>singleton</strong> — the same single instance handles every
+                        concurrent request, precisely mirroring the servlet model above. Any
+                        field you inject or assign on a controller is shared the same way an
+                        instance field on a raw servlet would be. This is the underlying
+                        mechanical reason controllers must stay stateless and pass everything
+                        request-specific as method parameters rather than fields.</p>
+                </div>
+            </section>
 
-            <h3>Servlet Listeners</h3>
-            <p>Listeners respond to lifecycle events in the container:</p>
-            <pre><code><span class="annotation">@WebListener</span>
-<span class="keyword">public class</span> <span class="class-name">AppLifecycleListener</span> <span class="keyword">implements</span> ServletContextListener {
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — FILTERS AND LISTENERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Filters and Listeners — Cross-Cutting Concerns at the Container Level</h2>
+
+                <h3>Filters — intercept before and after</h3>
+                <pre><code><span class="annotation">@WebFilter</span>(<span class="string">"/*"</span>)
+<span class="keyword">public class</span> <span class="class-name">RequestTimingFilter</span> <span class="keyword">implements</span> <span class="class-name">Filter</span> {
 
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> contextInitialized(ServletContextEvent sce) {
-        <span class="comment">// Called when application starts</span>
-        System.out.println(<span class="string">"Application starting up!"</span>);
-        <span class="comment">// Initialize connection pools, load config, start background services</span>
-    }
+    <span class="keyword">public void</span> <span class="function">doFilter</span>(<span class="class-name">ServletRequest</span> request, <span class="class-name">ServletResponse</span> response, <span class="class-name">FilterChain</span> chain)
+            <span class="keyword">throws</span> <span class="class-name">IOException</span>, <span class="class-name">ServletException</span> {
 
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> contextDestroyed(ServletContextEvent sce) {
-        <span class="comment">// Called when application shuts down</span>
-        System.out.println(<span class="string">"Application shutting down!"</span>);
-        <span class="comment">// Cleanup resources, close connections, stop threads</span>
+        <span class="keyword">long</span> start = <span class="class-name">System</span>.<span class="function">currentTimeMillis</span>();
+        <span class="keyword">try</span> {
+            chain.<span class="function">doFilter</span>(request, response);   <span class="comment">// pass control down the chain — every filter must call this</span>
+        } <span class="keyword">finally</span> {
+            <span class="keyword">long</span> duration = <span class="class-name">System</span>.<span class="function">currentTimeMillis</span>() - start;
+            log.<span class="function">info</span>(<span class="string">"Request completed in {}ms"</span>, duration);   <span class="comment">// finally — runs even if the chain throws</span>
+        }
     }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Popular Servlet Containers</h2>
+                <p>Common uses: authentication checks before a protected resource is
+                    reached, response compression, character-encoding normalization, and
+                    CORS headers — all covered in dedicated pages elsewhere in this Bible
+                    (<a href="../security/auth-vs-authz.html">Authentication vs
+                    Authorization</a>, <a href="../web-concepts/cors.html">CORS</a>).</p>
 
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Container</th>
-                        <th>Type</th>
-                        <th>Best For</th>
-                        <th>Key Features</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Apache Tomcat</strong></td>
-                        <td>Servlet Container</td>
-                        <td>Most Java web apps</td>
-                        <td>Industry standard, widely documented</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Eclipse Jetty</strong></td>
-                        <td>Servlet Container</td>
-                        <td>Embedded use, microservices</td>
-                        <td>Small footprint, fast startup</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Undertow</strong></td>
-                        <td>Servlet Container</td>
-                        <td>High performance</td>
-                        <td>Non-blocking I/O, embedded in WildFly</td>
-                    </tr>
-                    <tr>
-                        <td><strong>GlassFish</strong></td>
-                        <td>Full App Server</td>
-                        <td>Jakarta EE reference</td>
-                        <td>Reference implementation</td>
-                    </tr>
-                    <tr>
-                        <td><strong>WildFly</strong></td>
-                        <td>Full App Server</td>
-                        <td>Enterprise applications</td>
-                        <td>Modular, Jakarta EE certified</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <h3>Listeners — reacting to container lifecycle events</h3>
+                <pre><code><span class="annotation">@WebListener</span>
+<span class="keyword">public class</span> <span class="class-name">InventorySyncListener</span> <span class="keyword">implements</span> <span class="class-name">ServletContextListener</span> {
 
-        <section class="content-section">
-            <h2>Embedded Servlet Containers</h2>
-            <p>Modern frameworks like Spring Boot use <em>embedded</em> servlet containers—the container runs inside your application rather than your application inside the container.</p>
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">contextInitialized</span>(<span class="class-name">ServletContextEvent</span> event) {
+        <span class="comment">// Runs once when the application starts — start a background scheduler,
+        // warm a cache, verify required configuration is present</span>
+    }
 
-            <pre><code><span class="comment">// Spring Boot - embedded Tomcat by default</span>
-&lt;dependency&gt;
-    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
-    &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
-    <span class="comment">&lt;!-- Includes embedded Tomcat --&gt;</span>
-&lt;/dependency&gt;
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">contextDestroyed</span>(<span class="class-name">ServletContextEvent</span> event) {
+        <span class="comment">// Runs once during shutdown — stop background threads cleanly before
+        // the container finishes tearing down, so nothing is left running
+        // against resources that are about to disappear</span>
+    }
+}</code></pre>
+            </section>
 
-<span class="comment">// To switch to Jetty:</span>
-&lt;dependency&gt;
-    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
-    &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
-    &lt;exclusions&gt;
-        &lt;exclusion&gt;
-            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
-            &lt;artifactId&gt;spring-boot-starter-tomcat&lt;/artifactId&gt;
-        &lt;/exclusion&gt;
-    &lt;/exclusions&gt;
-&lt;/dependency&gt;
-&lt;dependency&gt;
-    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
-    &lt;artifactId&gt;spring-boot-starter-jetty&lt;/artifactId&gt;
-&lt;/dependency&gt;</code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — ASYNC SERVLETS AND VIRTUAL THREADS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Async Servlets — the Problem Virtual Threads Now Solve Differently</h2>
+                <p>Before Java 21, a servlet handling a long-running operation — waiting on
+                    a slow downstream call, holding a connection open for Server-Sent Events
+                    — tied up one of the container's limited platform threads for the
+                    entire duration, exactly the scaling problem described on the previous
+                    page. <strong>Servlet 3.0</strong> introduced asynchronous processing
+                    specifically to work around this: the servlet thread hands the request
+                    off and returns immediately, freeing itself to serve other requests,
+                    while the actual work completes elsewhere and finishes the response
+                    later.</p>
 
-            <h3>Why Embedded Containers?</h3>
-            <ul>
-                <li><strong>Simpler Deployment:</strong> Just copy one JAR file, run with <code>java -jar</code></li>
-                <li><strong>Version Control:</strong> Container version is part of your project dependencies</li>
-                <li><strong>Development Parity:</strong> Same container in dev, test, and production</li>
-                <li><strong>Cloud-Native:</strong> Perfect for Docker containers and Kubernetes</li>
-            </ul>
-        </section>
+                <pre><code><span class="annotation">@WebServlet</span>(urlPatterns = <span class="string">"/orders/*"</span>, asyncSupported = <span class="keyword">true</span>)
+<span class="keyword">public class</span> <span class="class-name">SlowReportServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
 
-        <section class="content-section">
-            <h2>The javax to jakarta Migration</h2>
-            <p>In 2017, Oracle transferred Java EE to the Eclipse Foundation, creating Jakarta EE. Due to Oracle's trademark on "Java," all packages changed:</p>
+    <span class="annotation">@Override</span>
+    <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> resp) {
+        <span class="class-name">AsyncContext</span> asyncContext = req.<span class="function">startAsync</span>();   <span class="comment">// releases the container thread NOW</span>
 
-            <table class="comparison-table">
-                <thead>
-                    <tr>
-                        <th>Servlet Version</th>
-                        <th>Java Version</th>
-                        <th>Package</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Servlet 4.0 and earlier</td>
-                        <td>Java 8+</td>
-                        <td>javax.servlet</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Servlet 5.0+</strong></td>
-                        <td>Java 8+</td>
-                        <td><strong>jakarta.servlet</strong></td>
-                    </tr>
-                </tbody>
-            </table>
+        reportingExecutor.<span class="function">submit</span>(() -> {
+            <span class="comment">// Runs on a SEPARATE thread pool, not the container's request thread</span>
+            <span class="class-name">Report</span> report = reportService.<span class="function">generateSlowReport</span>();   <span class="comment">// takes several seconds</span>
+            <span class="keyword">try</span> {
+                asyncContext.<span class="function">getResponse</span>().<span class="function">getWriter</span>().<span class="function">write</span>(report.<span class="function">toJson</span>());
+            } <span class="keyword">catch</span> (<span class="class-name">IOException</span> e) {
+                <span class="comment">// handle appropriately</span>
+            } <span class="keyword">finally</span> {
+                asyncContext.<span class="function">complete</span>();   <span class="comment">// signals the container the response is finished</span>
+            }
+        });
+        <span class="comment">// doGet() returns here — the request thread is immediately free for other work</span>
+    }
+}</code></pre>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Migration Tip</div>
-                <p>When upgrading to Tomcat 10+, Spring Boot 3+, or Jakarta EE 9+, you must update all imports from <code>javax</code> to <code>jakarta</code>.</p>
-            </div>
-        </section>
+                <div class="info-box important">
+                    <div class="info-box-title">Why this is less necessary — though not obsolete — since Virtual Threads</div>
+                    <p>Async servlets solve the platform-thread scarcity problem by manually
+                        moving work off the container's request thread onto a separate
+                        executor — at the cost of real complexity: callback-style code,
+                        careful exception handling across thread boundaries, and losing the
+                        straightforward request-scoped context that synchronous code gets for
+                        free. Virtual threads (covered on the previous page) solve the same
+                        underlying scarcity problem differently: since a virtual thread
+                        blocked on I/O doesn't tie up a scarce platform thread at all, plain
+                        synchronous, blocking code — <code>doGet()</code> that just calls a
+                        slow service directly — no longer needs manual async restructuring to
+                        scale. Async servlets remain genuinely useful for specific patterns
+                        that are asynchronous by nature regardless of thread cost — long-held
+                        Server-Sent Events connections, WebSocket-adjacent patterns — but
+                        "my synchronous code blocks a thread pool" is no longer, by itself, a
+                        reason to reach for this API on Java 21+.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Summary</h2>
-            <div class="info-box">
-                <ul>
-                    <li><strong>Servlet Container:</strong> The runtime environment that manages servlet lifecycle and handles HTTP requests</li>
-                    <li><strong>Single Instance, Multiple Threads:</strong> Only one servlet instance handles all requests concurrently</li>
-                    <li><strong>Lifecycle:</strong> init() once → service() many times → destroy() once</li>
-                    <li><strong>Filters:</strong> Intercept requests/responses for cross-cutting concerns</li>
-                    <li><strong>Listeners:</strong> React to lifecycle events in the container</li>
-                    <li><strong>Embedded Containers:</strong> Modern approach where container is inside your app</li>
-                    <li><strong>Jakarta Migration:</strong> javax.* packages became jakarta.* in Servlet 5.0+</li>
-                    <li><strong>Thread Safety:</strong> Always use local variables for request data</li>
-                </ul>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — POPULAR SERVLET CONTAINERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Popular Servlet Container Implementations</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Container</th><th>Type</th><th>Best for</th><th>Notable characteristic</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Apache Tomcat</strong></td><td>Servlet container</td><td>Most Java web apps — Spring Boot's default</td><td>Reference-grade, extensively documented, covered in depth next</td></tr>
+                        <tr><td><strong>Eclipse Jetty</strong></td><td>Servlet container</td><td>Embedded scenarios, fast startup</td><td>Small footprint, popular for embedding in tooling</td></tr>
+                        <tr><td><strong>Undertow</strong></td><td>Servlet container</td><td>High-concurrency, non-blocking workloads</td><td>Built on NIO from the ground up; powers WildFly and Spring Boot's Undertow starter</td></tr>
+                        <tr><td><strong>GlassFish</strong></td><td>Full application server</td><td>Jakarta EE reference implementation</td><td>The specification's own reference platform</td></tr>
+                        <tr><td><strong>WildFly</strong></td><td>Full application server</td><td>Enterprise Jakarta EE applications</td><td>Modular, Undertow-based, Jakarta EE certified</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="app-server.html" class="related-link">What is an Application Server?</a>
-                <a href="tomcat.html" class="related-link">Apache Tomcat</a>
-                <a href="war-jar.html" class="related-link">WAR vs JAR</a>
-                <a href="web-xml.html" class="related-link">Deployment Descriptors</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — THE JAVAX TO JAKARTA MIGRATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The <code>javax</code> to <code>jakarta</code> Package Migration</h2>
+                <p>Oracle transferred Java EE governance to the Eclipse Foundation in 2017,
+                    and the project was renamed Jakarta EE. The package rename that trips
+                    people up, however, didn't happen at that moment — it came later, with
+                    <strong>Jakarta EE 9</strong> in December 2020, when a trademark
+                    restriction on the <code>javax</code>/"Java" naming forced every
+                    specification package to move from <code>javax.servlet</code> to
+                    <code>jakarta.servlet</code>. Any code, tutorial, or dependency written
+                    before that point uses the old namespace; anything targeting Tomcat 10+,
+                    Spring Boot 3+, or Jakarta EE 9+ uses the new one — the two are
+                    source-incompatible, not just a version bump.</p>
+
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Servlet spec version</th><th>Package</th><th>Typical runtime</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>4.0 and earlier</td><td><code>javax.servlet</code></td><td>Tomcat 9 and earlier, Spring Boot 2.x</td></tr>
+                        <tr><td><strong>5.0 and later</strong></td><td><strong><code>jakarta.servlet</code></strong></td><td>Tomcat 10+, Spring Boot 3.x+</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">This is a real migration, not just an import find-and-replace</div>
+                    <p>Every dependency in the classpath — not just your own code — needs a
+                        <code>jakarta.*</code>-compatible version. A single lingering
+                        <code>javax.servlet</code>-based third-party library alongside a
+                        Tomcat 10+/Spring Boot 3+ upgrade fails at runtime with
+                        <code>ClassNotFoundException</code> or silent servlet
+                        registration failures, not a compile error you'd catch early —
+                        verify the entire dependency tree, not only your own imports, before
+                        attempting this upgrade.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Treat every servlet (and every default-scoped Spring controller) as a singleton shared across concurrent requests — keep request-specific data in local variables or method parameters, never instance fields</li>
+                        <li>Always call <code>chain.doFilter()</code> in a filter, in a <code>finally</code> block if you need code to run regardless of downstream exceptions</li>
+                        <li>Release resources acquired in <code>init()</code> inside the matching <code>destroy()</code>, or in a <code>ServletContextListener</code>'s <code>contextDestroyed()</code></li>
+                        <li>Prefer plain synchronous blocking code on Java 21+ with Virtual Threads over manual async servlet restructuring, unless the pattern is asynchronous by nature (SSE, long polling)</li>
+                        <li>Audit every dependency's package namespace (<code>javax.*</code> vs <code>jakarta.*</code>) before a Tomcat 10+/Spring Boot 3+ upgrade — not just your own code</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't store request- or user-specific state in a servlet's (or a singleton controller's) instance fields — it's shared, mutable state across every concurrent request</li>
+                        <li>Don't reach for <code>AsyncContext</code> purely to "avoid blocking a thread" on Java 21+ — Virtual Threads solve that specific problem with far less code complexity</li>
+                        <li>Don't assume a <code>javax</code>-to-<code>jakarta</code> upgrade is a mechanical import rename — verify every third-party dependency supports the new namespace first</li>
+                        <li>Don't forget to call <code>asyncContext.complete()</code> in every code path of an async servlet — a missed call leaves the request hanging until it times out</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: How many instances of a servlet class does the container create, and what does that mean for thread safety?</strong><br>
+                    Exactly one. The container calls that single instance's
+                    <code>service()</code> method from multiple threads concurrently as
+                    requests arrive, which means any instance field is shared, mutable state
+                    across every concurrent request. Request-specific data must be kept in
+                    local variables inside the handling method, never in instance fields.</p>
+
+                    <p><strong>Q: What are the three lifecycle methods of a Servlet, and when is each called?</strong><br>
+                    <code>init()</code> is called once, when the servlet is first loaded —
+                    the place to acquire resources. <code>service()</code> (dispatching to
+                    <code>doGet</code>/<code>doPost</code>/etc.) is called once per request,
+                    potentially from many threads at once. <code>destroy()</code> is called
+                    once, when the servlet is being unloaded — the place to release
+                    resources acquired in <code>init()</code>.</p>
+
+                    <p><strong>Q: What is a Filter, and how is it different from a Servlet?</strong><br>
+                    A Filter intercepts a request before it reaches a servlet and the
+                    response after the servlet generates it, and is meant for cross-cutting
+                    concerns — logging, authentication checks, compression — that apply
+                    across many URLs rather than one specific handler. Unlike a servlet, a
+                    filter doesn't generate the actual response content; it calls
+                    <code>chain.doFilter()</code> to pass control onward (or short-circuits
+                    the chain deliberately, e.g. to reject an unauthenticated request).</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A team migrating from Spring Boot 2.x to 3.x reports a third-party library throwing <code>ClassNotFoundException</code> at runtime, with no compile errors. What's the most likely cause?</strong><br>
+                    The library almost certainly still targets the <code>javax.servlet</code>
+                    namespace, while Spring Boot 3.x runs on Tomcat 10+, which implements
+                    <code>jakarta.servlet</code>. Since <code>javax.*</code> and
+                    <code>jakarta.*</code> are different packages entirely — not different
+                    versions of the same package — a dependency compiled against the old
+                    namespace can still compile successfully against your own code (since
+                    your code doesn't reference that library's servlet-related classes
+                    directly) but fails at runtime the moment the container tries to load a
+                    class that depends on a `javax.servlet` type that no longer exists on the
+                    Jakarta EE 9+ classpath. The fix is to find a `jakarta`-compatible
+                    version of that specific dependency, not to look for a bug in your own
+                    migrated code.</p>
+
+                    <p><strong>Q: Why did async servlets exist before Java 21, and why does enabling Virtual Threads reduce, but not eliminate, the need for that API?</strong><br>
+                    Before Virtual Threads, every in-flight request — including one merely
+                    waiting on a slow downstream call — occupied one of the container's
+                    bounded platform threads for the call's full duration. Async servlets
+                    (<code>AsyncContext</code>) worked around this by having the request
+                    thread hand off the actual work to a separate executor and return
+                    immediately, at the cost of callback-style code and manual lifecycle
+                    management (<code>complete()</code> must be called on every path).
+                    Virtual threads remove the scarcity that motivated this pattern in the
+                    first place — a virtual thread blocked on I/O releases its underlying
+                    platform thread automatically, so plain synchronous blocking code scales
+                    the same way async code used to, without the added complexity. What
+                    Virtual Threads don't replace is genuinely asynchronous-by-nature
+                    patterns — a Server-Sent Events connection held open indefinitely, or a
+                    callback triggered by an external event rather than a blocking call —
+                    where the async model isn't a workaround for thread scarcity, it's the
+                    correct shape of the problem itself.</p>
+
+                    <p><strong>Q: A Spring <code>@RestController</code> has a mutable instance field used to cache the "last processed order" across requests, and under load the wrong order occasionally appears in a response. Explain the root cause using the servlet model.</strong><br>
+                    A default-scoped Spring bean, including a controller, is a singleton —
+                    exactly one instance handles every concurrent HTTP request, mirroring
+                    precisely how the servlet container itself instantiates exactly one
+                    instance of each servlet class. An instance field on that singleton is
+                    therefore shared, mutable state across every thread the container is
+                    currently using to handle different concurrent requests — one request's
+                    thread can overwrite that field before another request's thread reads it
+                    back, producing exactly the interleaved, wrong-data symptom described.
+                    The fix is identical to the raw-servlet case: move the data into a local
+                    variable scoped to the single request being handled, or, if state
+                    genuinely needs to persist beyond one method call, into an explicitly
+                    request-scoped or session-scoped bean rather than a singleton's instance
+                    field.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="app-server.html" class="related-link"><span class="related-icon">🖥️</span>What is an Application Server?</a>
+                    <a href="tomcat.html" class="related-link"><span class="related-icon">🐱</span>Tomcat Overview</a>
+                    <a href="war-jar.html" class="related-link"><span class="related-icon">🗜️</span>WAR vs JAR Files</a>
+                    <a href="web-xml.html" class="related-link"><span class="related-icon">📄</span>Deployment Descriptors</a>
+                    <a href="context.html" class="related-link"><span class="related-icon">🚀</span>Context &amp; Deployment</a>
+                    <a href="../jakarta-ee/servlets-jsp.html" class="related-link"><span class="related-icon">☕</span>Servlets &amp; JSP</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-
