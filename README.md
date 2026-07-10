@@ -24,17 +24,21 @@ A complete, organized reference covering everything from Java fundamentals to en
 
 ## 📊 Project Status
 
-This project is under active, topic-by-topic quality improvement — older topics are being rewritten to a consistent standard: production-grade depth, a single running e-commerce domain across all code examples, in-page TOC, and junior/senior interview questions.
+This project went through a full, topic-by-topic quality overhaul: every page rewritten to a consistent standard — production-grade depth, a single running e-commerce domain across all code examples, in-page TOC, and junior/senior interview questions.
 
-**Fully modernized categories:**
+**All 12 categories fully modernized:**
+- ✅ Java Fundamentals
+- ✅ Advanced Java Concepts
+- ✅ Build Tools & Project Management
+- ✅ Spring Framework
+- ✅ Jakarta EE & Enterprise Java
+- ✅ Web Concepts & Architecture
+- ✅ Databases & Persistence
+- ✅ Security & Authentication
+- ✅ Application Servers & Deployment
+- ✅ Java Versions & Compatibility
 - ✅ Tools & Ecosystem (IDEs, Git, CI/CD, Logging, Testing, Code Quality Tools)
 - ✅ Best Practices (SOLID, Clean Code, Error Handling, Performance, Security, Code Conventions, SonarQube & Code Quality)
-
-**In progress:** Databases & Persistence, Jakarta EE, Application Servers & Deployment
-
-**Not yet modernized:** Fundamentals, Advanced Java, Spring Framework, Build Tools, Web Concepts, Java Versions
-
-If you land on a page from an unmodernized category, expect solid reference content, but not yet the same depth as the categories above — that gap is closing incrementally.
 
 ## 📂 Topics Covered
 
@@ -54,8 +58,7 @@ If you land on a page from an unmodernized category, expect solid reference cont
 
 ## 🗺️ Roadmap
 
-- [ ] Finish quality pass on remaining categories (Fundamentals, Advanced, Spring, Build Tools, Web Concepts, Java Versions)
-- [ ] Spanish translation via a language toggle — intentionally deferred until every category is at the same content quality bar, to avoid translating content that's about to be rewritten
+- [ ] Spanish translation via a language toggle — the content quality pass across all 12 categories is complete, so this is the next major piece of work
 - [ ] SEO metadata, sitemap.xml, structured data
 - [ ] Dark/light mode toggle
 
