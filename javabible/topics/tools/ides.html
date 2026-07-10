@@ -1,604 +1,670 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.ides.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDEs (IntelliJ, Eclipse) - JavaDev Bible</title>
+    <title>IDEs (IntelliJ, Eclipse, VS Code) - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#tools">Tools & Ecosystem</a> / IDEs
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#tools" data-i18n="nav.tools">Tools &amp; Ecosystem</a> /
+                IDEs
             </nav>
-            <h1>IDEs (IntelliJ, Eclipse)</h1>
-            <p class="topic-subtitle">Integrated Development Environments for Java Development</p>
-            <a href="../../index.html#tools" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.ides.h1">IDEs — IntelliJ IDEA, Eclipse, and VS Code</h1>
+            <p class="topic-subtitle" data-i18n="topic.ides.subtitle">How semantic indexing actually works under the hood, where AI-assisted coding fits (and where it doesn't), remote debugging against a running container, and choosing the right tool for the job</p>
+            <a href="../../index.html#tools" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is an IDE?</h2>
-            <p>An Integrated Development Environment (IDE) is a software application that provides comprehensive facilities for software development. IDEs combine multiple development tools into a single graphical interface, making coding more efficient and productive.</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">Core IDE Features</div>
-                <ul>
-                    <li><strong>Code Editor</strong> - Syntax highlighting, auto-completion, formatting</li>
-                    <li><strong>Compiler/Build Tools</strong> - Compile and build projects</li>
-                    <li><strong>Debugger</strong> - Step through code, inspect variables</li>
-                    <li><strong>Project Management</strong> - Organize files, dependencies</li>
-                    <li><strong>Version Control Integration</strong> - Git, SVN support</li>
-                    <li><strong>Refactoring Tools</strong> - Rename, extract methods, move classes</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>IntelliJ IDEA</h2>
-            <p>IntelliJ IDEA, developed by JetBrains, is widely considered the most powerful and feature-rich Java IDE. It's the preferred choice for many professional Java developers.</p>
+        <main class="topic-content">
 
-            <h3>Editions</h3>
-            <ul>
-                <li><strong>Community Edition</strong> - Free, open-source, covers Java SE development</li>
-                <li><strong>Ultimate Edition</strong> - Paid, includes web development, frameworks support, database tools</li>
-            </ul>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS AN IDE AND WHY IT EXISTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is an IDE — and Why Does It Exist?</h2>
+                <p>Before IDEs, Java development meant a text editor plus a terminal:
+                    write the file, run <code>javac</code>, read the compiler's
+                    line-number errors, switch back to the editor, repeat. Every piece
+                    of context — which classes exist, whether a method call is valid,
+                    whether a variable is null-safe — lived only in the developer's
+                    head. An IDE's actual job is to make that context
+                    machine-visible: it parses your entire codebase (and its
+                    dependencies) into an in-memory symbol index so it can answer
+                    "does this method exist / is this type correct / where is this
+                    used" in milliseconds, continuously, before you ever run a
+                    compile.</p>
 
-            <h3>Key Features</h3>
-            <pre><code><span class="comment">// Smart Code Completion - IntelliJ predicts what you need</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; names = <span class="keyword">new</span> <span class="class-name">Array</span>  <span class="comment">// Type "Array" and press Ctrl+Space</span>
-                                     <span class="comment">// IntelliJ suggests ArrayList, Arrays, etc.</span>
+                <pre><code><span class="comment">// BEFORE — editor + terminal, zero live feedback</span>
+<span class="comment">$ vim OrderService.java
+$ javac OrderService.java
+OrderService.java:14: error: cannot find symbol
+    customerRepository.findByEmail(email)
+                        ^
+  symbol:   method findByEmail(String)
+  location: variable customerRepository of type CustomerRepository
+// The error is discovered only after a full compile — and all you get
+// is a line number, not a fix.</span>
 
-<span class="comment">// Code Analysis - Real-time error detection</span>
-<span class="class-name">String</span> name = <span class="keyword">null</span>;
-name.length();  <span class="comment">// IntelliJ warns: "Method invocation may produce NullPointerException"</span>
-
-<span class="comment">// Quick Fixes - Alt+Enter to fix issues</span>
-<span class="keyword">public void</span> <span class="function">process</span>(<span class="class-name">String</span> data) {
-    <span class="comment">// Missing null check - Alt+Enter suggests adding validation</span>
+<span class="comment">// AFTER — IDE with live semantic indexing</span>
+<span class="comment">// The IDE flags the missing method the instant you type it — a red
+// underline, no compile step required — and offers to generate the
+// method stub directly on CustomerRepository via a quick fix.</span>
+<span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
+    <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email);   <span class="comment">// generated in one keystroke</span>
 }</code></pre>
 
-            <h3>Essential Keyboard Shortcuts</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Action</th>
-                        <th>Windows/Linux</th>
-                        <th>macOS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Search Everywhere</td>
-                        <td>Double Shift</td>
-                        <td>Double Shift</td>
-                    </tr>
-                    <tr>
-                        <td>Find Class</td>
-                        <td>Ctrl+N</td>
-                        <td>Cmd+O</td>
-                    </tr>
-                    <tr>
-                        <td>Find File</td>
-                        <td>Ctrl+Shift+N</td>
-                        <td>Cmd+Shift+O</td>
-                    </tr>
-                    <tr>
-                        <td>Code Completion</td>
-                        <td>Ctrl+Space</td>
-                        <td>Ctrl+Space</td>
-                    </tr>
-                    <tr>
-                        <td>Quick Fix</td>
-                        <td>Alt+Enter</td>
-                        <td>Option+Enter</td>
-                    </tr>
-                    <tr>
-                        <td>Generate Code</td>
-                        <td>Alt+Insert</td>
-                        <td>Cmd+N</td>
-                    </tr>
-                    <tr>
-                        <td>Refactor This</td>
-                        <td>Ctrl+Alt+Shift+T</td>
-                        <td>Ctrl+T</td>
-                    </tr>
-                    <tr>
-                        <td>Run</td>
-                        <td>Shift+F10</td>
-                        <td>Ctrl+R</td>
-                    </tr>
-                    <tr>
-                        <td>Debug</td>
-                        <td>Shift+F9</td>
-                        <td>Ctrl+D</td>
-                    </tr>
-                    <tr>
-                        <td>Reformat Code</td>
-                        <td>Ctrl+Alt+L</td>
-                        <td>Cmd+Option+L</td>
-                    </tr>
-                </tbody>
-            </table>
+                <p>This is the actual value proposition of an IDE, and it's worth
+                    stating precisely because it's what separates a real IDE from "a
+                    text editor with syntax highlighting": a full semantic model of
+                    your code, kept live as you type, that powers code completion,
+                    error detection, navigation, and mechanical refactoring — all
+                    without a compile-run cycle.</p>
+            </section>
 
-            <h3>Live Templates</h3>
-            <pre><code><span class="comment">// Type abbreviation and press Tab to expand</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE 2026 JAVA IDE LANDSCAPE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The 2026 Java IDE Landscape — and How Each One Actually Sees Your Code</h2>
+                <p>The three mainstream options solve the "semantic model" problem
+                    with genuinely different architectures, and that architectural
+                    choice is why their behavior on large codebases diverges:</p>
 
-<span class="comment">// "psvm" expands to:</span>
-<span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+                <ul>
+                    <li><strong>IntelliJ IDEA</strong> builds its own proprietary
+                        semantic model — the <strong>PSI</strong> (Program Structure
+                        Interface) — a full syntax and type tree maintained entirely by
+                        JetBrains, independent of any external compiler. This is why
+                        its refactoring and code-completion tend to stay accurate even
+                        across huge multi-module Maven/Gradle projects.</li>
+                    <li><strong>Eclipse</strong> uses the <strong>JDT</strong> (Java
+                        Development Tools) — its own incremental Java compiler that
+                        re-parses and re-type-checks only the files that changed. JDT
+                        predates the Language Server Protocol and was built directly
+                        into Eclipse's architecture.</li>
+                    <li><strong>VS Code</strong> has no built-in Java understanding at
+                        all. Its Java support comes from wrapping Eclipse's own JDT
+                        as a <strong>Language Server</strong> (JDT.LS), communicated
+                        over the <strong>Language Server Protocol (LSP)</strong> — the
+                        same underlying engine as Eclipse, exposed through a different
+                        editor shell.</li>
+                </ul>
 
+                <div class="info-box note">
+                    <div class="info-box-title">Where AI-native editors (Cursor, Windsurf) actually fit</div>
+                    <p>AI-native editors built as VS Code forks use the exact same
+                        JDT.LS language server for Java semantics that stock VS Code
+                        uses — their AI layer is additive, not a replacement for the
+                        underlying type-checking engine. For a large Spring Boot or
+                        Jakarta EE codebase, this matters: the quality of "does this
+                        compile / is this type correct" comes from JDT.LS regardless
+                        of which AI-native shell sits on top of it, and JDT.LS is
+                        historically less complete than IntelliJ's PSI on
+                        deep, multi-module refactors. Choose an AI-native editor for
+                        its agentic workflow, not under the assumption that it
+                        understands enterprise Java better than IntelliJ does.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — INTELLIJ IDEA
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>IntelliJ IDEA</h2>
+                <p>IntelliJ IDEA, developed by JetBrains, is the default choice for
+                    most professional Java teams — its PSI-based engine gives it the
+                    strongest refactoring and framework-aware completion of the three
+                    mainstream options.</p>
+
+                <h3>Editions</h3>
+                <ul>
+                    <li><strong>Community Edition</strong> — free, open-source, covers
+                        core Java SE, JUnit, and basic Maven/Gradle support</li>
+                    <li><strong>Ultimate Edition</strong> — paid, adds Spring/Spring
+                        Boot-aware completion, Jakarta EE tooling, database tools, and
+                        JavaScript/TypeScript support for full-stack work</li>
+                </ul>
+
+                <h3>Key Features</h3>
+                <pre><code><span class="comment">// Framework-aware completion (Ultimate) — knows Spring bean wiring, not just syntax</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="keyword">private final</span> <span class="class-name">CustomerRepository</span> customerRepository;
+
+    <span class="keyword">public</span> <span class="function">OrderService</span>(<span class="class-name">CustomerRepository</span> customerRepository) {
+        <span class="keyword">this</span>.customerRepository = customerRepository;
+    }
+    <span class="comment">// Gutter icon links this constructor directly to the Spring bean graph —
+    // click it to jump to every place this bean is injected.</span>
 }
 
-<span class="comment">// "sout" expands to:</span>
+<span class="comment">// Real-time null-safety analysis</span>
+<span class="class-name">Customer</span> customer = customerRepository.findById(id).orElse(<span class="keyword">null</span>);
+customer.getEmail();  <span class="comment">// flagged: "Method invocation may produce NullPointerException"</span>
+
+<span class="comment">// Quick Fix (Alt+Enter) on a missing null check</span>
+<span class="keyword">public void</span> <span class="function">notify</span>(<span class="class-name">Customer</span> customer) {
+    <span class="comment">// Alt+Enter here offers to wrap in an Objects.requireNonNull or an if-null guard</span>
+}</code></pre>
+
+                <h3>Live Templates</h3>
+                <pre><code><span class="comment">// Type the abbreviation and press Tab to expand</span>
+
+<span class="comment">// "psvm" →</span>
+<span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) { }
+
+<span class="comment">// "sout" →</span>
 <span class="class-name">System</span>.out.println();
 
-<span class="comment">// "fori" expands to:</span>
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; ; i++) {
+<span class="comment">// "iter" → enhanced for-loop over the inferred collection type</span>
+<span class="keyword">for</span> (<span class="class-name">OrderItem</span> item : order.getItems()) { }</code></pre>
 
-}
-
-<span class="comment">// "iter" expands to enhanced for loop:</span>
-<span class="keyword">for</span> (<span class="class-name">Object</span> o : ) {
-
-}</code></pre>
-
-            <div class="info-box tip">
-                <div class="info-box-title">Pro Tip: Postfix Completion</div>
-                <p>Type an expression followed by a dot and postfix template:</p>
-                <ul>
-                    <li><code>myList.for</code> &rarr; generates for-each loop</li>
-                    <li><code>result.if</code> &rarr; generates if statement</li>
-                    <li><code>value.null</code> &rarr; generates null check</li>
-                    <li><code>object.nn</code> &rarr; generates not-null check</li>
-                </ul>
-            </div>
-        </section>
-
-        <section class="content-section">
-            <h2>Eclipse IDE</h2>
-            <p>Eclipse is a free, open-source IDE that has been a cornerstone of Java development for over two decades. It's highly extensible through its plugin architecture.</p>
-
-            <h3>Eclipse Packages</h3>
-            <ul>
-                <li><strong>Eclipse IDE for Java Developers</strong> - Core Java development</li>
-                <li><strong>Eclipse IDE for Enterprise Java Developers</strong> - Jakarta EE, web development</li>
-                <li><strong>Eclipse IDE for Java and DSL Developers</strong> - Includes Xtext for DSLs</li>
-            </ul>
-
-            <h3>Key Features</h3>
-            <pre><code><span class="comment">// Content Assist (Ctrl+Space)</span>
-<span class="class-name">String</span> message = <span class="string">"Hello"</span>;
-message.  <span class="comment">// Press Ctrl+Space to see all String methods</span>
-
-<span class="comment">// Quick Fix (Ctrl+1)</span>
-<span class="comment">// Hover over error/warning and press Ctrl+1 for suggestions</span>
-
-<span class="comment">// Organize Imports (Ctrl+Shift+O)</span>
-<span class="comment">// Automatically adds missing imports and removes unused ones</span>
-
-<span class="comment">// Source menu (Alt+Shift+S)</span>
-<span class="comment">// Generate getters, setters, constructors, toString, etc.</span></code></pre>
-
-            <h3>Essential Keyboard Shortcuts</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Action</th>
-                        <th>Shortcut</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Content Assist</td>
-                        <td>Ctrl+Space</td>
-                    </tr>
-                    <tr>
-                        <td>Quick Fix</td>
-                        <td>Ctrl+1</td>
-                    </tr>
-                    <tr>
-                        <td>Open Type</td>
-                        <td>Ctrl+Shift+T</td>
-                    </tr>
-                    <tr>
-                        <td>Open Resource</td>
-                        <td>Ctrl+Shift+R</td>
-                    </tr>
-                    <tr>
-                        <td>Organize Imports</td>
-                        <td>Ctrl+Shift+O</td>
-                    </tr>
-                    <tr>
-                        <td>Format Code</td>
-                        <td>Ctrl+Shift+F</td>
-                    </tr>
-                    <tr>
-                        <td>Run</td>
-                        <td>Ctrl+F11</td>
-                    </tr>
-                    <tr>
-                        <td>Debug</td>
-                        <td>F11</td>
-                    </tr>
-                    <tr>
-                        <td>Rename Refactor</td>
-                        <td>Alt+Shift+R</td>
-                    </tr>
-                    <tr>
-                        <td>Extract Method</td>
-                        <td>Alt+Shift+M</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <h3>Workspace and Projects</h3>
-            <pre><code><span class="comment">// Eclipse Workspace Structure</span>
-workspace/
-├── .metadata/              <span class="comment"># Eclipse settings</span>
-├── project-1/
-│   ├── .project            <span class="comment"># Project configuration</span>
-│   ├── .classpath          <span class="comment"># Classpath settings</span>
-│   ├── .settings/          <span class="comment"># Project-specific settings</span>
-│   └── src/
-│       └── com/example/
-│           └── Main.java
-└── project-2/
-    └── ...</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Visual Studio Code</h2>
-            <p>VS Code is a lightweight, cross-platform editor that can be transformed into a powerful Java IDE through extensions.</p>
-
-            <h3>Essential Java Extensions</h3>
-            <ul>
-                <li><strong>Extension Pack for Java</strong> - Microsoft's comprehensive Java support
+                <div class="info-box tip">
+                    <div class="info-box-title">Postfix completion — write the expression first, the structure follows</div>
                     <ul>
-                        <li>Language Support for Java (Red Hat)</li>
-                        <li>Debugger for Java</li>
-                        <li>Test Runner for Java</li>
-                        <li>Maven for Java</li>
-                        <li>Project Manager for Java</li>
+                        <li><code>order.getItems().for</code> &rarr; generates a for-each loop over the items</li>
+                        <li><code>customer.null</code> &rarr; generates an <code>if (customer == null)</code> guard</li>
+                        <li><code>result.nn</code> &rarr; generates a not-null check</li>
                     </ul>
-                </li>
-                <li><strong>Spring Boot Extension Pack</strong> - For Spring development</li>
-                <li><strong>Lombok Annotations Support</strong> - For Lombok users</li>
-            </ul>
+                </div>
 
-            <h3>VS Code Java Shortcuts</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Action</th>
-                        <th>Windows/Linux</th>
-                        <th>macOS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Command Palette</td>
-                        <td>Ctrl+Shift+P</td>
-                        <td>Cmd+Shift+P</td>
-                    </tr>
-                    <tr>
-                        <td>Go to File</td>
-                        <td>Ctrl+P</td>
-                        <td>Cmd+P</td>
-                    </tr>
-                    <tr>
-                        <td>Go to Symbol</td>
-                        <td>Ctrl+Shift+O</td>
-                        <td>Cmd+Shift+O</td>
-                    </tr>
-                    <tr>
-                        <td>Quick Fix</td>
-                        <td>Ctrl+.</td>
-                        <td>Cmd+.</td>
-                    </tr>
-                    <tr>
-                        <td>Format Document</td>
-                        <td>Shift+Alt+F</td>
-                        <td>Shift+Option+F</td>
-                    </tr>
-                </tbody>
-            </table>
+                <h3>Essential Keyboard Shortcuts</h3>
+                <table>
+                    <thead>
+                        <tr><th>Action</th><th>Windows/Linux</th><th>macOS</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Search Everywhere</td><td>Double Shift</td><td>Double Shift</td></tr>
+                        <tr><td>Find Class</td><td>Ctrl+N</td><td>Cmd+O</td></tr>
+                        <tr><td>Code Completion</td><td>Ctrl+Space</td><td>Ctrl+Space</td></tr>
+                        <tr><td>Quick Fix</td><td>Alt+Enter</td><td>Option+Enter</td></tr>
+                        <tr><td>Refactor This</td><td>Ctrl+Alt+Shift+T</td><td>Ctrl+T</td></tr>
+                        <tr><td>Run / Debug</td><td>Shift+F10 / Shift+F9</td><td>Ctrl+R / Ctrl+D</td></tr>
+                        <tr><td>Reformat Code</td><td>Ctrl+Alt+L</td><td>Cmd+Option+L</td></tr>
+                    </tbody>
+                </table>
+            </section>
 
-            <div class="info-box note">
-                <div class="info-box-title">When to Use VS Code</div>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — ECLIPSE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Eclipse IDE</h2>
+                <p>Eclipse is a free, open-source IDE built on the OSGi plugin
+                    architecture (Equinox) — every feature, including Java support
+                    itself, is a plugin. This is why it's historically been the
+                    IDE of choice for teams needing deep customization or vendor
+                    application-server tooling built as Eclipse plugins.</p>
+
+                <h3>Eclipse Packages</h3>
                 <ul>
-                    <li>Quick edits and small projects</li>
-                    <li>Polyglot development (multiple languages)</li>
-                    <li>Limited system resources</li>
-                    <li>Preference for lightweight editors</li>
+                    <li><strong>Eclipse IDE for Java Developers</strong> — core Java SE development</li>
+                    <li><strong>Eclipse IDE for Enterprise Java and Web Developers</strong> — Jakarta EE, JAX-RS, application-server integration</li>
                 </ul>
-            </div>
-        </section>
 
-        <section class="content-section">
-            <h2>IDE Comparison</h2>
+                <h3>Key Features</h3>
+                <pre><code><span class="comment">// Content Assist (Ctrl+Space)</span>
+<span class="class-name">Order</span> order = orderRepository.findById(orderId);
+order.  <span class="comment">// Ctrl+Space lists every accessible member of Order</span>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Feature</th>
-                        <th>IntelliJ IDEA</th>
-                        <th>Eclipse</th>
-                        <th>VS Code</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Price</strong></td>
-                        <td>Free (Community) / Paid (Ultimate)</td>
-                        <td>Free</td>
-                        <td>Free</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Performance</strong></td>
-                        <td>Good (requires RAM)</td>
-                        <td>Moderate</td>
-                        <td>Fast, lightweight</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Code Completion</strong></td>
-                        <td>Excellent</td>
-                        <td>Good</td>
-                        <td>Good</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Refactoring</strong></td>
-                        <td>Excellent</td>
-                        <td>Good</td>
-                        <td>Basic</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Framework Support</strong></td>
-                        <td>Excellent (Ultimate)</td>
-                        <td>Good (via plugins)</td>
-                        <td>Good (via extensions)</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Learning Curve</strong></td>
-                        <td>Moderate</td>
-                        <td>Moderate</td>
-                        <td>Easy</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Maven/Gradle</strong></td>
-                        <td>Built-in</td>
-                        <td>Plugin</td>
-                        <td>Extension</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Git Integration</strong></td>
-                        <td>Excellent</td>
-                        <td>Good</td>
-                        <td>Excellent</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+<span class="comment">// Quick Fix (Ctrl+1) on an unresolved type</span>
+<span class="comment">// Hover the error, Ctrl+1 → "Import 'Order' (com.shop.model)"</span>
 
-        <section class="content-section">
-            <h2>Debugging in IDEs</h2>
-            <p>All major IDEs provide powerful debugging capabilities. Understanding debugging is essential for efficient development.</p>
+<span class="comment">// Organize Imports (Ctrl+Shift+O) — adds missing, removes unused</span></code></pre>
 
-            <h3>Common Debugging Actions</h3>
-            <pre><code><span class="comment">// Setting breakpoints - click in the gutter or use shortcuts</span>
+                <h3>Essential Keyboard Shortcuts</h3>
+                <table>
+                    <thead>
+                        <tr><th>Action</th><th>Shortcut</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Content Assist</td><td>Ctrl+Space</td></tr>
+                        <tr><td>Quick Fix</td><td>Ctrl+1</td></tr>
+                        <tr><td>Open Type</td><td>Ctrl+Shift+T</td></tr>
+                        <tr><td>Organize Imports</td><td>Ctrl+Shift+O</td></tr>
+                        <tr><td>Rename Refactor</td><td>Alt+Shift+R</td></tr>
+                        <tr><td>Run / Debug</td><td>Ctrl+F11 / F11</td></tr>
+                    </tbody>
+                </table>
 
-<span class="keyword">public void</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order) {
-    <span class="keyword">double</span> total = <span class="number">0</span>;                    <span class="comment">// Set breakpoint here</span>
+                <h3>Workspace Structure</h3>
+                <pre><code>workspace/
+├── .metadata/                  <span class="comment"># Eclipse settings — never commit this</span>
+├── order-service/
+│   ├── .project                <span class="comment"># project descriptor</span>
+│   ├── .classpath              <span class="comment"># classpath entries</span>
+│   └── src/main/java/com/shop/order/
+└── customer-service/
+    └── ...</code></pre>
+            </section>
 
-    <span class="keyword">for</span> (<span class="class-name">Item</span> item : order.getItems()) {
-        <span class="keyword">double</span> price = item.getPrice();   <span class="comment">// Inspect variable values</span>
-        total += price;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — VS CODE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Visual Studio Code</h2>
+                <p>VS Code is a lightweight, cross-platform editor turned into a
+                    Java IDE entirely through extensions — its Java intelligence, as
+                    covered above, comes from wrapping Eclipse's JDT as a language
+                    server rather than a purpose-built Java engine.</p>
+
+                <h3>Essential Java Extensions</h3>
+                <ul>
+                    <li><strong>Extension Pack for Java</strong> (Microsoft) — bundles
+                        Language Support for Java (Red Hat), Debugger for Java, Test
+                        Runner for Java, and Maven for Java</li>
+                    <li><strong>Spring Boot Extension Pack</strong> — bean navigation, application.properties completion</li>
+                </ul>
+
+                <h3>VS Code Java Shortcuts</h3>
+                <table>
+                    <thead>
+                        <tr><th>Action</th><th>Windows/Linux</th><th>macOS</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Command Palette</td><td>Ctrl+Shift+P</td><td>Cmd+Shift+P</td></tr>
+                        <tr><td>Go to File</td><td>Ctrl+P</td><td>Cmd+P</td></tr>
+                        <tr><td>Quick Fix</td><td>Ctrl+.</td><td>Cmd+.</td></tr>
+                        <tr><td>Format Document</td><td>Shift+Alt+F</td><td>Shift+Option+F</td></tr>
+                    </tbody>
+                </table>
+
+                <div class="info-box note">
+                    <div class="info-box-title">When VS Code is the right choice</div>
+                    <ul>
+                        <li>Polyglot work spanning Java, front-end, and infra config in one window</li>
+                        <li>Constrained hardware where a full IDE's memory footprint is a real cost</li>
+                        <li>Quick edits to a service you don't own the full module graph of</li>
+                    </ul>
+                    <p>For deep, day-to-day work inside a large Spring/Jakarta EE
+                        monorepo, the weaker refactoring engine (Section 1) is a real
+                        cost, not a style preference.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — AI-ASSISTED DEVELOPMENT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>AI-Assisted Development in the IDE</h2>
+                <p>Every mainstream IDE now ships an integrated AI layer — GitHub
+                    Copilot (IntelliJ, Eclipse, VS Code), JetBrains AI Assistant and
+                    its autonomous coding agent Junie, and AI-native editors like
+                    Cursor and Windsurf with agentic "auto-accept" modes. These sit
+                    on top of the semantic engines from Section 1 — they don't
+                    replace them, and the distinction matters in production.</p>
+
+                <pre><code><span class="comment">// A plausible-looking AI suggestion for a repository query method</span>
+<span class="annotation">@Query</span>(<span class="string">"SELECT o FROM Order o WHERE o.customer.email = :email"</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findOrdersForCustomer</span>(<span class="annotation">@Param</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email);
+
+<span class="comment">// Looks correct and compiles. What the assistant didn't know:
+// this project's convention is soft-deleted orders (deletedAt IS NULL),
+// enforced everywhere else via a @Where clause the assistant never saw
+// because it wasn't in the file it was editing. The generated method
+// silently returns cancelled/deleted orders too.</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">The real production risk is not "wrong code" — it's plausible code</div>
+                    <p>AI suggestions fail differently from a junior developer's
+                        mistakes: they compile, they follow correct Java syntax and
+                        common patterns, and they read as confident. The risk is
+                        specifically the categories a compiler cannot catch —
+                        business-rule omissions (soft-delete conventions, tenant
+                        isolation filters), N+1 queries hidden behind a
+                        reasonable-looking method signature, and <code>@Transactional</code>
+                        boundaries that don't match the surrounding service's actual
+                        rollback rules. Review AI-generated code with the same
+                        rigor as a human pull request — never with less, on the
+                        assumption that "it compiled" means "it's correct."</p>
+                </div>
+
+                <h3>Where it genuinely helps</h3>
+                <ul>
+                    <li>Boilerplate the IDE can't template-generate — mapping DTOs, writing parameterized test cases across a matrix of inputs</li>
+                    <li>Explaining unfamiliar code in a legacy module before you refactor it</li>
+                    <li>Drafting a first pass at a Javadoc or a commit message, always edited afterward</li>
+                </ul>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — IDE COMPARISON
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>IDE Comparison</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Feature</th><th>IntelliJ IDEA</th><th>Eclipse</th><th>VS Code</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Price</strong></td><td>Free (Community) / Paid (Ultimate)</td><td>Free</td><td>Free</td></tr>
+                        <tr><td><strong>Java engine</strong></td><td>Proprietary PSI</td><td>JDT (native)</td><td>JDT via LSP</td></tr>
+                        <tr><td><strong>Refactoring depth</strong></td><td>Excellent</td><td>Good</td><td>Basic–Good</td></tr>
+                        <tr><td><strong>Framework awareness (Spring/Jakarta EE)</strong></td><td>Excellent (Ultimate)</td><td>Good (plugins)</td><td>Good (extensions)</td></tr>
+                        <tr><td><strong>Memory footprint</strong></td><td>Heavy</td><td>Moderate</td><td>Light</td></tr>
+                        <tr><td><strong>Built-in AI assistant</strong></td><td>JetBrains AI / Junie</td><td>Via plugin</td><td>Copilot / extensions</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — DEBUGGING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Debugging in IDEs</h2>
+
+                <h3>Local debugging</h3>
+                <pre><code><span class="keyword">public void</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order) {
+    <span class="class-name">BigDecimal</span> total = <span class="class-name">BigDecimal</span>.ZERO;         <span class="comment">// breakpoint here</span>
+
+    <span class="keyword">for</span> (<span class="class-name">OrderItem</span> item : order.getItems()) {
+        total = total.add(item.getUnitPrice()
+                    .multiply(<span class="class-name">BigDecimal</span>.valueOf(item.getQuantity())));
     }
 
-    applyDiscount(total);                <span class="comment">// Step into this method (F7)</span>
-
-    order.setTotal(total);               <span class="comment">// Step over (F8)</span>
+    applyDiscount(order, total);         <span class="comment">// Step Into (F7 / F5) to follow the call</span>
+    order.setTotal(total);               <span class="comment">// Step Over to stay at this level</span>
 }
 
-<span class="comment">// Conditional breakpoints:</span>
-<span class="comment">// Right-click breakpoint -> Add condition</span>
-<span class="comment">// Example: item.getPrice() > 100</span>
+<span class="comment">// Conditional breakpoint: right-click the breakpoint → add a condition
+// Example: item.getQuantity() > 100 — stops only for bulk-order edge cases</span>
 
-<span class="comment">// Watches - monitor specific expressions</span>
-<span class="comment">// Add watch: order.getItems().size()</span></code></pre>
+<span class="comment">// Watch expression: order.getItems().size() — evaluated live at every stop</span></code></pre>
 
-            <h3>Debug Shortcuts</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Action</th>
-                        <th>IntelliJ</th>
-                        <th>Eclipse</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Toggle Breakpoint</td>
-                        <td>Ctrl+F8</td>
-                        <td>Ctrl+Shift+B</td>
-                    </tr>
-                    <tr>
-                        <td>Step Over</td>
-                        <td>F8</td>
-                        <td>F6</td>
-                    </tr>
-                    <tr>
-                        <td>Step Into</td>
-                        <td>F7</td>
-                        <td>F5</td>
-                    </tr>
-                    <tr>
-                        <td>Step Out</td>
-                        <td>Shift+F8</td>
-                        <td>F7</td>
-                    </tr>
-                    <tr>
-                        <td>Resume</td>
-                        <td>F9</td>
-                        <td>F8</td>
-                    </tr>
-                    <tr>
-                        <td>Evaluate Expression</td>
-                        <td>Alt+F8</td>
-                        <td>Ctrl+Shift+I</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <h3>Remote debugging — attaching to a running container</h3>
+                <p>In a microservices e-commerce stack, the service misbehaving in
+                    staging is usually already running inside a Docker container or a
+                    Kubernetes pod — you don't reproduce it locally, you attach to it.</p>
 
-        <section class="content-section">
-            <h2>Project Configuration</h2>
+                <pre><code><span class="comment"># Enable the JDWP debug agent when starting the JVM inside the container</span>
+JAVA_TOOL_OPTIONS=<span class="string">"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"</span>
 
-            <h3>Setting Up JDK</h3>
-            <pre><code><span class="comment">// IntelliJ IDEA</span>
-<span class="comment">// File -> Project Structure -> Project -> SDK</span>
-<span class="comment">// Or: File -> Project Structure -> SDKs (to add new JDKs)</span>
+<span class="comment"># docker-compose.yml — expose the debug port alongside the app port</span>
+services:
+  order-service:
+    environment:
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - <span class="string">"8080:8080"</span>
+      - <span class="string">"5005:5005"</span>
 
-<span class="comment">// Eclipse</span>
-<span class="comment">// Window -> Preferences -> Java -> Installed JREs</span>
-<span class="comment">// Project Properties -> Java Build Path -> Libraries</span>
+<span class="comment">// IntelliJ: Run → Edit Configurations → + → Remote JVM Debug → host, port 5005
+// Eclipse: Run → Debug Configurations → Remote Java Application</span></code></pre>
 
-<span class="comment">// VS Code</span>
-<span class="comment">// settings.json:</span>
+                <div class="info-box warning">
+                    <div class="info-box-title"><code>suspend=y</code> and an exposed debug port are real production risks</div>
+                    <p><code>suspend=y</code> halts the entire JVM at startup until a
+                        debugger attaches — fine for a throwaway local container,
+                        catastrophic if accidentally left on a service behind a load
+                        balancer that health-checks it. Just as important: a JDWP
+                        port has <strong>no authentication whatsoever</strong> — anyone
+                        who can reach <code>5005</code> can attach a debugger and
+                        execute arbitrary code in that JVM's context. Never expose a
+                        debug port beyond a locked-down internal network, and never
+                        enable it by default in a staging or production image — add it
+                        transiently, debug, remove it.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — PROJECT CONFIGURATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Project Configuration</h2>
+
+                <h3>Setting up the JDK</h3>
+                <pre><code><span class="comment">// IntelliJ IDEA: File → Project Structure → Project → SDK
+// Eclipse: Window → Preferences → Java → Installed JREs
+
+// VS Code — settings.json, multiple JDKs for polyglot service work</span>
 {
-    "java.configuration.runtimes": [
-        {
-            "name": "JavaSE-17",
-            "path": "/path/to/jdk-17",
-            "default": true
-        },
-        {
-            "name": "JavaSE-21",
-            "path": "/path/to/jdk-21"
-        }
+    <span class="string">"java.configuration.runtimes"</span>: [
+        { <span class="string">"name"</span>: <span class="string">"JavaSE-17"</span>, <span class="string">"path"</span>: <span class="string">"/opt/jdk-17"</span> },
+        { <span class="string">"name"</span>: <span class="string">"JavaSE-21"</span>, <span class="string">"path"</span>: <span class="string">"/opt/jdk-21"</span>, <span class="string">"default"</span>: <span class="keyword">true</span> }
     ]
 }</code></pre>
 
-            <h3>Import Maven/Gradle Project</h3>
-            <pre><code><span class="comment">// IntelliJ IDEA</span>
-<span class="comment">// File -> Open -> Select pom.xml or build.gradle</span>
-<span class="comment">// "Open as Project"</span>
+                <h3>Importing a multi-module project</h3>
+                <pre><code><span class="comment">// e-commerce-platform/
+//   ├── order-service/pom.xml
+//   ├── customer-service/pom.xml
+//   └── shared-domain/pom.xml   ← common Customer/Order/Product model
 
-<span class="comment">// Eclipse</span>
-<span class="comment">// File -> Import -> Maven -> Existing Maven Projects</span>
-<span class="comment">// Or: File -> Import -> Gradle -> Existing Gradle Project</span>
+// IntelliJ: File → Open → select the root pom.xml → "Open as Project"
+//   (multi-module Maven reactor is detected and each module becomes a
+//   separate IntelliJ module with correct inter-module dependencies)
 
-<span class="comment">// VS Code</span>
-<span class="comment">// Open folder containing pom.xml</span>
-<span class="comment">// Java extension auto-detects and imports</span></code></pre>
-        </section>
+// Eclipse: File → Import → Maven → Existing Maven Projects → select all modules
+// VS Code: open the root folder — the Java extension detects the reactor automatically</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Productivity Tips</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — TEAM PRODUCTIVITY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Productivity and Team-Wide Configuration</h2>
 
-            <div class="info-box tip">
-                <div class="info-box-title">IDE Productivity Boosters</div>
-                <ul>
-                    <li><strong>Learn shortcuts</strong> - Invest time learning keyboard shortcuts; it pays off</li>
-                    <li><strong>Use code generation</strong> - Let the IDE generate boilerplate code</li>
-                    <li><strong>Configure code style</strong> - Set up consistent formatting team-wide</li>
-                    <li><strong>Use TODO comments</strong> - Track tasks with // TODO comments</li>
-                    <li><strong>Master search</strong> - Learn to search classes, files, and text efficiently</li>
-                    <li><strong>Use local history</strong> - IDEs track changes even without Git</li>
-                </ul>
-            </div>
+                <div class="info-box tip">
+                    <div class="info-box-title">Share formatting rules — don't rely on each developer's personal IDE settings</div>
+                    <p>A per-developer code style setting is a guaranteed source of
+                        noisy diffs. Commit an <code>.editorconfig</code> at the repo
+                        root — IntelliJ, Eclipse, and VS Code all read it natively — so
+                        indentation and line endings are enforced identically
+                        regardless of which IDE a teammate uses.</p>
+                </div>
 
-            <h3>Code Generation Examples</h3>
-            <pre><code><span class="comment">// Generate constructor, getters, setters (Alt+Insert in IntelliJ)</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> {
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
+                <pre><code><span class="comment"># .editorconfig — committed at repo root, read by all three IDEs</span>
+root = true
+
+[*.java]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+insert_final_newline = true
+trim_trailing_whitespace = true</code></pre>
+
+                <h3>Code generation, on the actual domain</h3>
+                <pre><code><span class="comment">// Generate constructor, accessors, equals/hashCode, toString
+// (Alt+Insert in IntelliJ, Source menu in Eclipse)</span>
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
     <span class="keyword">private</span> <span class="class-name">String</span> email;
-    <span class="keyword">private int</span> age;
+    <span class="keyword">private</span> <span class="class-name">String</span> fullName;
+    <span class="keyword">private</span> <span class="class-name">LocalDate</span> registeredAt;
 
     <span class="comment">// Generated constructor</span>
-    <span class="keyword">public</span> <span class="function">User</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email, <span class="keyword">int</span> age) {
-        <span class="keyword">this</span>.name = name;
+    <span class="keyword">public</span> <span class="function">Customer</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> email, <span class="class-name">String</span> fullName, <span class="class-name">LocalDate</span> registeredAt) {
+        <span class="keyword">this</span>.id = id;
         <span class="keyword">this</span>.email = email;
-        <span class="keyword">this</span>.age = age;
+        <span class="keyword">this</span>.fullName = fullName;
+        <span class="keyword">this</span>.registeredAt = registeredAt;
     }
 
-    <span class="comment">// Generated getter</span>
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getName</span>() {
-        <span class="keyword">return</span> name;
-    }
-
-    <span class="comment">// Generated setter</span>
-    <span class="keyword">public void</span> <span class="function">setName</span>(<span class="class-name">String</span> name) {
-        <span class="keyword">this</span>.name = name;
-    }
-
-    <span class="comment">// Generated equals and hashCode</span>
+    <span class="comment">// Generated equals/hashCode — based on id, the natural identity for an entity</span>
     <span class="annotation">@Override</span>
     <span class="keyword">public boolean</span> <span class="function">equals</span>(<span class="class-name">Object</span> o) { <span class="comment">/* ... */</span> }
 
     <span class="annotation">@Override</span>
-    <span class="keyword">public int</span> <span class="function">hashCode</span>() { <span class="comment">/* ... */</span> }
-
-    <span class="comment">// Generated toString</span>
-    <span class="annotation">@Override</span>
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">toString</span>() {
-        <span class="keyword">return</span> <span class="string">"User{name='"</span> + name + <span class="string">"', email='"</span> + email + <span class="string">"', age="</span> + age + <span class="string">"}"</span>;
-    }
+    <span class="keyword">public int</span> <span class="function">hashCode</span>() { <span class="keyword">return</span> <span class="class-name">Objects</span>.hash(id); }
 }</code></pre>
-        </section>
+                <p>Generated <code>equals()</code>/<code>hashCode()</code> on a JPA
+                    entity should key off the identifier, not every field — see
+                    <a href="../databases/relationships.html">Entity Relationships</a>
+                    for why field-based equality breaks inside collections once
+                    Hibernate's persistence context is involved.</p>
+            </section>
 
-        <section class="content-section">
-            <h2>Recommended IDE by Use Case</h2>
-
-            <div class="info-box note">
-                <div class="info-box-title">Choosing the Right IDE</div>
-                <table>
-                    <tr>
-                        <td><strong>Enterprise/Spring Development</strong></td>
-                        <td>IntelliJ IDEA Ultimate</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Learning Java</strong></td>
-                        <td>IntelliJ Community or Eclipse</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Jakarta EE Development</strong></td>
-                        <td>Eclipse IDE for Enterprise Java</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Quick Scripts/Small Projects</strong></td>
-                        <td>VS Code</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Multi-language Development</strong></td>
-                        <td>VS Code or IntelliJ Ultimate</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Limited Resources</strong></td>
-                        <td>VS Code</td>
-                    </tr>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — CHOOSING THE RIGHT IDE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Choosing the Right IDE by Use Case</h2>
+                <table class="comparison-table">
+                    <tbody>
+                        <tr><td><strong>Enterprise Spring/Jakarta EE codebase</strong></td><td>IntelliJ IDEA Ultimate</td></tr>
+                        <tr><td><strong>Learning Java</strong></td><td>IntelliJ Community or Eclipse</td></tr>
+                        <tr><td><strong>Jakarta EE with a vendor application server</strong></td><td>Eclipse IDE for Enterprise Java</td></tr>
+                        <tr><td><strong>Polyglot service, limited resources</strong></td><td>VS Code</td></tr>
+                        <tr><td><strong>Agentic AI-driven workflows</strong></td><td>Cursor/Windsurf, or VS Code + Copilot — same JDT.LS engine underneath</td></tr>
+                    </tbody>
                 </table>
-            </div>
-        </section>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="git.html" class="related-link">Version Control (Git)</a>
-                <a href="testing.html" class="related-link">Testing (JUnit, Mockito)</a>
-                <a href="../build-tools/maven.html" class="related-link">Maven</a>
-                <a href="../fundamentals/what-is-java.html" class="related-link">What is Java?</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 11 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Commit an <code>.editorconfig</code> so formatting is consistent regardless of which IDE a teammate uses</li>
+                        <li>Review AI-generated code with the same rigor as a human pull request — "it compiled" is not "it's correct"</li>
+                        <li>Enable remote debug ports transiently and only over a locked-down internal network — never leave <code>suspend=y</code> on a health-checked service</li>
+                        <li>Learn your IDE's mechanical refactorings (rename, extract method, change signature) — they update every call site, a manual find-and-replace does not</li>
+                        <li>Use conditional breakpoints and watches instead of adding temporary <code>System.out.println</code> statements</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't assume an AI-native editor understands enterprise Java better than IntelliJ — the underlying language server is frequently the same JDT.LS engine VS Code uses</li>
+                        <li>Don't accept AI-suggested repository or query methods without checking them against project-wide conventions (soft deletes, tenant filters, fetch strategy) the assistant couldn't see</li>
+                        <li>Don't expose a JDWP debug port on any environment reachable from outside a trusted network — it has no authentication</li>
+                        <li>Don't rely on personal IDE code-style settings as the team's formatting source of truth — it produces noisy, unrelated diffs</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 12 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What does an IDE actually provide beyond a text editor with syntax highlighting?</strong><br>
+                    A live semantic model of the codebase — a symbol index built and
+                    kept up to date as you type — that answers "does this method
+                    exist," "is this type correct," and "where is this used"
+                    instantly, without running the compiler. This is what powers
+                    code completion, real-time error detection, and mechanical
+                    refactoring.</p>
+
+                    <p><strong>Q: What's the difference between code completion and a quick fix?</strong><br>
+                    Code completion suggests what you might type next as you're
+                    typing it (a method name, a variable). A quick fix reacts to an
+                    already-flagged problem — a missing import, a possible null
+                    dereference — and offers to resolve it automatically, usually
+                    triggered while the cursor is on the error.</p>
+
+                    <p><strong>Q: What is a conditional breakpoint, and why is it better than adding a temporary <code>System.out.println</code>?</strong><br>
+                    A conditional breakpoint only pauses execution when a boolean
+                    expression you specify is true — for example, only when an order
+                    quantity exceeds 100. It requires no code change, so there's
+                    nothing to remember to remove afterward, and it lets you inspect
+                    the full call stack and every variable in scope at that exact
+                    moment, not just whatever value you thought to print.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: IntelliJ IDEA and VS Code (with the Java extension pack) can both show completion and errors for the same Java file. Architecturally, why does IntelliJ's refactoring tend to hold up better on large, multi-module codebases?</strong><br>
+                    VS Code's Java support comes from wrapping Eclipse's JDT as a
+                    Language Server (JDT.LS) accessed over the Language Server
+                    Protocol — a general-purpose interface designed to serve many
+                    languages with a common contract. IntelliJ instead maintains its
+                    own proprietary semantic model, the PSI, built specifically for
+                    JetBrains' own refactoring and inspection engines with no
+                    intermediary protocol. On a small file the difference is
+                    invisible; on a large multi-module Maven/Gradle reactor with deep
+                    cross-module references, IntelliJ's purpose-built engine
+                    historically resolves and updates every call site more
+                    completely during a mechanical refactor than an LSP-mediated
+                    tool does. Neither is "wrong" — they're solving the same problem
+                    with a different amount of Java-specific investment in the
+                    engine itself.</p>
+
+                    <p><strong>Q: Your team enables an AI coding assistant in agent/auto-accept mode. What is the actual production risk on a Spring Data JPA e-commerce codebase, and what practice mitigates it?</strong><br>
+                    The risk is not that the generated code fails to compile — it
+                    almost always does compile, which is exactly the danger. The
+                    assistant has no visibility into project-wide conventions that
+                    live outside the file it's editing: a soft-delete filter applied
+                    via <code>@Where</code> elsewhere in the entity, a tenant-isolation
+                    predicate every other query includes, or the specific
+                    <code>@Transactional(rollbackOn = ...)</code> convention the team
+                    uses for checked exceptions. A generated repository method can be
+                    syntactically perfect and still silently violate one of these
+                    rules, producing a bug that no compiler error and no obvious code
+                    smell will surface — it will surface as subtly wrong data in
+                    production. The mitigation is treating every AI-generated change
+                    exactly like a human-authored pull request: full review, tests
+                    run, and no exception carved out just because a suggestion
+                    "looked right" and compiled cleanly.</p>
+
+                    <p><strong>Q: Explain what happens when you attach a remote debugger via JDWP to a running JVM, the difference between <code>suspend=y</code> and <code>suspend=n</code>, and the concrete security exposure of leaving the port open.</strong><br>
+                    JDWP (Java Debug Wire Protocol) opens a socket the JVM listens on
+                    for a debugger to connect to; once attached, the debugger can
+                    inspect and modify the running program's state, set breakpoints,
+                    and — critically — execute arbitrary bytecode in that JVM's
+                    security context. <code>suspend=y</code> halts the entire JVM at
+                    startup until a debugger connects, which is fine for a
+                    disposable local container but means a load-balanced service
+                    would simply never come up (and fail health checks) if this flag
+                    were left on by accident. The deeper issue is that JDWP has no
+                    authentication mechanism at all: anyone who can reach that port
+                    over the network can attach and run code as that process,
+                    with no credentials required. This is why a debug port must
+                    never be reachable from outside a trusted, locked-down network,
+                    and should be enabled transiently for an active debugging
+                    session rather than baked permanently into a staging or
+                    production image.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="git.html" class="related-link"><span class="related-icon">🔧</span>Version Control (Git)</a>
+                    <a href="testing.html" class="related-link"><span class="related-icon">🧪</span>Testing (JUnit, Mockito)</a>
+                    <a href="../build-tools/maven.html" class="related-link"><span class="related-icon">📦</span>What is Maven?</a>
+                    <a href="../databases/relationships.html" class="related-link"><span class="related-icon">💾</span>Entity Relationships</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

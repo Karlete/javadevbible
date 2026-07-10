@@ -1,360 +1,336 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.cicd.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CI/CD Basics - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#tools">Tools & Ecosystem</a> / CI/CD Basics
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#tools" data-i18n="nav.tools">Tools &amp; Ecosystem</a> /
+                CI/CD Basics
             </nav>
-            <h1>CI/CD Basics</h1>
-            <p class="topic-subtitle">Continuous Integration and Continuous Deployment for Java Projects</p>
-            <a href="../../index.html#tools" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.cicd.h1">CI/CD for Java Developers</h1>
+            <p class="topic-subtitle" data-i18n="topic.cicd.subtitle">What's actually your responsibility versus platform/DevOps, why a red pipeline is your code talking to you, backward-compatible database migrations during rollout, and the supply-chain risk of an unpinned Action</p>
+            <a href="../../index.html#tools" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is CI/CD?</h2>
-            <p>CI/CD stands for Continuous Integration and Continuous Deployment (or Delivery). It's a set of practices that automate the building, testing, and deployment of applications, enabling teams to deliver software faster and more reliably.</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">CI/CD Components</div>
-                <ul>
-                    <li><strong>Continuous Integration (CI)</strong> - Automatically build and test code when changes are pushed</li>
-                    <li><strong>Continuous Delivery</strong> - Automatically prepare releases for deployment (manual trigger)</li>
-                    <li><strong>Continuous Deployment</strong> - Automatically deploy to production after passing all tests</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>The CI/CD Pipeline</h3>
-            <pre><code><span class="comment">// Typical CI/CD Pipeline Flow</span>
+        <main class="topic-content">
 
-Code Push &rarr; Build &rarr; Unit Tests &rarr; Integration Tests &rarr; Package &rarr; Deploy
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is CI/CD — and Why Does It Exist?</h2>
+                <p>Before CI/CD, shipping a Java change meant building it on your
+                    own machine, and then manually copying the artifact to a server
+                    — SCP, FTP, or a shared drive — and restarting the process by
+                    hand. Every deploy depended on whoever's laptop built the jar:
+                    their exact JDK version, their exact dependency cache, whatever
+                    uncommitted local change happened to be sitting in their working
+                    directory. "It works on my machine" wasn't a joke; it was the
+                    actual deployment process.</p>
 
-<span class="comment">// Detailed stages:</span>
-1. Source        <span class="comment">// Developer pushes code to Git</span>
-2. Build         <span class="comment">// Compile Java code (mvn compile)</span>
-3. Unit Test     <span class="comment">// Run unit tests (mvn test)</span>
-4. Code Analysis <span class="comment">// SonarQube, checkstyle</span>
-5. Package       <span class="comment">// Create JAR/WAR (mvn package)</span>
-6. Integration   <span class="comment">// Run integration tests</span>
-7. Deploy Stage  <span class="comment">// Deploy to staging environment</span>
-8. Deploy Prod   <span class="comment">// Deploy to production</span></code></pre>
-        </section>
+                <pre><code><span class="comment">// BEFORE — manual build and deploy, different every time</span>
+<span class="comment">$ mvn package                      # on YOUR laptop, with YOUR local Maven cache
+$ scp target/order-service.jar deploy@prod:/opt/app/
+$ ssh deploy@prod "systemctl restart order-service"
+# Did staging get tested with this exact jar? Unknown.
+# Did anyone else's uncommitted change sneak into this build? Unknown.</span>
 
-        <section class="content-section">
-            <h2>Benefits of CI/CD</h2>
+<span class="comment">// AFTER — one pipeline builds it once, the same artifact moves through every stage</span>
+<span class="comment">// git push triggers: compile → test → package → the SAME jar is
+// promoted through staging → production. No laptop involved, ever.</span></code></pre>
 
-            <h3>For Development Teams</h3>
-            <ul>
-                <li><strong>Early Bug Detection</strong> - Issues caught immediately after commit</li>
-                <li><strong>Reduced Integration Problems</strong> - Frequent merges prevent "integration hell"</li>
-                <li><strong>Faster Feedback</strong> - Know within minutes if code breaks something</li>
-                <li><strong>Consistent Builds</strong> - Same build process every time</li>
-            </ul>
+                <div class="info-box note">
+                    <div class="info-box-title">Three terms people use interchangeably — they're not the same thing</div>
+                    <ul>
+                        <li><strong>Continuous Integration (CI)</strong> — every push automatically triggers a build and the full test suite. This is the part almost every team has.</li>
+                        <li><strong>Continuous Delivery</strong> — every change that passes CI is automatically packaged into a release-ready artifact, but a human still triggers the actual production deploy.</li>
+                        <li><strong>Continuous Deployment</strong> — every change that passes all checks deploys to production automatically, with no manual gate at all.</li>
+                    </ul>
+                </div>
+            </section>
 
-            <h3>For Business</h3>
-            <ul>
-                <li><strong>Faster Time to Market</strong> - Deploy features more frequently</li>
-                <li><strong>Reduced Risk</strong> - Smaller changes are easier to debug</li>
-                <li><strong>Higher Quality</strong> - Automated testing catches issues</li>
-                <li><strong>Reliable Releases</strong> - Consistent deployment process</li>
-            </ul>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — CI/CD FROM A DEVELOPER'S SEAT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>CI/CD from a Developer's Seat — What's Actually Your Job</h2>
+                <p>It's easy to hear "CI/CD" in standups and file it under "that's a
+                    DevOps thing." In practice, on most teams building services like
+                    <code>order-service</code> or <code>customer-service</code>, the
+                    split looks like this — and the boundary shifts with team size,
+                    but the categories stay useful:</p>
 
-        <section class="content-section">
-            <h2>Popular CI/CD Tools</h2>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Typically yours</th><th>Typically platform/DevOps</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>The workflow/Jenkinsfile for your own service's build and test stages</td>
+                            <td>The runners/agents themselves, and the cluster they execute on</td>
+                        </tr>
+                        <tr>
+                            <td>Keeping your tests fast and non-flaky — a flaky test is a bug in your test, not "a pipeline problem"</td>
+                            <td>Secrets management infrastructure (Vault, the encrypted-secrets backend itself)</td>
+                        </tr>
+                        <tr>
+                            <td>Writing database migrations that don't break the version of your code still running during a rolling deploy (Section 8)</td>
+                            <td>The GitOps controller that reconciles manifest changes into the cluster (Section 10)</td>
+                        </tr>
+                        <tr>
+                            <td>Reading a failed pipeline's actual error, not just re-running it and hoping</td>
+                            <td>Provisioning the environments and networking the pipeline deploys into</td>
+                        </tr>
+                    </tbody>
+                </table>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Tool</th>
-                        <th>Type</th>
-                        <th>Best For</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>GitHub Actions</strong></td>
-                        <td>Cloud-hosted</td>
-                        <td>GitHub repositories, easy setup</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Jenkins</strong></td>
-                        <td>Self-hosted</td>
-                        <td>Enterprise, highly customizable</td>
-                    </tr>
-                    <tr>
-                        <td><strong>GitLab CI</strong></td>
-                        <td>Cloud/Self-hosted</td>
-                        <td>GitLab users, integrated DevOps</td>
-                    </tr>
-                    <tr>
-                        <td><strong>CircleCI</strong></td>
-                        <td>Cloud-hosted</td>
-                        <td>Fast builds, Docker support</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Azure DevOps</strong></td>
-                        <td>Cloud-hosted</td>
-                        <td>Microsoft ecosystem, enterprise</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Travis CI</strong></td>
-                        <td>Cloud-hosted</td>
-                        <td>Open source projects</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+                <div class="info-box important">
+                    <div class="info-box-title">A red pipeline is almost always telling you something about your code</div>
+                    <p>The instinct to say "the pipeline is broken" is usually
+                        backwards. A failing test, a build that doesn't reproduce
+                        locally, a migration that locks a table for ten minutes —
+                        these are your code's problems surfacing earlier and cheaper
+                        than they would in production. Treating pipeline failures as
+                        an infrastructure annoyance instead of direct feedback on
+                        your own change is the single biggest mindset gap between
+                        developers who trust CI/CD and developers who route around
+                        it with <code>-DskipTests</code>.</p>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>GitHub Actions for Java</h2>
-            <p>GitHub Actions is integrated directly into GitHub repositories, making it easy to set up CI/CD pipelines.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — THE PIPELINE STAGES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The CI/CD Pipeline — Stage by Stage</h2>
+                <pre><code>Source &rarr; Build &rarr; Unit Tests &rarr; Static Analysis &rarr; Package &rarr; Integration Tests &rarr; Deploy Staging &rarr; Deploy Production</code></pre>
 
-            <h3>Basic Java Build Workflow</h3>
-            <pre><code><span class="comment"># .github/workflows/build.yml</span>
+                <table>
+                    <thead>
+                        <tr><th>Stage</th><th>What runs</th><th>A failure here usually means</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Build</td><td><code>mvn compile</code></td><td>A type error or missing dependency — caught before anyone else pulls your branch</td></tr>
+                        <tr><td>Unit Tests</td><td><code>mvn test</code></td><td>Your change broke a documented behavior, or the test itself is flaky and needs fixing</td></tr>
+                        <tr><td>Static Analysis</td><td>SonarQube, Checkstyle — see <a href="code-quality.html">Code Quality Tools</a></td><td>A real code smell or a quality gate threshold your change pushed past</td></tr>
+                        <tr><td>Package</td><td><code>mvn package</code></td><td>Rare if compile/test passed — usually a resource or manifest misconfiguration</td></tr>
+                        <tr><td>Integration Tests</td><td>Tests against a real database/queue, often via Testcontainers</td><td>Your change works in isolation but breaks against the real schema or a downstream service</td></tr>
+                        <tr><td>Deploy Staging</td><td>Automated, no approval</td><td>Environment configuration drift, not usually your code</td></tr>
+                        <tr><td>Deploy Production</td><td>Manual gate (Delivery) or automatic (Deployment)</td><td>The one place a mistake has real customer impact — this is why the earlier stages exist</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — GITHUB ACTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>GitHub Actions for Java</h2>
+
+                <h3>Basic build and test workflow</h3>
+                <pre><code><span class="comment"># .github/workflows/build.yml</span>
 name: Java CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
+
+<span class="comment"># Least-privilege by default — grant only what this workflow actually needs</span>
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
       with:
-        java-version: '17'
-        distribution: 'temurin'
+        java-version: <span class="string">'21'</span>
+        distribution: <span class="string">'temurin'</span>
         cache: maven
 
-    - name: Build with Maven
-      run: mvn -B package --file pom.xml
+    - name: Build and test
+      run: mvn -B verify</code></pre>
 
-    - name: Run tests
-      run: mvn test
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-jar
-        path: target/*.jar</code></pre>
-
-            <h3>Multi-Version Testing</h3>
-            <pre><code><span class="comment"># Test on multiple Java versions</span>
-name: Multi-Version CI
-
-on: [push, pull_request]
-
-jobs:
+                <h3>Multi-version testing</h3>
+                <pre><code>jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [11, 17, 21]
-
+        java: [17, 21]
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up JDK ${{ matrix.java }}
-      uses: actions/setup-java@v4
+    - uses: actions/setup-java@v4
       with:
-        java-version: ${{ matrix.java }}
-        distribution: 'temurin'
+        java-version: <span class="string">${{ matrix.java }}</span>
+        distribution: <span class="string">'temurin'</span>
         cache: maven
+    - run: mvn -B verify</code></pre>
 
-    - name: Build and Test
-      run: mvn -B verify</code></pre>
+                <div class="info-box important">
+                    <div class="info-box-title">Pin third-party Actions to a commit SHA, not a floating tag or branch</div>
+                    <p>An Action referenced by <code>@main</code> or even by a
+                        version tag like <code>@v4</code> can change underneath you
+                        the moment the maintainer pushes new code to that ref — and
+                        several real supply-chain compromises of popular GitHub
+                        Actions have worked exactly this way: a widely used
+                        third-party action gets compromised, and every workflow
+                        referencing it by a mutable ref starts running the
+                        attacker's code with access to your repository's secrets on
+                        the very next run. Pinning to a specific commit SHA makes
+                        the code that actually executes immutable and auditable:</p>
+                    <pre><code><span class="comment"># Fragile — the code that runs can change without your workflow file changing</span>
+- uses: some-org/some-action@main
+- uses: some-org/some-action@v4
 
-            <h3>Spring Boot Deployment</h3>
-            <pre><code><span class="comment"># Deploy Spring Boot to Docker Hub</span>
-name: Build and Push Docker
+<span class="comment"># Pinned — this exact commit's code is what runs, always, until you
+# deliberately bump it</span>
+- uses: some-org/some-action@8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f <span class="comment"># v4.2.1</span></code></pre>
+                    <p>Official actions maintained directly by GitHub
+                        (<code>actions/checkout</code>, <code>actions/setup-java</code>)
+                        carry materially lower risk than a random third-party action
+                        with a handful of stars — reserve strict SHA-pinning
+                        discipline especially for anything outside that trusted set.</p>
+                </div>
+
+                <h3>Docker build and push</h3>
+                <pre><code>name: Build and Push Image
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
+    tags: [ <span class="string">'v*'</span> ]
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
+    - uses: actions/setup-java@v4
       with:
-        java-version: '17'
-        distribution: 'temurin'
+        java-version: <span class="string">'21'</span>
+        distribution: <span class="string">'temurin'</span>
         cache: maven
 
     - name: Build with Maven
       run: mvn -B package -DskipTests
 
-    - name: Login to Docker Hub
+    - name: Log in to registry
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_TOKEN }}
+        username: <span class="string">${{ github.actor }}</span>
+        password: <span class="string">${{ secrets.GITHUB_TOKEN }}</span>
 
-    - name: Build and Push Docker Image
-      uses: docker/build-push-action@v5
+    - name: Build and push
+      uses: docker/build-push-action@v6
       with:
         context: .
         push: true
-        tags: |
-          username/myapp:latest
-          username/myapp:${{ github.sha }}</code></pre>
-        </section>
+        tags: ghcr.io/shop/order-service:<span class="string">${{ github.ref_name }}</span></code></pre>
 
-        <section class="content-section">
-            <h2>Jenkins Pipeline</h2>
-            <p>Jenkins is the most widely used self-hosted CI/CD server, offering maximum flexibility and control.</p>
+                <div class="info-box warning">
+                    <div class="info-box-title"><code>pull_request_target</code> is not a drop-in replacement for <code>pull_request</code></div>
+                    <p>Both `main` example workflows above trigger on
+                        <code>pull_request</code>, which runs with a read-only token
+                        and no access to repository secrets for PRs from forks —
+                        deliberately, because the code being tested came from
+                        someone you may not trust. <code>pull_request_target</code>
+                        runs with full access to secrets <em>and</em> checks out the
+                        base branch by default, which is safe — but if that workflow
+                        is modified to also check out and execute the PR's own
+                        untrusted code, it hands a stranger's code your secrets.
+                        Never combine <code>pull_request_target</code> with a
+                        checkout of the incoming PR's head ref.</p>
+                </div>
+            </section>
 
-            <h3>Declarative Pipeline (Jenkinsfile)</h3>
-            <pre><code><span class="comment">// Jenkinsfile in project root</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — JENKINS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Jenkins Pipeline</h2>
+                <p>Jenkins is the most widely used self-hosted CI/CD server —
+                    maximum flexibility and control, at the cost of you (or a
+                    platform team) maintaining the server itself.</p>
+
+                <pre><code><span class="comment">// Jenkinsfile in project root</span>
 pipeline {
     agent any
-
     tools {
-        maven 'Maven-3.9'
-        jdk 'JDK-17'
+        maven <span class="string">'Maven-3.9'</span>
+        jdk <span class="string">'JDK-21'</span>
     }
-
-    environment {
-        APP_NAME = 'my-java-app'
-        DEPLOY_ENV = 'staging'
-    }
-
     stages {
-        stage('Checkout') {
+        stage(<span class="string">'Build'</span>) {
+            steps { sh <span class="string">'mvn clean compile'</span> }
+        }
+        stage(<span class="string">'Unit Tests'</span>) {
+            steps { sh <span class="string">'mvn test'</span> }
+            post { always { junit <span class="string">'target/surefire-reports/*.xml'</span> } }
+        }
+        stage(<span class="string">'Package'</span>) {
             steps {
-                checkout scm
+                sh <span class="string">'mvn package -DskipTests'</span>
+                archiveArtifacts artifacts: <span class="string">'target/*.jar'</span>
             }
         }
-
-        stage('Build') {
+        stage(<span class="string">'Deploy to Production'</span>) {
+            when { branch <span class="string">'main'</span> }
             steps {
-                sh 'mvn clean compile'
+                input message: <span class="string">'Deploy to production?'</span>   <span class="comment">// manual gate — Continuous Delivery, not Deployment</span>
+                sh <span class="string">'./deploy.sh production'</span>
             }
-        }
-
-        stage('Unit Tests') {
-            steps {
-                sh 'mvn test'
-            }
-            post {
-                always {
-                    junit 'target/surefire-reports/*.xml'
-                }
-            }
-        }
-
-        stage('Code Analysis') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh 'mvn sonar:sonar'
-                }
-            }
-        }
-
-        stage('Package') {
-            steps {
-                sh 'mvn package -DskipTests'
-                archiveArtifacts artifacts: 'target/*.jar'
-            }
-        }
-
-        stage('Deploy to Staging') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                sh './deploy.sh staging'
-            }
-        }
-
-        stage('Deploy to Production') {
-            when {
-                branch 'main'
-            }
-            steps {
-                input message: 'Deploy to production?'
-                sh './deploy.sh production'
-            }
-        }
-    }
-
-    post {
-        success {
-            slackSend color: 'good', message: "Build successful: ${env.JOB_NAME}"
-        }
-        failure {
-            slackSend color: 'danger', message: "Build failed: ${env.JOB_NAME}"
         }
     }
 }</code></pre>
 
-            <h3>Parallel Stages</h3>
-            <pre><code>pipeline {
-    agent any
-
-    stages {
-        stage('Build') {
-            steps {
-                sh 'mvn clean compile'
-            }
-        }
-
-        stage('Tests') {
-            parallel {
-                stage('Unit Tests') {
-                    steps {
-                        sh 'mvn test -Dtest=*UnitTest'
-                    }
-                }
-                stage('Integration Tests') {
-                    steps {
-                        sh 'mvn test -Dtest=*IntegrationTest'
-                    }
-                }
-                stage('Code Coverage') {
-                    steps {
-                        sh 'mvn jacoco:report'
-                    }
-                }
-            }
-        }
+                <h3>Parallel stages — independent work runs concurrently</h3>
+                <pre><code>stage(<span class="string">'Tests'</span>) {
+    parallel {
+        stage(<span class="string">'Unit Tests'</span>)        { steps { sh <span class="string">'mvn test -Dtest=*UnitTest'</span> } }
+        stage(<span class="string">'Integration Tests'</span>) { steps { sh <span class="string">'mvn verify -Dtest=*IntegrationTest'</span> } }
+        stage(<span class="string">'Coverage'</span>)           { steps { sh <span class="string">'mvn jacoco:report'</span> } }
     }
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>GitLab CI/CD</h2>
-            <p>GitLab CI/CD is integrated into GitLab and configured via a .gitlab-ci.yml file.</p>
-
-            <pre><code><span class="comment"># .gitlab-ci.yml</span>
-image: maven:3.9-eclipse-temurin-17
-
-variables:
-  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — GITLAB CI
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>GitLab CI/CD</h2>
+                <pre><code><span class="comment"># .gitlab-ci.yml</span>
+image: maven:3.9-eclipse-temurin-21
 
 cache:
   paths:
@@ -363,14 +339,8 @@ cache:
 stages:
   - build
   - test
-  - analyze
   - package
   - deploy
-
-build:
-  stage: build
-  script:
-    - mvn compile
 
 unit-tests:
   stage: test
@@ -380,22 +350,6 @@ unit-tests:
     reports:
       junit: target/surefire-reports/TEST-*.xml
 
-integration-tests:
-  stage: test
-  script:
-    - mvn verify -DskipUnitTests
-  artifacts:
-    reports:
-      junit: target/failsafe-reports/TEST-*.xml
-
-sonarqube:
-  stage: analyze
-  script:
-    - mvn sonar:sonar -Dsonar.host.url=$SONAR_URL
-  only:
-    - main
-    - develop
-
 package:
   stage: package
   script:
@@ -404,194 +358,229 @@ package:
     paths:
       - target/*.jar
 
-deploy-staging:
-  stage: deploy
-  script:
-    - ./deploy.sh staging
-  environment:
-    name: staging
-    url: https://staging.example.com
-  only:
-    - develop
-
 deploy-production:
   stage: deploy
   script:
     - ./deploy.sh production
-  environment:
-    name: production
-    url: https://example.com
-  when: manual
+  when: manual   <span class="comment"># Continuous Delivery gate</span>
   only:
     - main</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Maven Configuration for CI/CD</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — MAVEN CI CONFIG
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Maven Configuration for CI/CD</h2>
+                <p>A multi-module reactor (like <code>order-service</code>,
+                    <code>customer-service</code>, and <code>shared-domain</code> as
+                    separate modules) needs every module's version to move
+                    together. Hardcoding the version in every <code>pom.xml</code>
+                    means a release requires editing N files; Maven's <strong>CI
+                    Friendly Versions</strong> feature lets CI inject one version
+                    into a single placeholder instead.</p>
 
-            <h3>CI-Friendly POM Configuration</h3>
-            <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
-&lt;project&gt;
-    &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
-    &lt;groupId&gt;com.example&lt;/groupId&gt;
-    &lt;artifactId&gt;my-app&lt;/artifactId&gt;
-    &lt;version&gt;${revision}&lt;/version&gt;
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;version&gt;${revision}&lt;/version&gt;
 
-    &lt;properties&gt;
-        &lt;revision&gt;1.0.0-SNAPSHOT&lt;/revision&gt;
-        &lt;maven.compiler.release&gt;17&lt;/maven.compiler.release&gt;
-        &lt;project.build.sourceEncoding&gt;UTF-8&lt;/project.build.sourceEncoding&gt;
-    &lt;/properties&gt;
+&lt;properties&gt;
+    &lt;revision&gt;1.0.0-SNAPSHOT&lt;/revision&gt;
+&lt;/properties&gt;
 
-    &lt;build&gt;
-        &lt;plugins&gt;
-            <span class="comment">&lt;!-- Flatten POM for CI --&gt;</span>
-            &lt;plugin&gt;
-                &lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;
-                &lt;artifactId&gt;flatten-maven-plugin&lt;/artifactId&gt;
-                &lt;version&gt;1.5.0&lt;/version&gt;
-                &lt;executions&gt;
-                    &lt;execution&gt;
-                        &lt;goals&gt;
-                            &lt;goal&gt;flatten&lt;/goal&gt;
-                        &lt;/goals&gt;
-                    &lt;/execution&gt;
-                &lt;/executions&gt;
-            &lt;/plugin&gt;
+&lt;build&gt;
+    &lt;plugins&gt;
+        <span class="comment">&lt;!-- Resolves ${revision} to a real value before the artifact is
+             installed/deployed — downstream consumers never see the placeholder --&gt;</span>
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;
+            &lt;artifactId&gt;flatten-maven-plugin&lt;/artifactId&gt;
+            &lt;version&gt;1.5.0&lt;/version&gt;
+            &lt;executions&gt;
+                &lt;execution&gt;&lt;goals&gt;&lt;goal&gt;flatten&lt;/goal&gt;&lt;/goals&gt;&lt;/execution&gt;
+            &lt;/executions&gt;
+        &lt;/plugin&gt;
+    &lt;/plugins&gt;
+&lt;/build&gt;</code></pre>
 
-            <span class="comment">&lt;!-- Surefire for unit tests --&gt;</span>
-            &lt;plugin&gt;
-                &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
-                &lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;
-                &lt;version&gt;3.2.2&lt;/version&gt;
-            &lt;/plugin&gt;
+                <pre><code><span class="comment"># CI sets the real version at build time — every module gets it consistently</span>
+mvn -B -Drevision=1.4.0 clean package</code></pre>
+            </section>
 
-            <span class="comment">&lt;!-- Failsafe for integration tests --&gt;</span>
-            &lt;plugin&gt;
-                &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
-                &lt;artifactId&gt;maven-failsafe-plugin&lt;/artifactId&gt;
-                &lt;version&gt;3.2.2&lt;/version&gt;
-                &lt;executions&gt;
-                    &lt;execution&gt;
-                        &lt;goals&gt;
-                            &lt;goal&gt;integration-test&lt;/goal&gt;
-                            &lt;goal&gt;verify&lt;/goal&gt;
-                        &lt;/goals&gt;
-                    &lt;/execution&gt;
-                &lt;/executions&gt;
-            &lt;/plugin&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — DOCKER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Docker in CI/CD</h2>
 
-            <span class="comment">&lt;!-- JaCoCo for code coverage --&gt;</span>
-            &lt;plugin&gt;
-                &lt;groupId&gt;org.jacoco&lt;/groupId&gt;
-                &lt;artifactId&gt;jacoco-maven-plugin&lt;/artifactId&gt;
-                &lt;version&gt;0.8.11&lt;/version&gt;
-                &lt;executions&gt;
-                    &lt;execution&gt;
-                        &lt;goals&gt;
-                            &lt;goal&gt;prepare-agent&lt;/goal&gt;
-                        &lt;/goals&gt;
-                    &lt;/execution&gt;
-                    &lt;execution&gt;
-                        &lt;id&gt;report&lt;/id&gt;
-                        &lt;phase&gt;test&lt;/phase&gt;
-                        &lt;goals&gt;
-                            &lt;goal&gt;report&lt;/goal&gt;
-                        &lt;/goals&gt;
-                    &lt;/execution&gt;
-                &lt;/executions&gt;
-            &lt;/plugin&gt;
-        &lt;/plugins&gt;
-    &lt;/build&gt;
-&lt;/project&gt;</code></pre>
-
-            <h3>Maven CI Commands</h3>
-            <pre><code><span class="comment"># Batch mode (no interactive prompts)</span>
-mvn -B clean install
-
-<span class="comment"># Set version from CI</span>
-mvn -B -Drevision=1.2.3 clean package
-
-<span class="comment"># Skip tests for quick builds</span>
-mvn -B package -DskipTests
-
-<span class="comment"># Run only unit tests</span>
-mvn test
-
-<span class="comment"># Run only integration tests</span>
-mvn verify -DskipUnitTests
-
-<span class="comment"># Generate site with reports</span>
-mvn site</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Docker in CI/CD</h2>
-
-            <h3>Dockerfile for Spring Boot</h3>
-            <pre><code><span class="comment"># Multi-stage Dockerfile</span>
-FROM maven:3.9-eclipse-temurin-17 AS build
+                <h3>Multi-stage Dockerfile</h3>
+                <pre><code>FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY pom.xml .
 COPY src ./src
 RUN mvn -B package -DskipTests
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
-<span class="comment"># Create non-root user</span>
+<span class="comment"># Non-root user — never run the JVM as root inside the container</span>
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring
 
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]</code></pre>
+ENTRYPOINT [<span class="string">"java"</span>, <span class="string">"-jar"</span>, <span class="string">"app.jar"</span>]</code></pre>
 
-            <h3>Docker Compose for Testing</h3>
-            <pre><code><span class="comment"># docker-compose.yml for integration tests</span>
-version: '3.8'
-
-services:
-  app:
+                <h3>Docker Compose for integration tests</h3>
+                <pre><code>services:
+  order-service:
     build: .
-    ports:
-      - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=test
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/testdb
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/orders_test
     depends_on:
       - db
 
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     environment:
-      - POSTGRES_DB=testdb
+      - POSTGRES_DB=orders_test
       - POSTGRES_USER=test
-      - POSTGRES_PASSWORD=test
-    ports:
-      - "5432:5432"</code></pre>
-        </section>
+      - POSTGRES_PASSWORD=test</code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>CI/CD Best Practices</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — DATABASE MIGRATIONS IN CI/CD
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Database Migrations in the Pipeline — the Part That Actually Breaks Production</h2>
+                <p>Rolling and canary deployments (Section 9) mean two versions of
+                    your code run against the <strong>same database</strong> at the
+                    same time, for minutes or longer. If a migration in the new
+                    version isn't compatible with the old version's queries, the old
+                    instances start failing the moment the migration runs — before
+                    they're even the ones being replaced.</p>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Pipeline Best Practices</div>
-                <ul>
-                    <li><strong>Fail Fast</strong> - Run quick checks (lint, compile) before slow tests</li>
-                    <li><strong>Cache Dependencies</strong> - Speed up builds by caching Maven/Gradle dependencies</li>
-                    <li><strong>Parallelize</strong> - Run independent stages concurrently</li>
-                    <li><strong>Use Artifacts</strong> - Build once, deploy the same artifact everywhere</li>
-                    <li><strong>Keep Pipelines Short</strong> - Target under 10 minutes for feedback</li>
-                    <li><strong>Secure Secrets</strong> - Never hardcode credentials, use secret management</li>
-                </ul>
-            </div>
+                <pre><code><span class="comment">// V12__rename_customer_full_name.sql — Flyway migration</span>
+<span class="comment">-- WRONG: renaming a column the old version still SELECTs by name</span>
+ALTER TABLE customers RENAME COLUMN full_name TO display_name;
+<span class="comment">-- The moment this runs, every OLD instance still executing
+-- "SELECT full_name FROM customers" starts throwing SQL errors —
+-- and during a rolling deploy, old instances are still serving traffic.</span>
 
-            <h3>Security Scanning</h3>
-            <pre><code><span class="comment"># GitHub Actions with security scanning</span>
-name: Security Scan
+<span class="comment">-- CORRECT: expand/contract pattern — add the new column first,
+-- backfill, deploy code that writes to both, THEN drop the old column
+-- in a LATER migration once every instance is on the new version</span>
+ALTER TABLE customers ADD COLUMN display_name VARCHAR(255);
+UPDATE customers SET display_name = full_name;
+<span class="comment">-- full_name is dropped only in a future release, after this one is fully rolled out</span></code></pre>
+
+                <pre><code><span class="comment"># Running Flyway as an explicit pipeline stage — a separate step from
+# the application deploy, so a failed migration blocks the rollout
+# instead of half-applying during app startup</span>
+mvn flyway:migrate -Dflyway.url=$DB_URL -Dflyway.user=$DB_USER</code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">The expand/contract pattern is a developer decision, not a DBA policy</div>
+                    <p>Every additive-only, backward-compatible migration in this
+                        pattern is something <em>you</em> write when you design the
+                        change — the pipeline just runs it. Getting this wrong isn't
+                        a CI/CD failure to blame on tooling; it's the same category
+                        of mistake as the cascade-on-delete trap covered in
+                        <a href="../databases/relationships.html">Entity
+                        Relationships</a> — a correct-looking change with a
+                        consequence that only shows up under a specific runtime
+                        condition the author didn't consider.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — DEPLOYMENT STRATEGIES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Deployment Strategies — and What Each One Requires From Your Code</h2>
+
+                <h3>Blue-Green</h3>
+                <pre><code>Blue (current)  &larr; production traffic
+Green (new)     &larr; deploy and test the new version here first
+
+<span class="comment">// Switch traffic once Green is verified. Rollback = switch back to Blue.</span></code></pre>
+                <p>Requires: the new version must be able to run health checks
+                    (Spring Boot Actuator's <code>/actuator/health</code>) before
+                    receiving any real traffic — the switch is only safe if
+                    "healthy" actually means healthy.</p>
+
+                <h3>Canary</h3>
+                <pre><code>v1.0 (current) &larr; 95% of traffic
+v1.1 (canary)  &larr; 5% of traffic, monitored, gradually increased</code></pre>
+                <p>Requires: your metrics and error rates must be observable per
+                    version — a canary you can't measure isn't a canary, it's just
+                    an unmonitored partial rollout.</p>
+
+                <h3>Rolling</h3>
+                <pre><code>Instance 1: v1.0 -&gt; v1.1 (updating)
+Instance 2: v1.0
+Instance 3: v1.0
+<span class="comment">// One instance at a time, until all are updated</span></code></pre>
+                <p>Requires: the exact backward-compatibility guarantee from
+                    Section 8 — old and new instances serve real traffic against the
+                    same schema simultaneously throughout the rollout.</p>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">Feature flags decouple "deployed" from "visible to users"</div>
+                    <p>All three strategies get considerably safer when risky
+                        logic ships behind a feature flag rather than a straight
+                        code path — the code deploys and runs everywhere
+                        immediately, but the new behavior only activates for a
+                        controlled subset, independent of the rollout mechanism
+                        itself. This is also what makes trunk-based development
+                        (see <a href="git.html">Version Control</a>) practical: you
+                        can merge unfinished work to <code>main</code> safely as
+                        long as it's flagged off.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — GITOPS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>GitOps — the Modern "Deploy" Step</h2>
+                <p>Increasingly, the final deploy step isn't your pipeline running
+                    <code>kubectl apply</code> directly against a cluster. Instead, a
+                    controller running inside the cluster (ArgoCD, Flux)
+                    continuously watches a Git repository of Kubernetes manifests
+                    and reconciles the cluster to match whatever is committed
+                    there.</p>
+
+                <pre><code><span class="comment">// What actually changes for you:
+// Your CI pipeline builds the image and pushes it to a registry, then
+// opens a PR (or commits directly) bumping the image tag in a manifests
+// repo — it never touches the cluster itself.</span>
+
+<span class="comment">// manifests-repo/order-service/deployment.yaml</span>
+image: ghcr.io/shop/order-service:1.4.0   <span class="comment"># ← this line is what your pipeline updates</span>
+
+<span class="comment">// ArgoCD notices the commit, diffs it against the live cluster state,
+// and applies the change itself — with a full audit trail of every
+// change as ordinary Git history.</span></code></pre>
+
+                <p>For you as a developer, this mostly means: the artifact you
+                    build and the state of the cluster are connected entirely
+                    through Git commits, so "what's running in production right
+                    now" is always answerable by reading a file in a repo, not by
+                    asking someone with cluster access.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 11 — SECURITY IN THE PIPELINE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Security Scanning in the Pipeline</h2>
+                <pre><code>name: Security Scan
 
 on: [push, pull_request]
+
+permissions:
+  contents: read
 
 jobs:
   security:
@@ -599,75 +588,159 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Run OWASP Dependency Check
-      uses: dependency-check/Dependency-Check_Action@main
+    - name: OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@<span class="string">&lt;pinned-commit-sha&gt;</span> <span class="comment"># pin to a specific release commit, not @main</span>
       with:
-        project: 'my-app'
-        path: '.'
-        format: 'HTML'
+        project: <span class="string">'order-service'</span>
+        path: <span class="string">'.'</span>
+        format: <span class="string">'HTML'</span>
 
-    - name: Upload Report
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
         name: dependency-check-report
         path: reports/</code></pre>
-        </section>
+                <p>This scans your <em>dependencies</em> for known CVEs. It does
+                    not protect you from Section 3's supply-chain risk — an Action
+                    itself being malicious is a different threat than a vulnerable
+                    library, and needs the SHA-pinning discipline covered there.</p>
+            </section>
 
-        <section class="content-section">
-            <h2>Deployment Strategies</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 12 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
 
-            <h3>Blue-Green Deployment</h3>
-            <pre><code><span class="comment">// Two identical production environments</span>
-Blue (current)  &lt;-- Production traffic
-Green (new)     &lt;-- Deploy and test new version
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Fail fast — run compile and lint before the slower test suites, not after</li>
+                        <li>Cache Maven/Gradle dependencies to keep pipeline feedback under ~10 minutes</li>
+                        <li>Build the artifact once and promote that exact artifact through every environment — never rebuild per environment</li>
+                        <li>Pin third-party GitHub Actions to a commit SHA; declare least-privilege <code>permissions</code> explicitly</li>
+                        <li>Write migrations as additive/expand-contract so old and new code can run against the same schema during rollout</li>
+                        <li>Treat a red pipeline as your code telling you something, not an infrastructure inconvenience to route around</li>
+                    </ul>
 
-<span class="comment">// After testing, switch traffic</span>
-Blue (old)
-Green (current) &lt;-- Production traffic now here
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't use <code>-DskipTests</code> as a habit to get a red pipeline green — it hides the signal, it doesn't fix it</li>
+                        <li>Don't reference third-party Actions by <code>@main</code> or a floating tag — that's the exact vector of real supply-chain compromises</li>
+                        <li>Don't combine <code>pull_request_target</code> with checking out the incoming PR's own code — it hands a stranger's code your secrets</li>
+                        <li>Don't rename or drop a column in the same migration that removes the old code path — use expand/contract across two releases</li>
+                        <li>Don't treat Canary/Blue-Green as purely an ops concern — they only work if your code exposes real health checks and tolerates two versions running concurrently</li>
+                    </ul>
+                </div>
+            </section>
 
-<span class="comment">// Easy rollback: switch back to Blue</span></code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 13 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
 
-            <h3>Canary Deployment</h3>
-            <pre><code><span class="comment">// Gradual rollout to subset of users</span>
-v1.0 (current) &lt;-- 95% of traffic
-v1.1 (canary)  &lt;-- 5% of traffic
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's the difference between Continuous Delivery and Continuous Deployment?</strong><br>
+                    Both automatically build, test, and package every change that
+                    passes CI into a release-ready artifact. Continuous Delivery
+                    stops there and requires a human to trigger the actual
+                    production deploy. Continuous Deployment removes that manual
+                    gate — a passing pipeline deploys to production automatically.</p>
 
-<span class="comment">// Monitor metrics, gradually increase</span>
-v1.0 (current) &lt;-- 80% of traffic
-v1.1 (canary)  &lt;-- 20% of traffic
+                    <p><strong>Q: Why should a pipeline build the artifact once and reuse it, instead of rebuilding for each environment?</strong><br>
+                    If staging and production are built from separate compile
+                    steps, you're no longer testing the actual bytes that will run
+                    in production — a different dependency resolution, a different
+                    compiler flag, or a flaky build could silently produce a
+                    different artifact. Building once and promoting that exact jar
+                    through every environment guarantees what you tested in staging
+                    is byte-for-byte what reaches production.</p>
 
-<span class="comment">// Full rollout when confident</span>
-v1.1           &lt;-- 100% of traffic</code></pre>
+                    <p><strong>Q: Why is a rolling deployment risky if a database migration in the same release renames a column?</strong><br>
+                    During a rolling deployment, old and new instances of the
+                    application serve real traffic against the same database
+                    simultaneously. If the migration renames a column the old
+                    version's queries still reference by its old name, every
+                    remaining old instance starts failing immediately — before the
+                    rollout has even finished replacing them.</p>
+                </div>
 
-            <h3>Rolling Deployment</h3>
-            <pre><code><span class="comment">// Update instances one at a time</span>
-Instance 1: v1.0 -&gt; v1.1 (updating)
-Instance 2: v1.0
-Instance 3: v1.0
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A workflow references a third-party GitHub Action via <code>@v3</code>. Explain precisely why this is a supply-chain risk even though the version looks pinned, and what actually mitigates it.</strong><br>
+                    A version tag like <code>v3</code> is a mutable Git ref — the
+                    maintainer (or an attacker who compromises the maintainer's
+                    account) can force-push a different commit to that same tag at
+                    any time, and every workflow referencing <code>@v3</code> will
+                    silently start executing that new code on its very next run,
+                    with whatever secrets and repository access that workflow
+                    already has. This is exactly the mechanism behind real
+                    supply-chain compromises of popular Actions in recent years.
+                    The only mitigation that actually closes this gap is pinning to
+                    an immutable commit SHA — a SHA cannot be reassigned to
+                    different content, so the code that executes is guaranteed
+                    identical to what you last reviewed, until you deliberately
+                    change the pin yourself.</p>
 
-Instance 1: v1.1 (done)
-Instance 2: v1.0 -&gt; v1.1 (updating)
-Instance 3: v1.0
+                    <p><strong>Q: Your team wants to migrate a NOT NULL column with no default on a large <code>orders</code> table, deployed via rolling update. Walk through why a single-migration approach breaks, and design the safe sequence.</strong><br>
+                    A single migration that adds the column as NOT NULL locks the
+                    entire table while it back-fills a value for every existing row
+                    — on a large table this can hold a write lock for minutes,
+                    during which the old application instances, still receiving
+                    traffic, will have their writes blocked or time out. The safe
+                    sequence follows expand/contract across at least two releases:
+                    first add the column as nullable with no default (a fast,
+                    metadata-only operation on most engines); ship application code
+                    that writes the new column going forward while tolerating nulls
+                    on read; run an online, batched backfill of historical rows
+                    outside of peak traffic; only once every instance is confirmed
+                    on the version that populates the column, add the NOT NULL
+                    constraint in a later migration, and only then remove any
+                    fallback logic that tolerated nulls. Each step is independently
+                    safe to roll out and roll back; the single-migration version is
+                    not.</p>
 
-<span class="comment">// Continue until all updated</span></code></pre>
-        </section>
+                    <p><strong>Q: Why does adopting GitOps change what "who deployed this" means, and what real problem does that solve?</strong><br>
+                    In a traditional pipeline, the deploy step is a script or job
+                    that authenticates directly against the cluster and pushes a
+                    change — the audit trail for "what's actually running" lives
+                    scattered across CI job logs and whoever had cluster
+                    credentials at the time, and the live cluster state can drift
+                    from what any manifest says it should be if someone applies a
+                    manual change out-of-band. Under GitOps, the cluster's desired
+                    state is defined entirely by what's committed in a manifests
+                    repository, and a controller continuously reconciles the live
+                    cluster to match it — including reverting manual out-of-band
+                    changes back to whatever Git says. "What's running in
+                    production" becomes answerable by reading Git history, and "who
+                    deployed this" becomes "who merged this commit," which is the
+                    same audit trail your team already trusts for code review.</p>
+                </div>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="git.html" class="related-link">Version Control (Git)</a>
-                <a href="testing.html" class="related-link">Testing (JUnit, Mockito)</a>
-                <a href="code-quality.html" class="related-link">Code Quality Tools</a>
-                <a href="../build-tools/maven.html" class="related-link">Maven</a>
-            </div>
-        </section>
-    </main>
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="git.html" class="related-link"><span class="related-icon">🔧</span>Version Control (Git)</a>
+                    <a href="testing.html" class="related-link"><span class="related-icon">🧪</span>Testing (JUnit, Mockito)</a>
+                    <a href="code-quality.html" class="related-link"><span class="related-icon">✅</span>Code Quality Tools</a>
+                    <a href="../databases/relationships.html" class="related-link"><span class="related-icon">💾</span>Entity Relationships</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

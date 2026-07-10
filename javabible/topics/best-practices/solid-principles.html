@@ -1,431 +1,566 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.solid-principles.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SOLID Principles - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#best-practices">Best Practices</a> / SOLID Principles
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#bestpractices" data-i18n="nav.bestpractices">Best Practices</a> /
+                SOLID Principles
             </nav>
-            <h1>SOLID Principles</h1>
-            <p class="topic-subtitle">Five Principles of Object-Oriented Design</p>
-            <a href="../../index.html#bestpractices" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.solid-principles.h1">SOLID Principles</h1>
+            <p class="topic-subtitle" data-i18n="topic.solid-principles.subtitle">Five design principles applied to a real order-processing domain, why Spring's constructor injection is Dependency Inversion in practice, and when SOLID becomes over-engineering rather than good design</p>
+            <a href="../../index.html#bestpractices" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is SOLID?</h2>
-            <p>SOLID is an acronym for five design principles that help developers create maintainable, flexible, and understandable object-oriented software.</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">The Five Principles</div>
-                <ul>
-                    <li><strong>S</strong> - Single Responsibility Principle</li>
-                    <li><strong>O</strong> - Open/Closed Principle</li>
-                    <li><strong>L</strong> - Liskov Substitution Principle</li>
-                    <li><strong>I</strong> - Interface Segregation Principle</li>
-                    <li><strong>D</strong> - Dependency Inversion Principle</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>S - Single Responsibility Principle</h2>
-            <p><strong>"A class should have only one reason to change."</strong></p>
-            <p>Each class should focus on doing one thing well. If a class has multiple responsibilities, changes to one aspect might break another.</p>
+        <main class="topic-content">
 
-            <h3>Violation Example</h3>
-            <pre><code><span class="comment">// BAD: This class does too many things</span>
-<span class="keyword">public class</span> <span class="class-name">UserManager</span> {
-    <span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">User</span> user) {
-        <span class="comment">// Validate user</span>
-        <span class="keyword">if</span> (user.getEmail() == <span class="keyword">null</span>) {
-            <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Email required"</span>);
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS SOLID
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is SOLID?</h2>
+                <p>SOLID is five design principles for keeping object-oriented
+                    code changeable without breaking things that shouldn't be
+                    affected. Each principle targets a specific, recurring way
+                    software gets harder to change over time — not five arbitrary
+                    rules, but five different failure modes a codebase actually
+                    runs into.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">The Five Principles</div>
+                    <ul>
+                        <li><strong>S</strong> — Single Responsibility Principle</li>
+                        <li><strong>O</strong> — Open/Closed Principle</li>
+                        <li><strong>L</strong> — Liskov Substitution Principle</li>
+                        <li><strong>I</strong> — Interface Segregation Principle</li>
+                        <li><strong>D</strong> — Dependency Inversion Principle</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — SRP
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>S — Single Responsibility Principle</h2>
+                <p><strong>"A class should have only one reason to change."</strong>
+                    A reason to change means a distinct stakeholder or concern that
+                    could independently trigger an edit — the business rule for
+                    validating an order, the schema of the orders table, the
+                    wording of a confirmation email. Bundling them means a change to
+                    one can accidentally break another.</p>
+
+                <h3>Violation</h3>
+                <pre><code><span class="comment">// BAD — one class, four unrelated reasons to change</span>
+<span class="keyword">public class</span> <span class="class-name">OrderManager</span> {
+    <span class="keyword">public void</span> <span class="function">createOrder</span>(<span class="class-name">Order</span> order) {
+        <span class="keyword">if</span> (order.getItems().isEmpty()) {
+            <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Order must have items"</span>);
         }
 
-        <span class="comment">// Save to database</span>
         <span class="class-name">Connection</span> conn = <span class="class-name">DriverManager</span>.getConnection(url);
         <span class="class-name">PreparedStatement</span> stmt = conn.prepareStatement(sql);
         stmt.executeUpdate();
 
-        <span class="comment">// Send email</span>
-        <span class="class-name">Properties</span> props = <span class="keyword">new</span> <span class="class-name">Properties</span>();
-        <span class="class-name">Session</span> session = <span class="class-name">Session</span>.getInstance(props);
-        <span class="class-name">Transport</span>.send(message);
+        <span class="class-name">Transport</span>.send(confirmationMessage);   <span class="comment">// raw email sending, inline</span>
 
-        <span class="comment">// Log the action</span>
-        <span class="class-name">FileWriter</span> fw = <span class="keyword">new</span> <span class="class-name">FileWriter</span>(<span class="string">"log.txt"</span>);
-        fw.write(<span class="string">"User created: "</span> + user.getId());
+        <span class="keyword">new</span> <span class="class-name">FileWriter</span>(<span class="string">"orders.log"</span>).write(<span class="string">"Order created: "</span> + order.getId());
     }
-}</code></pre>
+}
+<span class="comment">// A change to the email template, the persistence library, or the log
+// format all require editing the exact same method.</span></code></pre>
 
-            <h3>Correct Implementation</h3>
-            <pre><code><span class="comment">// GOOD: Each class has one responsibility</span>
-<span class="keyword">public class</span> <span class="class-name">UserValidator</span> {
-    <span class="keyword">public void</span> <span class="function">validate</span>(<span class="class-name">User</span> user) {
-        <span class="keyword">if</span> (user.getEmail() == <span class="keyword">null</span>) {
-            <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Email required"</span>);
+                <h3>Correct Implementation</h3>
+                <pre><code><span class="keyword">public class</span> <span class="class-name">OrderValidator</span> {
+    <span class="keyword">public void</span> <span class="function">validate</span>(<span class="class-name">Order</span> order) {
+        <span class="keyword">if</span> (order.getItems().isEmpty()) {
+            <span class="keyword">throw new</span> <span class="class-name">ValidationException</span>(<span class="string">"Order must have items"</span>);
         }
     }
 }
 
-<span class="keyword">public class</span> <span class="class-name">UserRepository</span> {
-    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">User</span> user) {
-        <span class="comment">// Database operations only</span>
-    }
+<span class="keyword">public class</span> <span class="class-name">OrderRepository</span> {
+    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">Order</span> order) { <span class="comment">/* persistence only */</span> }
 }
 
-<span class="keyword">public class</span> <span class="class-name">EmailService</span> {
-    <span class="keyword">public void</span> <span class="function">sendWelcomeEmail</span>(<span class="class-name">User</span> user) {
-        <span class="comment">// Email operations only</span>
-    }
+<span class="keyword">public class</span> <span class="class-name">NotificationService</span> {
+    <span class="keyword">public void</span> <span class="function">sendOrderConfirmation</span>(<span class="class-name">Order</span> order) { <span class="comment">/* email only */</span> }
 }
 
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
-    <span class="keyword">private final</span> <span class="class-name">UserValidator</span> validator;
-    <span class="keyword">private final</span> <span class="class-name">UserRepository</span> repository;
-    <span class="keyword">private final</span> <span class="class-name">EmailService</span> emailService;
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="keyword">private final</span> <span class="class-name">OrderValidator</span> validator;
+    <span class="keyword">private final</span> <span class="class-name">OrderRepository</span> repository;
+    <span class="keyword">private final</span> <span class="class-name">NotificationService</span> notifications;
 
-    <span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">User</span> user) {
-        validator.validate(user);
-        repository.save(user);
-        emailService.sendWelcomeEmail(user);
+    <span class="keyword">public</span> <span class="function">OrderService</span>(<span class="class-name">OrderValidator</span> validator, <span class="class-name">OrderRepository</span> repository,
+                        <span class="class-name">NotificationService</span> notifications) {
+        <span class="keyword">this</span>.validator = validator;
+        <span class="keyword">this</span>.repository = repository;
+        <span class="keyword">this</span>.notifications = notifications;
+    }
+
+    <span class="keyword">public void</span> <span class="function">createOrder</span>(<span class="class-name">Order</span> order) {
+        validator.validate(order);
+        repository.save(order);
+        notifications.sendOrderConfirmation(order);
     }
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>O - Open/Closed Principle</h2>
-            <p><strong>"Software entities should be open for extension, but closed for modification."</strong></p>
-            <p>You should be able to add new functionality without changing existing code.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — OCP
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>O — Open/Closed Principle</h2>
+                <p><strong>"Open for extension, closed for modification."</strong>
+                    Add new behavior by adding new code, not by editing code that
+                    already works and is already tested.</p>
 
-            <h3>Violation Example</h3>
-            <pre><code><span class="comment">// BAD: Must modify this class to add new payment types</span>
+                <h3>Violation</h3>
+                <pre><code><span class="comment">// BAD — every new payment method means editing this method again</span>
 <span class="keyword">public class</span> <span class="class-name">PaymentProcessor</span> {
-    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">String</span> type, <span class="keyword">double</span> amount) {
-        <span class="keyword">if</span> (type.equals(<span class="string">"credit_card"</span>)) {
-            <span class="comment">// Process credit card</span>
-        } <span class="keyword">else if</span> (type.equals(<span class="string">"paypal"</span>)) {
-            <span class="comment">// Process PayPal</span>
-        } <span class="keyword">else if</span> (type.equals(<span class="string">"crypto"</span>)) {
-            <span class="comment">// Adding new type requires modifying this class!</span>
-        }
+    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">String</span> type, <span class="class-name">BigDecimal</span> amount) {
+        <span class="keyword">if</span> (type.equals(<span class="string">"credit_card"</span>)) { <span class="comment">/* ... */</span> }
+        <span class="keyword">else if</span> (type.equals(<span class="string">"paypal"</span>)) { <span class="comment">/* ... */</span> }
+        <span class="comment">// adding "crypto" means modifying this method, and re-testing
+        // every branch above it all over again</span>
     }
 }</code></pre>
 
-            <h3>Correct Implementation</h3>
-            <pre><code><span class="comment">// GOOD: Open for extension via new implementations</span>
-<span class="keyword">public interface</span> <span class="class-name">PaymentMethod</span> {
-    <span class="keyword">void</span> <span class="function">process</span>(<span class="keyword">double</span> amount);
+                <h3>Correct Implementation</h3>
+                <pre><code><span class="keyword">public interface</span> <span class="class-name">PaymentMethod</span> {
+    <span class="keyword">boolean</span> <span class="function">supports</span>(<span class="class-name">PaymentType</span> type);
+    <span class="class-name">PaymentResult</span> <span class="function">process</span>(<span class="class-name">BigDecimal</span> amount);
 }
 
-<span class="keyword">public class</span> <span class="class-name">CreditCardPayment</span> <span class="keyword">implements</span> <span class="class-name">PaymentMethod</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">process</span>(<span class="keyword">double</span> amount) {
-        <span class="comment">// Credit card logic</span>
-    }
-}
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">CreditCardPayment</span> <span class="keyword">implements</span> <span class="class-name">PaymentMethod</span> { <span class="comment">/* ... */</span> }
 
-<span class="keyword">public class</span> <span class="class-name">PayPalPayment</span> <span class="keyword">implements</span> <span class="class-name">PaymentMethod</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">process</span>(<span class="keyword">double</span> amount) {
-        <span class="comment">// PayPal logic</span>
-    }
-}
-
-<span class="comment">// Adding crypto is just a new class - no modification needed!</span>
+<span class="annotation">@Component</span>
 <span class="keyword">public class</span> <span class="class-name">CryptoPayment</span> <span class="keyword">implements</span> <span class="class-name">PaymentMethod</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">process</span>(<span class="keyword">double</span> amount) {
-        <span class="comment">// Crypto logic</span>
-    }
+    <span class="comment">// Adding this is the ENTIRE change — no existing class touched</span>
 }
 
-<span class="comment">// Processor is closed for modification</span>
+<span class="annotation">@Service</span>
 <span class="keyword">public class</span> <span class="class-name">PaymentProcessor</span> {
-    <span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">PaymentMethod</span> method, <span class="keyword">double</span> amount) {
-        method.process(amount);
+    <span class="keyword">private final</span> <span class="class-name">List</span>&lt;<span class="class-name">PaymentMethod</span>&gt; methods;
+
+    <span class="comment">// Spring injects every bean implementing PaymentMethod automatically —
+    // registering a new strategy requires zero changes here</span>
+    <span class="keyword">public</span> <span class="function">PaymentProcessor</span>(<span class="class-name">List</span>&lt;<span class="class-name">PaymentMethod</span>&gt; methods) {
+        <span class="keyword">this</span>.methods = methods;
+    }
+
+    <span class="keyword">public</span> <span class="class-name">PaymentResult</span> <span class="function">process</span>(<span class="class-name">PaymentType</span> type, <span class="class-name">BigDecimal</span> amount) {
+        <span class="keyword">return</span> methods.stream()
+                .filter(m -&gt; m.supports(type))
+                .findFirst()
+                .orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">UnsupportedPaymentTypeException</span>(type))
+                .process(amount);
     }
 }</code></pre>
-        </section>
+                <p>This is OCP as Spring developers actually apply it day to day —
+                    not just polymorphism in the abstract, but a collection of
+                    auto-discovered strategy beans the container assembles for
+                    you.</p>
+            </section>
 
-        <section class="content-section">
-            <h2>L - Liskov Substitution Principle</h2>
-            <p><strong>"Objects of a superclass should be replaceable with objects of its subclasses without breaking the program."</strong></p>
-            <p>Subclasses must be usable through the base class interface without the need to know the difference.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — LSP
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>L — Liskov Substitution Principle</h2>
+                <p><strong>"Subtypes must be usable anywhere their base type is
+                    expected, without the caller needing to know the
+                    difference."</strong> More precisely (Design by Contract
+                    terms): a subtype may not strengthen preconditions or weaken
+                    postconditions the base type promised — it can only ask for
+                    less and guarantee at least as much.</p>
 
-            <h3>Violation Example</h3>
-            <pre><code><span class="comment">// BAD: Square violates LSP when used as Rectangle</span>
-<span class="keyword">public class</span> <span class="class-name">Rectangle</span> {
-    <span class="keyword">protected int</span> width;
-    <span class="keyword">protected int</span> height;
+                <h3>Violation</h3>
+                <pre><code><span class="comment">// BAD — ShippedOrder can't honor Order's contract, it just throws instead</span>
+<span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="keyword">private final</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 
-    <span class="keyword">public void</span> <span class="function">setWidth</span>(<span class="keyword">int</span> width) {
-        <span class="keyword">this</span>.width = width;
-    }
-
-    <span class="keyword">public void</span> <span class="function">setHeight</span>(<span class="keyword">int</span> height) {
-        <span class="keyword">this</span>.height = height;
-    }
-
-    <span class="keyword">public int</span> <span class="function">getArea</span>() {
-        <span class="keyword">return</span> width * height;
-    }
-}
-
-<span class="keyword">public class</span> <span class="class-name">Square</span> <span class="keyword">extends</span> <span class="class-name">Rectangle</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">setWidth</span>(<span class="keyword">int</span> width) {
-        <span class="keyword">this</span>.width = width;
-        <span class="keyword">this</span>.height = width;  <span class="comment">// Breaks expected behavior!</span>
-    }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">setHeight</span>(<span class="keyword">int</span> height) {
-        <span class="keyword">this</span>.height = height;
-        <span class="keyword">this</span>.width = height;  <span class="comment">// Breaks expected behavior!</span>
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">OrderItem</span> item) {
+        items.add(item);
     }
 }
 
-<span class="comment">// This test fails with Square!</span>
-<span class="keyword">void</span> <span class="function">testRectangle</span>(<span class="class-name">Rectangle</span> r) {
-    r.setWidth(<span class="number">5</span>);
-    r.setHeight(<span class="number">4</span>);
-    assert r.getArea() == <span class="number">20</span>;  <span class="comment">// Fails for Square (returns 16)</span>
+<span class="keyword">public class</span> <span class="class-name">ShippedOrder</span> <span class="keyword">extends</span> <span class="class-name">Order</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">OrderItem</span> item) {
+        <span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(<span class="string">"Cannot add items to a shipped order"</span>);
+        <span class="comment">// Any code written against Order — "call addItem(), it adds an item" —
+        // now has to know about ShippedOrder specifically to avoid crashing.
+        // The base type's contract is broken by this specific subtype.</span>
+    }
+}
+
+<span class="comment">// This generic, perfectly reasonable code now has a hidden landmine:</span>
+<span class="keyword">void</span> <span class="function">applyBackorderedItem</span>(<span class="class-name">Order</span> order, <span class="class-name">OrderItem</span> item) {
+    order.addItem(item);   <span class="comment">// works for Order, throws for ShippedOrder — LSP violated</span>
 }</code></pre>
 
-            <h3>Correct Implementation</h3>
-            <pre><code><span class="comment">// GOOD: Use interface instead of inheritance</span>
-<span class="keyword">public interface</span> <span class="class-name">Shape</span> {
-    <span class="keyword">int</span> <span class="function">getArea</span>();
+                <h3>Correct Implementation</h3>
+                <pre><code><span class="comment">// GOOD — model the states that genuinely differ as distinct types,
+// rather than one type that lies about what it can do</span>
+<span class="keyword">public interface</span> <span class="class-name">Order</span> {
+    <span class="class-name">BigDecimal</span> <span class="function">getTotal</span>();
 }
 
-<span class="keyword">public class</span> <span class="class-name">Rectangle</span> <span class="keyword">implements</span> <span class="class-name">Shape</span> {
-    <span class="keyword">private final int</span> width;
-    <span class="keyword">private final int</span> height;
-
-    <span class="keyword">public</span> <span class="function">Rectangle</span>(<span class="keyword">int</span> width, <span class="keyword">int</span> height) {
-        <span class="keyword">this</span>.width = width;
-        <span class="keyword">this</span>.height = height;
-    }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public int</span> <span class="function">getArea</span>() {
-        <span class="keyword">return</span> width * height;
-    }
+<span class="keyword">public interface</span> <span class="class-name">MutableOrder</span> <span class="keyword">extends</span> <span class="class-name">Order</span> {
+    <span class="keyword">void</span> <span class="function">addItem</span>(<span class="class-name">OrderItem</span> item);   <span class="comment">// only types that can genuinely do this implement it</span>
 }
 
-<span class="keyword">public class</span> <span class="class-name">Square</span> <span class="keyword">implements</span> <span class="class-name">Shape</span> {
-    <span class="keyword">private final int</span> side;
+<span class="keyword">public class</span> <span class="class-name">DraftOrder</span> <span class="keyword">implements</span> <span class="class-name">MutableOrder</span> { <span class="comment">/* addItem works normally */</span> }
 
-    <span class="keyword">public</span> <span class="function">Square</span>(<span class="keyword">int</span> side) {
-        <span class="keyword">this</span>.side = side;
-    }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public int</span> <span class="function">getArea</span>() {
-        <span class="keyword">return</span> side * side;
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>I - Interface Segregation Principle</h2>
-            <p><strong>"Clients should not be forced to depend on interfaces they don't use."</strong></p>
-            <p>Create smaller, focused interfaces rather than large, general-purpose ones.</p>
-
-            <h3>Violation Example</h3>
-            <pre><code><span class="comment">// BAD: Fat interface forces implementations to include unused methods</span>
-<span class="keyword">public interface</span> <span class="class-name">Worker</span> {
-    <span class="keyword">void</span> <span class="function">work</span>();
-    <span class="keyword">void</span> <span class="function">eat</span>();
-    <span class="keyword">void</span> <span class="function">sleep</span>();
-}
-
-<span class="comment">// Robot doesn't eat or sleep!</span>
-<span class="keyword">public class</span> <span class="class-name">Robot</span> <span class="keyword">implements</span> <span class="class-name">Worker</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">work</span>() {
-        <span class="comment">// Robot works</span>
-    }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">eat</span>() {
-        <span class="comment">// Forced to implement - throws exception or does nothing</span>
-        <span class="keyword">throw new</span> <span class="class-name">UnsupportedOperationException</span>();
-    }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">sleep</span>() {
-        <span class="keyword">throw new</span> <span class="class-name">UnsupportedOperationException</span>();
-    }
+<span class="keyword">public class</span> <span class="class-name">ShippedOrder</span> <span class="keyword">implements</span> <span class="class-name">Order</span> {
+    <span class="comment">// No addItem() here at all — the type system itself prevents calling
+    // it on a shipped order, instead of a runtime exception discovering it</span>
 }</code></pre>
 
-            <h3>Correct Implementation</h3>
-            <pre><code><span class="comment">// GOOD: Segregated interfaces</span>
-<span class="keyword">public interface</span> <span class="class-name">Workable</span> {
-    <span class="keyword">void</span> <span class="function">work</span>();
+                <div class="info-box note">
+                    <div class="info-box-title">A method that overrides its parent only to throw <code>UnsupportedOperationException</code> is the classic LSP smell</div>
+                    <p>Whenever an override's entire body is "throw because this
+                        subtype actually can't do this," that's a signal the
+                        inheritance itself is wrong — the subtype isn't really a
+                        specialization of the parent, it's a different thing that
+                        happens to share some methods. Splitting the capability
+                        into its own interface (as above) makes the type system
+                        enforce the distinction the exception was trying to
+                        enforce at runtime, except at compile time, for every
+                        caller, automatically.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — ISP
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>I — Interface Segregation Principle</h2>
+                <p><strong>"Clients shouldn't be forced to depend on methods they
+                    don't use."</strong> A large, general-purpose interface forces
+                    every implementer to either genuinely support every method, or
+                    fake support with a stub that throws.</p>
+
+                <h3>Violation</h3>
+                <pre><code><span class="comment">// BAD — a read-only reporting client is forced to implement mutation methods it never calls</span>
+<span class="keyword">public interface</span> <span class="class-name">OrderOperations</span> {
+    <span class="class-name">Order</span> <span class="function">create</span>(<span class="class-name">OrderRequest</span> request);
+    <span class="keyword">void</span> <span class="function">cancel</span>(<span class="class-name">Long</span> orderId);
+    <span class="keyword">void</span> <span class="function">refund</span>(<span class="class-name">Long</span> orderId);
+    <span class="class-name">byte</span>[] <span class="function">generateInvoicePdf</span>(<span class="class-name">Long</span> orderId);
 }
 
-<span class="keyword">public interface</span> <span class="class-name">Eatable</span> {
-    <span class="keyword">void</span> <span class="function">eat</span>();
-}
-
-<span class="keyword">public interface</span> <span class="class-name">Sleepable</span> {
-    <span class="keyword">void</span> <span class="function">sleep</span>();
-}
-
-<span class="comment">// Human implements all</span>
-<span class="keyword">public class</span> <span class="class-name">Human</span> <span class="keyword">implements</span> <span class="class-name">Workable</span>, <span class="class-name">Eatable</span>, <span class="class-name">Sleepable</span> {
+<span class="comment">// A reporting dashboard only ever wants to READ order data,
+// but this interface forces it to also implement mutation it will never use</span>
+<span class="keyword">public class</span> <span class="class-name">ReportingOrderAdapter</span> <span class="keyword">implements</span> <span class="class-name">OrderOperations</span> {
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">work</span>() { }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">eat</span>() { }
-
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">sleep</span>() { }
-}
-
-<span class="comment">// Robot only implements what it needs</span>
-<span class="keyword">public class</span> <span class="class-name">Robot</span> <span class="keyword">implements</span> <span class="class-name">Workable</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">work</span>() {
-        <span class="comment">// Robot works</span>
+    <span class="keyword">public void</span> <span class="function">cancel</span>(<span class="class-name">Long</span> orderId) {
+        <span class="keyword">throw new</span> <span class="class-name">UnsupportedOperationException</span>();   <span class="comment">// forced stub</span>
     }
+    <span class="comment">// ... and refund(), generateInvoicePdf() — same problem</span>
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>D - Dependency Inversion Principle</h2>
-            <p><strong>"High-level modules should not depend on low-level modules. Both should depend on abstractions."</strong></p>
-            <p>Depend on interfaces rather than concrete implementations.</p>
+                <h3>Correct Implementation</h3>
+                <pre><code><span class="keyword">public interface</span> <span class="class-name">OrderCreator</span>  { <span class="class-name">Order</span> <span class="function">create</span>(<span class="class-name">OrderRequest</span> request); }
+<span class="keyword">public interface</span> <span class="class-name">OrderCanceller</span> { <span class="keyword">void</span> <span class="function">cancel</span>(<span class="class-name">Long</span> orderId); }
+<span class="keyword">public interface</span> <span class="class-name">OrderRefunder</span>  { <span class="keyword">void</span> <span class="function">refund</span>(<span class="class-name">Long</span> orderId); }
+<span class="keyword">public interface</span> <span class="class-name">InvoiceGenerator</span> { <span class="class-name">byte</span>[] <span class="function">generateInvoicePdf</span>(<span class="class-name">Long</span> orderId); }
 
-            <h3>Violation Example</h3>
-            <pre><code><span class="comment">// BAD: High-level class depends on concrete low-level class</span>
-<span class="keyword">public class</span> <span class="class-name">MySQLDatabase</span> {
-    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">String</span> data) {
-        <span class="comment">// MySQL-specific code</span>
-    }
+<span class="comment">// The reporting adapter now only depends on what it actually uses</span>
+<span class="keyword">public class</span> <span class="class-name">ReportingOrderAdapter</span> <span class="keyword">implements</span> <span class="class-name">InvoiceGenerator</span> {
+    <span class="annotation">@Override</span>
+    <span class="keyword">public</span> <span class="class-name">byte</span>[] <span class="function">generateInvoicePdf</span>(<span class="class-name">Long</span> orderId) { <span class="comment">/* ... */</span> }
 }
 
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
-    <span class="keyword">private</span> <span class="class-name">MySQLDatabase</span> database = <span class="keyword">new</span> <span class="class-name">MySQLDatabase</span>();  <span class="comment">// Tight coupling!</span>
+<span class="comment">// The full order service composes all four — it genuinely needs all of them</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> <span class="keyword">implements</span> <span class="class-name">OrderCreator</span>, <span class="class-name">OrderCanceller</span>,
+                                          <span class="class-name">OrderRefunder</span>, <span class="class-name">InvoiceGenerator</span> { <span class="comment">/* ... */</span> }</code></pre>
+            </section>
 
-    <span class="keyword">public void</span> <span class="function">saveUser</span>(<span class="class-name">User</span> user) {
-        database.save(user.toString());
-        <span class="comment">// Can't easily switch to PostgreSQL or test with mock</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — DIP
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>D — Dependency Inversion Principle</h2>
+                <p><strong>"High-level modules and low-level modules should both
+                    depend on abstractions, not on each other directly."</strong>
+                    This is the principle Spring's dependency injection exists to
+                    apply automatically — the site's own convention of
+                    <strong>always using constructor injection</strong> is DIP
+                    put into practice, not a separate, unrelated style rule.</p>
+
+                <h3>Violation</h3>
+                <pre><code><span class="comment">// BAD — OrderService is welded to one concrete persistence choice</span>
+<span class="keyword">public class</span> <span class="class-name">MySQLOrderRepository</span> {
+    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">Order</span> order) { <span class="comment">/* MySQL-specific JDBC code */</span> }
+}
+
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="keyword">private</span> <span class="class-name">MySQLOrderRepository</span> repository = <span class="keyword">new</span> <span class="class-name">MySQLOrderRepository</span>();   <span class="comment">// tight coupling</span>
+
+    <span class="keyword">public void</span> <span class="function">createOrder</span>(<span class="class-name">Order</span> order) {
+        repository.save(order);
+        <span class="comment">// Can't swap the database, and can't unit test this without a real one</span>
     }
 }</code></pre>
 
-            <h3>Correct Implementation</h3>
-            <pre><code><span class="comment">// GOOD: Both depend on abstraction</span>
-<span class="keyword">public interface</span> <span class="class-name">Database</span> {
-    <span class="keyword">void</span> <span class="function">save</span>(<span class="class-name">String</span> data);
+                <h3>Correct Implementation</h3>
+                <pre><code><span class="keyword">public interface</span> <span class="class-name">OrderRepository</span> {
+    <span class="keyword">void</span> <span class="function">save</span>(<span class="class-name">Order</span> order);
 }
 
-<span class="keyword">public class</span> <span class="class-name">MySQLDatabase</span> <span class="keyword">implements</span> <span class="class-name">Database</span> {
+<span class="annotation">@Repository</span>
+<span class="keyword">public class</span> <span class="class-name">JpaOrderRepository</span> <span class="keyword">implements</span> <span class="class-name">OrderRepository</span> {
     <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">String</span> data) {
-        <span class="comment">// MySQL implementation</span>
+    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">Order</span> order) { <span class="comment">/* JPA implementation */</span> }
+}
+
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="keyword">private final</span> <span class="class-name">OrderRepository</span> repository;   <span class="comment">// depends on the abstraction</span>
+
+    <span class="comment">// Constructor injection — Spring wires in whichever OrderRepository
+    // bean exists, and this class never knows or cares which one</span>
+    <span class="keyword">public</span> <span class="function">OrderService</span>(<span class="class-name">OrderRepository</span> repository) {
+        <span class="keyword">this</span>.repository = repository;
     }
 }
 
-<span class="keyword">public class</span> <span class="class-name">PostgreSQLDatabase</span> <span class="keyword">implements</span> <span class="class-name">Database</span> {
-    <span class="annotation">@Override</span>
-    <span class="keyword">public void</span> <span class="function">save</span>(<span class="class-name">String</span> data) {
-        <span class="comment">// PostgreSQL implementation</span>
-    }
-}
+<span class="comment">// Testing — swap in a mock with zero changes to OrderService itself</span>
+<span class="class-name">OrderRepository</span> mockRepo = mock(<span class="class-name">OrderRepository</span>.<span class="keyword">class</span>);
+<span class="class-name">OrderService</span> testService = <span class="keyword">new</span> <span class="class-name">OrderService</span>(mockRepo);</code></pre>
 
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
-    <span class="keyword">private final</span> <span class="class-name">Database</span> database;  <span class="comment">// Depends on abstraction</span>
+                <div class="info-box tip">
+                    <div class="info-box-title">Field injection (<code>@Autowired</code> on a field) quietly undermines DIP's actual benefit</div>
+                    <p>DIP's real payoff is being able to construct
+                        <code>OrderService</code> with any implementation you want,
+                        including a mock, without Spring's container involved at
+                        all — which is exactly what constructor injection enables
+                        and field injection doesn't: a field-injected dependency
+                        can only be set by reflection, meaning true unit tests need
+                        a full Spring context or reflection hacks just to substitute
+                        a fake. This is the concrete, mechanical reason the
+                        constructor-injection-always convention isn't a style
+                        preference — it's what makes DIP's testability benefit
+                        real instead of theoretical.</p>
+                </div>
+            </section>
 
-    <span class="comment">// Dependency injected</span>
-    <span class="keyword">public</span> <span class="function">UserService</span>(<span class="class-name">Database</span> database) {
-        <span class="keyword">this</span>.database = database;
-    }
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — WHEN SOLID BECOMES OVER-ENGINEERING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>When Applying SOLID Becomes the Problem It Was Meant to Solve</h2>
+                <p>Every principle above has a real cost if applied where the
+                    underlying problem doesn't actually exist yet.</p>
 
-    <span class="keyword">public void</span> <span class="function">saveUser</span>(<span class="class-name">User</span> user) {
-        database.save(user.toString());
-    }
-}
+                <div class="info-box warning">
+                    <div class="info-box-title">Premature abstraction: an interface with exactly one implementation, forever</div>
+                    <p>Creating an <code>OrderRepository</code> interface for DIP
+                        makes sense when a second implementation is a real,
+                        foreseeable possibility, or when the interface exists to
+                        make unit testing possible. An interface wrapping a single
+                        concrete class that will only ever have that one
+                        implementation adds a layer of indirection — a reader now
+                        has to jump from the interface to the implementation to
+                        see what actually happens — for a flexibility the codebase
+                        will never use. YAGNI (You Aren't Gonna Need It) is the
+                        useful counterweight here: introduce the interface when a
+                        second implementation or a genuine test-substitution need
+                        actually shows up, not preemptively for every single
+                        class.</p>
+                </div>
 
-<span class="comment">// Usage - can swap implementations easily</span>
-<span class="class-name">UserService</span> service1 = <span class="keyword">new</span> <span class="class-name">UserService</span>(<span class="keyword">new</span> <span class="class-name">MySQLDatabase</span>());
-<span class="class-name">UserService</span> service2 = <span class="keyword">new</span> <span class="class-name">UserService</span>(<span class="keyword">new</span> <span class="class-name">PostgreSQLDatabase</span>());
+                <p>Similarly, Interface Segregation taken to an extreme produces
+                    an interface per method, forcing callers to depend on five
+                    tiny interfaces to do one coherent thing — segregate along
+                    real client boundaries (the reporting adapter genuinely only
+                    needs invoicing), not reflexively per method.</p>
+            </section>
 
-<span class="comment">// Testing - can use mock</span>
-<span class="class-name">Database</span> mockDb = mock(<span class="class-name">Database</span>.<span class="keyword">class</span>);
-<span class="class-name">UserService</span> testService = <span class="keyword">new</span> <span class="class-name">UserService</span>(mockDb);</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>SOLID Summary</h2>
-
-            <div class="info-box tip">
-                <div class="info-box-title">Quick Reference</div>
-                <table class="info-table">
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — QUICK REFERENCE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>SOLID Quick Reference</h2>
+                <table class="comparison-table">
                     <thead>
-                        <tr>
-                            <th>Principle</th>
-                            <th>Key Idea</th>
-                            <th>Benefit</th>
-                        </tr>
+                        <tr><th>Principle</th><th>Key idea</th><th>Benefit</th></tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>SRP</td>
-                            <td>One reason to change</td>
-                            <td>Easier maintenance</td>
-                        </tr>
-                        <tr>
-                            <td>OCP</td>
-                            <td>Extend, don't modify</td>
-                            <td>Safer additions</td>
-                        </tr>
-                        <tr>
-                            <td>LSP</td>
-                            <td>Substitutable subclasses</td>
-                            <td>Reliable polymorphism</td>
-                        </tr>
-                        <tr>
-                            <td>ISP</td>
-                            <td>Small, focused interfaces</td>
-                            <td>Flexible implementations</td>
-                        </tr>
-                        <tr>
-                            <td>DIP</td>
-                            <td>Depend on abstractions</td>
-                            <td>Testable, decoupled code</td>
-                        </tr>
+                        <tr><td>SRP</td><td>One reason to change</td><td>Easier, safer maintenance</td></tr>
+                        <tr><td>OCP</td><td>Extend via new code, don't modify existing code</td><td>Safer additions, no re-testing old paths</td></tr>
+                        <tr><td>LSP</td><td>Subtypes honor the base type's contract</td><td>Reliable, surprise-free polymorphism</td></tr>
+                        <tr><td>ISP</td><td>Small, client-shaped interfaces</td><td>No forced stub implementations</td></tr>
+                        <tr><td>DIP</td><td>Depend on abstractions, inject via constructor</td><td>Real testability, swappable implementations</td></tr>
                     </tbody>
                 </table>
-            </div>
-        </section>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="clean-code.html" class="related-link">Clean Code Principles</a>
-                <a href="../advanced/design-patterns.html" class="related-link">Design Patterns</a>
-                <a href="../fundamentals/interfaces-abstract.html" class="related-link">Interfaces vs Abstract Classes</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Split a class the moment two unrelated stakeholders would need to request changes to it independently</li>
+                        <li>Use Spring's <code>List&lt;Interface&gt;</code> injection for genuinely open-ended strategy sets (payment methods, notification channels)</li>
+                        <li>Treat an override whose entire body is "throw <code>UnsupportedOperationException</code>" as a sign the type hierarchy itself is wrong</li>
+                        <li>Introduce an interface for DIP when a second implementation or a real test-substitution need exists — not preemptively</li>
+                        <li>Always inject via constructor, never a field — it's what makes DIP's testability benefit real</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't create an interface with exactly one implementation "just in case" — that's YAGNI territory, not DIP</li>
+                        <li>Don't segregate an interface down to one method each reflexively — segregate along real client boundaries instead</li>
+                        <li>Don't model a business state as a subclass that overrides a parent method just to throw — model the state as its own type instead</li>
+                        <li>Don't use field injection (<code>@Autowired</code> on a field) — it silently defeats the point of depending on an abstraction</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What does "one reason to change" actually mean for the Single Responsibility Principle?</strong><br>
+                    It means a class should serve one stakeholder or concern —
+                    validation rules, persistence, or notification logic, for
+                    example — so that a change requested for one of those reasons
+                    doesn't require touching, and risking, code that serves an
+                    unrelated concern.</p>
+
+                    <p><strong>Q: Why is a method override that only throws <code>UnsupportedOperationException</code> usually a sign of a design problem?</strong><br>
+                    It means the subtype can't actually honor the contract the
+                    base type promises, which violates the Liskov Substitution
+                    Principle — any code written generically against the base
+                    type can't safely assume this method works, defeating the
+                    point of polymorphism.</p>
+
+                    <p><strong>Q: How does constructor injection relate to the Dependency Inversion Principle?</strong><br>
+                    DIP says high-level code should depend on abstractions, not
+                    concrete implementations. Constructor injection is the
+                    mechanical way that's achieved in practice — the class
+                    declares a dependency on an interface type in its constructor,
+                    and whoever constructs it (Spring, or a test) decides which
+                    concrete implementation to provide.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A codebase has an interface for every single class, including several with only one implementation that will never realistically change. Is this good adherence to DIP?</strong><br>
+                    No — this misapplies DIP by treating "introduce an interface"
+                    as the goal rather than the means to an actual end. DIP's real
+                    value is decoupling a high-level module from a specific
+                    low-level implementation detail it might need to vary or
+                    substitute — for a second real implementation, or for test
+                    doubles. An interface with exactly one implementation, and no
+                    realistic prospect of a second, adds a layer of indirection a
+                    reader must navigate through for a flexibility the codebase
+                    structurally can't exercise: nobody is ever going to construct
+                    the class with a different implementation, because none
+                    exists. This is a premature abstraction cost with none of
+                    DIP's actual benefit — the interface exists in service of
+                    "following the principle" rather than in service of any
+                    concrete need the principle is meant to address, which is
+                    precisely the over-engineering YAGNI warns against.</p>
+
+                    <p><strong>Q: Explain concretely why field injection (<code>@Autowired</code> on a field) undermines the testability benefit that Dependency Inversion is supposed to provide, even though the class still technically depends on an interface type.</strong><br>
+                    Depending on an interface type is necessary for DIP but not
+                    sufficient for its practical benefit — the benefit is
+                    realized specifically through <em>how</em> that dependency
+                    gets supplied. With field injection, the field has no public
+                    setter and no constructor parameter; the only way to populate
+                    it outside of Spring's reflection-based injection is more
+                    reflection, or standing up a full Spring test context just to
+                    substitute a mock. This reintroduces exactly the friction DIP
+                    is meant to remove: a genuine unit test — one that constructs
+                    the object directly with a hand-built test double, no
+                    container involved — becomes awkward or impossible. Constructor
+                    injection keeps the dependency swap a first-class,
+                    reflection-free operation: <code>new OrderService(mockRepo)</code>
+                    is the entire test setup. The type is inverted either way; only
+                    constructor injection keeps the practical payoff of that
+                    inversion intact.</p>
+
+                    <p><strong>Q: A team models <code>ShippedOrder extends Order</code>, where <code>addItem()</code> is overridden to throw an exception once the order ships. A colleague argues this correctly represents the business rule that shipped orders are immutable. Where's the actual design flaw, separate from whether the business rule itself is correct?</strong><br>
+                    The business rule — shipped orders can't be modified — is
+                    entirely correct; the flaw is encoding it as a subtype that
+                    silently fails a contract its supertype promises, discoverable
+                    only at runtime by whichever caller happens to invoke
+                    <code>addItem()</code> on the wrong instance. Any code written
+                    generically against <code>Order</code> — and polymorphism's
+                    entire purpose is enabling exactly that kind of generic code —
+                    now carries a hidden precondition ("only call
+                    <code>addItem()</code> if this isn't secretly a
+                    <code>ShippedOrder</code>") that the type signature gives no
+                    indication of. The fix isn't abandoning the business rule; it's
+                    expressing it in the type system instead of in a runtime
+                    exception — an interface like <code>MutableOrder</code> that
+                    only mutable states implement, so that a caller holding a plain
+                    <code>Order</code> reference to a shipped order simply has no
+                    <code>addItem()</code> method to call in the first place, and
+                    the compiler — not a production stack trace — is what tells a
+                    developer their assumption was wrong.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="clean-code.html" class="related-link"><span class="related-icon">🧹</span>Clean Code Principles</a>
+                    <a href="../advanced/design-patterns.html" class="related-link"><span class="related-icon">🧩</span>Design Patterns</a>
+                    <a href="../fundamentals/interfaces-abstract.html" class="related-link"><span class="related-icon">🔌</span>Interfaces vs Abstract Classes</a>
+                    <a href="../spring/core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

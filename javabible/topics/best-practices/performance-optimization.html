@@ -1,258 +1,382 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.performance-optimization.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Performance Optimization - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#best-practices">Best Practices</a> / Performance Optimization
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#bestpractices" data-i18n="nav.bestpractices">Best Practices</a> /
+                Performance Optimization
             </nav>
-            <h1>Performance Optimization</h1>
-            <p class="topic-subtitle">Making Java Applications Fast and Efficient</p>
-            <a href="../../index.html#bestpractices" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.performance-optimization.h1">Performance Optimization</h1>
+            <p class="topic-subtitle" data-i18n="topic.performance-optimization.subtitle">Measure before you optimize, Virtual Threads for I/O-bound throughput, why HikariCP's default pool size is usually already too big, and when object pooling helps versus when it fights the garbage collector</p>
+            <a href="../../index.html#bestpractices" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>Performance Principles</h2>
+    <div class="topic-layout">
 
-            <div class="info-box warning">
-                <div class="info-box-title">Premature Optimization</div>
-                <p>"Premature optimization is the root of all evil." - Donald Knuth</p>
-                <p>Always measure first. Optimize only after profiling identifies actual bottlenecks.</p>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>Optimization Process</h3>
-            <ol>
-                <li>Write correct, clean code first</li>
-                <li>Measure performance with realistic data</li>
-                <li>Identify bottlenecks using profilers</li>
-                <li>Optimize the critical path</li>
-                <li>Measure again to verify improvement</li>
-            </ol>
-        </section>
+        <main class="topic-content">
 
-        <section class="content-section">
-            <h2>String Operations</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — PERFORMANCE PRINCIPLES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Performance Principles</h2>
 
-            <h3>StringBuilder for Concatenation</h3>
-            <pre><code><span class="comment">// BAD: String concatenation in loop - O(n²)</span>
+                <div class="info-box warning">
+                    <div class="info-box-title">Premature Optimization</div>
+                    <p>"Premature optimization is the root of all evil." — Donald
+                        Knuth</p>
+                    <p>Always measure first. Optimize only after a profiler
+                        identifies an actual bottleneck — not the line of code that
+                        merely looks slow.</p>
+                </div>
+
+                <h3>Optimization Process</h3>
+                <ol>
+                    <li>Write correct, clean code first</li>
+                    <li>Measure performance with realistic data and realistic load</li>
+                    <li>Identify bottlenecks using a profiler, not intuition</li>
+                    <li>Optimize the critical path specifically</li>
+                    <li>Measure again to confirm the change actually helped</li>
+                </ol>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — STRING OPERATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>String Operations</h2>
+
+                <h3>StringBuilder for Concatenation</h3>
+                <pre><code><span class="comment">// BAD — string concatenation in a loop is O(n²): each += allocates
+// a brand-new String and copies everything built so far into it</span>
 <span class="class-name">String</span> result = <span class="string">""</span>;
 <span class="keyword">for</span> (<span class="class-name">String</span> item : items) {
-    result += item + <span class="string">", "</span>;  <span class="comment">// Creates new String each iteration!</span>
+    result += item + <span class="string">", "</span>;
 }
 
-<span class="comment">// GOOD: StringBuilder - O(n)</span>
+<span class="comment">// GOOD — StringBuilder mutates a single buffer — O(n)</span>
 <span class="class-name">StringBuilder</span> sb = <span class="keyword">new</span> <span class="class-name">StringBuilder</span>();
 <span class="keyword">for</span> (<span class="class-name">String</span> item : items) {
     sb.append(item).append(<span class="string">", "</span>);
 }
 <span class="class-name">String</span> result = sb.toString();
 
-<span class="comment">// BETTER: String.join() for simple cases</span>
+<span class="comment">// BEST for the common case — String.join() or Collectors.joining()</span>
 <span class="class-name">String</span> result = <span class="class-name">String</span>.join(<span class="string">", "</span>, items);
 
-<span class="comment">// BEST: Streams with Collectors.joining()</span>
-<span class="class-name">String</span> result = items.stream()
-    .collect(<span class="class-name">Collectors</span>.joining(<span class="string">", "</span>));
+<span class="comment">// A single concatenation is fine — javac compiles it to an efficient
+// invokedynamic call (StringConcatFactory) since Java 9, not naive + chaining</span>
+<span class="class-name">String</span> msg = <span class="string">"Hello, "</span> + name + <span class="string">"!"</span>;   <span class="comment">// OK, not a loop</span></code></pre>
 
-<span class="comment">// Note: Single concatenation is fine - compiler optimizes it</span>
-<span class="class-name">String</span> msg = <span class="string">"Hello, "</span> + name + <span class="string">"!"</span>;  <span class="comment">// OK</span></code></pre>
-
-            <h3>String Interning</h3>
-            <pre><code><span class="comment">// String literals are automatically interned</span>
-<span class="class-name">String</span> s1 = <span class="string">"hello"</span>;
+                <h3>String Interning</h3>
+                <pre><code><span class="class-name">String</span> s1 = <span class="string">"hello"</span>;
 <span class="class-name">String</span> s2 = <span class="string">"hello"</span>;
-s1 == s2;  <span class="comment">// true - same object in string pool</span>
+s1 == s2;   <span class="comment">// true — both point to the same interned literal</span>
 
-<span class="comment">// new String() creates new object</span>
 <span class="class-name">String</span> s3 = <span class="keyword">new</span> <span class="class-name">String</span>(<span class="string">"hello"</span>);
-s1 == s3;  <span class="comment">// false - different objects</span>
+s1 == s3;   <span class="comment">// false — a genuinely new heap object</span></code></pre>
+            </section>
 
-<span class="comment">// Manual interning (use sparingly)</span>
-<span class="class-name">String</span> s4 = s3.intern();
-s1 == s4;  <span class="comment">// true - s4 points to pool</span></code></pre>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — COLLECTION PERFORMANCE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Collection Performance</h2>
 
-        <section class="content-section">
-            <h2>Collection Performance</h2>
+                <h3>Choosing the Right Collection</h3>
+                <pre><code><span class="comment">// ArrayList: fast random access O(1), slower insert/delete in the middle O(n)</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 
-            <h3>Choosing the Right Collection</h3>
-            <pre><code><span class="comment">// ArrayList vs LinkedList</span>
-<span class="comment">// ArrayList: Fast random access O(1), slow insert/delete O(n)</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; arrayList = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="comment">// LinkedList: O(n) random access, O(1) insert/delete at a known node —
+// in practice ArrayList usually wins anyway due to CPU cache locality</span>
 
-<span class="comment">// LinkedList: Slow random access O(n), fast insert/delete O(1)</span>
-<span class="comment">// In practice, ArrayList is almost always faster due to CPU cache</span>
+<span class="comment">// HashMap: O(1) average get/put, no ordering guarantee</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Customer</span>&gt; customersByEmail = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
 
-<span class="comment">// HashMap vs TreeMap</span>
-<span class="comment">// HashMap: O(1) average for get/put</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">User</span>&gt; hashMap = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;();
+<span class="comment">// TreeMap: O(log n), but keeps keys sorted — only pay for this if you need the order</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Customer</span>&gt; sortedCustomers = <span class="keyword">new</span> <span class="class-name">TreeMap</span>&lt;&gt;();</code></pre>
 
-<span class="comment">// TreeMap: O(log n) for get/put, but maintains sorted order</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">User</span>&gt; treeMap = <span class="keyword">new</span> <span class="class-name">TreeMap</span>&lt;&gt;();
+                <h3>Initial Capacity</h3>
+                <pre><code><span class="comment">// BAD — default capacity (10) forces several resize-and-copy operations
+// as the list grows to 10,000 elements</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 
-<span class="comment">// HashSet vs TreeSet - same tradeoffs</span>
-<span class="class-name">Set</span>&lt;<span class="class-name">String</span>&gt; hashSet = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();   <span class="comment">// O(1)</span>
-<span class="class-name">Set</span>&lt;<span class="class-name">String</span>&gt; treeSet = <span class="keyword">new</span> <span class="class-name">TreeSet</span>&lt;&gt;();   <span class="comment">// O(log n), sorted</span></code></pre>
+<span class="comment">// GOOD — pre-size when the final size is known or estimable</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;(<span class="number">10_000</span>);
 
-            <h3>Initial Capacity</h3>
-            <pre><code><span class="comment">// BAD: Default capacity causes resizing</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; list = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();  <span class="comment">// Initial capacity 10</span>
-<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">10000</span>; i++) {
-    list.add(item);  <span class="comment">// Multiple resizes!</span>
-}
-
-<span class="comment">// GOOD: Pre-size when you know the size</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; list = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;(<span class="number">10000</span>);
-
-<span class="comment">// HashMap: Account for load factor (default 0.75)</span>
+<span class="comment">// HashMap: account for load factor (default 0.75) to avoid an early resize</span>
 <span class="keyword">int</span> expectedSize = <span class="number">1000</span>;
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; map = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;(
-    (<span class="keyword">int</span>) (expectedSize / <span class="number">0.75</span>) + <span class="number">1</span>
-);</code></pre>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Customer</span>&gt; map = <span class="keyword">new</span> <span class="class-name">HashMap</span>&lt;&gt;((<span class="keyword">int</span>) (expectedSize / <span class="number">0.75</span>) + <span class="number">1</span>);</code></pre>
 
-            <h3>Avoid Boxed Primitives in Collections</h3>
-            <pre><code><span class="comment">// BAD: Boxing overhead</span>
-<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; numbers = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-<span class="keyword">int</span> sum = <span class="number">0</span>;
-<span class="keyword">for</span> (<span class="class-name">Integer</span> n : numbers) {
-    sum += n;  <span class="comment">// Unboxing on each iteration</span>
+                <h3>Avoid Boxed Primitives in Hot Loops</h3>
+                <pre><code><span class="comment">// BAD — unboxing on every iteration</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Integer</span>&gt; quantities = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="keyword">int</span> total = <span class="number">0</span>;
+<span class="keyword">for</span> (<span class="class-name">Integer</span> q : quantities) {
+    total += q;   <span class="comment">// autoboxing/unboxing overhead per element</span>
 }
 
-<span class="comment">// GOOD: Use primitive arrays when possible</span>
-<span class="keyword">int</span>[] numbers = <span class="keyword">new int</span>[<span class="number">1000</span>];
-<span class="keyword">int</span> sum = <span class="number">0</span>;
-<span class="keyword">for</span> (<span class="keyword">int</span> n : numbers) {
-    sum += n;  <span class="comment">// No boxing</span>
+<span class="comment">// GOOD — primitive array, no boxing at all</span>
+<span class="keyword">int</span>[] quantities = <span class="keyword">new int</span>[<span class="number">1000</span>];
+<span class="keyword">int</span> total = <span class="number">0</span>;
+<span class="keyword">for</span> (<span class="keyword">int</span> q : quantities) {
+    total += q;
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — STREAM PERFORMANCE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Stream Performance</h2>
+                <pre><code><span class="comment">// Simple iteration — a plain loop has less overhead than a stream pipeline</span>
+<span class="keyword">for</span> (<span class="class-name">Customer</span> customer : customers) {
+    customer.setActive(<span class="keyword">true</span>);
 }
 
-<span class="comment">// ALTERNATIVE: Use specialized collections (Eclipse Collections, etc.)</span>
-<span class="comment">// IntArrayList, LongHashSet, etc.</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Stream Performance</h2>
-
-            <pre><code><span class="comment">// Streams have overhead - avoid for simple operations</span>
-
-<span class="comment">// Simple iteration - loop is faster</span>
-<span class="keyword">for</span> (<span class="class-name">User</span> user : users) {
-    user.setActive(<span class="keyword">true</span>);
-}
-
-<span class="comment">// Complex transformations - streams shine</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt;&gt; ordersByCustomer = orders.stream()
+<span class="comment">// Complex transformations — this is where streams genuinely earn their keep</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">Long</span>, <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt;&gt; ordersByCustomer = orders.stream()
     .filter(<span class="class-name">Order</span>::isCompleted)
     .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Order</span>::getCustomerId));
 
-<span class="comment">// Parallel streams - only for CPU-intensive operations on large datasets</span>
-<span class="keyword">long</span> sum = numbers.parallelStream()
-    .filter(n -&gt; expensiveCheck(n))
-    .mapToLong(<span class="class-name">Long</span>::valueOf)
-    .sum();
+<span class="comment">// Parallel streams — only for genuinely CPU-intensive work on large
+// collections; the fork-join overhead isn't worth it otherwise</span>
+<span class="keyword">long</span> total = orders.parallelStream()
+    .filter(<span class="class-name">Order</span>::requiresManualReview)
+    .count();
 
-<span class="comment">// DON'T parallelize:</span>
-<span class="comment">// - Small collections (&lt; 10,000 elements)</span>
-<span class="comment">// - I/O-bound operations</span>
-<span class="comment">// - Operations with side effects</span>
+<span class="comment">// DON'T parallelize: small collections (&lt; ~10,000 elements), I/O-bound
+// operations, or anything with side effects on shared state</span>
 
-<span class="comment">// Avoid repeated stream creation</span>
-<span class="comment">// BAD</span>
-users.stream().filter(u -&gt; u.isActive()).count();
-users.stream().filter(u -&gt; u.isActive()).map(...);  <span class="comment">// Second traversal!</span>
+<span class="comment">// BAD — re-traversing the source stream twice</span>
+customers.stream().filter(<span class="class-name">Customer</span>::isActive).count();
+customers.stream().filter(<span class="class-name">Customer</span>::isActive).map(<span class="class-name">Customer</span>::getEmail).toList();   <span class="comment">// second full traversal</span>
 
-<span class="comment">// GOOD: Collect intermediate results if needed multiple times</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; activeUsers = users.stream()
-    .filter(<span class="class-name">User</span>::isActive)
+<span class="comment">// GOOD — collect once, reuse the materialized list</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; activeCustomers = customers.stream()
+    .filter(<span class="class-name">Customer</span>::isActive)
     .toList();
-<span class="keyword">long</span> count = activeUsers.size();
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; names = activeUsers.stream().map(<span class="class-name">User</span>::getName).toList();</code></pre>
-        </section>
+<span class="keyword">long</span> count = activeCustomers.size();
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; emails = activeCustomers.stream().map(<span class="class-name">Customer</span>::getEmail).toList();</code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Object Creation</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — OBJECT CREATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Object Creation</h2>
+                <pre><code><span class="comment">// Reuse cached immutable instances where the JDK already provides them</span>
+<span class="class-name">Boolean</span> flag = <span class="class-name">Boolean</span>.TRUE;              <span class="comment">// not `new Boolean(true)` — deprecated and pointless</span>
+<span class="class-name">Integer</span> num = <span class="class-name">Integer</span>.valueOf(<span class="number">42</span>);      <span class="comment">// caches -128..127 automatically</span>
 
-            <pre><code><span class="comment">// Reuse immutable objects</span>
-<span class="comment">// BAD</span>
-<span class="class-name">Boolean</span> flag = <span class="keyword">new</span> <span class="class-name">Boolean</span>(<span class="keyword">true</span>);  <span class="comment">// Deprecated, creates new object</span>
+<span class="comment">// Create genuinely expensive-to-construct objects once, not per call</span>
+<span class="keyword">private static final</span> <span class="class-name">DateTimeFormatter</span> ORDER_DATE_FORMAT =
+    <span class="class-name">DateTimeFormatter</span>.ofPattern(<span class="string">"yyyy-MM-dd"</span>);
 
-<span class="comment">// GOOD</span>
-<span class="class-name">Boolean</span> flag = <span class="class-name">Boolean</span>.TRUE;  <span class="comment">// Reuses cached instance</span>
-<span class="class-name">Integer</span> num = <span class="class-name">Integer</span>.valueOf(<span class="number">42</span>);  <span class="comment">// Caches -128 to 127</span>
+<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">formatOrderDate</span>(<span class="class-name">LocalDate</span> date) {
+    <span class="keyword">return</span> date.format(ORDER_DATE_FORMAT);   <span class="comment">// reused, never rebuilt</span>
+}</code></pre>
 
-<span class="comment">// Object pooling for expensive objects</span>
-<span class="keyword">private static final</span> <span class="class-name">DateTimeFormatter</span> FORMATTER =
-    <span class="class-name">DateTimeFormatter</span>.ofPattern(<span class="string">"yyyy-MM-dd"</span>);  <span class="comment">// Create once</span>
+                <div class="info-box warning">
+                    <div class="info-box-title">Object pooling is for genuinely expensive resources — not a default optimization for ordinary objects</div>
+                    <p>Pooling makes sense for things that are actually costly to
+                        create: database connections (HikariCP), thread pools,
+                        or a heavyweight parser/formatter. Applying the same
+                        instinct to ordinary short-lived POJOs — an
+                        <code>OrderLineItem</code>, a small DTO — usually makes
+                        things <em>worse</em> on a modern JVM. Generational
+                        garbage collectors are specifically optimized for
+                        allocating and immediately discarding short-lived objects
+                        via thread-local allocation buffers (TLABs) — that path is
+                        extremely cheap. A hand-rolled object pool for cheap
+                        objects adds synchronization overhead, complicates object
+                        lifecycle (a pooled object holding stale state from its
+                        previous use is a real, recurring bug class), and fights a
+                        garbage collector that was already good at exactly this
+                        job. Profile before pooling anything that isn't a
+                        connection, a thread, or a comparably expensive
+                        resource.</p>
+                </div>
 
-<span class="keyword">public</span> <span class="class-name">String</span> <span class="function">format</span>(<span class="class-name">LocalDate</span> date) {
-    <span class="keyword">return</span> date.format(FORMATTER);  <span class="comment">// Reuse</span>
-}
+                <pre><code><span class="comment">// Lazy initialization with double-checked locking — still correct with
+// `volatile`, but in a Spring application this is rarely something you
+// should hand-write: a @Bean or @Service is already a container-managed
+// singleton, with lifecycle handled for you</span>
+<span class="keyword">private volatile</span> <span class="class-name">ExpensiveParser</span> instance;
 
-<span class="comment">// Lazy initialization for expensive objects</span>
-<span class="keyword">private volatile</span> <span class="class-name">ExpensiveObject</span> instance;
-
-<span class="keyword">public</span> <span class="class-name">ExpensiveObject</span> <span class="function">getInstance</span>() {
+<span class="keyword">public</span> <span class="class-name">ExpensiveParser</span> <span class="function">getInstance</span>() {
     <span class="keyword">if</span> (instance == <span class="keyword">null</span>) {
         <span class="keyword">synchronized</span> (<span class="keyword">this</span>) {
             <span class="keyword">if</span> (instance == <span class="keyword">null</span>) {
-                instance = <span class="keyword">new</span> <span class="class-name">ExpensiveObject</span>();
+                instance = <span class="keyword">new</span> <span class="class-name">ExpensiveParser</span>();
             }
         }
     }
     <span class="keyword">return</span> instance;
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Database Performance</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — VIRTUAL THREADS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Virtual Threads (Java 21+) — the Biggest Throughput Change in Years for I/O-Bound Apps</h2>
+                <p>Most Java web services spend the overwhelming majority of a
+                    request's time waiting — on a database query, a downstream
+                    HTTP call, a payment gateway. Traditional platform threads make
+                    that waiting expensive: each platform thread reserves roughly
+                    1MB of stack and maps directly to an OS thread, so a bounded
+                    thread pool (Tomcat's default of ~200) becomes the hard ceiling
+                    on how many concurrent requests a service can actually be
+                    <em>waiting</em> on at once, regardless of how idle the CPU
+                    actually is.</p>
 
-            <pre><code><span class="comment">// Use connection pooling</span>
-<span class="annotation">@Bean</span>
+                <pre><code><span class="comment">// BEFORE — a platform-thread-per-request model: 200 threads waiting on
+// a slow payment gateway means request #201 queues, even though every
+// CPU core is sitting idle</span>
+<span class="annotation">@GetMapping</span>(<span class="string">"/orders/{id}/payment-status"</span>)
+<span class="keyword">public</span> <span class="class-name">PaymentStatus</span> <span class="function">checkStatus</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> paymentGatewayClient.checkStatus(id);   <span class="comment">// blocks the platform thread for the full round-trip</span>
+}</code></pre>
+
+                <p><strong>Virtual threads</strong> are JVM-managed, not OS-managed —
+                    millions can exist simultaneously because they're cheap
+                    (kilobytes, not megabytes) and only occupy an actual OS
+                    ("carrier") thread while genuinely running CPU instructions.
+                    The moment a virtual thread blocks on I/O, the JVM unmounts it
+                    from its carrier thread entirely, freeing that carrier to run
+                    a different virtual thread — the blocking code you already
+                    wrote (no reactive rewrite needed) now scales to a completely
+                    different order of concurrent, waiting requests.</p>
+
+                <pre><code><span class="comment"># application.properties — Spring Boot 3.2+, one line switches Tomcat's
+# request-handling threads to virtual threads</span>
+spring.threads.virtual.enabled=true</code></pre>
+
+                <pre><code><span class="comment">// Using virtual threads directly, outside a web container</span>
+<span class="keyword">try</span> (<span class="class-name">ExecutorService</span> executor = <span class="class-name">Executors</span>.newVirtualThreadPerTaskExecutor()) {
+    <span class="class-name">List</span>&lt;<span class="class-name">Future</span>&lt;<span class="class-name">PaymentStatus</span>&gt;&gt; results = orderIds.stream()
+        .map(id -&gt; executor.submit(() -&gt; paymentGatewayClient.checkStatus(id)))
+        .toList();
+    <span class="comment">// Each submitted task gets its own virtual thread — thousands of
+    // concurrent, blocking gateway calls with no reactive code at all</span>
+}</code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Pinning: the one real gotcha that defeats the whole benefit</div>
+                    <p>A virtual thread executing inside a <code>synchronized</code>
+                        block or method cannot be unmounted from its carrier thread
+                        while blocked — it stays <strong>pinned</strong>, blocking
+                        the carrier exactly like a platform thread would, which
+                        silently reintroduces the original scalability limit for
+                        any code path that combines <code>synchronized</code> with
+                        blocking I/O. The fix is replacing
+                        <code>synchronized</code> with
+                        <code>java.util.concurrent.locks.ReentrantLock</code> in
+                        hot paths that hold a lock across a blocking call — the
+                        lock itself doesn't pin the carrier thread. This is
+                        entirely invisible until you're specifically profiling for
+                        it, which is exactly why it's worth knowing about before it
+                        surfaces as "virtual threads didn't actually help" in
+                        production.</p>
+                </div>
+
+                <p>Virtual threads help I/O-bound throughput specifically — they
+                    do nothing for CPU-bound work, which is still limited by
+                    actual core count. See <a href="../../topics/advanced/thread-pools.html">Thread
+                    Pools &amp; ExecutorService</a> for how platform thread pools
+                    are sized and managed, and <a href="../servers/app-server.html">Application
+                    Servers</a> for how this changes container thread
+                    configuration.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — DATABASE PERFORMANCE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Database Performance</h2>
+
+                <h3>Connection Pooling — sized correctly, not maximized</h3>
+                <pre><code><span class="annotation">@Bean</span>
 <span class="keyword">public</span> <span class="class-name">HikariDataSource</span> <span class="function">dataSource</span>() {
     <span class="class-name">HikariConfig</span> config = <span class="keyword">new</span> <span class="class-name">HikariConfig</span>();
     config.setMaximumPoolSize(<span class="number">10</span>);
-    config.setMinimumIdle(<span class="number">5</span>);
+    config.setMinimumIdle(<span class="number">10</span>);      <span class="comment">// match maximum — a fixed-size pool avoids pool churn</span>
     config.setConnectionTimeout(<span class="number">30000</span>);
     <span class="keyword">return new</span> <span class="class-name">HikariDataSource</span>(config);
+}</code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Bigger is not faster — a database has a fixed number of CPU cores too</div>
+                    <p>The intuitive assumption — more connections in the pool
+                        means more throughput — is usually wrong past a fairly
+                        small number. Every query still has to execute on the
+                        database server's own finite CPU cores; beyond the point
+                        where the database is already saturated, additional
+                        connections just mean more queries queuing
+                        <em>inside</em> the database instead of inside your
+                        application, adding context-switching overhead with no
+                        throughput gain. HikariCP's own guidance suggests a
+                        formula in the neighborhood of
+                        <code>connections = ((core_count * 2) + effective_spindle_count)</code>
+                        as a starting point, not a fixed default — for most
+                        modern SSD-backed databases this lands surprisingly low,
+                        often in the 10-20 range even for a moderately busy
+                        service, and should be verified by actually measuring
+                        throughput at different pool sizes rather than assumed.</p>
+                </div>
+
+                <h3>Batch Operations</h3>
+                <pre><code><span class="comment">// BAD — N individual round-trips</span>
+<span class="keyword">for</span> (<span class="class-name">Order</span> order : orders) {
+    orderRepository.save(order);
 }
 
-<span class="comment">// Batch operations</span>
-<span class="comment">// BAD: Individual inserts</span>
-<span class="keyword">for</span> (<span class="class-name">User</span> user : users) {
-    userRepository.save(user);  <span class="comment">// N database calls</span>
-}
+<span class="comment">// GOOD — a single batched call</span>
+orderRepository.saveAll(orders);</code></pre>
 
-<span class="comment">// GOOD: Batch insert</span>
-userRepository.saveAll(users);  <span class="comment">// Single batched call</span>
-
-<span class="comment">// Fetch only what you need</span>
-<span class="comment">// BAD: Fetch entire entity</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users = userRepository.findAll();
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; emails = users.stream()
-    .map(<span class="class-name">User</span>::getEmail)
+                <h3>Fetch Only What You Need</h3>
+                <pre><code><span class="comment">// BAD — loads every column of every Order just to read the total</span>
+<span class="class-name">List</span>&lt;<span class="class-name">BigDecimal</span>&gt; totals = orderRepository.findAll().stream()
+    .map(<span class="class-name">Order</span>::getTotal)
     .toList();
 
-<span class="comment">// GOOD: Projection</span>
-<span class="annotation">@Query</span>(<span class="string">"SELECT u.email FROM User u"</span>)
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; <span class="function">findAllEmails</span>();
+<span class="comment">// GOOD — a projection fetches only the column actually needed</span>
+<span class="annotation">@Query</span>(<span class="string">"SELECT o.total FROM Order o"</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">BigDecimal</span>&gt; <span class="function">findAllTotals</span>();
 
-<span class="comment">// Pagination for large datasets</span>
-<span class="class-name">Page</span>&lt;<span class="class-name">User</span>&gt; page = userRepository.findAll(<span class="class-name">PageRequest</span>.of(<span class="number">0</span>, <span class="number">20</span>));</code></pre>
-        </section>
+<span class="comment">// Pagination for anything that could grow unbounded</span>
+<span class="class-name">Page</span>&lt;<span class="class-name">Order</span>&gt; page = orderRepository.findAll(<span class="class-name">PageRequest</span>.of(<span class="number">0</span>, <span class="number">20</span>));</code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Caching</h2>
-
-            <pre><code><span class="comment">// Spring Cache abstraction</span>
-<span class="annotation">@Service</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — CACHING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Caching</h2>
+                <pre><code><span class="annotation">@Service</span>
 <span class="keyword">public class</span> <span class="class-name">ProductService</span> {
 
     <span class="annotation">@Cacheable</span>(<span class="string">"products"</span>)
@@ -264,35 +388,35 @@ userRepository.saveAll(users);  <span class="comment">// Single batched call</sp
     <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">update</span>(<span class="class-name">Product</span> product) {
         <span class="keyword">return</span> productRepository.save(product);
     }
-
-    <span class="annotation">@CacheEvict</span>(value = <span class="string">"products"</span>, allEntries = <span class="keyword">true</span>)
-    <span class="keyword">public void</span> <span class="function">clearCache</span>() { }
 }
 
-<span class="comment">// In-memory memoization</span>
-<span class="keyword">private final</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Result</span>&gt; cache = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
+<span class="comment">// In-memory memoization for values not backed by a full cache provider</span>
+<span class="keyword">private final</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">BigDecimal</span>&gt; taxRateCache = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
 
-<span class="keyword">public</span> <span class="class-name">Result</span> <span class="function">compute</span>(<span class="class-name">String</span> key) {
-    <span class="keyword">return</span> cache.computeIfAbsent(key, <span class="keyword">this</span>::expensiveComputation);
+<span class="keyword">public</span> <span class="class-name">BigDecimal</span> <span class="function">getTaxRate</span>(<span class="class-name">String</span> region) {
+    <span class="keyword">return</span> taxRateCache.computeIfAbsent(region, <span class="keyword">this</span>::lookupTaxRate);
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Profiling Tools</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — PROFILING TOOLS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Profiling Tools</h2>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Essential Profiling Tools</div>
-                <ul>
-                    <li><strong>JProfiler / YourKit</strong> - Commercial profilers</li>
-                    <li><strong>VisualVM</strong> - Free, bundled with JDK</li>
-                    <li><strong>async-profiler</strong> - Low-overhead sampling profiler</li>
-                    <li><strong>JMH</strong> - Microbenchmarking harness</li>
-                    <li><strong>JFR (Java Flight Recorder)</strong> - Production profiling</li>
-                </ul>
-            </div>
+                <div class="info-box tip">
+                    <div class="info-box-title">Essential Profiling Tools</div>
+                    <ul>
+                        <li><strong>JProfiler / YourKit</strong> — commercial, deep profilers</li>
+                        <li><strong>VisualVM</strong> — free, bundled with the JDK</li>
+                        <li><strong>async-profiler</strong> — low-overhead sampling profiler, safe for production use</li>
+                        <li><strong>JMH</strong> — microbenchmarking harness for isolated method-level comparisons</li>
+                        <li><strong>JFR (Java Flight Recorder)</strong> — always-on, low-overhead production profiling built into the JDK</li>
+                    </ul>
+                </div>
 
-            <h3>JMH Benchmark Example</h3>
-            <pre><code><span class="annotation">@BenchmarkMode</span>(<span class="class-name">Mode</span>.AverageTime)
+                <h3>JMH Benchmark Example</h3>
+                <pre><code><span class="annotation">@BenchmarkMode</span>(<span class="class-name">Mode</span>.AverageTime)
 <span class="annotation">@OutputTimeUnit</span>(<span class="class-name">TimeUnit</span>.NANOSECONDS)
 <span class="annotation">@State</span>(<span class="class-name">Scope</span>.Thread)
 <span class="keyword">public class</span> <span class="class-name">StringConcatBenchmark</span> {
@@ -301,46 +425,180 @@ userRepository.saveAll(users);  <span class="comment">// Single batched call</sp
 
     <span class="annotation">@Setup</span>
     <span class="keyword">public void</span> <span class="function">setup</span>() {
-        items = <span class="class-name">IntStream</span>.range(<span class="number">0</span>, <span class="number">100</span>)
-            .mapToObj(<span class="class-name">String</span>::valueOf)
-            .toList();
+        items = <span class="class-name">IntStream</span>.range(<span class="number">0</span>, <span class="number">100</span>).mapToObj(<span class="class-name">String</span>::valueOf).toList();
     }
 
     <span class="annotation">@Benchmark</span>
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">stringConcat</span>() {
         <span class="class-name">String</span> result = <span class="string">""</span>;
-        <span class="keyword">for</span> (<span class="class-name">String</span> item : items) {
-            result += item;
-        }
+        <span class="keyword">for</span> (<span class="class-name">String</span> item : items) { result += item; }
         <span class="keyword">return</span> result;
     }
 
     <span class="annotation">@Benchmark</span>
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">stringBuilder</span>() {
         <span class="class-name">StringBuilder</span> sb = <span class="keyword">new</span> <span class="class-name">StringBuilder</span>();
-        <span class="keyword">for</span> (<span class="class-name">String</span> item : items) {
-            sb.append(item);
-        }
+        <span class="keyword">for</span> (<span class="class-name">String</span> item : items) { sb.append(item); }
         <span class="keyword">return</span> sb.toString();
     }
 }</code></pre>
-        </section>
+                <p>JMH's default warm-up iterations exist because the JIT compiler
+                    doesn't optimize code immediately — early calls run
+                    interpreted or under a cheap tier-1 compilation, and only
+                    "hot" code gets the fully optimized tier-4 (C2) compilation.
+                    Benchmarking without a warm-up phase measures the JIT
+                    compiler's warm-up cost, not the code's actual steady-state
+                    performance.</p>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="../advanced/jvm-internals.html" class="related-link">JVM Internals</a>
-                <a href="../advanced/garbage-collection.html" class="related-link">Garbage Collection</a>
-                <a href="../fundamentals/collections.html" class="related-link">Collections Framework</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Measure with a profiler before optimizing anything — intuition about "the slow part" is wrong surprisingly often</li>
+                        <li>Enable virtual threads (<code>spring.threads.virtual.enabled=true</code>) for I/O-bound services on Java 21+ — it's close to a free throughput win for typical blocking web/database code</li>
+                        <li>Size a connection pool by measuring actual throughput at different sizes, not by maximizing it</li>
+                        <li>Reserve object pooling for genuinely expensive resources (connections, threads) — not ordinary short-lived objects a modern GC already handles cheaply</li>
+                        <li>Use projections and pagination for any query that could return an unbounded or very large result set</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't concatenate strings with <code>+=</code> inside a loop — use <code>StringBuilder</code> or <code>Collectors.joining()</code></li>
+                        <li>Don't mix <code>synchronized</code> blocks with blocking I/O inside virtual-thread code — it pins the carrier thread and silently defeats the scalability benefit</li>
+                        <li>Don't reach for parallel streams on small collections or I/O-bound work — the fork-join overhead outweighs any gain</li>
+                        <li>Don't hand-roll a singleton with double-checked locking inside a Spring-managed class — the container already provides this</li>
+                        <li>Don't benchmark without a warm-up phase — you'll measure JIT compilation cost, not real performance</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: Why is string concatenation with <code>+=</code> inside a loop O(n²)?</strong><br>
+                    <code>String</code> is immutable, so each <code>+=</code>
+                    creates an entirely new <code>String</code> object and copies
+                    every character built so far into it. Doing this once per
+                    iteration across n iterations means roughly
+                    1 + 2 + 3 + ... + n character copies in total — quadratic in
+                    n. <code>StringBuilder</code> mutates a single growable buffer
+                    instead, making the whole operation linear.</p>
+
+                    <p><strong>Q: Why should you pre-size an <code>ArrayList</code> when you know roughly how many elements it will hold?</strong><br>
+                    Without a specified capacity, the list starts small and has to
+                    repeatedly allocate a larger backing array and copy every
+                    existing element into it as it grows. Specifying the expected
+                    capacity upfront avoids those repeated resize-and-copy
+                    operations entirely.</p>
+
+                    <p><strong>Q: What's the main benefit of Virtual Threads for a typical Spring Boot web service?</strong><br>
+                    Most web requests spend most of their time waiting on I/O — a
+                    database query, an external API call. Traditional platform
+                    threads are expensive and capped in number, so that waiting
+                    limits how many requests can be in flight simultaneously.
+                    Virtual threads are cheap enough to create millions of, and the
+                    JVM automatically frees the underlying OS thread while a
+                    virtual thread is blocked on I/O, letting far more requests
+                    wait concurrently using the same blocking code you'd already
+                    written.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: Your team enables Virtual Threads expecting a major throughput improvement, but production metrics show almost no change under load. What's the most likely cause, and how would you confirm it?</strong><br>
+                    The most likely cause is pinning: a hot code path that
+                    combines a <code>synchronized</code> block or method with a
+                    blocking I/O call inside it. When a virtual thread executing
+                    inside <code>synchronized</code> blocks on I/O, the JVM cannot
+                    unmount it from its carrier thread — it stays pinned, blocking
+                    that carrier exactly as a platform thread would, which
+                    silently reintroduces the original concurrency ceiling for any
+                    request that touches that code path. To confirm it, JFR
+                    (Java Flight Recorder) records pinning events specifically —
+                    enabling JFR and filtering for virtual thread pinning events
+                    during a load test will show exactly which
+                    <code>synchronized</code> block is responsible. The fix is
+                    replacing that <code>synchronized</code> block with
+                    <code>java.util.concurrent.locks.ReentrantLock</code>, which
+                    provides equivalent mutual exclusion without pinning the
+                    carrier thread while blocked.</p>
+
+                    <p><strong>Q: A team doubles their HikariCP <code>maximumPoolSize</code> from 10 to 20 hoping to fix slow response times under load, and throughput doesn't improve — it gets slightly worse. Explain why.</strong><br>
+                    A connection pool's ceiling is only useful up to the point
+                    where the database server itself can actually execute that
+                    many queries concurrently — and the database has a fixed
+                    number of CPU cores, disk I/O capacity, and lock contention
+                    characteristics of its own. Once the database is already
+                    saturated at the original pool size, adding more connections
+                    doesn't create additional database capacity — it just means
+                    more queries queuing and context-switching inside the
+                    database's own execution engine instead of queuing more
+                    visibly inside the application's connection pool. The
+                    additional connections add real overhead (each one holds
+                    server-side resources, and increased concurrent query
+                    execution increases lock contention and cache thrashing on
+                    the database) without adding real throughput, which is exactly
+                    why the change made things slightly worse rather than better.
+                    The correct diagnostic is measuring actual throughput at
+                    several different pool sizes under realistic load, rather than
+                    assuming a larger number is strictly safer.</p>
+
+                    <p><strong>Q: Why does pooling ordinary short-lived domain objects (like a small DTO created per request) tend to hurt performance on a modern JVM, even though it "obviously" reduces allocation?</strong><br>
+                    Modern generational garbage collectors are specifically
+                    optimized for exactly this allocation pattern: short-lived
+                    objects are allocated in a thread-local allocation buffer
+                    (TLAB) with no synchronization needed between threads, and a
+                    young-generation collection that finds most such objects
+                    already unreachable can reclaim that entire buffer extremely
+                    cheaply — often cheaper than the bookkeeping a hand-rolled
+                    pool requires to safely hand out and reclaim instances across
+                    threads. A manual object pool reintroduces exactly the kind of
+                    shared, synchronized state the GC's allocation path is
+                    designed to avoid, and adds a real correctness risk on top:
+                    a pooled object that isn't fully reset between uses can leak
+                    stale state from a previous caller into a new one, a bug class
+                    that doesn't exist at all if the object is simply allocated
+                    fresh and discarded. Pooling is worth its complexity
+                    specifically when construction cost is high relative to the
+                    GC's handling of it — a database connection or a thread — not
+                    for objects a modern JVM was already built to allocate and
+                    collect cheaply.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../advanced/jvm-internals.html" class="related-link"><span class="related-icon">⚙️</span>JVM Internals</a>
+                    <a href="../advanced/garbage-collection.html" class="related-link"><span class="related-icon">🗑️</span>Garbage Collection</a>
+                    <a href="../advanced/thread-pools.html" class="related-link"><span class="related-icon">🧵</span>Thread Pools &amp; ExecutorService</a>
+                    <a href="../fundamentals/collections.html" class="related-link"><span class="related-icon">📚</span>Collections Framework</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

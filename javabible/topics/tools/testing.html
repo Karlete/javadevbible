@@ -1,577 +1,690 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.testing.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Testing (JUnit, Mockito) - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#tools">Tools & Ecosystem</a> / Testing (JUnit, Mockito)
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#tools" data-i18n="nav.tools">Tools &amp; Ecosystem</a> /
+                Testing (JUnit, Mockito)
             </nav>
-            <h1>Testing (JUnit, Mockito)</h1>
-            <p class="topic-subtitle">Unit Testing and Mocking in Java Applications</p>
-            <a href="../../index.html#tools" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.testing.h1">Testing — JUnit 5 and Mockito</h1>
+            <p class="topic-subtitle" data-i18n="topic.testing.subtitle">Why a green test suite can still be lying to you, mutation testing as the honest answer to "does coverage mean anything," and getting real network calls out of your test runs for good</p>
+            <a href="../../index.html#tools" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>Why Testing Matters</h2>
-            <p>Automated testing is essential for maintaining code quality, catching bugs early, and enabling confident refactoring. Well-tested code is easier to maintain and extend.</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">Testing Benefits</div>
-                <ul>
-                    <li><strong>Bug Prevention</strong> - Catch issues before they reach production</li>
-                    <li><strong>Documentation</strong> - Tests show how code should be used</li>
-                    <li><strong>Refactoring Safety</strong> - Change code with confidence</li>
-                    <li><strong>Design Feedback</strong> - Hard-to-test code often has design issues</li>
-                    <li><strong>Regression Protection</strong> - Ensure fixes don't break existing features</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-            <h3>Testing Pyramid</h3>
-            <pre><code><span class="comment">// Testing Pyramid (bottom to top)</span>
+        <main class="topic-content">
 
-         /\
-        /  \         E2E Tests (few)
-       /----\        - Full system tests
-      /      \       - Slowest, most expensive
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHY TESTING MATTERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Why Testing Matters — and the Trap Most Test Suites Fall Into</h2>
+                <p>Automated tests exist to answer one question with confidence:
+                    "does the code actually do what it's supposed to do?" The trap —
+                    and it's an extremely common one, even among developers fluent
+                    in JUnit and Mockito syntax — is writing a test that makes the
+                    code <em>pass through</em> without ever actually checking that
+                    it did the right thing. A test suite full of syntactically
+                    correct tests that don't verify real behavior is worse than no
+                    tests at all, because it gives everyone false confidence to
+                    refactor and deploy.</p>
+
+                <h3>The Testing Pyramid</h3>
+                <pre><code>         /\
+        /  \         E2E Tests (few) — full system, slowest
+       /----\
+      /      \       Integration Tests (some) — real collaborators at the boundary
      /--------\
-    /          \     Integration Tests (some)
-   /------------\    - Test component interactions
-  /              \   - Databases, APIs, services
- /----------------\
-/                  \ Unit Tests (many)
-                     - Test individual classes/methods
-                     - Fastest, cheapest, most numerous</code></pre>
-        </section>
+    /          \     Unit Tests (many) — fast, isolated, the bulk of your suite
+   /------------\</code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>JUnit 5</h2>
-            <p>JUnit 5 (Jupiter) is the current standard for Java unit testing. It provides powerful features for writing and organizing tests.</p>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — TESTS THAT PASS BUT DON'T TEST ANYTHING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Tests That Pass But Don't Test Anything</h2>
+                <p>This is the single most common way an experienced team ends up
+                    with "100% coverage" and production bugs anyway. Three concrete
+                    failure patterns, and how to actually catch them.</p>
 
-            <h3>Maven Dependencies</h3>
-            <pre><code>&lt;dependency&gt;
-    &lt;groupId&gt;org.junit.jupiter&lt;/groupId&gt;
-    &lt;artifactId&gt;junit-jupiter&lt;/artifactId&gt;
-    &lt;version&gt;5.10.1&lt;/version&gt;
-    &lt;scope&gt;test&lt;/scope&gt;
-&lt;/dependency&gt;
+                <h3>1. Tautological assertions</h3>
+                <pre><code><span class="comment">// LOOKS like a test. Verifies almost nothing.</span>
+<span class="annotation">@Test</span>
+<span class="keyword">void</span> <span class="function">createOrder</span>() {
+    <span class="class-name">Order</span> result = orderService.createOrder(request);
+    assertNotNull(result);   <span class="comment">// passes even if total, status, and items are all wrong</span>
+}
 
-<span class="comment">&lt;!-- For Spring Boot projects --&gt;</span>
+<span class="comment">// ACTUALLY tests the behavior a caller depends on</span>
+<span class="annotation">@Test</span>
+<span class="keyword">void</span> <span class="function">createOrder_calculatesCorrectTotal</span>() {
+    <span class="class-name">Order</span> result = orderService.createOrder(request);
+
+    assertEquals(<span class="class-name">OrderStatus</span>.CREATED, result.getStatus());
+    assertEquals(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"59.98"</span>), result.getTotal());
+    assertEquals(<span class="number">2</span>, result.getItems().size());
+}</code></pre>
+
+                <h3>2. Over-mocking — the test verifies the implementation, not the outcome</h3>
+                <pre><code><span class="comment">// This test mocks every collaborator so thoroughly that it just re-describes
+// the method body, line by line, instead of checking what the caller
+// actually cares about: did the order get created correctly?</span>
+<span class="annotation">@Test</span>
+<span class="keyword">void</span> <span class="function">createOrder_overSpecified</span>() {
+    orderService.createOrder(request);
+
+    verify(inventoryService).checkAvailability(<span class="string">"item-1"</span>, <span class="number">2</span>);
+    verify(pricingService).calculateSubtotal(any());
+    verify(taxService).calculateTax(any());
+    verify(paymentService).process(any());
+    verify(orderRepository).save(any());
+    verify(auditLog).record(any());
+    <span class="comment">// Reorder these calls harmlessly inside createOrder(), or inline one of
+    // these collaborators — this test breaks, even though the actual output
+    // (the returned Order) never changed. It's coupled to HOW, not WHAT.</span>
+}
+
+<span class="comment">// Verify only the interactions that represent a real side effect the
+// caller depends on — not every internal step</span>
+<span class="annotation">@Test</span>
+<span class="keyword">void</span> <span class="function">createOrder_persistsAndCharges</span>() {
+    <span class="class-name">Order</span> result = orderService.createOrder(request);
+
+    assertEquals(<span class="class-name">OrderStatus</span>.CREATED, result.getStatus());
+    verify(orderRepository).save(any(<span class="class-name">Order</span>.<span class="keyword">class</span>));   <span class="comment">// a real side effect callers rely on</span>
+    verify(paymentService).process(any());                        <span class="comment">// same</span>
+    <span class="comment">// No assertions about pricing/tax internals — those get their own
+    // focused unit tests on PricingService and TaxService directly.</span>
+}</code></pre>
+
+                <h3>3. The mutation testing gut check</h3>
+                <p>Here's the honest question coverage tools can't answer: if you
+                    deleted a business rule from the code, would any test actually
+                    fail? Coverage only tells you a line executed — not that a test
+                    would notice if that line's logic were wrong or missing
+                    entirely.</p>
+
+                <pre><code><span class="keyword">public void</span> <span class="function">validateOrder</span>(<span class="class-name">Order</span> order) {
+    <span class="keyword">if</span> (order.getTotal().compareTo(<span class="class-name">BigDecimal</span>.ZERO) &lt;= <span class="number">0</span>) {
+        <span class="keyword">throw new</span> <span class="class-name">InvalidOrderException</span>(<span class="string">"Total must be positive"</span>);
+    }
+}
+<span class="comment">// If your test suite only ever exercises this method with a valid,
+// positive-total order, this line has 100% line coverage — and a test
+// suite that would pass identically if you deleted the entire if-block.</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Mutation testing (PIT) measures whether your tests would actually notice</div>
+                    <p><strong>PIT (pitest)</strong> automatically mutates your
+                        compiled code in small ways — flips a
+                        <code>&lt;=</code> to <code>&lt;</code>, changes a
+                        <code>return true</code> to <code>return false</code>,
+                        removes a method call — and reruns your test suite against
+                        each mutant. If your tests still pass with the mutation in
+                        place, that mutant <strong>survived</strong>, meaning no
+                        test actually verifies that specific piece of logic. A
+                        surviving mutant on a business rule like the one above is a
+                        precise, automated way to find exactly the "tests that pass
+                        but don't test anything" problem — far more reliable than
+                        eyeballing coverage percentages.</p>
+                    <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;plugin&gt;
+    &lt;groupId&gt;org.pitest&lt;/groupId&gt;
+    &lt;artifactId&gt;pitest-maven&lt;/artifactId&gt;
+    &lt;version&gt;1.15.8&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;targetClasses&gt;
+            &lt;param&gt;com.shop.order.*&lt;/param&gt;
+        &lt;/targetClasses&gt;
+    &lt;/configuration&gt;
+&lt;/plugin&gt;</code></pre>
+                    <pre><code>mvn org.pitest:pitest-maven:mutationCoverage
+<span class="comment"># Report shows KILLED vs SURVIVED mutants per class — a surviving mutant
+# on a conditional you thought was tested is a direct signal to add a
+# test for the missing branch.</span></code></pre>
+                    <p>Running PIT on the full codebase on every commit is usually
+                        too slow — most teams run it selectively on critical
+                        modules (payment, pricing, order validation) or as a
+                        periodic CI job rather than on every push.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — REAL NETWORK CALLS LEAKING INTO TESTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Real Network Calls Leaking Into Your Test Suite</h2>
+                <p>The other classic way "tests" quietly become something worse
+                    than useless: a test that hardcodes a real URL —
+                    <code>localhost:8080</code>, a real payment gateway sandbox, a
+                    real third-party API — and makes an actual network call every
+                    single time the suite runs. This makes tests slow, flaky
+                    (they fail when the network or the third party is down, not
+                    when your code is wrong), and occasionally dangerous (a "test"
+                    that accidentally hits a production endpoint).</p>
+
+                <pre><code><span class="comment">// BAD — a "unit" test that makes a real HTTP call on every run</span>
+<span class="annotation">@Test</span>
+<span class="keyword">void</span> <span class="function">chargePayment</span>() {
+    <span class="class-name">RestTemplate</span> restTemplate = <span class="keyword">new</span> <span class="class-name">RestTemplate</span>();
+    <span class="class-name">PaymentResponse</span> response = restTemplate.postForObject(
+        <span class="string">"http://localhost:8080/payment-gateway/charge"</span>,   <span class="comment">// real call, real dependency, every run</span>
+        request, <span class="class-name">PaymentResponse</span>.<span class="keyword">class</span>);
+    assertTrue(response.isSuccessful());
+    <span class="comment">// Fails if the gateway isn't running locally. Fails differently in CI.
+    // Says nothing reliable about YOUR code's correctness.</span>
+}</code></pre>
+
+                <h3>For pure unit tests — mock the collaborator, never the network</h3>
+                <p>If <code>PaymentService</code> is a Spring bean wrapping the
+                    HTTP call, mock <code>PaymentService</code> itself with
+                    Mockito, exactly as covered in Section 6 — there's no reason a
+                    unit test for <code>OrderService</code> should know an HTTP
+                    call is involved at all.</p>
+
+                <h3>For integration tests that must exercise real HTTP wiring — use WireMock</h3>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
 &lt;dependency&gt;
-    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
-    &lt;artifactId&gt;spring-boot-starter-test&lt;/artifactId&gt;
+    &lt;groupId&gt;org.wiremock&lt;/groupId&gt;
+    &lt;artifactId&gt;wiremock-standalone&lt;/artifactId&gt;
+    &lt;version&gt;3.9.1&lt;/version&gt;
     &lt;scope&gt;test&lt;/scope&gt;
 &lt;/dependency&gt;</code></pre>
 
-            <h3>Basic Test Structure</h3>
-            <pre><code><span class="keyword">import</span> org.junit.jupiter.api.*;
-<span class="keyword">import static</span> org.junit.jupiter.api.Assertions.*;
+                <pre><code>&#64;SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+<span class="keyword">class</span> <span class="class-name">PaymentServiceIntegrationTest</span> {
 
-<span class="keyword">class</span> <span class="class-name">CalculatorTest</span> {
-
-    <span class="keyword">private</span> <span class="class-name">Calculator</span> calculator;
-
-    <span class="annotation">@BeforeEach</span>
-    <span class="keyword">void</span> <span class="function">setUp</span>() {
-        calculator = <span class="keyword">new</span> <span class="class-name">Calculator</span>();
-    }
-
-    <span class="annotation">@Test</span>
-    <span class="annotation">@DisplayName</span>(<span class="string">"Should add two positive numbers"</span>)
-    <span class="keyword">void</span> <span class="function">addPositiveNumbers</span>() {
-        <span class="comment">// Given</span>
-        <span class="keyword">int</span> a = <span class="number">5</span>;
-        <span class="keyword">int</span> b = <span class="number">3</span>;
-
-        <span class="comment">// When</span>
-        <span class="keyword">int</span> result = calculator.add(a, b);
-
-        <span class="comment">// Then</span>
-        assertEquals(<span class="number">8</span>, result);
-    }
-
-    <span class="annotation">@Test</span>
-    <span class="annotation">@DisplayName</span>(<span class="string">"Should throw exception when dividing by zero"</span>)
-    <span class="keyword">void</span> <span class="function">divideByZeroThrowsException</span>() {
-        assertThrows(<span class="class-name">ArithmeticException</span>.<span class="keyword">class</span>, () -&gt; {
-            calculator.divide(<span class="number">10</span>, <span class="number">0</span>);
-        });
-    }
-
-    <span class="annotation">@AfterEach</span>
-    <span class="keyword">void</span> <span class="function">tearDown</span>() {
-        calculator = <span class="keyword">null</span>;
-    }
-}</code></pre>
-
-            <h3>Common Assertions</h3>
-            <pre><code><span class="keyword">import static</span> org.junit.jupiter.api.Assertions.*;
-
-<span class="comment">// Equality</span>
-assertEquals(<span class="number">expected</span>, actual);
-assertEquals(<span class="number">expected</span>, actual, <span class="string">"Custom failure message"</span>);
-assertNotEquals(<span class="number">unexpected</span>, actual);
-
-<span class="comment">// Boolean</span>
-assertTrue(condition);
-assertFalse(condition);
-
-<span class="comment">// Null checks</span>
-assertNull(object);
-assertNotNull(object);
-
-<span class="comment">// Same reference</span>
-assertSame(expected, actual);
-assertNotSame(unexpected, actual);
-
-<span class="comment">// Arrays</span>
-assertArrayEquals(expectedArray, actualArray);
-
-<span class="comment">// Exceptions</span>
-assertThrows(<span class="class-name">IllegalArgumentException</span>.<span class="keyword">class</span>, () -&gt; service.process(<span class="keyword">null</span>));
-
-<span class="class-name">Exception</span> ex = assertThrows(<span class="class-name">CustomException</span>.<span class="keyword">class</span>, () -&gt; service.run());
-assertEquals(<span class="string">"Expected message"</span>, ex.getMessage());
-
-<span class="comment">// Timeout</span>
-assertTimeout(<span class="class-name">Duration</span>.ofSeconds(<span class="number">2</span>), () -&gt; slowOperation());
-
-<span class="comment">// Multiple assertions (all run, reports all failures)</span>
-assertAll(<span class="string">"User properties"</span>,
-    () -&gt; assertEquals(<span class="string">"John"</span>, user.getName()),
-    () -&gt; assertEquals(<span class="number">30</span>, user.getAge()),
-    () -&gt; assertNotNull(user.getEmail())
-);</code></pre>
-
-            <h3>Test Lifecycle Annotations</h3>
-            <pre><code><span class="keyword">class</span> <span class="class-name">LifecycleTest</span> {
+    <span class="keyword">static</span> <span class="class-name">WireMockServer</span> wireMockServer = <span class="keyword">new</span> <span class="class-name">WireMockServer</span>(<span class="number">0</span>);   <span class="comment">// random free port — never hardcoded</span>
 
     <span class="annotation">@BeforeAll</span>
-    <span class="keyword">static void</span> <span class="function">initAll</span>() {
-        <span class="comment">// Runs once before all tests</span>
-        <span class="comment">// Must be static (unless using @TestInstance(PER_CLASS))</span>
-    }
-
-    <span class="annotation">@BeforeEach</span>
-    <span class="keyword">void</span> <span class="function">init</span>() {
-        <span class="comment">// Runs before each test</span>
-    }
-
-    <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">testMethod</span>() {
-        <span class="comment">// Test code</span>
-    }
-
-    <span class="annotation">@AfterEach</span>
-    <span class="keyword">void</span> <span class="function">tearDown</span>() {
-        <span class="comment">// Runs after each test</span>
+    <span class="keyword">static void</span> <span class="function">startWireMock</span>() {
+        wireMockServer.start();
+        configureFor(<span class="string">"localhost"</span>, wireMockServer.port());
     }
 
     <span class="annotation">@AfterAll</span>
-    <span class="keyword">static void</span> <span class="function">tearDownAll</span>() {
-        <span class="comment">// Runs once after all tests</span>
-    }
+    <span class="keyword">static void</span> <span class="function">stopWireMock</span>() { wireMockServer.stop(); }
 
     <span class="annotation">@Test</span>
-    <span class="annotation">@Disabled</span>(<span class="string">"Not implemented yet"</span>)
-    <span class="keyword">void</span> <span class="function">skippedTest</span>() {
-        <span class="comment">// This test is skipped</span>
+    <span class="keyword">void</span> <span class="function">chargePayment_gatewaySucceeds</span>() {
+        stubFor(post(urlEqualTo(<span class="string">"/charge"</span>))
+            .willReturn(aResponse()
+                .withStatus(<span class="number">200</span>)
+                .withHeader(<span class="string">"Content-Type"</span>, <span class="string">"application/json"</span>)
+                .withBody(<span class="string">"{\"successful\": true, \"transactionId\": \"tx-123\"}"</span>)));
+
+        <span class="class-name">PaymentResponse</span> response = paymentService.charge(request);
+
+        assertTrue(response.isSuccessful());
+        verify(postRequestedFor(urlEqualTo(<span class="string">"/charge"</span>)));   <span class="comment">// confirms the real HTTP call shape, no real network</span>
     }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Parameterized Tests</h2>
-            <p>Run the same test with different inputs to reduce duplication and improve coverage.</p>
+                <h3>For database integration tests — Testcontainers, never a real localhost service</h3>
+                <p>Pointing an integration test's datasource URL at
+                    <code>jdbc:postgresql://localhost:5432/mydb</code> means the
+                    test only passes on machines that happen to have a Postgres
+                    instance running locally with matching credentials — it's not
+                    reproducible, and it silently passes against whatever schema
+                    state that local database happens to be in.</p>
 
-            <pre><code><span class="keyword">import</span> org.junit.jupiter.params.ParameterizedTest;
-<span class="keyword">import</span> org.junit.jupiter.params.provider.*;
+                <pre><code><span class="annotation">@Testcontainers</span>
+<span class="annotation">@DataJpaTest</span>
+<span class="annotation">@AutoConfigureTestDatabase</span>(replace = AutoConfigureTestDatabase.Replace.NONE)
+<span class="keyword">class</span> <span class="class-name">CustomerRepositoryTest</span> {
 
-<span class="keyword">class</span> <span class="class-name">ParameterizedTests</span> {
+    <span class="annotation">@Container</span>
+    <span class="keyword">static</span> <span class="class-name">PostgreSQLContainer</span>&lt;?&gt; postgres =
+        <span class="keyword">new</span> <span class="class-name">PostgreSQLContainer</span>&lt;&gt;(<span class="string">"postgres:16-alpine"</span>);   <span class="comment">// a real, disposable Postgres — same engine as production</span>
 
-    <span class="comment">// Value source - simple values</span>
-    <span class="annotation">@ParameterizedTest</span>
-    <span class="annotation">@ValueSource</span>(ints = {<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>})
-    <span class="keyword">void</span> <span class="function">testPositiveNumbers</span>(<span class="keyword">int</span> number) {
-        assertTrue(number &gt; <span class="number">0</span>);
+    <span class="annotation">@DynamicPropertySource</span>
+    <span class="keyword">static void</span> <span class="function">configure</span>(<span class="class-name">DynamicPropertyRegistry</span> registry) {
+        registry.add(<span class="string">"spring.datasource.url"</span>, postgres::getJdbcUrl);
+        registry.add(<span class="string">"spring.datasource.username"</span>, postgres::getUsername);
+        registry.add(<span class="string">"spring.datasource.password"</span>, postgres::getPassword);
     }
 
-    <span class="annotation">@ParameterizedTest</span>
-    <span class="annotation">@ValueSource</span>(strings = {<span class="string">"hello"</span>, <span class="string">"world"</span>, <span class="string">"junit"</span>})
-    <span class="keyword">void</span> <span class="function">testStringsNotEmpty</span>(<span class="class-name">String</span> str) {
-        assertFalse(str.isEmpty());
-    }
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> <span class="class-name">CustomerRepository</span> customerRepository;
 
-    <span class="comment">// Null and empty sources</span>
-    <span class="annotation">@ParameterizedTest</span>
-    <span class="annotation">@NullSource</span>
-    <span class="annotation">@EmptySource</span>
-    <span class="annotation">@ValueSource</span>(strings = {<span class="string">" "</span>, <span class="string">"\t"</span>, <span class="string">"\n"</span>})
-    <span class="keyword">void</span> <span class="function">testNullEmptyAndBlank</span>(<span class="class-name">String</span> text) {
-        assertTrue(text == <span class="keyword">null</span> || text.isBlank());
-    }
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">findByEmail_customerExists_returnsCustomer</span>() {
+        customerRepository.save(<span class="keyword">new</span> <span class="class-name">Customer</span>(<span class="string">"jane@shop.com"</span>, <span class="string">"Jane Doe"</span>));
 
-    <span class="comment">// CSV source - multiple arguments</span>
-    <span class="annotation">@ParameterizedTest</span>
-    <span class="annotation">@CsvSource</span>({
-        <span class="string">"1, 2, 3"</span>,
-        <span class="string">"5, 5, 10"</span>,
-        <span class="string">"-1, 1, 0"</span>
-    })
-    <span class="keyword">void</span> <span class="function">testAddition</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b, <span class="keyword">int</span> expected) {
-        assertEquals(expected, calculator.add(a, b));
-    }
+        <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; found = customerRepository.findByEmail(<span class="string">"jane@shop.com"</span>);
 
-    <span class="comment">// Method source - complex objects</span>
-    <span class="annotation">@ParameterizedTest</span>
-    <span class="annotation">@MethodSource</span>(<span class="string">"provideUsers"</span>)
-    <span class="keyword">void</span> <span class="function">testUserValidation</span>(<span class="class-name">User</span> user, <span class="keyword">boolean</span> expected) {
-        assertEquals(expected, validator.isValid(user));
-    }
-
-    <span class="keyword">static</span> <span class="class-name">Stream</span>&lt;<span class="class-name">Arguments</span>&gt; <span class="function">provideUsers</span>() {
-        <span class="keyword">return</span> <span class="class-name">Stream</span>.of(
-            <span class="class-name">Arguments</span>.of(<span class="keyword">new</span> <span class="class-name">User</span>(<span class="string">"John"</span>, <span class="number">25</span>), <span class="keyword">true</span>),
-            <span class="class-name">Arguments</span>.of(<span class="keyword">new</span> <span class="class-name">User</span>(<span class="string">""</span>, <span class="number">25</span>), <span class="keyword">false</span>),
-            <span class="class-name">Arguments</span>.of(<span class="keyword">new</span> <span class="class-name">User</span>(<span class="string">"Jane"</span>, -<span class="number">1</span>), <span class="keyword">false</span>)
-        );
-    }
-
-    <span class="comment">// Enum source</span>
-    <span class="annotation">@ParameterizedTest</span>
-    <span class="annotation">@EnumSource</span>(<span class="class-name">DayOfWeek</span>.<span class="keyword">class</span>)
-    <span class="keyword">void</span> <span class="function">testAllDaysOfWeek</span>(<span class="class-name">DayOfWeek</span> day) {
-        assertNotNull(day);
+        assertTrue(found.isPresent());
+        assertEquals(<span class="string">"Jane Doe"</span>, found.get().getFullName());
     }
 }</code></pre>
-        </section>
 
-        <section class="content-section">
-            <h2>Mockito</h2>
-            <p>Mockito is the most popular mocking framework for Java. It allows you to create mock objects and verify interactions in unit tests.</p>
+                <div class="info-box important">
+                    <div class="info-box-title">Every run gets a fresh, disposable container — no "works on my machine" database state</div>
+                    <p>Testcontainers starts an actual Postgres in Docker
+                        specifically for this test class and tears it down
+                        afterward — every developer's machine and every CI run gets
+                        an identical, empty database on the exact same engine
+                        version as production. This closes the gap plain
+                        <code>@DataJpaTest</code> with its default embedded H2
+                        leaves open too: H2 doesn't enforce every constraint or SQL
+                        dialect quirk the same way Postgres does, so a query that
+                        passes against H2 can still fail against the real engine in
+                        production.</p>
+                </div>
+            </section>
 
-            <h3>Maven Dependency</h3>
-            <pre><code>&lt;dependency&gt;
-    &lt;groupId&gt;org.mockito&lt;/groupId&gt;
-    &lt;artifactId&gt;mockito-core&lt;/artifactId&gt;
-    &lt;version&gt;5.8.0&lt;/version&gt;
-    &lt;scope&gt;test&lt;/scope&gt;
-&lt;/dependency&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — JUNIT 5 FUNDAMENTALS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>JUnit 5 Fundamentals</h2>
 
-<span class="comment">&lt;!-- JUnit 5 integration --&gt;</span>
-&lt;dependency&gt;
-    &lt;groupId&gt;org.mockito&lt;/groupId&gt;
-    &lt;artifactId&gt;mockito-junit-jupiter&lt;/artifactId&gt;
-    &lt;version&gt;5.8.0&lt;/version&gt;
+                <h3>Maven Dependencies</h3>
+                <pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;org.junit.jupiter&lt;/groupId&gt;
+    &lt;artifactId&gt;junit-jupiter&lt;/artifactId&gt;
+    &lt;version&gt;5.11.0&lt;/version&gt;
     &lt;scope&gt;test&lt;/scope&gt;
 &lt;/dependency&gt;</code></pre>
 
-            <h3>Creating Mocks</h3>
-            <pre><code><span class="keyword">import</span> org.mockito.Mock;
-<span class="keyword">import</span> org.mockito.InjectMocks;
-<span class="keyword">import</span> org.mockito.junit.jupiter.MockitoExtension;
-<span class="keyword">import static</span> org.mockito.Mockito.*;
+                <h3>Basic Test Structure</h3>
+                <pre><code><span class="keyword">import</span> org.junit.jupiter.api.*;
+<span class="keyword">import static</span> org.junit.jupiter.api.Assertions.*;
 
-<span class="annotation">@ExtendWith</span>(<span class="class-name">MockitoExtension</span>.<span class="keyword">class</span>)
-<span class="keyword">class</span> <span class="class-name">UserServiceTest</span> {
+<span class="keyword">class</span> <span class="class-name">DiscountCalculatorTest</span> {
 
-    <span class="annotation">@Mock</span>
-    <span class="keyword">private</span> <span class="class-name">UserRepository</span> userRepository;
+    <span class="keyword">private</span> <span class="class-name">DiscountCalculator</span> calculator;
 
-    <span class="annotation">@Mock</span>
-    <span class="keyword">private</span> <span class="class-name">EmailService</span> emailService;
-
-    <span class="annotation">@InjectMocks</span>
-    <span class="keyword">private</span> <span class="class-name">UserService</span> userService;
+    <span class="annotation">@BeforeEach</span>
+    <span class="keyword">void</span> <span class="function">setUp</span>() {
+        calculator = <span class="keyword">new</span> <span class="class-name">DiscountCalculator</span>();
+    }
 
     <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">findUserById</span>() {
-        <span class="comment">// Given - define mock behavior</span>
-        <span class="class-name">User</span> mockUser = <span class="keyword">new</span> <span class="class-name">User</span>(<span class="number">1L</span>, <span class="string">"John"</span>);
-        when(userRepository.findById(<span class="number">1L</span>)).thenReturn(<span class="class-name">Optional</span>.of(mockUser));
+    <span class="annotation">@DisplayName</span>(<span class="string">"Applies a 10% discount to orders over $100"</span>)
+    <span class="keyword">void</span> <span class="function">appliesDiscountAboveThreshold</span>() {
+        <span class="class-name">BigDecimal</span> result = calculator.apply(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"200.00"</span>));
+        assertEquals(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"180.00"</span>), result);
+    }
 
-        <span class="comment">// When - call the method under test</span>
-        <span class="class-name">User</span> result = userService.findById(<span class="number">1L</span>);
-
-        <span class="comment">// Then - verify the result</span>
-        assertEquals(<span class="string">"John"</span>, result.getName());
-        verify(userRepository).findById(<span class="number">1L</span>);
+    <span class="annotation">@Test</span>
+    <span class="annotation">@DisplayName</span>(<span class="string">"Rejects a negative order total"</span>)
+    <span class="keyword">void</span> <span class="function">rejectsNegativeTotal</span>() {
+        assertThrows(<span class="class-name">IllegalArgumentException</span>.<span class="keyword">class</span>,
+            () -&gt; calculator.apply(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"-1"</span>)));
     }
 }</code></pre>
 
-            <h3>Stubbing Methods</h3>
-            <pre><code><span class="comment">// Return a value</span>
-when(repository.findById(<span class="number">1L</span>)).thenReturn(<span class="class-name">Optional</span>.of(user));
+                <h3>Common Assertions</h3>
+                <pre><code>assertEquals(expected, actual);
+assertThrows(<span class="class-name">IllegalArgumentException</span>.<span class="keyword">class</span>, () -&gt; service.process(<span class="keyword">null</span>));
+assertAll(<span class="string">"Customer properties"</span>,
+    () -&gt; assertEquals(<span class="string">"Jane"</span>, customer.getFullName()),
+    () -&gt; assertNotNull(customer.getEmail())
+);</code></pre>
 
-<span class="comment">// Return different values on consecutive calls</span>
-when(service.getNext())
-    .thenReturn(<span class="string">"first"</span>)
-    .thenReturn(<span class="string">"second"</span>)
-    .thenReturn(<span class="string">"third"</span>);
+                <h3>Lifecycle Annotations</h3>
+                <pre><code><span class="annotation">@BeforeAll</span>  <span class="keyword">static void</span> <span class="function">initAll</span>() { }    <span class="comment">// once, before all tests in the class</span>
+<span class="annotation">@BeforeEach</span> <span class="keyword">void</span> <span class="function">init</span>() { }         <span class="comment">// before every test — fresh state, no leakage between tests</span>
+<span class="annotation">@AfterEach</span>  <span class="keyword">void</span> <span class="function">tearDown</span>() { }     <span class="comment">// after every test</span>
+<span class="annotation">@AfterAll</span>   <span class="keyword">static void</span> <span class="function">tearDownAll</span>() { } <span class="comment">// once, after all tests</span>
+<span class="annotation">@Disabled</span>(<span class="string">"Blocked on PAY-1421"</span>) <span class="comment">// skip with a reason, not silently</span></code></pre>
+            </section>
 
-<span class="comment">// Throw an exception</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — PARAMETERIZED TESTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Parameterized Tests</h2>
+                <pre><code><span class="annotation">@ParameterizedTest</span>
+<span class="annotation">@CsvSource</span>({
+    <span class="string">"100.00, 90.00"</span>,   <span class="comment">// above threshold — discounted</span>
+    <span class="string">"50.00, 50.00"</span>,    <span class="comment">// below threshold — unchanged</span>
+    <span class="string">"100.01, 90.01"</span>    <span class="comment">// boundary — exactly above</span>
+})
+<span class="keyword">void</span> <span class="function">applyDiscount_variousTotals</span>(<span class="class-name">BigDecimal</span> input, <span class="class-name">BigDecimal</span> expected) {
+    assertEquals(expected, calculator.apply(input));
+}
+
+<span class="annotation">@ParameterizedTest</span>
+<span class="annotation">@MethodSource</span>(<span class="string">"provideCustomers"</span>)
+<span class="keyword">void</span> <span class="function">isValid_variousCustomers</span>(<span class="class-name">Customer</span> customer, <span class="keyword">boolean</span> expected) {
+    assertEquals(expected, validator.isValid(customer));
+}
+
+<span class="keyword">static</span> <span class="class-name">Stream</span>&lt;<span class="class-name">Arguments</span>&gt; <span class="function">provideCustomers</span>() {
+    <span class="keyword">return</span> <span class="class-name">Stream</span>.of(
+        <span class="class-name">Arguments</span>.of(<span class="keyword">new</span> <span class="class-name">Customer</span>(<span class="string">"jane@shop.com"</span>, <span class="string">"Jane"</span>), <span class="keyword">true</span>),
+        <span class="class-name">Arguments</span>.of(<span class="keyword">new</span> <span class="class-name">Customer</span>(<span class="string">"invalid-email"</span>, <span class="string">"Jane"</span>), <span class="keyword">false</span>)
+    );
+}</code></pre>
+                <p>Boundary cases (like the <code>100.01</code> row above) matter
+                    more than adding a fourth arbitrary "normal" value — this is
+                    exactly the kind of case a surviving mutant from Section 1 tends
+                    to expose.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — MOCKITO
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Mockito</h2>
+
+                <h3>Maven Dependencies</h3>
+                <pre><code>&lt;dependency&gt;
+    &lt;groupId&gt;org.mockito&lt;/groupId&gt;
+    &lt;artifactId&gt;mockito-junit-jupiter&lt;/artifactId&gt;
+    &lt;version&gt;5.14.0&lt;/version&gt;
+    &lt;scope&gt;test&lt;/scope&gt;
+&lt;/dependency&gt;</code></pre>
+
+                <h3>Creating Mocks</h3>
+                <pre><code><span class="annotation">@ExtendWith</span>(<span class="class-name">MockitoExtension</span>.<span class="keyword">class</span>)
+<span class="keyword">class</span> <span class="class-name">CustomerServiceTest</span> {
+
+    <span class="annotation">@Mock</span>  <span class="keyword">private</span> <span class="class-name">CustomerRepository</span> customerRepository;
+    <span class="annotation">@InjectMocks</span> <span class="keyword">private</span> <span class="class-name">CustomerService</span> customerService;
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">findById_customerExists_returnsCustomer</span>() {
+        <span class="class-name">Customer</span> mockCustomer = <span class="keyword">new</span> <span class="class-name">Customer</span>(<span class="number">1L</span>, <span class="string">"Jane"</span>);
+        when(customerRepository.findById(<span class="number">1L</span>)).thenReturn(<span class="class-name">Optional</span>.of(mockCustomer));
+
+        <span class="class-name">Customer</span> result = customerService.findById(<span class="number">1L</span>);
+
+        assertEquals(<span class="string">"Jane"</span>, result.getFullName());
+    }
+}</code></pre>
+
+                <h3>Stubbing and Verification</h3>
+                <pre><code>when(repository.findById(<span class="number">1L</span>)).thenReturn(<span class="class-name">Optional</span>.of(customer));
 when(service.process(<span class="keyword">null</span>)).thenThrow(<span class="keyword">new</span> <span class="class-name">IllegalArgumentException</span>());
+doThrow(<span class="keyword">new</span> <span class="class-name">RuntimeException</span>()).when(service).dangerousMethod();
 
-<span class="comment">// Use argument matchers</span>
-when(repository.findByName(anyString())).thenReturn(user);
-when(repository.findByAge(eq(<span class="number">25</span>))).thenReturn(users);
-
-<span class="comment">// Answer - dynamic response based on input</span>
-when(repository.save(any(<span class="class-name">User</span>.<span class="keyword">class</span>))).thenAnswer(invocation -&gt; {
-    <span class="class-name">User</span> u = invocation.getArgument(<span class="number">0</span>);
-    u.setId(<span class="number">100L</span>);
-    <span class="keyword">return</span> u;
-});
-
-<span class="comment">// Void methods</span>
-doNothing().when(emailService).sendEmail(anyString());
-doThrow(<span class="keyword">new</span> <span class="class-name">RuntimeException</span>()).when(service).dangerousMethod();</code></pre>
-
-            <h3>Verification</h3>
-            <pre><code><span class="comment">// Verify method was called</span>
-verify(repository).save(user);
-
-<span class="comment">// Verify with specific arguments</span>
-verify(repository).findById(<span class="number">1L</span>);
-
-<span class="comment">// Verify call count</span>
-verify(repository, times(<span class="number">2</span>)).findAll();
+verify(repository, times(<span class="number">1</span>)).save(any());
 verify(repository, never()).delete(any());
-verify(repository, atLeast(<span class="number">1</span>)).findById(anyLong());
-verify(repository, atMost(<span class="number">3</span>)).save(any());
 
-<span class="comment">// Verify order of calls</span>
-<span class="class-name">InOrder</span> inOrder = inOrder(repository, emailService);
-inOrder.verify(repository).save(user);
-inOrder.verify(emailService).sendWelcomeEmail(user);
-
-<span class="comment">// Verify no more interactions</span>
-verifyNoMoreInteractions(repository);
-
-<span class="comment">// Argument captor - capture and inspect arguments</span>
-<span class="class-name">ArgumentCaptor</span>&lt;<span class="class-name">User</span>&gt; captor = <span class="class-name">ArgumentCaptor</span>.forClass(<span class="class-name">User</span>.<span class="keyword">class</span>);
+<span class="comment">// ArgumentCaptor — inspect what was actually passed, not just that it was called</span>
+<span class="class-name">ArgumentCaptor</span>&lt;<span class="class-name">Customer</span>&gt; captor = <span class="class-name">ArgumentCaptor</span>.forClass(<span class="class-name">Customer</span>.<span class="keyword">class</span>);
 verify(repository).save(captor.capture());
-<span class="class-name">User</span> savedUser = captor.getValue();
-assertEquals(<span class="string">"John"</span>, savedUser.getName());</code></pre>
-        </section>
+assertEquals(<span class="string">"Jane"</span>, captor.getValue().getFullName());</code></pre>
 
-        <section class="content-section">
-            <h2>Testing Best Practices</h2>
+                <div class="info-box warning">
+                    <div class="info-box-title"><code>verifyNoMoreInteractions</code> is brittle by default — use it sparingly</div>
+                    <p>Asserting there were absolutely no other interactions with
+                        a mock ties the test to the exact set of calls the current
+                        implementation happens to make. Adding an unrelated,
+                        harmless logging call inside the method under test breaks
+                        every such assertion across the suite. Reserve it for cases
+                        where "nothing else must happen" is itself the actual
+                        business rule you're testing (Section 1's
+                        <code>createOrderItemNotAvailable</code> example below is a
+                        legitimate use — payment must never be attempted if
+                        inventory checks fail).</p>
+                </div>
+            </section>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Test Best Practices</div>
-                <ul>
-                    <li><strong>Follow AAA pattern</strong> - Arrange, Act, Assert</li>
-                    <li><strong>Test one thing per test</strong> - Single assertion focus</li>
-                    <li><strong>Use descriptive names</strong> - should_returnNull_when_userNotFound</li>
-                    <li><strong>Keep tests independent</strong> - No shared state between tests</li>
-                    <li><strong>Don't test implementation</strong> - Test behavior, not internals</li>
-                    <li><strong>Make tests fast</strong> - Unit tests should run in milliseconds</li>
-                </ul>
-            </div>
-
-            <h3>Test Naming Conventions</h3>
-            <pre><code><span class="comment">// Option 1: methodName_stateUnderTest_expectedBehavior</span>
-<span class="keyword">void</span> <span class="function">findById_userExists_returnsUser</span>() { }
-<span class="keyword">void</span> <span class="function">findById_userNotFound_throwsException</span>() { }
-
-<span class="comment">// Option 2: should_expectedBehavior_when_stateUnderTest</span>
-<span class="keyword">void</span> <span class="function">should_returnUser_when_userExists</span>() { }
-<span class="keyword">void</span> <span class="function">should_throwException_when_userNotFound</span>() { }
-
-<span class="comment">// Option 3: Given-When-Then with @DisplayName</span>
-<span class="annotation">@Test</span>
-<span class="annotation">@DisplayName</span>(<span class="string">"Given existing user, when findById called, then return user"</span>)
-<span class="keyword">void</span> <span class="function">testFindById</span>() { }</code></pre>
-
-            <h3>Test Structure Example</h3>
-            <pre><code><span class="annotation">@ExtendWith</span>(<span class="class-name">MockitoExtension</span>.<span class="keyword">class</span>)
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — A COMPLETE, WELL-SCOPED TEST CLASS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>A Complete, Well-Scoped Test Class</h2>
+                <pre><code><span class="annotation">@ExtendWith</span>(<span class="class-name">MockitoExtension</span>.<span class="keyword">class</span>)
 <span class="keyword">class</span> <span class="class-name">OrderServiceTest</span> {
 
-    <span class="annotation">@Mock</span>
-    <span class="keyword">private</span> <span class="class-name">OrderRepository</span> orderRepository;
-
-    <span class="annotation">@Mock</span>
-    <span class="keyword">private</span> <span class="class-name">PaymentService</span> paymentService;
-
-    <span class="annotation">@Mock</span>
-    <span class="keyword">private</span> <span class="class-name">InventoryService</span> inventoryService;
-
-    <span class="annotation">@InjectMocks</span>
-    <span class="keyword">private</span> <span class="class-name">OrderService</span> orderService;
+    <span class="annotation">@Mock</span> <span class="keyword">private</span> <span class="class-name">OrderRepository</span> orderRepository;
+    <span class="annotation">@Mock</span> <span class="keyword">private</span> <span class="class-name">PaymentService</span> paymentService;
+    <span class="annotation">@Mock</span> <span class="keyword">private</span> <span class="class-name">InventoryService</span> inventoryService;
+    <span class="annotation">@InjectMocks</span> <span class="keyword">private</span> <span class="class-name">OrderService</span> orderService;
 
     <span class="annotation">@Nested</span>
-    <span class="annotation">@DisplayName</span>(<span class="string">"When creating order"</span>)
+    <span class="annotation">@DisplayName</span>(<span class="string">"When creating an order"</span>)
     <span class="keyword">class</span> <span class="class-name">CreateOrder</span> {
 
         <span class="annotation">@Test</span>
-        <span class="annotation">@DisplayName</span>(<span class="string">"should create order successfully"</span>)
+        <span class="annotation">@DisplayName</span>(<span class="string">"succeeds and persists the order with a CREATED status"</span>)
         <span class="keyword">void</span> <span class="function">createOrderSuccess</span>() {
-            <span class="comment">// Arrange</span>
             <span class="class-name">OrderRequest</span> request = <span class="keyword">new</span> <span class="class-name">OrderRequest</span>(<span class="string">"item-1"</span>, <span class="number">2</span>);
             when(inventoryService.checkAvailability(<span class="string">"item-1"</span>, <span class="number">2</span>)).thenReturn(<span class="keyword">true</span>);
             when(paymentService.process(any())).thenReturn(<span class="class-name">PaymentResult</span>.success());
 
-            <span class="comment">// Act</span>
             <span class="class-name">Order</span> result = orderService.createOrder(request);
 
-            <span class="comment">// Assert</span>
-            assertNotNull(result);
             assertEquals(<span class="class-name">OrderStatus</span>.CREATED, result.getStatus());
             verify(orderRepository).save(any(<span class="class-name">Order</span>.<span class="keyword">class</span>));
         }
 
         <span class="annotation">@Test</span>
-        <span class="annotation">@DisplayName</span>(<span class="string">"should throw exception when item not available"</span>)
+        <span class="annotation">@DisplayName</span>(<span class="string">"throws and never attempts payment when inventory is insufficient"</span>)
         <span class="keyword">void</span> <span class="function">createOrderItemNotAvailable</span>() {
-            <span class="comment">// Arrange</span>
             <span class="class-name">OrderRequest</span> request = <span class="keyword">new</span> <span class="class-name">OrderRequest</span>(<span class="string">"item-1"</span>, <span class="number">100</span>);
             when(inventoryService.checkAvailability(<span class="string">"item-1"</span>, <span class="number">100</span>)).thenReturn(<span class="keyword">false</span>);
 
-            <span class="comment">// Act & Assert</span>
             assertThrows(<span class="class-name">InsufficientInventoryException</span>.<span class="keyword">class</span>,
                 () -&gt; orderService.createOrder(request));
 
-            verify(paymentService, never()).process(any());
+            verify(paymentService, never()).process(any());   <span class="comment">// a real business rule, legitimately verified</span>
         }
     }
 }</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Integration Testing</h2>
-
-            <h3>Spring Boot Integration Tests</h3>
-            <pre><code><span class="annotation">@SpringBootTest</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTEGRATION TESTING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Integration Testing with Spring Boot</h2>
+                <pre><code><span class="annotation">@SpringBootTest</span>
 <span class="annotation">@AutoConfigureMockMvc</span>
-<span class="keyword">class</span> <span class="class-name">UserControllerIntegrationTest</span> {
+<span class="keyword">class</span> <span class="class-name">CustomerControllerIntegrationTest</span> {
 
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">MockMvc</span> mockMvc;
-
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">ObjectMapper</span> objectMapper;
+    <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">MockMvc</span> mockMvc;
+    <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">ObjectMapper</span> objectMapper;
 
     <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">createUser_validRequest_returnsCreated</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="class-name">UserDTO</span> user = <span class="keyword">new</span> <span class="class-name">UserDTO</span>(<span class="string">"John"</span>, <span class="string">"john@example.com"</span>);
+    <span class="keyword">void</span> <span class="function">createCustomer_validRequest_returnsCreated</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="class-name">CustomerDTO</span> customer = <span class="keyword">new</span> <span class="class-name">CustomerDTO</span>(<span class="string">"Jane"</span>, <span class="string">"jane@shop.com"</span>);
 
-        mockMvc.perform(post(<span class="string">"/api/users"</span>)
+        mockMvc.perform(post(<span class="string">"/api/customers"</span>)
                 .contentType(<span class="class-name">MediaType</span>.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(user)))
+                .content(objectMapper.writeValueAsString(customer)))
             .andExpect(status().isCreated())
-            .andExpect(jsonPath(<span class="string">"$.name"</span>).value(<span class="string">"John"</span>))
-            .andExpect(jsonPath(<span class="string">"$.email"</span>).value(<span class="string">"john@example.com"</span>));
-    }
-
-    <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">getUser_notFound_returns404</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        mockMvc.perform(get(<span class="string">"/api/users/999"</span>))
-            .andExpect(status().isNotFound());
+            .andExpect(jsonPath(<span class="string">"$.email"</span>).value(<span class="string">"jane@shop.com"</span>));
     }
 }</code></pre>
+                <p>See Section 2 for how to keep the database and any downstream
+                    HTTP calls behind this kind of test real but not
+                    machine-dependent, via Testcontainers and WireMock.</p>
+            </section>
 
-            <h3>Database Integration Tests</h3>
-            <pre><code><span class="annotation">@DataJpaTest</span>
-<span class="keyword">class</span> <span class="class-name">UserRepositoryTest</span> {
-
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">UserRepository</span> userRepository;
-
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">TestEntityManager</span> entityManager;
-
-    <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">findByEmail_userExists_returnsUser</span>() {
-        <span class="comment">// Given</span>
-        <span class="class-name">User</span> user = <span class="keyword">new</span> <span class="class-name">User</span>(<span class="string">"John"</span>, <span class="string">"john@test.com"</span>);
-        entityManager.persistAndFlush(user);
-
-        <span class="comment">// When</span>
-        <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; found = userRepository.findByEmail(<span class="string">"john@test.com"</span>);
-
-        <span class="comment">// Then</span>
-        assertTrue(found.isPresent());
-        assertEquals(<span class="string">"John"</span>, found.get().getName());
-    }
-}</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Test Coverage</h2>
-            <p>JaCoCo is the standard tool for measuring test coverage in Java projects.</p>
-
-            <h3>Maven JaCoCo Configuration</h3>
-            <pre><code>&lt;plugin&gt;
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — TEST COVERAGE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Test Coverage — and Its Real Limits</h2>
+                <pre><code>&lt;plugin&gt;
     &lt;groupId&gt;org.jacoco&lt;/groupId&gt;
     &lt;artifactId&gt;jacoco-maven-plugin&lt;/artifactId&gt;
-    &lt;version&gt;0.8.11&lt;/version&gt;
+    &lt;version&gt;0.8.12&lt;/version&gt;
     &lt;executions&gt;
-        &lt;execution&gt;
-            &lt;goals&gt;
-                &lt;goal&gt;prepare-agent&lt;/goal&gt;
-            &lt;/goals&gt;
-        &lt;/execution&gt;
-        &lt;execution&gt;
-            &lt;id&gt;report&lt;/id&gt;
-            &lt;phase&gt;test&lt;/phase&gt;
-            &lt;goals&gt;
-                &lt;goal&gt;report&lt;/goal&gt;
-            &lt;/goals&gt;
-        &lt;/execution&gt;
-        &lt;execution&gt;
-            &lt;id&gt;check&lt;/id&gt;
-            &lt;goals&gt;
-                &lt;goal&gt;check&lt;/goal&gt;
-            &lt;/goals&gt;
-            &lt;configuration&gt;
-                &lt;rules&gt;
-                    &lt;rule&gt;
-                        &lt;element&gt;BUNDLE&lt;/element&gt;
-                        &lt;limits&gt;
-                            &lt;limit&gt;
-                                &lt;counter&gt;LINE&lt;/counter&gt;
-                                &lt;value&gt;COVEREDRATIO&lt;/value&gt;
-                                &lt;minimum&gt;0.80&lt;/minimum&gt;
-                            &lt;/limit&gt;
-                        &lt;/limits&gt;
-                    &lt;/rule&gt;
-                &lt;/rules&gt;
-            &lt;/configuration&gt;
-        &lt;/execution&gt;
+        &lt;execution&gt;&lt;goals&gt;&lt;goal&gt;prepare-agent&lt;/goal&gt;&lt;/goals&gt;&lt;/execution&gt;
+        &lt;execution&gt;&lt;id&gt;report&lt;/id&gt;&lt;phase&gt;test&lt;/phase&gt;&lt;goals&gt;&lt;goal&gt;report&lt;/goal&gt;&lt;/goals&gt;&lt;/execution&gt;
     &lt;/executions&gt;
 &lt;/plugin&gt;</code></pre>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Coverage Is Not Everything</div>
-                <p>High coverage doesn't guarantee good tests. Focus on testing important behavior, edge cases, and error conditions rather than chasing a coverage percentage.</p>
-            </div>
-        </section>
+                <div class="info-box warning">
+                    <div class="info-box-title">Line coverage answers "did this run." Mutation testing answers "would you notice."</div>
+                    <p>JaCoCo tells you a line executed at least once during the
+                        suite. It cannot tell you whether any assertion actually
+                        depended on that line's specific logic being correct — that
+                        gap is exactly what Section 1's PIT setup measures. Treat a
+                        high JaCoCo percentage as necessary, not sufficient.</p>
+                </div>
+            </section>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="code-quality.html" class="related-link">Code Quality Tools</a>
-                <a href="cicd.html" class="related-link">CI/CD Basics</a>
-                <a href="../spring/boot.html" class="related-link">Spring Boot</a>
-                <a href="../best-practices/clean-code.html" class="related-link">Clean Code</a>
-            </div>
-        </section>
-    </main>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Assert on the actual outcome a caller depends on (status, total, thrown exception) — not just "it's not null"</li>
+                        <li>Verify only the mock interactions that represent a real side effect — not every internal collaborator call</li>
+                        <li>Run mutation testing (PIT) on critical modules to find assertions that don't actually verify anything</li>
+                        <li>Use WireMock/MockWebServer for HTTP boundaries and Testcontainers for database boundaries — never a hardcoded real URL or a "just make sure Postgres is running locally" instruction</li>
+                        <li>Test boundary and error conditions deliberately, not just one happy-path example</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't write a test whose only assertion is <code>assertNotNull()</code> on a complex result</li>
+                        <li>Don't mock every single collaborator so precisely that the test just restates the method body — that couples the test to implementation, not behavior</li>
+                        <li>Don't hardcode <code>localhost</code> or any real endpoint in a test — it makes the suite flaky, slow, and non-reproducible across machines</li>
+                        <li>Don't chase a coverage percentage as the goal — a suite can hit 100% line coverage and still not catch a deleted business rule</li>
+                        <li>Don't use <code>verifyNoMoreInteractions</code> reflexively — reserve it for cases where "nothing else happens" is itself the rule under test</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's wrong with a test that only calls <code>assertNotNull(result)</code> on the return value of a method that computes a discount?</strong><br>
+                    It confirms the method returned something, but not that the
+                    something is correct. A method with a completely wrong discount
+                    calculation would still pass this test as long as it returns a
+                    non-null value. The test should assert the actual expected
+                    value.</p>
+
+                    <p><strong>Q: Why should a unit test for a service that calls an external payment gateway mock that gateway instead of calling it for real?</strong><br>
+                    A real call makes the test depend on network availability, the
+                    third party's uptime, and the state of a system outside your
+                    control — turning a fast, deterministic unit test into a slow,
+                    flaky one that can fail for reasons that have nothing to do
+                    with your code. Mocking the collaborator keeps the test focused
+                    on your own logic.</p>
+
+                    <p><strong>Q: What's the AAA pattern in test structure?</strong><br>
+                    Arrange (set up the inputs and mock behavior), Act (call the
+                    method under test), Assert (verify the outcome). Keeping these
+                    three phases visually separate makes a test's intent clear at
+                    a glance.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A codebase has 95% JaCoCo line coverage, yet a critical business rule was silently broken for two releases before anyone noticed. How is this possible, and what tool would have caught it?</strong><br>
+                    Line coverage only confirms that a line of code executed
+                    during the test run — it says nothing about whether any
+                    assertion actually depended on that line's specific behavior
+                    being correct. A test can execute a validation check and still
+                    pass regardless of whether that check's condition is right,
+                    wrong, or entirely removed, as long as no assertion in the test
+                    happens to depend on the distinction. Mutation testing (PIT)
+                    is built exactly for this gap: it automatically introduces
+                    small, deliberate faults into the compiled code — inverting a
+                    boolean condition, changing a comparison operator, deleting a
+                    method call — and reruns the suite against each mutant. A
+                    mutant that survives (the suite still passes despite the
+                    injected fault) is a precise, automated signal that no test
+                    actually depends on that logic being correct, which a coverage
+                    percentage alone can never reveal.</p>
+
+                    <p><strong>Q: Explain concretely why a test that calls <code>verify()</code> on every single mock interaction inside a method is a maintainability liability, even though it looks thorough.</strong><br>
+                    Verifying every internal collaborator call couples the test to
+                    the current implementation's exact sequence of steps rather
+                    than to the method's observable contract. Any behavior-neutral
+                    refactor — reordering two independent calls, inlining a helper,
+                    extracting a new private method that wraps an existing call —
+                    breaks the test even though the actual output for every caller
+                    is identical. This inverts the entire purpose of a test suite:
+                    instead of giving developers confidence to refactor freely, an
+                    over-specified test actively punishes safe refactoring,
+                    training the team to either avoid refactoring or to treat
+                    broken tests as noise to silence rather than signal to
+                    investigate — which is how a team ends up ignoring a test
+                    suite altogether. The fix is verifying only the interactions
+                    that represent an actual side effect a caller or the business
+                    depends on (a payment being charged, a row being persisted),
+                    and testing internal collaborators' own logic through their
+                    own dedicated unit tests instead.</p>
+
+                    <p><strong>Q: Your integration test suite passes locally but fails intermittently in CI with connection-refused errors against a database. What's the likely root cause, and what's the fix that removes the flakiness structurally rather than just retrying?</strong><br>
+                    The likely cause is that the test's datasource configuration
+                    points at a fixed host and port — typically
+                    <code>localhost</code> with a well-known port — assuming a
+                    compatible database is already running there. This works by
+                    accident on a developer's machine that happens to have one
+                    running locally, and fails unpredictably in CI depending on
+                    container startup ordering, port availability, or whether the
+                    CI environment provisions that service at all. Adding retries
+                    treats the symptom, not the cause, and doesn't fix the
+                    underlying non-reproducibility. The structural fix is
+                    Testcontainers: the test itself launches a real, disposable
+                    instance of the actual database engine used in production, gets
+                    a dynamically allocated port and connection URL back from the
+                    container at runtime, and tears the container down when the
+                    test class finishes. This removes any assumption about what's
+                    already running on the host entirely — the test is
+                    self-contained and produces the same result on any machine with
+                    Docker available, developer laptop or CI runner alike.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="code-quality.html" class="related-link"><span class="related-icon">✅</span>Code Quality Tools</a>
+                    <a href="cicd.html" class="related-link"><span class="related-icon">🔁</span>CI/CD Basics</a>
+                    <a href="../spring/boot.html" class="related-link"><span class="related-icon">🍃</span>Spring Boot</a>
+                    <a href="../best-practices/clean-code.html" class="related-link"><span class="related-icon">🧹</span>Clean Code</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-

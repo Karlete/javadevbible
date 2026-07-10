@@ -1,116 +1,128 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-i18n-root="../.." data-i18n-title="topic.git.page-title">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Version Control (Git) - JavaDev Bible</title>
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
 </head>
 <body class="topic-page">
     <header class="topic-header">
         <div class="header-content">
             <nav class="breadcrumb">
-                <a href="../../index.html">Home</a> / <a href="../../index.html#tools">Tools & Ecosystem</a> / Version Control (Git)
+                <a href="../../index.html" data-i18n="nav.home">Home</a> /
+                <a href="../../index.html#tools" data-i18n="nav.tools">Tools &amp; Ecosystem</a> /
+                Version Control (Git)
             </nav>
-            <h1>Version Control (Git)</h1>
-            <p class="topic-subtitle">Managing Source Code with Git for Java Projects</p>
-            <a href="../../index.html#tools" class="back-btn">&larr; Back to Index</a>
+            <h1 data-i18n="topic.git.h1">Version Control — Git for Java Projects</h1>
+            <p class="topic-subtitle" data-i18n="topic.git.subtitle">Why Git is distributed, choosing a branching model that matches how you actually deploy, the force-push trap, commit signing, and keeping secrets out of history in the first place</p>
+            <a href="../../index.html#tools" class="back-btn" data-i18n="nav.back-to-index">&larr; Back to Index</a>
         </div>
     </header>
 
-    <main class="topic-content">
-        <section class="content-section">
-            <h2>What is Version Control?</h2>
-            <p>Version control is a system that records changes to files over time, allowing you to recall specific versions later. Git is the most widely used distributed version control system, essential for any software development project.</p>
+    <div class="topic-layout">
 
-            <div class="info-box note">
-                <div class="info-box-title">Why Git Matters for Java Developers</div>
-                <ul>
-                    <li><strong>Track Changes</strong> - See who changed what and when</li>
-                    <li><strong>Collaboration</strong> - Multiple developers work on the same codebase</li>
-                    <li><strong>Branching</strong> - Work on features without affecting main code</li>
-                    <li><strong>Backup</strong> - Code is stored in multiple locations</li>
-                    <li><strong>CI/CD Integration</strong> - Automated builds and deployments</li>
-                </ul>
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
             </div>
-        </section>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
 
-        <section class="content-section">
-            <h2>Git Basics</h2>
+        <main class="topic-content">
 
-            <h3>Initial Setup</h3>
-            <pre><code><span class="comment"># Configure your identity (required once)</span>
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Version Control — and Why Is Git Distributed?</h2>
+                <p>Before distributed version control, teams used centralized
+                    systems (CVS, Subversion) where a single central server held the
+                    only complete history — every commit, log, and diff required a
+                    network round-trip, and if that server went down, nobody could
+                    commit, branch, or even browse history. Git's core design
+                    decision was to give every clone the <strong>full history</strong>,
+                    not just a working snapshot — which is exactly what makes
+                    branching, merging, and working offline cheap, local operations
+                    instead of server round-trips.</p>
 
-<span class="comment"># Configure default branch name</span>
+                <pre><code><span class="comment">// BEFORE — centralized VCS: branching means a server-side copy</span>
+<span class="comment">$ svn copy https://svn.example.com/trunk https://svn.example.com/branches/feature-x
+# Every commit, every log, every diff round-trips to the server.
+# No server reachable = no history, no commit, no branch at all.</span>
+
+<span class="comment">// AFTER — Git: the full history lives on your machine</span>
+<span class="comment">$ git clone https://github.com/shop/order-service.git
+$ git checkout -b feature/discount-codes
+# Branching is a 41-byte pointer update — no network call, no server.
+# You can commit, diff, and browse the entire project history offline.</span></code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — INITIAL SETUP
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Initial Setup</h2>
+
+                <pre><code><span class="comment"># Identity — required once per machine</span>
+git config --global user.name <span class="string">"Your Name"</span>
+git config --global user.email <span class="string">"your.email@example.com"</span>
+
+<span class="comment"># Default branch name for new repositories</span>
 git config --global init.defaultBranch main
 
-<span class="comment"># Configure line endings (Windows)</span>
-git config --global core.autocrlf true
-
-<span class="comment"># Configure line endings (Mac/Linux)</span>
-git config --global core.autocrlf input
-
-<span class="comment"># View all configuration</span>
+<span class="comment"># View all effective configuration</span>
 git config --list</code></pre>
 
-            <h3>Creating a Repository</h3>
-            <pre><code><span class="comment"># Initialize a new repository</span>
-cd my-java-project
+                <h3>Repository Creation</h3>
+                <pre><code><span class="comment"># Initialize a new repository</span>
+cd order-service
 git init
 
 <span class="comment"># Clone an existing repository</span>
-git clone https://github.com/username/repository.git
+git clone https://github.com/shop/order-service.git
 
-<span class="comment"># Clone with specific branch</span>
-git clone -b develop https://github.com/username/repository.git</code></pre>
+<span class="comment"># Clone a specific branch only</span>
+git clone -b develop https://github.com/shop/order-service.git</code></pre>
 
-            <h3>Basic Workflow</h3>
-            <pre><code><span class="comment"># Check status of your working directory</span>
-git status
+                <h3>Line Endings — <code>.gitattributes</code>, Not Per-Developer Config</h3>
+                <p><code>core.autocrlf</code> is a common recommendation, but it's a
+                    <strong>per-developer, per-machine</strong> setting — it only
+                    works if every single teammate configures it the same way, on
+                    every machine, forever. A committed <code>.gitattributes</code>
+                    file enforces the same normalization for everyone automatically,
+                    the same way <code>.editorconfig</code> does for formatting (see
+                    <a href="ides.html">IDEs</a>).</p>
 
-<span class="comment"># Stage specific files</span>
-git add src/main/java/MyClass.java
+                <pre><code><span class="comment"># .gitattributes — committed at repo root</span>
+* text=auto eol=lf
+*.jar binary
+*.bat text eol=crlf</code></pre>
+            </section>
 
-<span class="comment"># Stage all changes</span>
-git add .
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — GITIGNORE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>.gitignore for Java Projects</h2>
+                <p>The <code>.gitignore</code> file tells Git which files to never
+                    stage — compiled output, IDE metadata, and local secrets that
+                    have no business in shared history.</p>
 
-<span class="comment"># Commit staged changes</span>
-git commit -m "Add user authentication feature"
-
-<span class="comment"># Push to remote repository</span>
-git push origin main
-
-<span class="comment"># Pull latest changes</span>
-git pull origin main</code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>.gitignore for Java Projects</h2>
-            <p>The .gitignore file specifies which files Git should ignore. This is crucial for Java projects to avoid committing compiled classes and IDE files.</p>
-
-            <pre><code><span class="comment"># Compiled class files</span>
+                <pre><code><span class="comment"># Compiled output</span>
 *.class
-
-<span class="comment"># Log files</span>
-*.log
-
-<span class="comment"># Package files</span>
 *.jar
 *.war
 *.ear
-*.zip
-*.tar.gz
 
 <span class="comment"># Maven</span>
 target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
 
 <span class="comment"># Gradle</span>
 .gradle/
@@ -119,440 +131,588 @@ build/
 
 <span class="comment"># IntelliJ IDEA</span>
 .idea/
-*.iws
 *.iml
-*.ipr
-out/
 
 <span class="comment"># Eclipse</span>
 .settings/
 .classpath
 .project
-bin/
 
 <span class="comment"># VS Code</span>
 .vscode/
 
-<span class="comment"># OS generated files</span>
+<span class="comment"># OS files</span>
 .DS_Store
 Thumbs.db
 
-<span class="comment"># Environment files</span>
+<span class="comment"># Local secrets and environment overrides — see Section 8 for why
+# .gitignore alone is not sufficient protection for these</span>
 .env
-*.env.local
-application-local.properties
+application-local.properties</code></pre>
 
-<span class="comment"># Test output</span>
-/test-output/
-/coverage/</code></pre>
+                <div class="info-box tip">
+                    <div class="info-box-title">Global .gitignore for OS/IDE noise</div>
+                    <p>Keep truly personal, machine-specific ignores (your own
+                        editor swap files, for example) out of the repo's shared
+                        <code>.gitignore</code> entirely:</p>
+                    <pre><code>git config --global core.excludesfile ~/.gitignore_global</code></pre>
+                </div>
+            </section>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Global .gitignore</div>
-                <p>Set up a global .gitignore for OS-specific files:</p>
-                <pre><code>git config --global core.excludesfile ~/.gitignore_global</code></pre>
-            </div>
-        </section>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — BRANCHING STRATEGIES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Branching Strategies — Match the Model to How You Actually Deploy</h2>
+                <p>This is where most teams copy a diagram without asking whether it
+                    fits their release process. There are three real options, and
+                    picking the wrong one adds process overhead that buys you
+                    nothing.</p>
 
-        <section class="content-section">
-            <h2>Branching Strategies</h2>
+                <h3>Trunk-Based Development — the default for continuous deployment</h3>
+                <p>One long-lived branch (<code>main</code>), short-lived feature
+                    branches merged back within a day or two, behind feature flags
+                    if the work isn't ready to ship. This is the correct default for
+                    a service deployed continuously — which describes most of the
+                    microservices covered throughout this site's Application Servers
+                    and CI/CD topics.</p>
 
-            <h3>Branch Commands</h3>
-            <pre><code><span class="comment"># List all branches</span>
-git branch -a
-
-<span class="comment"># Create a new branch</span>
-git branch feature/user-login
-
-<span class="comment"># Switch to a branch</span>
-git checkout feature/user-login
-
-<span class="comment"># Create and switch in one command</span>
-git checkout -b feature/user-login
-
-<span class="comment"># Modern alternative (Git 2.23+)</span>
-git switch -c feature/user-login
-
-<span class="comment"># Delete a branch (local)</span>
-git branch -d feature/user-login
-
-<span class="comment"># Delete a branch (remote)</span>
-git push origin --delete feature/user-login
-
-<span class="comment"># Rename current branch</span>
-git branch -m new-branch-name</code></pre>
-
-            <h3>Git Flow</h3>
-            <pre><code><span class="comment"># Git Flow branch structure:</span>
-main (or master)     <span class="comment"># Production-ready code</span>
-├── develop          <span class="comment"># Integration branch for features</span>
-│   ├── feature/xyz  <span class="comment"># New features</span>
-│   └── feature/abc
-├── release/1.0      <span class="comment"># Release preparation</span>
-└── hotfix/urgent    <span class="comment"># Production bug fixes</span>
-
-<span class="comment"># Feature branch workflow</span>
-git checkout develop
-git checkout -b feature/user-authentication
-
-<span class="comment"># ... develop the feature ...</span>
-
-git checkout develop
-git merge feature/user-authentication
-git push origin develop</code></pre>
-
-            <h3>GitHub Flow (Simplified)</h3>
-            <pre><code><span class="comment"># Simpler workflow for continuous deployment</span>
-main                    <span class="comment"># Always deployable</span>
-├── feature/login       <span class="comment"># Feature branches</span>
-├── fix/null-pointer    <span class="comment"># Bug fix branches</span>
-└── docs/readme-update  <span class="comment"># Documentation branches</span>
-
-<span class="comment"># Workflow:</span>
-<span class="comment"># 1. Create branch from main</span>
-git checkout -b feature/new-feature main
-
-<span class="comment"># 2. Make changes and commit</span>
-git add .
-git commit -m "Implement new feature"
-
-<span class="comment"># 3. Push branch and create Pull Request</span>
-git push -u origin feature/new-feature
-
-<span class="comment"># 4. After review, merge to main and deploy</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Merging and Rebasing</h2>
-
-            <h3>Merge</h3>
-            <pre><code><span class="comment"># Merge feature branch into main</span>
+                <pre><code><span class="comment"># Trunk-based: branch, commit, merge back same day</span>
 git checkout main
-git merge feature/user-login
+git pull
+git checkout -b add-discount-codes
+<span class="comment"># ... small, focused change ...</span>
+git push -u origin add-discount-codes
+<span class="comment"># Open PR, get one review, merge within hours — not days</span></code></pre>
 
-<span class="comment"># Merge with commit message</span>
-git merge feature/user-login -m "Merge user login feature"
+                <h3>GitHub Flow — trunk-based with an explicit PR gate</h3>
+                <pre><code>main                    <span class="comment"># always deployable</span>
+├── feature/login       <span class="comment"># short-lived</span>
+├── fix/null-pointer     <span class="comment"># short-lived</span>
+└── docs/readme-update  <span class="comment"># short-lived</span>
 
-<span class="comment"># Abort a merge in progress</span>
-git merge --abort</code></pre>
+<span class="comment"># 1. Branch from main</span>
+git checkout -b feature/discount-codes main
 
-            <h3>Rebase</h3>
-            <pre><code><span class="comment"># Rebase feature branch onto main</span>
-git checkout feature/user-login
+<span class="comment"># 2. Commit</span>
+git add .
+git commit -m <span class="string">"feat(order): add percentage discount codes"</span>
+
+<span class="comment"># 3. Push and open a Pull Request</span>
+git push -u origin feature/discount-codes
+
+<span class="comment"># 4. After review and CI passes, merge to main — deploy follows automatically</span></code></pre>
+
+                <h3>Git Flow — reserve it for versioned releases, not continuous services</h3>
+                <p>Git Flow's <code>develop</code>/<code>release/*</code>/<code>hotfix/*</code>
+                    branch structure exists to support <strong>multiple released
+                    versions in parallel</strong> — a library or an on-premise
+                    product where customers run v1.4 and v2.1 simultaneously and
+                    both need bug fixes. Forcing this model onto a continuously
+                    deployed service adds a long-lived <code>develop</code> branch
+                    that constantly drifts from what's actually in production, for
+                    no benefit — there's only ever one "release" running.</p>
+
+                <pre><code>main (or master)     <span class="comment"># production-ready code</span>
+├── develop          <span class="comment"># integration branch</span>
+│   └── feature/xyz
+├── release/1.0      <span class="comment"># release stabilization</span>
+└── hotfix/urgent    <span class="comment"># production patch, branched from main</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">Choosing between them is not a style preference</div>
+                    <p>Use <strong>trunk-based / GitHub Flow</strong> when: the
+                        service deploys continuously and only one version is ever
+                        live in production. Use <strong>Git Flow</strong> when: you
+                        genuinely maintain multiple released versions in parallel and
+                        need a stabilization window before each release. Most
+                        microservices in an e-commerce platform fall into the first
+                        category — <code>order-service</code> doesn't have a "v1.4
+                        still in the field" problem the way a distributed client
+                        library does.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — MERGING AND REBASING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Merging and Rebasing</h2>
+
+                <h3>Merge — preserves complete history</h3>
+                <pre><code>git checkout main
+git merge feature/discount-codes
+<span class="comment"># Creates a merge commit — both parent histories remain intact</span>
+
+git merge --abort   <span class="comment"># bail out of a merge in progress</span></code></pre>
+
+                <h3>Rebase — linear history, rewrites commits</h3>
+                <pre><code>git checkout feature/discount-codes
 git rebase main
 
-<span class="comment"># Interactive rebase (squash commits)</span>
-git rebase -i HEAD~3  <span class="comment"># Interact with last 3 commits</span>
+<span class="comment"># Interactive rebase — squash the last 3 commits into one clean commit</span>
+git rebase -i HEAD~3
 
-<span class="comment"># Continue after resolving conflicts</span>
-git rebase --continue
-
-<span class="comment"># Abort rebase</span>
+git rebase --continue   <span class="comment"># after resolving a conflict</span>
 git rebase --abort</code></pre>
 
-            <div class="info-box warning">
-                <div class="info-box-title">Merge vs Rebase</div>
-                <ul>
-                    <li><strong>Merge</strong> - Preserves complete history, creates merge commit</li>
-                    <li><strong>Rebase</strong> - Linear history, rewrites commits</li>
-                </ul>
-                <p><strong>Rule:</strong> Never rebase commits that have been pushed to a shared branch.</p>
-            </div>
+                <div class="info-box warning">
+                    <div class="info-box-title">Never rebase a branch that has been pushed and shared — and never force-push without <code>--force-with-lease</code></div>
+                    <p>Rebasing rewrites commit hashes. If anyone else has already
+                        pulled the branch, their history now diverges from yours
+                        irreconcilably. When you do need to update a remote branch
+                        after a legitimate rebase of your own unshared work, use:</p>
+                    <pre><code><span class="comment"># DANGEROUS — overwrites the remote unconditionally,
+# silently discarding any commit a teammate pushed since your last fetch</span>
+git push --force
 
-            <h3>Resolving Conflicts</h3>
-            <pre><code><span class="comment"># When conflicts occur, files are marked:</span>
+<span class="comment"># SAFE — fails instead of overwriting if the remote has moved
+# since you last fetched it</span>
+git push --force-with-lease</code></pre>
+                    <p><code>--force-with-lease</code> checks that the remote branch
+                        still points where you last saw it before overwriting it. A
+                        plain <code>--force</code> has no such check — it's the
+                        single most common way a teammate's pushed commit
+                        silently vanishes from a shared branch.</p>
+                </div>
+
+                <h3>Resolving Conflicts</h3>
+                <pre><code><span class="comment"># Conflict markers inside the file</span>
 &lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
-<span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">Payment</span> payment) {
-    <span class="comment">// Your changes</span>
+<span class="keyword">public void</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order) {
+    <span class="comment">// your changes</span>
 =======
-<span class="keyword">public void</span> <span class="function">processPayment</span>(<span class="class-name">Payment</span> payment, <span class="class-name">User</span> user) {
-    <span class="comment">// Their changes</span>
-&gt;&gt;&gt;&gt;&gt;&gt;&gt; feature/payment-update
+<span class="keyword">public void</span> <span class="function">processOrder</span>(<span class="class-name">Order</span> order, <span class="class-name">Customer</span> customer) {
+    <span class="comment">// their changes</span>
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; feature/order-validation
 
-<span class="comment"># Steps to resolve:</span>
-<span class="comment"># 1. Edit the file to keep desired changes</span>
-<span class="comment"># 2. Remove conflict markers</span>
-<span class="comment"># 3. Stage the resolved file</span>
-git add src/main/java/PaymentService.java
+<span class="comment"># 1. Edit the file to keep the correct combined logic
+# 2. Remove the conflict markers entirely
+# 3. Stage the resolved file</span>
+git add src/main/java/com/shop/order/OrderService.java
 
-<span class="comment"># 4. Continue with merge/rebase</span>
-git commit  <span class="comment"># For merge</span>
-git rebase --continue  <span class="comment"># For rebase</span></code></pre>
-        </section>
+<span class="comment"># 4. Continue</span>
+git commit             <span class="comment"># for a merge</span>
+git rebase --continue  <span class="comment"># for a rebase</span></code></pre>
+            </section>
 
-        <section class="content-section">
-            <h2>Common Git Operations</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — COMMON OPERATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Common Git Operations</h2>
 
-            <h3>Viewing History</h3>
-            <pre><code><span class="comment"># View commit history</span>
-git log
+                <h3>Viewing History</h3>
+                <pre><code>git log --oneline --graph --all   <span class="comment"># compact, visual</span>
+git log -p                        <span class="comment"># show the diff of each commit</span>
+git log --author=<span class="string">"Karlete"</span>
+git log --since=<span class="string">"2026-01-01"</span> --until=<span class="string">"2026-06-30"</span>
+git blame OrderService.java       <span class="comment"># who changed each line, and when</span></code></pre>
 
-<span class="comment"># Compact one-line format</span>
-git log --oneline
+                <h3>Undoing Changes</h3>
+                <pre><code>git restore OrderService.java           <span class="comment"># discard working-directory changes</span>
+git restore --staged OrderService.java  <span class="comment"># unstage without discarding the edit</span>
+git commit --amend -m <span class="string">"fix(order): correct total calculation"</span>
 
-<span class="comment"># With graph visualization</span>
-git log --oneline --graph --all
+git reset --soft HEAD~1    <span class="comment"># undo last commit, keep changes staged</span>
+git reset --hard HEAD~1    <span class="comment"># undo last commit, discard changes entirely</span>
+git revert abc123          <span class="comment"># undo via a new commit — safe on shared branches</span></code></pre>
 
-<span class="comment"># Show changes in each commit</span>
-git log -p
+                <div class="info-box note">
+                    <div class="info-box-title"><code>reset --hard</code> vs <code>revert</code> on a shared branch</div>
+                    <p><code>reset --hard</code> rewrites history — the same
+                        force-push danger from Section 4 applies if the branch is
+                        shared. <code>revert</code> adds a new commit that undoes
+                        the change, leaving history intact and safe to push normally.
+                        On <code>main</code>, always <code>revert</code>; reserve
+                        <code>reset</code> for commits nobody else has seen.</p>
+                </div>
 
-<span class="comment"># Show commits by author</span>
-git log --author="John"
+                <h3>Stashing and Tags</h3>
+                <pre><code>git stash                       <span class="comment"># shelve work in progress</span>
+git stash pop                   <span class="comment"># reapply the most recent stash</span>
+git stash apply stash@{2}       <span class="comment"># reapply a specific one, keep it in the list</span>
 
-<span class="comment"># Show commits in date range</span>
-git log --since="2024-01-01" --until="2024-06-30"
+git tag -a v1.4.0 -m <span class="string">"Release 1.4.0"</span>   <span class="comment"># annotated — always prefer this over a lightweight tag</span>
+git push origin v1.4.0</code></pre>
+            </section>
 
-<span class="comment"># Search commit messages</span>
-git log --grep="fix bug"</code></pre>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — REMOTES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Working with Remotes</h2>
+                <pre><code>git remote -v
+git remote add upstream https://github.com/original-org/order-service.git
 
-            <h3>Undoing Changes</h3>
-            <pre><code><span class="comment"># Discard changes in working directory</span>
-git checkout -- filename.java
-git restore filename.java  <span class="comment"># Modern alternative</span>
+git fetch origin        <span class="comment"># download refs — no merge, safe to run anytime</span>
 
-<span class="comment"># Unstage a file</span>
-git reset HEAD filename.java
-git restore --staged filename.java  <span class="comment"># Modern alternative</span>
-
-<span class="comment"># Amend last commit (change message or add files)</span>
-git commit --amend -m "New commit message"
-
-<span class="comment"># Undo last commit (keep changes)</span>
-git reset --soft HEAD~1
-
-<span class="comment"># Undo last commit (discard changes)</span>
-git reset --hard HEAD~1
-
-<span class="comment"># Revert a commit (creates new commit)</span>
-git revert abc123</code></pre>
-
-            <h3>Stashing</h3>
-            <pre><code><span class="comment"># Save work in progress</span>
-git stash
-
-<span class="comment"># Stash with message</span>
-git stash save "WIP: user authentication"
-
-<span class="comment"># List stashes</span>
-git stash list
-
-<span class="comment"># Apply most recent stash</span>
-git stash pop
-
-<span class="comment"># Apply specific stash</span>
-git stash apply stash@{2}
-
-<span class="comment"># Drop a stash</span>
-git stash drop stash@{0}
-
-<span class="comment"># Clear all stashes</span>
-git stash clear</code></pre>
-
-            <h3>Tags</h3>
-            <pre><code><span class="comment"># Create lightweight tag</span>
-git tag v1.0.0
-
-<span class="comment"># Create annotated tag (recommended)</span>
-git tag -a v1.0.0 -m "Release version 1.0.0"
-
-<span class="comment"># Tag specific commit</span>
-git tag -a v1.0.0 abc123 -m "Release version 1.0.0"
-
-<span class="comment"># List tags</span>
-git tag -l
-
-<span class="comment"># Push tags to remote</span>
-git push origin v1.0.0
-git push origin --tags  <span class="comment"># Push all tags</span>
-
-<span class="comment"># Delete tag</span>
-git tag -d v1.0.0
-git push origin --delete v1.0.0  <span class="comment"># Delete remote tag</span></code></pre>
-        </section>
-
-        <section class="content-section">
-            <h2>Working with Remotes</h2>
-
-            <pre><code><span class="comment"># List remotes</span>
-git remote -v
-
-<span class="comment"># Add remote</span>
-git remote add origin https://github.com/user/repo.git
-
-<span class="comment"># Add upstream (for forks)</span>
-git remote add upstream https://github.com/original/repo.git
-
-<span class="comment"># Change remote URL</span>
-git remote set-url origin https://github.com/user/new-repo.git
-
-<span class="comment"># Fetch from remote (download without merge)</span>
-git fetch origin
-
-<span class="comment"># Fetch all remotes</span>
-git fetch --all
-
-<span class="comment"># Sync fork with upstream</span>
+<span class="comment"># Sync a fork with its upstream</span>
 git fetch upstream
 git checkout main
 git merge upstream/main
 git push origin main</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>Git Commit Best Practices</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — COMMIT PRACTICES + SIGNING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Commit Practices — Message Format and Signing</h2>
 
-            <h3>Commit Message Format</h3>
-            <pre><code><span class="comment"># Conventional Commits format</span>
-type(scope): subject
+                <h3>Conventional Commits</h3>
+                <pre><code>type(scope): subject
 
-body (optional)
+<span class="comment"># Types:
+# feat:     new feature
+# fix:      bug fix
+# refactor: restructuring without behavior change
+# test:     adding or fixing tests
+# chore:    build tasks, dependencies, configs</span>
 
-footer (optional)
-
-<span class="comment"># Types:</span>
-feat:     <span class="comment"># New feature</span>
-fix:      <span class="comment"># Bug fix</span>
-docs:     <span class="comment"># Documentation changes</span>
-style:    <span class="comment"># Formatting, missing semicolons, etc.</span>
-refactor: <span class="comment"># Code restructuring without behavior change</span>
-test:     <span class="comment"># Adding or fixing tests</span>
-chore:    <span class="comment"># Build tasks, dependencies, configs</span>
-
-<span class="comment"># Examples:</span>
-feat(auth): add JWT token refresh endpoint
-
+feat(order): add percentage discount codes
 fix(payment): handle null payment method gracefully
 
 Fixes #123
 
-refactor(user): extract validation logic to separate class
+refactor(customer): extract validation into CustomerValidator
 
-BREAKING CHANGE: UserService now requires AuthProvider</code></pre>
+BREAKING CHANGE: CustomerService now requires an AddressValidator</code></pre>
 
-            <div class="info-box tip">
-                <div class="info-box-title">Good Commit Practices</div>
-                <ul>
-                    <li>Commit early and often</li>
-                    <li>Make atomic commits (one logical change per commit)</li>
-                    <li>Write meaningful commit messages</li>
-                    <li>Use present tense ("Add feature" not "Added feature")</li>
-                    <li>Keep subject line under 50 characters</li>
-                    <li>Reference issue numbers when applicable</li>
-                </ul>
-            </div>
-        </section>
+                <p>Conventional Commits are not just a style preference — many teams
+                    wire <code>semantic-release</code> or similar tooling into CI to
+                    derive the next version number and changelog directly from
+                    commit types, which only works if the format is followed
+                    consistently. See <a href="cicd.html">CI/CD Basics</a>.</p>
 
-        <section class="content-section">
-            <h2>Git in Java IDEs</h2>
+                <h3>Signing Commits — verifying who actually authored a commit</h3>
+                <p><code>user.name</code> and <code>user.email</code> are plain text
+                    — anyone can set <code>git config user.email
+                    "you@company.com"</code> and author a commit that appears to be
+                    yours. Signing proves the commit was created by someone holding
+                    a specific private key, and GitHub/GitLab display a "Verified"
+                    badge only for signed commits. This connects directly to the
+                    supply-chain concerns covered in
+                    <a href="../security/auth-vs-authz.html">Authentication vs
+                    Authorization</a> — a commit is, in effect, an unauthenticated
+                    claim unless it's signed.</p>
 
-            <h3>IntelliJ IDEA Git Integration</h3>
-            <pre><code><span class="comment"># Key shortcuts:</span>
-Ctrl+K          <span class="comment"># Commit dialog</span>
-Ctrl+Shift+K    <span class="comment"># Push</span>
-Ctrl+T          <span class="comment"># Update project (pull)</span>
-Alt+9           <span class="comment"># Open Git tool window</span>
-Alt+`           <span class="comment"># VCS operations popup</span>
+                <pre><code><span class="comment"># SSH signing (simplest — reuses your existing SSH key)</span>
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub
+git config --global commit.gpgsign true
 
-<span class="comment"># Features:</span>
-<span class="comment"># - Visual diff viewer</span>
-<span class="comment"># - Interactive rebase</span>
-<span class="comment"># - Conflict resolution tool</span>
-<span class="comment"># - Shelve (similar to stash)</span>
-<span class="comment"># - Local history (independent of Git)</span></code></pre>
+<span class="comment"># GPG signing (traditional)</span>
+git config --global user.signingkey ABCD1234
+git config --global commit.gpgsign true
 
-            <h3>Eclipse Git (EGit)</h3>
-            <pre><code><span class="comment"># Access via:</span>
-<span class="comment"># Team menu (right-click on project)</span>
-<span class="comment"># Git Perspective</span>
-<span class="comment"># Git Staging View</span>
+<span class="comment"># Sign a single commit explicitly</span>
+git commit -S -m <span class="string">"feat(order): add percentage discount codes"</span></code></pre>
 
-<span class="comment"># Common operations:</span>
-<span class="comment"># Team -> Commit (Ctrl+#)</span>
-<span class="comment"># Team -> Push</span>
-<span class="comment"># Team -> Pull</span>
-<span class="comment"># Team -> Switch To -> New Branch</span></code></pre>
-        </section>
+                <div class="info-box tip">
+                    <div class="info-box-title">Good Commit Practices</div>
+                    <ul>
+                        <li>One logical change per commit — atomic, not a dump of the day's work</li>
+                        <li>Present tense subject line ("add feature", not "added feature")</li>
+                        <li>Reference the issue/ticket number when one exists</li>
+                        <li>Enable signing globally once, rather than remembering <code>-S</code> per commit</li>
+                    </ul>
+                </div>
+            </section>
 
-        <section class="content-section">
-            <h2>Advanced Git Commands</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — HOOKS AND SECRET PREVENTION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Git Hooks and Keeping Secrets Out of History</h2>
+                <p><code>.gitignore</code> only stops a file from being staged
+                    <strong>going forward</strong>. It does nothing for a secret
+                    that was already committed once — that credential is in history
+                    permanently, retrievable by anyone with clone access, even after
+                    you delete the file and add it to <code>.gitignore</code>
+                    afterward.</p>
 
-            <pre><code><span class="comment"># Cherry-pick specific commit</span>
-git cherry-pick abc123
+                <pre><code><span class="comment">// WRONG assumption — this does NOT remove the secret from history</span>
+<span class="comment">$ echo "application-local.properties" >> .gitignore
+$ git rm --cached application-local.properties
+$ git commit -m "Remove leaked credentials"
+# The old commit that added the file with the real password is still
+# reachable in history — git log -p will show it, forever, to anyone
+# who clones the repo.</span></code></pre>
 
-<span class="comment"># Find which commit introduced a bug</span>
-git bisect start
-git bisect bad          <span class="comment"># Current commit is bad</span>
-git bisect good v1.0.0  <span class="comment"># v1.0.0 was good</span>
-<span class="comment"># Git will help find the problematic commit</span>
-git bisect reset        <span class="comment"># When done</span>
+                <h3>Pre-commit hooks — catch it before it's ever committed</h3>
+                <pre><code><span class="comment"># .git/hooks/pre-commit — a simple local guard (not committed by default;
+# use the "pre-commit" framework or huskyesque tooling to share it with the team)</span>
+#!/bin/sh
+git diff --cached --name-only | xargs grep -lE <span class="string">"AKIA[0-9A-Z]{16}"</span> && {
+    echo <span class="string">"AWS key detected in staged changes — commit blocked."</span>
+    <span class="keyword">exit</span> 1
+}</code></pre>
 
-<span class="comment"># Show who changed each line</span>
-git blame filename.java
+                <p>In practice, use a maintained scanner rather than hand-rolled
+                    regex — <strong>gitleaks</strong> or <strong>git-secrets</strong>
+                    run as a pre-commit hook and as a CI step, catching both new
+                    commits and, when run with <code>--log-opts</code> against full
+                    history, anything that slipped through previously.</p>
 
-<span class="comment"># Search for string in all commits</span>
-git log -S "methodName" --source --all
+                <div class="info-box important">
+                    <div class="info-box-title">If a secret was already committed, rotate it — don't just rewrite history</div>
+                    <p>If a real credential was pushed, the correct first response
+                        is to <strong>revoke and rotate that credential</strong> at
+                        the source (the database, the cloud provider, the API
+                        vendor) — treat it as compromised the moment it's on a
+                        remote you don't fully control the audit log for.
+                        Rewriting history with <code>git filter-repo</code>
+                        afterward is good hygiene, but it does not undo exposure
+                        that already happened, and every existing clone still has
+                        the old commit until they re-clone.</p>
+                </div>
+            </section>
 
-<span class="comment"># Clean untracked files</span>
-git clean -n  <span class="comment"># Dry run</span>
-git clean -f  <span class="comment"># Force clean</span>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 9 — ADVANCED GIT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Advanced Git Commands</h2>
 
-<span class="comment"># Recover deleted branch</span>
-git reflog  <span class="comment"># Find the commit hash</span>
+                <h3>Partial staging — genuinely atomic commits</h3>
+                <pre><code><span class="comment"># You fixed a bug AND refactored a method in the same file.
+# Stage only the bug fix hunk, leave the refactor for a separate commit.</span>
+git add -p OrderService.java
+<span class="comment"># y = stage this hunk, n = skip it, s = split it further</span></code></pre>
+
+                <h3>Worktrees — two branches checked out at once, no stash needed</h3>
+                <pre><code><span class="comment"># Reviewing a PR while mid-feature on another branch, without stashing</span>
+git worktree add ../order-service-review feature/discount-codes
+<span class="comment"># A second, independent working directory — same repo, different branch,
+# both checked out simultaneously.</span>
+git worktree remove ../order-service-review   <span class="comment"># when done</span></code></pre>
+
+                <h3>Bisect — automated, not manual</h3>
+                <pre><code>git bisect start
+git bisect bad                     <span class="comment"># current commit is broken</span>
+git bisect good v1.4.0             <span class="comment"># this tag was known good</span>
+
+<span class="comment"># Automate it with a script that exits 0 (good) or 1 (bad) —
+# git tests every candidate commit for you, no manual checkout loop</span>
+git bisect run mvn -q test -Dtest=OrderServiceTest
+
+git bisect reset</code></pre>
+
+                <h3>Other essentials</h3>
+                <pre><code>git cherry-pick abc123             <span class="comment"># apply one specific commit onto the current branch</span>
+git log -S <span class="string">"applyDiscount"</span> --source --all   <span class="comment"># find every commit that added/removed this string</span>
+git clean -nd                      <span class="comment"># dry-run: show untracked files/dirs that would be removed</span>
+git clean -fd                      <span class="comment"># actually remove them</span>
+
+git reflog                         <span class="comment"># recover a branch tip even after a hard reset or deletion</span>
 git checkout -b recovered-branch abc123</code></pre>
-        </section>
+            </section>
 
-        <section class="content-section">
-            <h2>GitHub/GitLab Workflow</h2>
+            <!-- ═══════════════════════════════════════════
+                 SECTION 10 — GIT IN JAVA IDEs
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Git in Java IDEs</h2>
 
-            <h3>Pull Request / Merge Request</h3>
-            <pre><code><span class="comment"># 1. Create feature branch</span>
-git checkout -b feature/new-api
+                <h3>IntelliJ IDEA</h3>
+                <pre><code><span class="comment">Ctrl+K       # Commit dialog
+Ctrl+Shift+K # Push
+Alt+9        # Git tool window
 
-<span class="comment"># 2. Make changes and commit</span>
+# Visual diff, interactive rebase, and conflict resolution UI all built in.
+# "Shelve" is IntelliJ's own equivalent to git stash, independent of it.</span></code></pre>
+
+                <h3>Eclipse (EGit)</h3>
+                <pre><code><span class="comment"># Team menu (right-click project) → Commit / Push / Pull / Switch To</span></code></pre>
+
+                <p>See <a href="ides.html">IDEs</a> for how each IDE's Git
+                    integration relates to its underlying Java semantic engine.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 11 — GITHUB/GITLAB WORKFLOW
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>GitHub/GitLab Workflow</h2>
+
+                <h3>Pull Request / Merge Request</h3>
+                <pre><code>git checkout -b feature/new-shipping-rate main
 git add .
-git commit -m "feat(api): add new REST endpoint"
+git commit -m <span class="string">"feat(shipping): add flat-rate shipping tier"</span>
+git push -u origin feature/new-shipping-rate
 
-<span class="comment"># 3. Push branch</span>
-git push -u origin feature/new-api
-
-<span class="comment"># 4. Create Pull Request via GitHub/GitLab UI</span>
-
-<span class="comment"># 5. Address review comments</span>
-git add .
-git commit -m "fix: address review comments"
-git push
-
-<span class="comment"># 6. After approval, merge via UI or CLI</span>
-<span class="comment"># GitHub CLI example:</span>
+<span class="comment"># After review and CI, merge via the UI or the CLI</span>
 gh pr merge --squash</code></pre>
 
-            <div class="info-box note">
-                <div class="info-box-title">Code Review Tips</div>
-                <ul>
-                    <li>Keep pull requests small and focused</li>
-                    <li>Write clear PR descriptions</li>
-                    <li>Link related issues</li>
-                    <li>Add screenshots for UI changes</li>
-                    <li>Respond promptly to review feedback</li>
-                </ul>
-            </div>
-        </section>
+                <h3>Merge Strategy — the choice affects what <code>git log</code> looks like forever</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr><th>Strategy</th><th>Result</th><th>When to use</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Squash merge</strong></td><td>All PR commits collapse into one commit on main</td><td>Default for feature branches with messy WIP commits — keeps main's history clean and one-commit-per-feature</td></tr>
+                        <tr><td><strong>Merge commit</strong></td><td>Preserves every commit plus a merge commit</td><td>When individual commits inside the PR are each meaningful and reviewed separately</td></tr>
+                        <tr><td><strong>Rebase merge</strong></td><td>PR commits replay individually onto main, no merge commit</td><td>Small PRs where a fully linear history matters more than commit grouping</td></tr>
+                    </tbody>
+                </table>
 
-        <section class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="related-links">
-                <a href="cicd.html" class="related-link">CI/CD Basics</a>
-                <a href="ides.html" class="related-link">IDEs</a>
-                <a href="../build-tools/maven.html" class="related-link">Maven</a>
-                <a href="../build-tools/gradle.html" class="related-link">Gradle</a>
-            </div>
-        </section>
-    </main>
+                <div class="info-box note">
+                    <div class="info-box-title"><code>CODEOWNERS</code> — route review automatically, don't rely on memory</div>
+                    <p>A <code>CODEOWNERS</code> file at the repo root maps paths to
+                        required reviewers, so a change under
+                        <code>src/main/java/com/shop/payment/**</code> automatically
+                        requests the payments team, without anyone having to
+                        remember to tag them by hand.</p>
+                    <pre><code><span class="comment"># .github/CODEOWNERS</span>
+/src/main/java/com/shop/payment/  @shop/payments-team
+/src/main/java/com/shop/order/    @shop/order-team</code></pre>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 12 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Match the branching model to the deployment model — trunk-based/GitHub Flow for continuously deployed services, Git Flow only for genuinely versioned parallel releases</li>
+                        <li>Use <code>git push --force-with-lease</code>, never a plain <code>--force</code>, on any branch someone else might have touched</li>
+                        <li>Commit a <code>.gitattributes</code> file rather than relying on every developer configuring <code>core.autocrlf</code> identically</li>
+                        <li>Run a secret scanner (gitleaks, git-secrets) as both a pre-commit hook and a CI step</li>
+                        <li>Sign commits (SSH or GPG) on any repo where authorship needs to be verifiable, not just claimed</li>
+                        <li>Use <code>git revert</code> instead of <code>git reset --hard</code> to undo anything already pushed to a shared branch</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't rebase or force-push a branch that others have already pulled from — their history diverges irreconcilably</li>
+                        <li>Don't assume adding a file to <code>.gitignore</code> after the fact removes it, or any secret it contained, from history</li>
+                        <li>Don't impose Git Flow's <code>develop</code> branch on a service deployed continuously — it becomes a permanently drifting branch nobody trusts</li>
+                        <li>Don't leave a leaked credential in place after "fixing" the commit — rotate it at the source; history rewriting alone does not undo the exposure</li>
+                        <li>Don't bundle unrelated changes into one commit — use <code>git add -p</code> to split them before committing</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 13 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What's the difference between <code>git fetch</code> and <code>git pull</code>?</strong><br>
+                    <code>git fetch</code> downloads the remote's commits and updates
+                    your local tracking branches, but does not touch your working
+                    directory or current branch. <code>git pull</code> is
+                    <code>fetch</code> followed immediately by a
+                    <code>merge</code> (or <code>rebase</code>, if configured) of
+                    the remote branch into your current one. <code>fetch</code> is
+                    always safe to run; <code>pull</code> changes your working
+                    files.</p>
+
+                    <p><strong>Q: What is the difference between <code>git merge</code> and <code>git rebase</code>?</strong><br>
+                    Merge combines two branches' histories with a new merge commit
+                    that has two parents — nothing is rewritten, the full history is
+                    preserved. Rebase replays your branch's commits one by one onto
+                    the tip of another branch, producing a linear history but
+                    generating new commit hashes for every replayed commit — which
+                    is why rebasing a branch already pushed and shared is
+                    dangerous.</p>
+
+                    <p><strong>Q: Why isn't adding a leaked password to <code>.gitignore</code> enough to remove it?</strong><br>
+                    <code>.gitignore</code> only prevents files matching a pattern
+                    from being staged <em>from that point forward</em>. A commit
+                    that already exists in history still contains the old version
+                    of the file with the real credential — anyone who clones the
+                    repository or runs <code>git log -p</code> on that commit can
+                    still see it, indefinitely.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A teammate reports their pushed commit disappeared from a shared feature branch after you force-pushed. What happened, and how do you prevent it going forward?</strong><br>
+                    A plain <code>git push --force</code> unconditionally overwrites
+                    whatever is on the remote with your local branch tip — it
+                    performs no check on what the remote currently points to. If your
+                    teammate pushed a commit after your last <code>fetch</code>,
+                    your force-push silently discarded it; the commit still exists
+                    in Git's object database and is recoverable via
+                    <code>reflog</code> on their machine if they still have the
+                    local branch, but it's gone from the shared remote. The fix is
+                    to always use <code>git push --force-with-lease</code>, which
+                    refuses to push if the remote branch has moved since you last
+                    fetched it — it converts a silent, destructive overwrite into a
+                    visible failure the team can investigate before anything is
+                    lost.</p>
+
+                    <p><strong>Q: Your organization mandates Git Flow for every repository, including a continuously deployed Spring Boot microservice with no versioned releases. What's the actual cost of this, beyond "it's more branches"?</strong><br>
+                    Git Flow's value proposition is coordinating stabilization
+                    across multiple versions that are simultaneously live in the
+                    field — a <code>develop</code> branch that accumulates
+                    completed features ahead of a <code>release/*</code>
+                    branch that stabilizes before tagging. A continuously deployed
+                    service has no such scenario: there is exactly one version
+                    running in production at any time, deployed directly from
+                    <code>main</code> on every merge. Forcing Git Flow here creates
+                    a <code>develop</code> branch that is neither "what's in
+                    production" nor "what's released" — it's a third, permanently
+                    drifting state that CI either has to build and deploy
+                    redundantly, or that nobody actually deploys from, making it
+                    dead process weight. The mismatch also breaks the mental model
+                    of trunk-based CI/CD, where every merge to <code>main</code>
+                    is assumed deployable — under Git Flow that assumption shifts
+                    to <code>develop</code>, which then requires its own separate
+                    CI pipeline to keep meaningful.</p>
+
+                    <p><strong>Q: Explain concretely why signing commits matters even inside a private, access-controlled repository.</strong><br>
+                    <code>git config user.email</code> is plain, unauthenticated
+                    text — anyone with commit access (a compromised CI credential, a
+                    disgruntled contractor, an attacker who obtained a valid push
+                    token) can set it to any value and author commits that display
+                    as coming from someone else entirely, with no cryptographic
+                    proof required. Access control on the repository restricts
+                    <em>who can push</em>, but says nothing about <em>whose identity
+                    a given commit actually represents</em> once someone has push
+                    access through any means. Signing with a GPG or SSH key ties
+                    each commit to a specific private key the platform can verify
+                    against a registered public key — the "Verified" badge is
+                    exactly that check. This matters most precisely in the
+                    scenario people assume doesn't need it: a compromised CI token
+                    with push rights can forge commits as any teammate unless
+                    signing is enforced, at which point it can only push commits
+                    that fail verification, which is a detectable, actionable
+                    signal instead of a silent impersonation.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="cicd.html" class="related-link"><span class="related-icon">🔁</span>CI/CD Basics</a>
+                    <a href="ides.html" class="related-link"><span class="related-icon">🖥️</span>IDEs</a>
+                    <a href="../build-tools/maven.html" class="related-link"><span class="related-icon">📦</span>What is Maven?</a>
+                    <a href="../security/auth-vs-authz.html" class="related-link"><span class="related-icon">🔒</span>Authentication vs Authorization</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
 
     <footer class="site-footer">
-        <p>&copy; 2026 JavaDev Bible</p>
+        <p data-i18n="footer.copyright">&copy; 2026 JavaDev Bible</p>
     </footer>
 
+    <script src="../../js/i18n.js"></script>
     <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
 </body>
 </html>
-
