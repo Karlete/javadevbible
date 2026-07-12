@@ -171,7 +171,17 @@ body {
     transition: all 0.3s ease;
 }
 
-#searchInput:focus {
+#searchInput:focus-visible {
+    background: white;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+    outline: 3px solid var(--dark-bg);
+    outline-offset: 2px;
+}
+
+/* Mouse users keep the old look, with no ring. :focus-visible above handles
+   keyboard; this handles the pointer. */
+#searchInput:focus:not(:focus-visible) {
     background: white;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
     transform: translateY(-2px);
@@ -210,33 +220,52 @@ body {
     margin-top: 1rem;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     z-index: 1000;
+
+    /* Hidden by default. search.js flips data-open; nothing writes inline
+       styles into this element any more. */
+    display: none;
+}
+
+.search-results[data-open="true"] {
+    display: block;
 }
 
 .search-result-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid #E0E0E0;
-    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
     transition: background 0.2s ease;
-}
-
-.search-result-item:hover {
-    background: #F5F5F5;
 }
 
 .search-result-item:last-child {
     border-bottom: none;
 }
 
+/* :hover for the mouse, .is-active for the arrow keys. Both must look the
+   same, or keyboard navigation feels like a second-class path. */
+.search-result-item:hover,
+.search-result-item.is-active {
+    background: #F5F5F5;
+}
+
+.search-result-item:focus-visible {
+    outline: 3px solid var(--secondary-color);
+    outline-offset: -3px;
+    background: #F5F5F5;
+}
+
 .search-result-title {
     font-weight: 600;
     color: var(--primary-color);
-    margin-bottom: 0.3rem;
 }
 
 .search-result-category {
     font-size: 0.85rem;
     color: var(--secondary-color);
-    margin-bottom: 0.3rem;
 }
 
 .search-result-excerpt {
@@ -244,10 +273,29 @@ body {
     color: #666;
 }
 
-.no-results {
+/* Highlighted query matches. Replaces the inline background colour the old
+   highlightText() injected into every <strong>. */
+.search-result-item mark {
+    background: #FFF3A0;
+    color: inherit;
+    padding: 0 0.1em;
+    border-radius: 2px;
+}
+
+/* Covers both "no results" and "index failed to load". The old code had a
+   .no-results class plus an inline-styled <p>; one class does both jobs. */
+.search-message {
     padding: 2rem;
     text-align: center;
     color: #666;
+}
+
+.search-result-more {
+    padding: 0.75rem 1.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #888;
+    font-style: italic;
 }
 
 /* Content Wrapper */
@@ -750,4 +798,48 @@ html {
 ::-moz-selection {
     background: var(--accent-color);
     color: white;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    /* Blanket rule: anything that animates or transitions is reduced to a
+       single, effectively instant frame. Duration 0.01ms rather than 0 so that
+       animationend / transitionend listeners still fire. */
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    html {
+        scroll-behavior: auto;
+    }
+
+    /* The hero gradient animates background-position on a 300% canvas. With the
+       animation stopped it would sit at 0% 50% — pin it explicitly and drop the
+       oversized background so the gradient renders as intended. */
+    .hero-section {
+        background-size: 100% 100%;
+        animation: none;
+    }
+
+    .hero-section::before {
+        animation: none;
+        opacity: 0.75;
+        /* midpoint of the pulse it would otherwise run */
+    }
+
+    #cursor {
+        animation: none;
+        opacity: 1;
+    }
+
+    /* The canvas is cleared and hidden by hero-effects.js, but hide it here too
+       so it never flashes before the script runs. */
+    #hero-particles {
+        display: none;
+    }
 }

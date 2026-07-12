@@ -1,229 +1,341 @@
-// ========================================
-// JAVDEV BIBLE - SEARCH FUNCTIONALITY
-// ========================================
+/* ==========================================================================
+   JavaDev Bible — client-side search
+   ==========================================================================
 
-let searchIndex = [];
-let searchTimeout = null;
+   Design notes, since the choices here are deliberate:
 
-// Initialize search on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadSearchIndex();
-    setupSearchListeners();
-});
+   - Results are real <a> elements, not <div onclick>. Anchors are focusable,
+     openable in a new tab, announced as links by screen readers, and work
+     without JavaScript's help once rendered. A div with a click handler is
+     none of those things.
 
-// Load the search index
-async function loadSearchIndex() {
-    try {
-        const response = await fetch('data/search-index.json');
-        searchIndex = await response.json();
-        console.log('Search index loaded:', searchIndex.length, 'items');
-    } catch (error) {
-        console.log('Search index not yet available. Building from page content...');
-        buildSearchIndexFromPage();
-    }
-}
+   - Nothing is built with innerHTML from index data. Every node is created
+     with createElement and filled with textContent. Escaping is not a step
+     that can be forgotten, because there is no string concatenation to escape.
 
-// Build a basic search index from the current page
-function buildSearchIndexFromPage() {
-    const categories = document.querySelectorAll('.category-card');
-    searchIndex = [];
+   - No inline styles. Presentation lives in main.css.
 
-    categories.forEach(category => {
-        const categoryTitle = category.querySelector('h3').textContent;
-        const categoryDesc = category.querySelector('p').textContent;
-        const links = category.querySelectorAll('.topic-list a');
+   - No silent fallback. If the index fails to load, the search box says so.
+     The previous version quietly rebuilt a degraded index from the DOM, which
+     meant a broken deploy looked like a working one.
+   ========================================================================== */
 
-        links.forEach(link => {
-            searchIndex.push({
-                title: link.textContent,
-                category: categoryTitle,
-                url: link.getAttribute('href'),
-                keywords: [
-                    link.textContent.toLowerCase(),
-                    categoryTitle.toLowerCase(),
-                    categoryDesc.toLowerCase()
-                ].join(' ')
-            });
-        });
+(function () {
+    'use strict';
+
+    const INDEX_URL   = 'data/search-index.json';
+    const MIN_QUERY   = 2;      // below this, searching is noise
+    const DEBOUNCE_MS = 200;
+    const MAX_RESULTS = 10;
+
+    // Field weights. Title matches matter most; a description match is a weak
+    // signal that the page is merely adjacent to what the user meant.
+    const WEIGHT = { title: 10, category: 5, keywords: 3, description: 2 };
+
+    let index          = [];
+    let indexError     = null;  // set if the fetch failed; surfaced to the user
+    let debounceTimer  = null;
+    let activeIndex    = -1;    // keyboard-highlighted result, -1 = none
+    let currentResults = [];
+
+    let input;
+    let button;
+    let panel;
+
+    // ── Boot ────────────────────────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', function () {
+        input  = document.getElementById('searchInput');
+        button = document.getElementById('searchBtn');
+        panel  = document.getElementById('searchResults');
+
+        // Search only exists on the index page. Every other page loads this
+        // script through the same <script> tag and must exit quietly.
+        if (!input || !panel) return;
+
+        applyAriaContract();
+        loadIndex();
+        bindEvents();
     });
 
-    console.log('Built search index from page:', searchIndex.length, 'items');
-}
+    /**
+     * Wires up the ARIA combobox pattern. The markup declares the structure;
+     * this declares the behaviour contract to assistive technology.
+     */
+    function applyAriaContract() {
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-expanded', 'false');
+        input.setAttribute('aria-controls', 'searchResults');
+        input.setAttribute('aria-autocomplete', 'list');
+        panel.setAttribute('role', 'listbox');
+    }
 
-// Setup search event listeners
-function setupSearchListeners() {
-    const searchInput = document.getElementById('searchInput');
-    const searchBtn = document.getElementById('searchBtn');
-    const searchResults = document.getElementById('searchResults');
+    // ── Index ───────────────────────────────────────────────────────────────
 
-    if (!searchInput) return;
+    async function loadIndex() {
+        try {
+            const response = await fetch(INDEX_URL);
+            if (!response.ok) {
+                throw new Error(response.status + ' ' + response.statusText);
+            }
+            index = await response.json();
+        } catch (error) {
+            // Deliberately kept: a search box that silently returns nothing is
+            // worse than one that admits it is broken.
+            indexError = error;
+            index = [];
+        }
+    }
 
-    // Real-time search as user types
-    searchInput.addEventListener('input', function(e) {
-        clearTimeout(searchTimeout);
-        const query = e.target.value.trim();
+    // ── Events ──────────────────────────────────────────────────────────────
 
-        if (query.length < 2) {
-            hideSearchResults();
+    function bindEvents() {
+        input.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            const query = input.value.trim();
+
+            if (query.length < MIN_QUERY) {
+                close();
+                return;
+            }
+            debounceTimer = setTimeout(function () { search(query); }, DEBOUNCE_MS);
+        });
+
+        input.addEventListener('keydown', onKeyDown);
+
+        if (button) {
+            button.addEventListener('click', function () {
+                const query = input.value.trim();
+                if (query.length >= MIN_QUERY) search(query);
+            });
+        }
+
+        // Click outside dismisses the panel.
+        document.addEventListener('click', function (event) {
+            if (!panel.contains(event.target) &&
+                event.target !== input &&
+                event.target !== button) {
+                close();
+            }
+        });
+    }
+
+    /**
+     * Arrow keys move a highlight through the results; Enter follows it; Escape
+     * dismisses. Without this, the results panel is reachable but not usable
+     * from the keyboard.
+     */
+    function onKeyDown(event) {
+        const isOpen = panel.hasChildNodes() && panel.dataset.open === 'true';
+
+        switch (event.key) {
+            case 'ArrowDown':
+                if (!isOpen) return;
+                event.preventDefault();
+                move(1);
+                break;
+
+            case 'ArrowUp':
+                if (!isOpen) return;
+                event.preventDefault();
+                move(-1);
+                break;
+
+            case 'Enter':
+                if (isOpen && activeIndex >= 0) {
+                    event.preventDefault();
+                    const link = panel.querySelectorAll('.search-result-item')[activeIndex];
+                    if (link) link.click();
+                } else {
+                    const query = input.value.trim();
+                    if (query.length >= MIN_QUERY) search(query);
+                }
+                break;
+
+            case 'Escape':
+                close();
+                input.blur();
+                break;
+        }
+    }
+
+    function move(delta) {
+        const items = panel.querySelectorAll('.search-result-item');
+        if (items.length === 0) return;
+
+        if (activeIndex >= 0 && items[activeIndex]) {
+            items[activeIndex].classList.remove('is-active');
+        }
+
+        activeIndex = (activeIndex + delta + items.length) % items.length;
+
+        const active = items[activeIndex];
+        active.classList.add('is-active');
+        active.scrollIntoView({ block: 'nearest' });
+        input.setAttribute('aria-activedescendant', active.id);
+    }
+
+    // ── Search ──────────────────────────────────────────────────────────────
+
+    function search(query) {
+        const needle = query.toLowerCase();
+
+        currentResults = index
+            .map(function (item) {
+                return { item: item, score: scoreOf(item, needle) };
+            })
+            .filter(function (hit) { return hit.score > 0; })
+            .sort(function (a, b) { return b.score - a.score; })
+            .map(function (hit) { return hit.item; });
+
+        render(currentResults, query);
+    }
+
+    function scoreOf(item, needle) {
+        let score = 0;
+        if (contains(item.title,       needle)) score += WEIGHT.title;
+        if (contains(item.category,    needle)) score += WEIGHT.category;
+        if (contains(item.keywords,    needle)) score += WEIGHT.keywords;
+        if (contains(item.description, needle)) score += WEIGHT.description;
+        return score;
+    }
+
+    function contains(field, needle) {
+        return typeof field === 'string' &&
+               field.toLowerCase().indexOf(needle) !== -1;
+    }
+
+    // ── Render ──────────────────────────────────────────────────────────────
+
+    function render(results, query) {
+        panel.textContent = '';   // clear without innerHTML
+        activeIndex = -1;
+        input.removeAttribute('aria-activedescendant');
+
+        if (indexError) {
+            panel.appendChild(
+                message('Search is unavailable — the index could not be loaded.')
+            );
+            open();
             return;
         }
 
-        // Debounce search
-        searchTimeout = setTimeout(() => {
-            performSearch(query);
-        }, 300);
-    });
+        if (results.length === 0) {
+            panel.appendChild(
+                message('No results for “' + query + '”. Try a different term, ' +
+                        'or browse the categories below.')
+            );
+            open();
+            return;
+        }
 
-    // Search on button click
-    if (searchBtn) {
-        searchBtn.addEventListener('click', function() {
-            const query = searchInput.value.trim();
-            if (query.length >= 2) {
-                performSearch(query);
-            }
+        const shown = results.slice(0, MAX_RESULTS);
+
+        shown.forEach(function (result, i) {
+            panel.appendChild(resultLink(result, query, i));
         });
+
+        if (results.length > shown.length) {
+            const more = document.createElement('p');
+            more.className = 'search-result-more';
+            more.textContent = '+' + (results.length - shown.length) +
+                               ' more result(s). Refine your search to narrow them down.';
+            panel.appendChild(more);
+        }
+
+        open();
     }
 
-    // Search on Enter key
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            const query = searchInput.value.trim();
-            if (query.length >= 2) {
-                performSearch(query);
+    /**
+     * Builds one result as a real anchor. Every piece of text goes in via
+     * textContent or via a <mark> node — never as an HTML string — so index
+     * content can never be interpreted as markup.
+     */
+    function resultLink(result, query, position) {
+        const link = document.createElement('a');
+        link.className = 'search-result-item';
+        link.href = result.url;
+        link.id   = 'search-result-' + position;
+        link.setAttribute('role', 'option');
+        link.setAttribute('aria-selected', 'false');
+
+        const title = document.createElement('span');
+        title.className = 'search-result-title';
+        appendHighlighted(title, result.title, query);
+
+        const category = document.createElement('span');
+        category.className = 'search-result-category';
+        category.textContent = result.category || '';
+
+        const excerpt = document.createElement('span');
+        excerpt.className = 'search-result-excerpt';
+        appendHighlighted(excerpt, result.description || '', query);
+
+        link.appendChild(title);
+        link.appendChild(category);
+        link.appendChild(excerpt);
+        return link;
+    }
+
+    /**
+     * Splits `text` on the query and appends the parts to `parent`, wrapping
+     * matches in <mark>. Text nodes are created via createTextNode, so the
+     * source string is data and can never become markup — which is why there
+     * is no escapeHtml() anywhere in this file. There is nothing to escape.
+     */
+    function appendHighlighted(parent, text, query) {
+        if (!text) return;
+
+        if (!query) {
+            parent.appendChild(document.createTextNode(text));
+            return;
+        }
+
+        const haystack = text.toLowerCase();
+        const needle   = query.toLowerCase();
+        let cursor = 0;
+
+        for (;;) {
+            const hit = haystack.indexOf(needle, cursor);
+            if (hit === -1) break;
+
+            if (hit > cursor) {
+                parent.appendChild(
+                    document.createTextNode(text.slice(cursor, hit))
+                );
             }
-        }
-    });
 
-    // Hide results when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!searchResults.contains(e.target) && e.target !== searchInput && e.target !== searchBtn) {
-            hideSearchResults();
-        }
-    });
-}
+            const mark = document.createElement('mark');
+            mark.textContent = text.slice(hit, hit + needle.length);
+            parent.appendChild(mark);
 
-// Perform the search
-function performSearch(query) {
-    const searchResults = document.getElementById('searchResults');
-    if (!searchResults) return;
-
-    const queryLower = query.toLowerCase();
-    const results = [];
-
-    // Search through the index
-    searchIndex.forEach(item => {
-        let score = 0;
-
-        // Check title match (highest priority)
-        if (item.title.toLowerCase().includes(queryLower)) {
-            score += 10;
+            cursor = hit + needle.length;
         }
 
-        // Check category match
-        if (item.category.toLowerCase().includes(queryLower)) {
-            score += 5;
+        if (cursor < text.length) {
+            parent.appendChild(document.createTextNode(text.slice(cursor)));
         }
-
-        // Check keywords match
-        if (item.keywords && item.keywords.includes(queryLower)) {
-            score += 3;
-        }
-
-        // Check description match if available
-        if (item.description && item.description.toLowerCase().includes(queryLower)) {
-            score += 2;
-        }
-
-        if (score > 0) {
-            results.push({ ...item, score });
-        }
-    });
-
-    // Sort by score (highest first)
-    results.sort((a, b) => b.score - a.score);
-
-    // Display results
-    displaySearchResults(results, query);
-}
-
-// Display search results
-function displaySearchResults(results, query) {
-    const searchResults = document.getElementById('searchResults');
-    if (!searchResults) return;
-
-    if (results.length === 0) {
-        searchResults.innerHTML = `
-            <div class="no-results">
-                <p>No results found for "${escapeHtml(query)}"</p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Try different keywords or browse the categories below.</p>
-            </div>
-        `;
-        searchResults.style.display = 'block';
-        return;
     }
 
-    let html = '';
-    const maxResults = 10;
-    const displayResults = results.slice(0, maxResults);
-
-    displayResults.forEach(result => {
-        const highlightedTitle = highlightText(result.title, query);
-        const excerpt = result.description || `Learn about ${result.title}`;
-        const highlightedExcerpt = highlightText(excerpt, query);
-
-        html += `
-            <div class="search-result-item" onclick="window.location.href='${result.url}'">
-                <div class="search-result-title">${highlightedTitle}</div>
-                <div class="search-result-category">${escapeHtml(result.category)}</div>
-                <div class="search-result-excerpt">${highlightedExcerpt}</div>
-            </div>
-        `;
-    });
-
-    if (results.length > maxResults) {
-        html += `
-            <div class="search-result-item" style="text-align: center; color: #666; cursor: default;">
-                <em>+${results.length - maxResults} more results...</em>
-            </div>
-        `;
+    function message(text) {
+        const p = document.createElement('p');
+        p.className = 'search-message';
+        p.textContent = text;
+        return p;
     }
 
-    searchResults.innerHTML = html;
-    searchResults.style.display = 'block';
-}
+    // ── Panel state ─────────────────────────────────────────────────────────
 
-// Hide search results
-function hideSearchResults() {
-    const searchResults = document.getElementById('searchResults');
-    if (searchResults) {
-        searchResults.style.display = 'none';
+    function open() {
+        panel.dataset.open = 'true';
+        input.setAttribute('aria-expanded', 'true');
     }
-}
 
-// Highlight matching text
-function highlightText(text, query) {
-    if (!query || !text) return escapeHtml(text);
-
-    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
-    return escapeHtml(text).replace(regex, '<strong style="background: #FFEB3B; color: #000;">$1</strong>');
-}
-
-// Escape HTML to prevent XSS
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Escape regex special characters
-function escapeRegex(text) {
-    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// Export functions for use in other scripts if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        performSearch,
-        loadSearchIndex
-    };
-}
+    function close() {
+        panel.textContent = '';
+        panel.dataset.open = 'false';
+        input.setAttribute('aria-expanded', 'false');
+        input.removeAttribute('aria-activedescendant');
+        activeIndex = -1;
+    }
+}());

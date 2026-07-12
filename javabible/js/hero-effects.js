@@ -160,8 +160,22 @@ class TypingEffect {
     }
 }
 
-// Initialize on DOM ready
+/**
+ * The particle canvas and the typing effect are decoration. A user who has
+ * asked their operating system to reduce motion has already told us they do
+ * not want them — and an animation loop running behind a hidden canvas burns
+ * CPU and battery to paint pixels nobody sees.
+ *
+ * The media query is checked once at boot. It is deliberately NOT reactive:
+ * starting an animation the moment someone toggles the OS setting mid-session
+ * would be the exact opposite of what they asked for.
+ */
 document.addEventListener('DOMContentLoaded', () => {
+    const prefersReducedMotion =
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (prefersReducedMotion) return;
+
     new ParticlesCanvas();
     new TypingEffect();
 });

@@ -114,7 +114,11 @@ function sharePage() {
             title: document.title,
             text: 'Check out this Java development resource',
             url: window.location.href
-        }).catch(err => console.log('Error sharing:', err));
+        }).catch(() => {
+            // The user dismissed the share sheet, or the browser refused. Neither is
+            // an error worth reporting — and a portfolio site should ship with a
+            // silent console.
+        });
     } else {
         navigator.clipboard.writeText(window.location.href).then(() => {
             alert('Link copied to clipboard!');
