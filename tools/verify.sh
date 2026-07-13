@@ -12,6 +12,7 @@
 #   2. Search index drift     — search-index.json out of sync with disk
 #   3. UTF-8 BOM              — forbidden by CLAUDE.md, present anyway
 #   4. Debug leftovers        — console.log shipped to production
+#   5. Dead CSS class         — class="comparison-table", defined in no stylesheet
 #
 # Usage:
 #   bash tools/verify.sh            run all checks
@@ -226,14 +227,35 @@ else
   show_capped "$(printf '%s\n' "$CONSOLE_HITS" | sed "s|^$REPO_ROOT/||")"
 fi
 
+# ─── Check 5: Dead CSS class ──────────────────────────────────────────────────
+#
+# CLAUDE.md forbids class="comparison-table". The class is defined in no
+# stylesheet, so it styles nothing — a table wearing it renders identically to a
+# bare <table>, which is why 38 pages carried it undetected. The convention
+# existed; nothing enforced it, so it drifted into a lie. This check ends that:
+# the correct markup is a bare <table>, which main.css styles globally.
+
+header "5. Dead CSS class"
+
+DEAD_CLASS_HITS="$(grep -rn 'class="comparison-table"' "$TOPICS_DIR" 2>/dev/null || true)"
+DEAD_CLASS_N=$(printf '%s' "$DEAD_CLASS_HITS" | grep -c . || true)
+
+if [[ "$DEAD_CLASS_N" -eq 0 ]]; then
+  pass 'no class="comparison-table" in topics/'
+else
+  fail "$DEAD_CLASS_N use(s) of class=\"comparison-table\" (defined in no CSS)"
+  show_capped "$(printf '%s\n' "$DEAD_CLASS_HITS" | sed "s|^$REPO_ROOT/||")"
+  hint 'fix: replace <table class="comparison-table"> with a bare <table>'
+fi
+
 # ─── Summary ──────────────────────────────────────────────────────────────────
 
 printf '\n'
 if [[ "$CHECKS_FAILED" -eq 0 ]]; then
-  printf '%s%s✓ 4/4 checks passed.%s\n' "$BOLD" "$GREEN" "$RESET"
+  printf '%s%s✓ 5/5 checks passed.%s\n' "$BOLD" "$GREEN" "$RESET"
   exit 0
 else
-  printf '%s%s✗ %d of 4 checks failed.%s\n' \
+  printf '%s%s✗ %d of 5 checks failed.%s\n' \
     "$BOLD" "$RED" "$CHECKS_FAILED" "$RESET"
   exit 1
 fi
