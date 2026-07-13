@@ -1,123 +1,163 @@
 # CLAUDE.md
 
-This file gives Claude Code (and any other Claude instance working in this repo) the context it needs to work on JavaDevBible correctly on the first try. Read this before editing anything.
+Context for Claude Code and any other Claude instance working in this repo. Read this before editing anything.
 
 ## Project identity
 
 - **Name:** JavaDevBible
-- **Live URL:** https://karlete.github.io/javadevbible/javabible/index.html
-- **Repository:** https://github.com/karlete/javadevbible
-- **What it is:** A comprehensive static HTML educational reference site covering Java, from fundamentals through advanced ecosystem topics, targeting both junior and senior developers simultaneously in the same page.
+- **Live:** https://karlete.github.io/javadevbible/javabible/index.html
+- **Repo:** https://github.com/karlete/javadevbible
+- **What it is:** A static HTML reference covering Java from fundamentals through the wider ecosystem, written for junior and senior developers on the same page.
 - **Deploy:** GitHub Pages, branch `main`, folder `/javabible/`.
+- **Scale:** 90 topic pages across 12 categories.
 
 ## Stack — non-negotiable
 
 100% static. **Do not** introduce:
-- Any JS framework (React, Vue, etc.)
+- Any JS framework
 - A backend of any kind
-- A build step or bundler (no webpack, no vite)
-- A CMS
-- Login, user accounts, or comments
+- A build step or bundler
+- A CMS, login, user accounts, or comments
+- **Any dependency at all** — including in tooling. `tools/verify.sh` is pure bash for exactly this reason. A `package.json` in a repo whose defining constraint is zero dependencies would be a contradiction.
 
 The stack is HTML5 + CSS3 + Vanilla JavaScript + JSON, and it stays that way.
+
+## Verify before you claim anything is done
+
+```bash
+bash tools/verify.sh
+```
+
+Four checks: internal links resolve, the search index matches what is on disk (both directions), no UTF-8 BOM, no `console.log` in shipped JS. It exits non-zero on failure and runs in CI on every push.
+
+**Run it after any change that touches a filename, a link, the search index, or `js/`.** It exists because a restructure once left 22 broken links, 16 index entries pointing at deleted files, and 11 pages that no search could reach — none of which anything caught. It is the closest thing this project has to a compiler.
+
+It does **not** verify behaviour. A page can pass all four checks and still be visually broken. Anything touching CSS or JS needs a browser:
+
+```bash
+cd javabible && python -m http.server 8000
+```
 
 ## Repository structure
 
 ```
 /javabible/
-├── index.html                    ← category navigation + instant search
-├── topics/{category}/{topic}.html ← individual topic pages
-├── css/                           ← main.css, syntax-highlighting.css, toc.css
-├── js/                            ← i18n.js, navigation.js, search.js, hero-effects.js, toc.js
-└── *.json                         ← search index
+├── index.html                     category navigation + instant search
+├── topics/{category}/{topic}.html 90 topic pages
+├── css/                           main.css, syntax-highlighting.css, toc.css
+├── js/                            search.js, navigation.js, toc.js, hero-effects.js
+└── data/search-index.json         must always match topics/ on disk — verify.sh checks this
+
+/tools/verify.sh                   integrity checker
+/.github/workflows/verify.yml      runs it on every push
 /README.md
-/CONTRIBUTING.md
-/PROJECT_STATUS.md
-/QUICK_START.md
+/CLAUDE.md
+/LICENSE
 ```
 
 ### Categories (12) and their folder names
 
 | Category | Folder | Index anchor |
 |---|---|---|
-| Java Fundamentals | `fundamentals` | `#fundamentals` ✅ |
-| Advanced Java | `advanced` | `#advanced` ✅ |
-| Build Tools | `build-tools` | *(no anchor id yet — see Known Issues)* |
-| Spring Framework | `spring` | `#spring` ✅ |
-| Jakarta EE | `jakarta-ee` | `#jakarta-ee` ✅ |
-| Web Concepts | `web-concepts` | *(no anchor id yet)* |
-| Databases & Persistence | `databases` | *(no anchor id yet)* |
-| Security & Authentication | `security` | *(no anchor id yet)* |
-| Application Servers & Deployment | `servers` | *(no anchor id yet)* |
-| Java Versions & Compatibility | `java-versions` | *(no anchor id yet)* |
-| Tools & Ecosystem | `tools` | *(no anchor id yet)* |
-| Best Practices | `best-practices` | `#bestpractices` ✅ |
+| Java Fundamentals | `fundamentals` | `#fundamentals` |
+| Advanced Java | `advanced` | `#advanced` |
+| Build Tools | `build-tools` | `#build-tools` |
+| Spring Framework | `spring` | `#spring` |
+| Jakarta EE | `jakarta-ee` | `#jakarta-ee` |
+| Web Concepts | `web-concepts` | `#web-concepts` |
+| Databases & Persistence | `databases` | `#databases` |
+| Security & Authentication | `security` | `#security` |
+| Application Servers & Deployment | `servers` | `#servers` |
+| Java Versions & Compatibility | `java-versions` | `#versions` |
+| Tools & Ecosystem | `tools` | `#tools` |
+| Best Practices | `best-practices` | `#bestpractices` |
 
-## Known issues — check before assuming a fix is needed elsewhere
-
-- **`index.html` is missing `id` attributes** on the `category-card` divs for Databases, Security, Servers, Java Versions, Tools, Build Tools, and Web Concepts. Every topic page's breadcrumb links to `../../index.html#<category>` — for the categories above, that anchor currently doesn't exist, so the link works but doesn't scroll to the right place. **Fix:** add the matching `id="databases"`, `id="security"`, `id="servers"`, `id="versions"`, `id="tools"`, `id="build-tools"`, `id="web-concepts"` to each `category-card` div in `index.html`. One-file, low-risk fix — do this the next time `index.html` is touched for any reason, or proactively if asked.
-- Mobile search results (`#searchResults`) have had a z-index / stacking-context bug reported. Root cause not yet isolated — needs `css/main.css` (specifically `.hero-section`, `.overlay`, `#hero-particles`, `.search-container`, `.search-results`) and possibly `js/search.js` in hand before attempting a fix. Don't guess a `z-index: 9999 !important` patch without seeing the actual stacking context.
+> **Unverified:** the `id` attributes on the `category-card` divs in `index.html` were reported missing for several categories, which would make the breadcrumb anchors land at the top of the page instead of the right card. Check with `grep -c 'category-card" id=' javabible/index.html` — it should return 12. If it does not, add the missing `id`s to match the table above. Delete this note once confirmed.
 
 ## Non-negotiable template conventions
 
 Every topic page follows this structure. Deviating from it is a defect, not a style choice.
 
 ### Required page structure, in order
-1. **Section 0** — "What is X — and why does it exist?" Always includes: a plain-language explanation, the concrete problem it solves, and a **before/after code comparison** (a naive/legacy/manual approach vs. the correct modern one), with comments explaining *why* the after-version is better, not just what changed.
+
+1. **Section 0** — opens by explaining what the thing *is* and what problem it exists to solve, before any usage. Always includes a **before/after code comparison**: the naive, legacy or manual approach against the correct modern one, with comments explaining *why* the after-version is better, not just what changed. No page may assume prior knowledge of its own subject.
+
+   The `<h2>` does **not** have to be literally "What is X". `"Why Testing Matters — and the Trap Most Test Suites Fall Into"` is a better heading than `"What is Testing"` and satisfies the convention. The requirement is the *content*: what it is, why it exists, before/after.
+
 2. Body sections specific to the topic.
-3. **Best Practices** section, formatted as `✅ Do` / `❌ Don't` lists — never a single flat bullet list, never called "Summary."
-4. **Interview Questions**, split explicitly into `🎓 Junior level` and `🔥 Senior level`, using `info-box note` and `info-box important` respectively. 3 junior + 3 senior is the norm. Every page must have this section.
-5. **Related Topics** — links to every sibling page in the same category (not just 2–3), using the *exact* filenames as they appear in `index.html`, plus meaningful cross-category links where genuinely relevant (e.g., a Security page linking to a JWT-storage detail on another Security page; a JPA page linking to Transactions).
+
+3. **Best Practices** — formatted as `✅ Do` / `❌ Don't` lists. Never a single flat bullet list. Never titled "Summary."
+
+4. **Interview Questions** — split explicitly into `🎓 Junior level` (`info-box note`) and `🔥 Senior level` (`info-box important`). **Minimum 3 + 3; more is fine and often better.** Do not cut a good question to hit a number. Every page must have this section.
+
+5. **Related Topics** — links to sibling pages in the same category, plus meaningful cross-category links where genuinely relevant. Use exact filenames. `verify.sh` will catch a wrong one, but catching it yourself is faster.
 
 ### Explicitly forbidden, anywhere on any page
-- Analogies (restaurant, apartment building, moving boxes, etc.) — if you catch yourself reframing a request into an analogy, that's the signal to write the literal technical explanation instead.
-- Emojis in body prose (icons in headers like `🎓`/`🔥`/`✅`/`❌` and `related-icon` spans are fine and expected).
-- A section literally titled "Summary."
-- ASCII-art box diagrams with side-by-side columns (`┌──┐` style) — they break at 320px viewport width. A **vertical** ASCII tree (directory structure) is fine since it just needs horizontal scroll, not layout integrity. Multi-column diagrams → convert to an HTML `<table>` instead.
-- Toy domain models: no `User` with just `name`/`age`, no generic `Employee`/`Department`. All examples use the site's established **e-commerce domain**: `Customer`, `Product`, `Order`, `OrderItem`, `Invoice`, `ShippingAddress`. (Exception: illustrating a pure language mechanic like polymorphism with `Animal`/`Dog` is acceptable — that's not a business-domain model.)
 
-### Required HTML/document conventions
-- No BOM at the start of the file.
-- `<html lang="en" data-i18n-root="../.." data-i18n-title="topic.<slug>.page-title">`
-- `<link rel="stylesheet" href="../../css/toc.css">` in addition to `main.css` and `syntax-highlighting.css`.
-- TOC sidebar (`<aside class="toc-sidebar" id="toc-sidebar">…</aside>`) — copy the exact markup block from an existing gold-standard page (see below), don't hand-roll it.
-- `data-i18n="..."` attributes on breadcrumb links, `<h1>`, subtitle `<p>`, back-button, and footer copyright — every static text node that should be translatable.
-- Scripts at the end of `<body>`: `js/i18n.js`, `js/navigation.js`, `js/toc.js` (topic pages) — `index.html` additionally loads `js/search.js` and `js/hero-effects.js`.
-- Tables use `class="comparison-table"` — not `info-table`, not unstyled `<table>`.
-- No inline `style="..."` attributes on content elements — use existing CSS classes; if a new visual treatment is genuinely needed (e.g., highlighting a table row), propose a small named class to add to `main.css` rather than inlining styles.
+- **Analogies** (restaurant, apartment building, moving boxes). If you catch yourself reframing a request into an analogy, that is the signal to write the literal technical explanation instead.
+- **Emojis in body prose.** Header icons (`🎓` `🔥` `✅` `❌`) and `related-icon` spans are expected and fine.
+- **A section titled "Summary."**
+- **ASCII-art box diagrams with side-by-side columns** (`┌──┐` style) — they break at 320px. A *vertical* ASCII tree (a directory listing) is fine; it only needs horizontal scroll, not layout integrity. Multi-column diagrams become an HTML `<table>`.
+- **Toy domain models.** No `User` with `name`/`age`/`email`. No generic `Employee`/`Department`. All business-domain examples use the site's e-commerce domain: `Customer`, `Product`, `Order`, `OrderItem`, `Invoice`, `ShippingAddress`, `order_items`. (Exception: a pure language mechanic like polymorphism may use `Animal`/`Dog` — that is not a business-domain model.)
+- **A UTF-8 BOM** at the start of the file. Windows editors add it silently. `verify.sh` catches it.
+- **Inline `style="..."`** on content elements. If a new visual treatment is genuinely needed, propose a named class for `main.css` instead.
+- **`console.log`** in anything under `js/`.
+
+### Required HTML conventions
+
+- `<html lang="en">`
+- Stylesheets: `main.css`, `syntax-highlighting.css`, `toc.css`.
+- Scripts at the end of `<body>`: `navigation.js`, `toc.js` on topic pages. `index.html` additionally loads `search.js` and `hero-effects.js`.
+- TOC sidebar (`<aside class="toc-sidebar" id="toc-sidebar">`) — copy the exact markup from a reference page below. Do not hand-roll it.
+- Tables need **no class**. `main.css` styles `<table>` globally. (A `comparison-table` class was previously mandated here; it was never defined in any stylesheet and did nothing. It has been removed from this document — do not reintroduce it.)
 
 ### Required Java/Spring conventions in every code sample
-- Spring Boot 3.x / Java 17–21 baseline (Java 25 LTS content is being folded in as of the Java Versions & Compatibility topic — check the most recently completed pages in that category before assuming which baseline a new page should target).
-- `jakarta.*` namespace, never `javax.*`, unless the code is explicitly illustrating pre-Jakarta-EE-9 legacy behavior.
+
+- Spring Boot 3.x / Java 17–21 baseline. Java 25 is the current LTS; check the most recently completed pages in Java Versions & Compatibility before assuming which baseline a new page targets.
+- `jakarta.*`, never `javax.*` — unless the code is explicitly illustrating pre-Jakarta-EE-9 legacy behaviour.
 - **Constructor injection always.** Never `@Autowired` field injection. Never `@Autowired` on a single constructor (unnecessary since Spring 4.3).
 - `record` for all DTOs.
-- `ProblemDetail` (RFC 9457) for all error responses — never a hand-rolled `ApiError`/`ErrorResponse` class.
-- `LAZY` fetch as the default on every JPA association (`@ManyToOne`, `@OneToOne` default to EAGER — override explicitly). Cross-reference `topics/databases/relationships.html` when EAGER is tempting.
+- `ProblemDetail` (RFC 9457) for all error responses. Never a hand-rolled `ApiError` / `ErrorResponse`.
+- `LAZY` fetch on every JPA association. `@ManyToOne` and `@OneToOne` default to EAGER — override them explicitly. Cross-reference `topics/databases/relationships.html` when EAGER looks tempting.
 - `@MockitoBean`, not `@MockBean` (renamed in Spring Boot 3.4+).
-- `AutoConfiguration.imports`, not `spring.factories` (replaced since Boot 2.7).
-- `spring.forward-headers-strategy=native` (or `framework`, context-dependent) behind a reverse proxy — and always flag the security risk of trusting `X-Forwarded-*` headers on a server reachable outside the trusted proxy.
+- `AutoConfiguration.imports`, not `spring.factories`.
 - No Lombok `@Data` on JPA entities.
-- No cursing, no filler — every code comment should teach something, not restate the line above it.
+- Every code comment must teach something. A comment that restates the line above it is noise.
 
-## Workflow — how we actually build pages here
+## Workflow
 
-1. **One file at a time.** The person pastes or uploads the current file (or says "let's create X from scratch"). Never assume a file's contents, existence, or that a linked/related file is correct — view it if it's available, ask if it isn't.
-2. **Structured delivery format**, in this order:
+1. **One file at a time.** The person uploads the current file or asks for a new one. **Never assume a file's contents, its existence, or that a linked file is correct** — read it if it is available, ask if it is not.
+
+2. **Do not ask for confirmation before generating.** Proceed directly with the full rewrite and deliver the complete file.
+
+3. **Delivery format:**
    - **Entendido** — brief restatement of the task
-   - **Análisis** — real technical diagnosis of the current file: what's wrong, what's outdated, what's missing, cross-checked against this document's conventions
-   - **Propuesta** — the rewritten file (or the specific diff), with reasoning
-   - **Plan de implementación** — concrete next steps, which files are touched
-   - **Auto-revisión crítica** — an honest, specific list of this response's own limitations, unverified claims, or deliberate scope choices. This is not boilerplate; each point should be genuinely useful to the person reviewing the work.
-3. **Confirm topic ordering before writing pages.** When starting a new category/topic, propose the page order explicitly (general concept before specific implementation; foundational concept before the mechanism built on it) and get confirmation before writing.
-4. **Verify currency for anything version-, date-, or release-specific.** Java's ecosystem moves fast — LTS status, JEP numbers, deprecation/removal timelines, and library defaults (e.g., Spring Boot's fat-jar mechanism, Oracle JDK licensing terms) should be checked against current sources rather than assumed from training data, especially for anything that could have changed in the last 12–18 months.
-5. **Flag cross-page consistency issues proactively** — if a fix, a renamed link, or a corrected fact on the current page implies another already-completed page needs the same fix, say so explicitly rather than leaving it implicit.
+   - **Análisis** — real technical diagnosis: what is wrong, outdated, or missing, cross-checked against this document
+   - **Propuesta** — the rewritten file, with reasoning
+   - **Plan de implementación** — concrete steps, which files are touched
+   - **Auto-revisión crítica** — an honest, specific list of the response's own limitations, unverified claims, and deliberate scope choices. Not boilerplate. Each point must be useful to whoever reviews the work.
 
-## Reference files — read these before building a new page in an unfamiliar section
+4. **Verify currency for anything version-, date- or release-specific.** Java moves fast. LTS status, JEP numbers, deprecation timelines and library defaults should be checked against current sources rather than recalled from training data — particularly anything that could have changed in the last 12–18 months.
 
-- **`topics/databases/relationships.html`** — the established gold-standard template for structure, tone, and depth.
-- **`topics/jakarta-ee/transactions.html`** — gold standard for a topic with heavy propagation/lifecycle nuance.
-- Any of the completed **Security & Authentication** or **Application Servers & Deployment** pages — these are the most recently built and reflect the current template most precisely (TOC, i18n, Do/Don't, Junior/Senior interview questions).
+5. **Flag cross-file consequences proactively.** If a fix, a renamed link, or a corrected fact implies another completed page needs the same change, say so explicitly. And say so when you *cannot* check, because the related file was not provided.
 
-## What "done" looks like for a single page
+6. **Run `bash tools/verify.sh` before declaring anything done.**
 
-A page is not done until it has: Section 0 with before/after, no forbidden elements, TOC + i18n wiring, e-commerce-domain examples throughout, a Best Practices Do/Don't section, 3+3 Interview Questions, a complete Related Topics block with correct filenames, and an honest auto-critique was given to the person requesting the work. If any of these is missing, the page is a draft, not a finished deliverable.
+## Reference files
+
+- **`topics/databases/relationships.html`** — the gold standard for structure, tone and technical depth.
+- **`topics/java-versions/version-compatibility.html`** — the structural template.
+
+## What "done" means for a page
+
+Section 0 with a before/after comparison. No forbidden elements. TOC wired up. E-commerce domain throughout. A Do/Don't Best Practices section. Interview questions, at least 3 junior and 3 senior. A complete Related Topics block with filenames that resolve. `verify.sh` green. An honest auto-critique delivered to the person.
+
+Anything less is a draft, not a deliverable.
+
+## A standing warning about this file
+
+Every convention here is a claim about the repository. Claims rot.
+
+The `comparison-table` rule sat in this document for months, was applied to 78 tables, and did nothing — the class was never defined in any stylesheet. An `i18n` section mandated `data-i18n` attributes on every text node in 90 files; the i18n system was deleted. A `PROJECT_STATUS.md` declared 95 pages complete when 90 existed.
+
+**A convention nothing verifies will eventually be a lie.** If you add a rule here, ask whether `verify.sh` can enforce it. If it can, add the check. If it cannot, expect this document to drift from reality and treat every unverified claim in it with suspicion — starting with the ones above.
