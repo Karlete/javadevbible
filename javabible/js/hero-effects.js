@@ -5,7 +5,7 @@ const codeSnippets = [
 
 // Typing effect configuration
 const phrases = [
-    'Your Comprehensive Java Developer Knowledge Base',
+    'Your Java Developer Knowledge Base',
     'From Fundamentals to Enterprise Mastery',
     'Multithreading, Jakarta EE, Spring & more'
 ];

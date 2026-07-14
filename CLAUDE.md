@@ -72,8 +72,6 @@ cd javabible && python -m http.server 8000
 | Tools & Ecosystem | `tools` | `#tools` |
 | Best Practices | `best-practices` | `#bestpractices` |
 
-> **Unverified:** the `id` attributes on the `category-card` divs in `index.html` were reported missing for several categories, which would make the breadcrumb anchors land at the top of the page instead of the right card. Check with `grep -c 'category-card" id=' javabible/index.html` — it should return 12. If it does not, add the missing `id`s to match the table above. Delete this note once confirmed.
-
 ## Non-negotiable template conventions
 
 Every topic page follows this structure. Deviating from it is a defect, not a style choice.

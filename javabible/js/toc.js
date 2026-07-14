@@ -33,6 +33,15 @@
         buildToc(headings, tocNav);
         setupToggle(tocNav, tocToggle);
         setupScrollSpy(tocNav);
+
+        // Marca la ToC como inicializada. En mobile, el CSS mantiene la nav
+        // colapsada hasta este punto; solo entonces se habilita la variante
+        // expandida. Así el primer render nunca muestra el estado expandido
+        // ni anima el colapso al cargar (elimina el CLS). En este momento, en
+        // mobile, setupToggle() ya ha añadido .toc-collapsed, de modo que
+        // habilitar la puerta no dispara ninguna animación.
+        const sidebar = document.getElementById('toc-sidebar');
+        if (sidebar) sidebar.classList.add('toc-ready');
     }
 
     /* ── Construir la ToC ──────────────────────────────────── */
