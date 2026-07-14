@@ -13,6 +13,7 @@
 #   3. UTF-8 BOM              — forbidden by CLAUDE.md, present anyway
 #   4. Debug leftovers        — console.log shipped to production
 #   5. Dead CSS class         — class="comparison-table", defined in no stylesheet
+#   6. Missing meta description — topic page with no <meta name="description">
 #
 # Usage:
 #   bash tools/verify.sh            run all checks
@@ -248,14 +249,36 @@ else
   hint 'fix: replace <table class="comparison-table"> with a bare <table>'
 fi
 
+# ─── Check 6: Meta description coverage ───────────────────────────────────────
+#
+# Every topic page needs a <meta name="description"> for SEO. Lighthouse flags
+# its absence ("Document does not have a meta description"), and without one the
+# search engine invents the result snippet from arbitrary body text. All 90
+# pages once lacked it — a template gap nothing caught, exactly like
+# comparison-table. This check ends that: the description belongs in the <head>,
+# right after the <title>.
+
+header "6. Meta description"
+
+NO_DESC="$(grep -rL 'name="description"' --include='*.html' "$TOPICS_DIR" 2>/dev/null || true)"
+NO_DESC_N=$(printf '%s' "$NO_DESC" | grep -c . || true)
+
+if [[ "$NO_DESC_N" -eq 0 ]]; then
+  pass 'every topic page has a <meta name="description">'
+else
+  fail "$NO_DESC_N topic page(s) with no <meta name=\"description\">"
+  show_capped "$(printf '%s\n' "$NO_DESC" | sed "s|^$REPO_ROOT/||")"
+  hint 'fix: add <meta name="description" content="..."> after the <title>'
+fi
+
 # ─── Summary ──────────────────────────────────────────────────────────────────
 
 printf '\n'
 if [[ "$CHECKS_FAILED" -eq 0 ]]; then
-  printf '%s%s✓ 5/5 checks passed.%s\n' "$BOLD" "$GREEN" "$RESET"
+  printf '%s%s✓ 6/6 checks passed.%s\n' "$BOLD" "$GREEN" "$RESET"
   exit 0
 else
-  printf '%s%s✗ %d of 5 checks failed.%s\n' \
+  printf '%s%s✗ %d of 6 checks failed.%s\n' \
     "$BOLD" "$RED" "$CHECKS_FAILED" "$RESET"
   exit 1
 fi
