@@ -46,10 +46,18 @@ JavaDev Bible — integrity check
 4. Debug leftovers
   ✓ no console.log / debug / warn in js/
 
-✓ 4/4 checks passed.
+5. Dead CSS class
+  ✓ no class="comparison-table" in topics/
+
+6. Meta description
+  ✓ every topic page has a <meta name="description">
+
+✓ 6/6 checks passed.
 ```
 
-[`tools/verify.sh`](tools/verify.sh) walks every `href` in every page and resolves it against the filesystem; diffs the search index against what is actually on disk, in both directions; catches the UTF-8 BOM that Windows editors keep reintroducing; and fails on any `console.log` that reaches production.
+[`tools/verify.sh`](tools/verify.sh) walks every `href` in every page and resolves it against the filesystem; diffs the search index against what is actually on disk, in both directions; catches the UTF-8 BOM that Windows editors keep reintroducing; fails on any `console.log` that reaches production; catches a CSS class that styles nothing; and flags any topic page missing a meta description.
+
+The last two checks exist for the same reason as the first four: a convention documented but not enforced eventually stops being true. `comparison-table` sat in `CLAUDE.md` for months, was applied to dozens of tables, and did nothing — the class was never defined in any stylesheet. It has since been removed from the conventions doc, and check 5 makes sure it can't quietly come back. Check 6 exists because Lighthouse flags a missing meta description on every single page that lacks one, and a template gap like that is exactly the kind of thing that's invisible until something automated looks for it.
 
 It is **pure bash — no Node, no npm, no `package.json`**. Adding a dependency to check a project whose defining constraint is *zero dependencies* would have missed the point. It runs on every push via [GitHub Actions](.github/workflows/verify.yml) and blocks the merge if the site's internal references do not hold together.
 
@@ -66,6 +74,8 @@ It knows what it does not cover: referential integrity, not behaviour. Verifying
 **Search results are real anchors.** They were `<div onclick="location.href=...">`, which is not focusable, not openable in a new tab, and not announced as a link by a screen reader. They are `<a href>` now, built with `createElement` and `textContent` rather than `innerHTML`, so index content cannot be interpreted as markup — there is nothing left to escape.
 
 **Motion is opt-out.** The hero runs an animated gradient, a particle canvas, a pulse, a typing effect and a blinking cursor. Under `prefers-reduced-motion`, all five stop — including the `requestAnimationFrame` loop, which would otherwise keep burning CPU to paint a canvas the CSS has already hidden.
+
+**A meta description on every page, but no SEO strategy.** This project doesn't chase search rankings — a personal portfolio with no backlinks and no domain authority isn't going to outrank Baeldung, and trying to would be effort spent on the wrong problem. The meta description exists because Lighthouse scores it and because a shared link should preview cleanly, not because anyone is expected to find this site through a Google search.
 
 ---
 
@@ -86,6 +96,7 @@ To run the integrity checks:
 ```bash
 bash tools/verify.sh          # human-readable
 bash tools/verify.sh --quiet  # failures only, for CI
+bash tools/verify.sh --full   # do not truncate long failure lists
 ```
 
 ---
@@ -101,7 +112,7 @@ javabible/
 └── data/
     └── search-index.json   generated from disk, verified in CI
 
-tools/verify.sh             integrity checker
+tools/verify.sh             integrity checker — 6 checks, pure bash
 .github/workflows/          runs it on every push
 CLAUDE.md                   the conventions every page must satisfy
 ```
