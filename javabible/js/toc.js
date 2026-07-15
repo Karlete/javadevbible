@@ -129,9 +129,14 @@
                 match.link.classList.add('toc-active');
                 activeLink = match.link;
 
-                // Auto-scroll de la ToC hacia el ítem activo
+                // Auto-scroll de la ToC hacia el ítem activo.
+                // Solo en el sidebar de escritorio: es el único caso en que la
+                // ToC tiene overflow-y propio. Por debajo de 901px (la misma
+                // media query de toc.css) el sidebar es overflow: visible, no
+                // hay ancestro desplazable entre el link y la ventana, y
+                // scrollIntoView acabaría desplazando la página entera.
                 const nav = document.getElementById('toc-nav');
-                if (nav) {
+                if (nav && window.matchMedia('(min-width: 901px)').matches) {
                     const navRect = nav.getBoundingClientRect();
                     const linkRect = match.link.getBoundingClientRect();
                     if (linkRect.top < navRect.top || linkRect.bottom > navRect.bottom) {
