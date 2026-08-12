@@ -111,7 +111,7 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
 
 ### Required Java/Spring conventions in every code sample
 
-- Spring Boot 3.x / Java 17–21 baseline. Java 25 is the current LTS; check the most recently completed pages in Java Versions & Compatibility before assuming which baseline a new page targets.
+- Spring Boot 4.x / Java 17–25 baseline. Java 25 is the current LTS (September 2025); Java 25 recommended for all new projects.
 - `jakarta.*`, never `javax.*` — unless the code is explicitly illustrating pre-Jakarta-EE-9 legacy behaviour.
 - **Constructor injection always.** Never `@Autowired` field injection. Never `@Autowired` on a single constructor (unnecessary since Spring 4.3).
 - `record` for all DTOs.

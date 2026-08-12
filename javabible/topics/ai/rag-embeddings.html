@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG &amp; Embeddings - JavaDev Bible</title>
+    <meta name="description" content="Retrieval-Augmented Generation in Java — embeddings, vector stores, pgvector, and the QuestionAnswerAdvisor with Spring AI">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+</head>
+
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#ai">AI &amp; Java</a> /
+                RAG &amp; Embeddings
+            </nav>
+            <h1>RAG &amp; Embeddings</h1>
+            <p class="topic-subtitle">Give the model access to your data without fine-tuning — embeddings, vector stores, and Retrieval-Augmented Generation with Spring AI</p>
+            <a href="../../index.html#ai" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is RAG, and What Problem Does It Solve?</h2>
+
+                <p>An LLM's knowledge is frozen at its training cutoff. It knows nothing about
+                    your product catalogue, your order history, your internal documentation, or
+                    anything that changed after training. The naive fix is to include your data
+                    in the prompt — but a context window has a token limit, and sending an entire
+                    product catalogue on every request is expensive, slow, and often impossible.</p>
+
+                <p><strong>Retrieval-Augmented Generation (RAG)</strong> solves this by storing
+                    your data as vector embeddings in a database and retrieving only the relevant
+                    chunks at query time. The model gets exactly the context it needs — not
+                    everything, just the right thing.</p>
+
+                <pre><code><span class="comment">/*
+ * BEFORE — stuffing the entire product catalogue into the prompt.
+ * Breaks at scale: 50,000 products × 200 tokens each = 10 million tokens.
+ * gpt-4o has a 128k token context. This does not fit, costs a fortune,
+ * and degrades answer quality as the context grows.
+ */</span>
+<span class="class-name">String</span> allProducts = productRepository.findAll().stream()
+    .map(<span class="class-name">Product</span>::toString)
+    .collect(<span class="class-name">Collectors</span>.joining(<span class="string">"\n"</span>));
+
+<span class="class-name">String</span> answer = chatClient.prompt()
+    .user(<span class="string">"Here are all our products:\n"</span> + allProducts    <span class="comment">// token explosion</span>
+        + <span class="string">"\n\nCustomer asks: "</span> + customerQuestion)
+    .call()
+    .content();</code></pre>
+
+                <pre><code><span class="comment">/*
+ * AFTER — RAG. Retrieve the 5 most relevant product chunks, send only those.
+ * Works at 50,000 products, at 5 million products. Cost and latency are
+ * proportional to the retrieved context size, not the catalogue size.
+ */</span>
+<span class="class-name">String</span> answer = chatClient.prompt()
+    .advisors(<span class="class-name">QuestionAnswerAdvisor</span>.builder(vectorStore)
+        .searchRequest(<span class="class-name">SearchRequest</span>.builder()
+            .topK(<span class="number">5</span>)
+            .similarityThreshold(<span class="number">0.6</span>)
+            .build())
+        .build())
+    .user(customerQuestion)
+    .call()
+    .content();
+<span class="comment">// Spring AI retrieves the 5 most semantically similar product chunks,
+// injects them into the prompt automatically, then calls the model.</span></code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">RAG vs fine-tuning — which one?</div>
+                    <p><strong>Fine-tuning</strong> re-trains the model on your data. It is
+                        expensive ($thousands for a large model), requires ML expertise, and the
+                        result is a static snapshot that goes stale when your data changes.</p>
+                    <p><strong>RAG</strong> retrieves fresh data at query time from a vector
+                        store you control. It is cheap, keeps knowledge current, and requires no
+                        ML expertise. For the vast majority of enterprise use cases — product
+                        catalogues, documentation, order history, policy documents — RAG is
+                        the right choice. Fine-tuning is for teaching the model a new
+                        communication style or domain-specific reasoning pattern, not for
+                        injecting factual data.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — EMBEDDINGS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Embeddings — Text as Vectors</h2>
+
+                <p>An <strong>embedding</strong> is a dense numerical vector (typically 768–3072
+                    numbers) that represents the semantic meaning of a piece of text. Two texts
+                    that mean the same thing in different words have vectors that are close
+                    together in this high-dimensional space. Two texts with unrelated meanings
+                    are far apart.</p>
+
+                <p>This is the mechanism that makes semantic search possible: you embed the user's
+                    question and retrieve the stored texts whose embeddings are closest to it —
+                    not by keyword match, but by meaning.</p>
+
+                <pre><code><span class="comment">// EmbeddingModel is auto-configured from your Spring AI starter.
+// You rarely call it directly — VectorStore uses it internally.</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">ProductIngestionService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">VectorStore</span> vectorStore;
+
+    <span class="keyword">public</span> <span class="function">ProductIngestionService</span>(<span class="class-name">VectorStore</span> vectorStore) {
+        <span class="keyword">this</span>.vectorStore = vectorStore;
+    }
+
+    <span class="comment">// Call this once at startup, or whenever products change.
+    // VectorStore embeds each document automatically using the configured EmbeddingModel.</span>
+    <span class="keyword">public void</span> <span class="function">ingestProducts</span>(<span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; products) {
+        <span class="class-name">List</span>&lt;<span class="class-name">Document</span>&gt; documents = products.stream()
+            .map(p -> {
+                <span class="comment">// The text you embed determines what queries will match.
+                // Include all fields a customer might search for.</span>
+                <span class="class-name">String</span> content = <span class="class-name">String</span>.format(
+                    <span class="string">"Product: %s. Category: %s. Description: %s. Price: %s."</span>,
+                    p.name(), p.category(), p.description(), p.price());
+
+                <span class="keyword">return new</span> <span class="class-name">Document</span>(content, <span class="class-name">Map</span>.of(
+                    <span class="string">"productId"</span>,  p.id(),
+                    <span class="string">"category"</span>,   p.category(),
+                    <span class="string">"price"</span>,      p.price().toString()
+                ));
+            })
+            .toList();
+
+        vectorStore.add(documents);
+        <span class="comment">// Each Document is sent to the EmbeddingModel, which returns a vector.
+        // The vector + original text + metadata are stored in the vector store.</span>
+    }
+}</code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">The text you embed determines what you can retrieve</div>
+                    <p>Embedding quality determines retrieval quality. If you embed only the
+                        product name, a query for "waterproof shoes for rain" will not find
+                        "Trail Runner Pro" unless its name mentions waterproofing. Include every
+                        field a user might search for — name, category, description, tags. Think
+                        of it as choosing what goes into a search index: garbage in, garbage
+                        out.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — VECTOR STORES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Vector Stores — Where Embeddings Live</h2>
+
+                <p>Spring AI's <code>VectorStore</code> interface abstracts over different vector
+                    databases. You write code against the interface; the implementation is a
+                    dependency choice.</p>
+
+                <table>
+                    <tr>
+                        <th>Implementation</th>
+                        <th>When to use</th>
+                        <th>Dependency</th>
+                    </tr>
+                    <tr>
+                        <td><code>SimpleVectorStore</code></td>
+                        <td>Development and tests. In-memory, no persistence. Disappears on
+                            restart</td>
+                        <td>Built-in (no extra dependency)</td>
+                    </tr>
+                    <tr>
+                        <td><code>PgVectorStore</code></td>
+                        <td>Production with PostgreSQL already in the stack. The most common
+                            enterprise choice</td>
+                        <td><code>spring-ai-starter-vector-store-pgvector</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>RedisVectorStore</code></td>
+                        <td>Low-latency retrieval, Redis already in the stack</td>
+                        <td><code>spring-ai-starter-vector-store-redis</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>ChromaVectorStore</code></td>
+                        <td>Dedicated vector DB, standalone deployment</td>
+                        <td><code>spring-ai-starter-vector-store-chroma</code></td>
+                    </tr>
+                </table>
+
+                <h3>PgVector — production setup</h3>
+                <pre><code><span class="comment">&lt;!-- pom.xml --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.ai&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-ai-starter-vector-store-pgvector&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+                <pre><code><span class="comment"># application.properties</span>
+spring.ai.vectorstore.pgvector.index-type=HNSW
+spring.ai.vectorstore.pgvector.distance-type=COSINE_DISTANCE
+spring.ai.vectorstore.pgvector.dimensions=1536        <span class="comment"># must match the embedding model's output size</span>
+spring.ai.vectorstore.pgvector.initialize-schema=true <span class="comment"># creates the vector_store table on startup</span></code></pre>
+
+                <pre><code><span class="comment">// VectorStore is auto-configured — inject it directly.</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">ProductSearchService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">VectorStore</span> vectorStore;
+
+    <span class="keyword">public</span> <span class="function">ProductSearchService</span>(<span class="class-name">VectorStore</span> vectorStore) {
+        <span class="keyword">this</span>.vectorStore = vectorStore;
+    }
+
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Document</span>&gt; <span class="function">findSimilarProducts</span>(<span class="class-name">String</span> query) {
+        <span class="keyword">return</span> vectorStore.similaritySearch(
+            <span class="class-name">SearchRequest</span>.builder()
+                .query(query)
+                .topK(<span class="number">5</span>)
+                .similarityThreshold(<span class="number">0.6</span>)  <span class="comment">// 0–1; below this, the result is noise</span>
+                .filterExpression(<span class="string">"category == 'footwear'"</span>)  <span class="comment">// metadata filter</span>
+                .build()
+        );
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — THE FULL RAG PIPELINE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Full RAG Pipeline</h2>
+
+                <p>RAG has two phases that run at different times:</p>
+
+                <pre><code><span class="comment">/*
+ *  INGESTION PHASE (run once, or on data change)
+ *
+ *  Raw data → chunk → embed → store
+ *
+ *  Product descriptions are split into chunks (if long), each chunk is sent
+ *  to the embedding model, the resulting vector is stored in pgvector
+ *  alongside the original text and metadata.
+ *
+ *  RETRIEVAL PHASE (run on every user query)
+ *
+ *  User query → embed query → find nearest neighbours → inject into prompt → generate
+ *
+ *  The user's question is embedded with the SAME model used at ingestion.
+ *  The nearest stored vectors are retrieved. Their text is injected into
+ *  the prompt context. The model answers using that context.
+ */</span></code></pre>
+
+                <h3>QuestionAnswerAdvisor — the wiring in one line</h3>
+                <pre><code><span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">ProductAssistantService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">ChatClient</span> chatClient;
+
+    <span class="keyword">public</span> <span class="function">ProductAssistantService</span>(<span class="class-name">ChatClient</span>.<span class="class-name">Builder</span> builder,
+                                        <span class="class-name">VectorStore</span> vectorStore) {
+        <span class="keyword">this</span>.chatClient = builder
+            .defaultSystem(<span class="string">"""
+                You are a product assistant for an e-commerce platform.
+                Answer questions ONLY using the product information provided in the context.
+                If the context does not contain relevant information, say so clearly —
+                do not invent product details.
+                """</span>)
+            .defaultAdvisors(
+                <span class="class-name">QuestionAnswerAdvisor</span>.builder(vectorStore)
+                    .searchRequest(<span class="class-name">SearchRequest</span>.builder()
+                        .topK(<span class="number">5</span>)
+                        .similarityThreshold(<span class="number">0.6</span>)
+                        .build())
+                    .build()
+            )
+            .build();
+    }
+
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">answer</span>(<span class="class-name">String</span> customerQuestion) {
+        <span class="keyword">return</span> chatClient.prompt()
+            .user(customerQuestion)
+            .call()
+            .content();
+        <span class="comment">// What happens inside .call():
+        // 1. QuestionAnswerAdvisor embeds the question
+        // 2. Retrieves the 5 most similar product documents from pgvector
+        // 3. Injects them into the prompt context
+        // 4. Calls the model with the augmented prompt
+        // 5. Returns the model's answer</span>
+    }
+}</code></pre>
+
+                <h3>Chunking — when documents are long</h3>
+                <pre><code><span class="comment">// A product description of 50 words fits in one document.
+// An order history PDF of 20 pages does not — it needs chunking.
+// Spring AI provides TokenTextSplitter for this.</span>
+
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">DocumentIngestionService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">VectorStore</span> vectorStore;
+    <span class="keyword">private final</span> <span class="class-name">TokenTextSplitter</span> splitter = <span class="keyword">new</span> <span class="class-name">TokenTextSplitter</span>();
+
+    <span class="keyword">public</span> <span class="function">DocumentIngestionService</span>(<span class="class-name">VectorStore</span> vectorStore) {
+        <span class="keyword">this</span>.vectorStore = vectorStore;
+    }
+
+    <span class="keyword">public void</span> <span class="function">ingestPolicyDocument</span>(<span class="class-name">String</span> documentText, <span class="class-name">String</span> documentId) {
+        <span class="class-name">Document</span> doc = <span class="keyword">new</span> <span class="class-name">Document</span>(documentText,
+            <span class="class-name">Map</span>.of(<span class="string">"source"</span>, documentId, <span class="string">"type"</span>, <span class="string">"policy"</span>));
+
+        <span class="class-name">List</span>&lt;<span class="class-name">Document</span>&gt; chunks = splitter.apply(<span class="class-name">List</span>.of(doc));
+        <span class="comment">// Each chunk is ~512 tokens with ~100-token overlap between chunks.
+        // Overlap ensures context around a concept is not split across boundaries.</span>
+        vectorStore.add(chunks);
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — TUNING AND COMMON PITFALLS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Tuning and Common Pitfalls</h2>
+
+                <table>
+                    <tr>
+                        <th>Problem</th>
+                        <th>Symptom</th>
+                        <th>Fix</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Wrong embedding model at query time</strong></td>
+                        <td>Retrieval returns garbage — completely unrelated documents</td>
+                        <td>You must use the <strong>same embedding model</strong> for ingestion
+                            and retrieval. If you switch models, you must re-embed all stored
+                            documents</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Similarity threshold too low</strong></td>
+                        <td>Retrieval returns many irrelevant documents; model hallucinates from
+                            noise</td>
+                        <td>Raise <code>similarityThreshold</code>. Start at 0.6, measure
+                            retrieval quality, adjust. Below 0.5, results are typically
+                            noise</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Chunk size too large</strong></td>
+                        <td>Retrieved chunks contain the right section plus a lot of irrelevant
+                            surrounding text, diluting the answer</td>
+                        <td>Reduce chunk size and increase topK — retrieve more, smaller,
+                            focused chunks</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Metadata not filtered</strong></td>
+                        <td>A customer question about shoes retrieves electronics
+                            documentation</td>
+                        <td>Store category/type in document metadata and apply a
+                            <code>filterExpression</code> in the search request</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Ingestion not triggered on data change</strong></td>
+                        <td>The model answers with stale product information</td>
+                        <td>Trigger re-ingestion from an application event or a Kafka consumer
+                            when products are updated. Track ingested documents by ID and
+                            delete/re-add on change</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices</h2>
+
+                <p>✅ <strong>Do</strong> use the same embedding model for ingestion and retrieval.
+                    Different models produce incompatible vector spaces — retrievals will be
+                    meaningless.</p>
+
+                <p>✅ <strong>Do</strong> include a <code>similarityThreshold</code>. Without it,
+                    the vector store returns the top-K documents regardless of how dissimilar
+                    they are — including completely unrelated content that poisons the prompt.</p>
+
+                <p>✅ <strong>Do</strong> store metadata on every document (source ID, category,
+                    timestamp) and filter on it. Metadata filters are evaluated before vector
+                    similarity — they are free, and they dramatically improve retrieval
+                    precision.</p>
+
+                <p>✅ <strong>Do</strong> instruct the model explicitly to answer only from the
+                    provided context and to say so when the context does not contain the answer.
+                    Without this instruction, the model will blend retrieved context with its
+                    training knowledge — producing confident answers that mix real data with
+                    hallucinated data.</p>
+
+                <p>✅ <strong>Do</strong> measure retrieval quality separately from generation
+                    quality. Log which documents were retrieved for each query. If retrieval is
+                    bad, better prompts do not help — fix the embedding and chunking strategy
+                    first.</p>
+
+                <p>❌ <strong>Don't</strong> embed entire documents without chunking when documents
+                    exceed ~500 tokens. A single embedding for a long document averages out
+                    the meaning of the whole — it retrieves the document when any part is
+                    relevant, not when the most relevant part is closest to the query.</p>
+
+                <p>❌ <strong>Don't</strong> skip re-ingestion when source data changes. Stale
+                    embeddings produce stale answers. Build ingestion into your data pipeline,
+                    not as a one-off startup job.</p>
+
+                <p>❌ <strong>Don't</strong> use RAG as a substitute for a proper search index.
+                    RAG retrieves by semantic similarity. Exact-match requirements (order ID
+                    lookup, SKU search) are better served by a structured query. RAG and
+                    traditional search are complementary, not alternatives.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+
+                    <p><strong>Q: What is RAG and why is it used instead of just putting all
+                        your data in the prompt?</strong><br>
+                    RAG (Retrieval-Augmented Generation) retrieves only the relevant chunks
+                    of data at query time and injects them into the prompt, rather than
+                    including everything. Context windows have token limits — you cannot fit
+                    a large product catalogue into a single prompt. RAG also reduces cost
+                    (you pay per token), improves answer quality (focused context beats
+                    noisy context), and keeps knowledge current because you control the
+                    vector store.</p>
+
+                    <p><strong>Q: What is an embedding?</strong><br>
+                    An embedding is a numerical vector — typically hundreds to thousands of
+                    floating-point numbers — that represents the semantic meaning of a piece
+                    of text. Text with similar meaning produces vectors that are close in
+                    vector space. This closeness is how semantic search works: embed the
+                    query, find the stored vectors nearest to it, retrieve those documents.</p>
+
+                    <p><strong>Q: Why must you use the same embedding model for ingestion and
+                        retrieval?</strong><br>
+                    Different embedding models produce vectors in different spaces — the
+                    dimensions do not correspond. A vector from model A compared to a vector
+                    from model B produces a meaningless similarity score. If you switch
+                    embedding models, you must discard all stored embeddings and re-embed
+                    every document with the new model.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+
+                    <p><strong>Q: What is the difference between RAG and fine-tuning, and when
+                        is each appropriate?</strong><br>
+                    Fine-tuning modifies the model's weights by training on your data. It is
+                    expensive, requires ML expertise, and produces a static snapshot that goes
+                    stale when data changes. RAG retrieves fresh data at inference time from
+                    a vector store you control. It is cheap, keeps knowledge current, and
+                    requires no ML expertise. Fine-tuning is appropriate for teaching the
+                    model a communication style, a domain-specific reasoning pattern, or
+                    a new task format. RAG is appropriate for factual knowledge — product
+                    catalogues, policy documents, order history. For most enterprise
+                    applications, RAG is the right tool.</p>
+
+                    <p><strong>Q: Your RAG system is returning relevant documents but the model
+                        is still giving wrong answers. What do you investigate?</strong><br>
+                    Retrieval and generation are separate failure modes. If retrieval is
+                    confirmed good, investigate: (1) chunk size — the retrieved chunk may
+                    contain the right section surrounded by distracting context; (2) topK —
+                    too many chunks can dilute the relevant signal; (3) system prompt — without
+                    an explicit instruction to answer only from context, the model blends
+                    retrieved data with training knowledge; (4) similarity threshold — a
+                    threshold that is too low retrieves noise that poisons the prompt; (5)
+                    document quality — if the ingested text is poorly structured, even correct
+                    retrieval produces hard-to-use context.</p>
+
+                    <p><strong>Q: How do you handle data freshness in a RAG system — products
+                        change, prices update, policies are revised?</strong><br>
+                    Ingestion must be event-driven, not a one-off startup job. The cleanest
+                    pattern: an application event (or a Kafka consumer) triggers re-ingestion
+                    whenever a product, document, or policy is updated. Documents should be
+                    stored with a source ID in their metadata so you can delete the old
+                    embedding and add the new one atomically. For high-frequency updates, a
+                    scheduled full re-ingestion may be simpler than tracking individual
+                    changes — the vector store is rebuilt nightly, and stale data is bounded
+                    to hours rather than days.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your AI &amp; Java journey:</p>
+                <div class="related-links">
+                    <a href="llm-integration.html" class="related-link">
+                        <span class="related-icon">🤖</span>Integrating LLMs from Java
+                    </a>
+                    <a href="tool-calling-mcp.html" class="related-link">
+                        <span class="related-icon">🔧</span>Tool Calling &amp; MCP
+                    </a>
+                    <a href="testing-and-risks.html" class="related-link">
+                        <span class="related-icon">🧪</span>Testing AI Systems &amp; Risks
+                    </a>
+                    <a href="../databases/connection-pooling.html" class="related-link">
+                        <span class="related-icon">💾</span>Connection Pooling
+                    </a>
+                    <a href="../databases/relationships.html" class="related-link">
+                        <span class="related-icon">🔗</span>Entity Relationships
+                    </a>
+                    <a href="../spring/data-jpa.html" class="related-link">
+                        <span class="related-icon">🍃</span>Spring Data JPA
+                    </a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+
+</html>

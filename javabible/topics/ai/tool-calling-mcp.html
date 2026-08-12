@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Calling &amp; MCP - JavaDev Bible</title>
+    <meta name="description" content="How LLMs call your Java code — function calling, the Model Context Protocol, and building MCP servers with Spring AI">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+</head>
+
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#ai">AI &amp; Java</a> /
+                Tool Calling &amp; MCP
+            </nav>
+            <h1>Tool Calling &amp; MCP</h1>
+            <p class="topic-subtitle">How LLMs call your Java code — function calling, the Model Context Protocol, and building MCP servers with Spring AI</p>
+            <a href="../../index.html#ai" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What is Tool Calling, and What Problem Does It Solve?</h2>
+                <p>An LLM generates text. It cannot query your database, check an order status,
+                    call a payment gateway, or read a file — it has no access to the outside world.
+                    <strong>Tool calling</strong> (also called function calling) is the mechanism
+                    that closes this gap: you describe available tools to the model, and the model
+                    responds with a structured request to invoke one — including the arguments,
+                    extracted from the conversation. Your code executes the tool, returns the
+                    result, and the model incorporates it into its next response.</p>
+
+                <p>The model never executes anything. It decides <em>which</em> tool to call and
+                    <em>what arguments</em> to pass. Your application decides whether to actually
+                    execute it, validates the arguments, runs the code, and returns the result.
+                    The model is the decision-maker; your code is the executor.</p>
+
+                <pre><code><span class="comment">/*
+ * BEFORE — a custom integration per external capability.
+ * The LLM has no way to check order status, so you hardcode the lookup into
+ * the prompt pipeline. Every new capability means new glue code, new prompt
+ * rewiring, and a growing if/else chain that routes user intent to Java methods.
+ */</span>
+<span class="keyword">if</span> (userMessage.contains(<span class="string">"order status"</span>)) {
+    <span class="class-name">Order</span> order = orderService.findByCustomerLastOrder(customerId);
+    <span class="class-name">String</span> prompt = <span class="string">"The customer's order #"</span> + order.id()
+        + <span class="string">" is "</span> + order.status() + <span class="string">". Respond to: "</span> + userMessage;
+    <span class="keyword">return</span> chatClient.prompt().user(prompt).call().content();
+} <span class="keyword">else if</span> (userMessage.contains(<span class="string">"return"</span>)) {
+    <span class="comment">// another branch, another hardcoded integration...</span>
+}</code></pre>
+
+                <pre><code><span class="comment">/*
+ * AFTER — tool calling. You describe the tools; the model decides when to use them.
+ * Adding a new capability means adding a new @McpTool method — no prompt rewiring,
+ * no if/else routing, no glue code.
+ */</span>
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">OrderTools</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">OrderService</span> orderService;
+
+    <span class="keyword">public</span> <span class="function">OrderTools</span>(<span class="class-name">OrderService</span> orderService) {
+        <span class="keyword">this</span>.orderService = orderService;
+    }
+
+    <span class="annotation">@McpTool</span>(description = <span class="string">"Look up the current status of a customer order by order ID"</span>)
+    <span class="keyword">public</span> <span class="class-name">OrderStatusResponse</span> <span class="function">getOrderStatus</span>(
+            <span class="annotation">@McpToolParam</span>(description = <span class="string">"The order ID to look up"</span>) <span class="class-name">Long</span> orderId) {
+        <span class="class-name">Order</span> order = orderService.findById(orderId);
+        <span class="keyword">return new</span> <span class="class-name">OrderStatusResponse</span>(order.id(), order.status(), order.estimatedDelivery());
+    }
+}
+
+<span class="keyword">public record</span> <span class="class-name">OrderStatusResponse</span>(<span class="class-name">Long</span> orderId, <span class="class-name">String</span> status, <span class="class-name">LocalDate</span> estimatedDelivery) {}</code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Tool calling vs MCP — the relationship</div>
+                    <p><strong>Tool calling</strong> is the capability: the model requests a
+                        function invocation, your code executes it. Every major LLM provider
+                        supports it via their API.</p>
+                    <p><strong>MCP (Model Context Protocol)</strong> is a standard that wraps
+                        tool calling into a protocol — with discovery, schema negotiation,
+                        transport options, and a client/server architecture. It solves the
+                        problem of every provider and every tool having a different integration
+                        format. MCP is to tool calling what JDBC is to database access: a
+                        standard interface that decouples the consumer from the provider.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — HOW TOOL CALLING WORKS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>How Tool Calling Works — The Loop</h2>
+                <p>Tool calling is not a single request/response. It is a multi-turn loop between
+                    your application, the model, and your tools:</p>
+
+                <pre><code><span class="comment">/*
+ *  1. Your app sends the user message + a list of available tools (with schemas)
+ *     to the model.
+ *
+ *  2. The model examines the message and decides:
+ *     - Respond directly (no tool needed), OR
+ *     - Request a tool call: { "tool": "getOrderStatus", "arguments": { "orderId": 4821 } }
+ *
+ *  3. Your app receives the tool call request, validates the arguments,
+ *     executes the Java method, and sends the result back to the model.
+ *
+ *  4. The model incorporates the tool result into its response and replies
+ *     to the user: "Your order #4821 is currently being shipped and should
+ *     arrive by Friday."
+ *
+ *  5. The model may chain multiple tool calls in a single turn — e.g. look up
+ *     the order, then check the return policy, then compose a response.
+ *
+ *  USER ──▶ APP ──▶ MODEL
+ *                     │
+ *                     ▼ (tool call request)
+ *            APP ◀── MODEL
+ *             │
+ *             ▼ (execute tool, return result)
+ *            APP ──▶ MODEL
+ *                     │
+ *                     ▼ (final response)
+ *  USER ◀── APP ◀── MODEL
+ */</span></code></pre>
+
+                <div class="info-box important">
+                    <div class="info-box-title">The model never executes your code</div>
+                    <p>This is the most important thing to understand. The model outputs a
+                        JSON object saying "call <code>getOrderStatus</code> with
+                        <code>orderId=4821</code>." Your application decides whether to honour
+                        that request. You can validate arguments, enforce permissions, rate-limit,
+                        log, or refuse the call entirely. The model is a decision engine, not an
+                        executor — your code retains full control.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — MCP: THE PROTOCOL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>MCP — The Model Context Protocol</h2>
+                <p>MCP is an open standard (created by Anthropic, now part of the Linux
+                    Foundation) that defines how AI applications discover and interact with
+                    external tools, data sources, and prompts. It replaces the ad-hoc integration
+                    pattern where every tool has a different schema and every provider has a
+                    different calling convention.</p>
+
+                <h3>Architecture</h3>
+                <table>
+                    <tr>
+                        <th>Component</th>
+                        <th>Role</th>
+                        <th>Java example</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Host</strong></td>
+                        <td>The application the user interacts with (IDE, chat UI)</td>
+                        <td>Claude Desktop, an IntelliJ plugin</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Client</strong></td>
+                        <td>Maintains a 1:1 connection to one MCP server</td>
+                        <td>Spring AI's MCP client auto-configuration</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Server</strong></td>
+                        <td>Exposes tools, resources, and prompts via the MCP protocol</td>
+                        <td>Your Spring Boot app with <code>@McpTool</code> methods</td>
+                    </tr>
+                </table>
+
+                <h3>What an MCP server exposes</h3>
+                <table>
+                    <tr>
+                        <th>Primitive</th>
+                        <th>What it is</th>
+                        <th>Example</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Tools</strong></td>
+                        <td>Functions the model can call — with typed parameters and return values</td>
+                        <td><code>getOrderStatus(orderId)</code>,
+                            <code>searchProducts(query)</code></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Resources</strong></td>
+                        <td>Read-only data the model can access — files, database rows, API responses</td>
+                        <td><code>orders://{orderId}</code> returns the order as JSON</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Prompts</strong></td>
+                        <td>Reusable prompt templates the client can fetch and fill</td>
+                        <td>A "summarise order" prompt template with parameter slots</td>
+                    </tr>
+                </table>
+
+                <h3>Transport options</h3>
+                <table>
+                    <tr>
+                        <th>Transport</th>
+                        <th>When to use</th>
+                    </tr>
+                    <tr>
+                        <td><strong>STDIO</strong></td>
+                        <td>Local process — the host launches your JAR as a subprocess and
+                            communicates via stdin/stdout. No network, no port, no auth.
+                            Best for local development and CLI tools</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Streamable HTTP</strong></td>
+                        <td>Remote deployment — the server is a regular HTTP endpoint. Supports
+                            stateless operation, load balancing, and standard web security.
+                            This is the default in Spring AI 2.0 and the MCP specification's
+                            recommended transport for production</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — BUILDING AN MCP SERVER WITH SPRING AI
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Building an MCP Server with Spring AI</h2>
+
+                <pre><code><span class="comment">&lt;!-- pom.xml — MCP server starter --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.ai&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-ai-starter-mcp-server&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+
+                <pre><code><span class="comment"># application.properties</span>
+spring.ai.mcp.server.name=ecommerce-tools
+spring.ai.mcp.server.version=1.0.0</code></pre>
+
+                <pre><code><span class="comment">// Tools are plain Spring beans annotated with @McpTool.
+// Spring AI auto-discovers them, generates the JSON schema from the method
+// signature, and registers them with the MCP server at startup.</span>
+
+<span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">ProductTools</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">ProductRepository</span> productRepository;
+
+    <span class="keyword">public</span> <span class="function">ProductTools</span>(<span class="class-name">ProductRepository</span> productRepository) {
+        <span class="keyword">this</span>.productRepository = productRepository;
+    }
+
+    <span class="annotation">@McpTool</span>(description = <span class="string">"Search products by name or category. Returns matching products with prices."</span>)
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">ProductSummary</span>&gt; <span class="function">searchProducts</span>(
+            <span class="annotation">@McpToolParam</span>(description = <span class="string">"Search query — product name, category, or keyword"</span>)
+            <span class="class-name">String</span> query,
+            <span class="annotation">@McpToolParam</span>(description = <span class="string">"Maximum number of results"</span>, required = <span class="keyword">false</span>)
+            <span class="class-name">Integer</span> maxResults) {
+
+        <span class="keyword">int</span> limit = (maxResults != <span class="keyword">null</span>) ? maxResults : <span class="number">10</span>;
+        <span class="keyword">return</span> productRepository.searchByNameOrCategory(query).stream()
+            .limit(limit)
+            .map(p -> <span class="keyword">new</span> <span class="class-name">ProductSummary</span>(p.id(), p.name(), p.price(), p.category()))
+            .toList();
+    }
+
+    <span class="annotation">@McpTool</span>(description = <span class="string">"Get full details of a specific product by its ID"</span>)
+    <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProductById</span>(
+            <span class="annotation">@McpToolParam</span>(description = <span class="string">"The product ID"</span>) <span class="class-name">Long</span> productId) {
+        <span class="keyword">return</span> productRepository.findById(productId)
+            .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Product not found: "</span> + productId));
+    }
+}
+
+<span class="keyword">public record</span> <span class="class-name">ProductSummary</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> name, <span class="class-name">BigDecimal</span> price, <span class="class-name">String</span> category) {}</code></pre>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">Tool descriptions are prompts — write them carefully</div>
+                    <p>The <code>description</code> on <code>@McpTool</code> and
+                        <code>@McpToolParam</code> is what the model reads to decide whether to
+                        call the tool and how to fill the arguments. A vague description like
+                        "gets product info" leads to wrong tool selection. A precise description
+                        like "Search products by name or category. Returns matching products with
+                        prices." tells the model exactly when to use it and what to expect
+                        back.</p>
+                </div>
+
+                <h3>Exposing resources</h3>
+                <pre><code><span class="annotation">@Component</span>
+<span class="keyword">public class</span> <span class="class-name">OrderResources</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">OrderService</span> orderService;
+
+    <span class="keyword">public</span> <span class="function">OrderResources</span>(<span class="class-name">OrderService</span> orderService) {
+        <span class="keyword">this</span>.orderService = orderService;
+    }
+
+    <span class="annotation">@McpResource</span>(uri = <span class="string">"orders://{orderId}"</span>,
+                 description = <span class="string">"Full order details including items, totals, and shipping address"</span>)
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">getOrder</span>(<span class="class-name">Long</span> orderId) {
+        <span class="keyword">return</span> orderService.findById(orderId);
+    }
+}</code></pre>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — CLIENT SIDE: CONSUMING MCP TOOLS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Client Side — Consuming MCP Tools</h2>
+                <p>An MCP client connects to one or more MCP servers, discovers their tools,
+                    and makes them available to the <code>ChatClient</code>. Spring AI
+                    auto-configures this.</p>
+
+                <pre><code><span class="comment"># application.properties — connect to a remote MCP server</span>
+spring.ai.mcp.client.streamable-http.connections.ecommerce.url=http://localhost:8080</code></pre>
+
+                <pre><code><span class="comment">// The ChatClient automatically sees tools from connected MCP servers.
+// No manual wiring needed — Spring AI resolves them at startup.</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">CustomerSupportService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">ChatClient</span> chatClient;
+
+    <span class="keyword">public</span> <span class="function">CustomerSupportService</span>(<span class="class-name">ChatClient</span>.<span class="class-name">Builder</span> builder) {
+        <span class="keyword">this</span>.chatClient = builder
+            .defaultSystem(<span class="string">"""
+                You are a customer support agent for an e-commerce platform.
+                Use the available tools to look up order status, search products,
+                and retrieve order details. Always verify information before
+                responding to the customer.
+                """</span>)
+            .build();
+    }
+
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">handleCustomerQuery</span>(<span class="class-name">String</span> customerMessage) {
+        <span class="keyword">return</span> chatClient.prompt()
+            .user(customerMessage)
+            .call()
+            .content();
+        <span class="comment">// If the model decides it needs to check an order status or search
+        // products, it will call the MCP tools automatically — the loop
+        // described in Section 1 happens inside .call().</span>
+    }
+}</code></pre>
+
+                <div class="info-box note">
+                    <div class="info-box-title">STDIO for local development</div>
+                    <p>For local development — including connecting your MCP server to Claude
+                        Desktop or Claude Code — the STDIO transport is simpler. The host
+                        launches your JAR as a subprocess:</p>
+                    <pre><code><span class="comment">// claude_desktop_config.json</span>
+{
+  <span class="string">"mcpServers"</span>: {
+    <span class="string">"ecommerce"</span>: {
+      <span class="string">"command"</span>: <span class="string">"java"</span>,
+      <span class="string">"args"</span>: [<span class="string">"-jar"</span>, <span class="string">"path/to/ecommerce-tools.jar"</span>]
+    }
+  }
+}</code></pre>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SECURITY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Security — Tools Are an Attack Surface</h2>
+                <p>Every <code>@McpTool</code> method is code that an LLM can trigger. The model
+                    decides <em>when</em> to call it and <em>what arguments</em> to pass — and
+                    those arguments come from user input interpreted by the model. This makes
+                    tool inputs fundamentally untrusted.</p>
+
+                <table>
+                    <tr>
+                        <th>Risk</th>
+                        <th>Mitigation</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Argument injection</strong></td>
+                        <td>Validate all tool arguments the same way you validate
+                            <code>@RequestBody</code> — null checks, range checks, regex
+                            patterns. The model can pass anything</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Privilege escalation</strong></td>
+                        <td>Tools should execute with the minimum permissions needed. A tool
+                            that looks up orders should not have write access to payment
+                            records. Apply the same principle of least privilege as any API
+                            endpoint</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data leakage</strong></td>
+                        <td>Tool responses are sent to the model and may appear in the output.
+                            Never return sensitive data (passwords, payment details, PII)
+                            in a tool response unless the output channel is secured</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Denial of service</strong></td>
+                        <td>A tool that queries a database without limits can be called
+                            repeatedly by the model. Always paginate, set max results,
+                            and apply rate limits</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices</h2>
+
+                <p>✅ <strong>Do</strong> write precise, unambiguous descriptions on
+                    <code>@McpTool</code> and <code>@McpToolParam</code>. The description is
+                    the only thing the model reads to decide whether to call the tool — a vague
+                    description leads to wrong tool selection.</p>
+
+                <p>✅ <strong>Do</strong> return records from tools. Spring AI serialises them to
+                    JSON via Jackson automatically, and the model can interpret the structured
+                    result cleanly.</p>
+
+                <p>✅ <strong>Do</strong> validate all tool arguments as untrusted input. The
+                    model decides what to pass — your code decides whether to accept it.</p>
+
+                <p>✅ <strong>Do</strong> keep tools small and focused. A tool that does one thing
+                    well is easier for the model to select correctly than a tool that accepts a
+                    mode parameter and does five different things.</p>
+
+                <p>✅ <strong>Do</strong> use STDIO for local development and Streamable HTTP for
+                    production deployment. STDIO requires no network, no port, and no auth —
+                    the host launches your JAR directly.</p>
+
+                <p>❌ <strong>Don't</strong> expose write operations (delete, update, payment)
+                    as tools without human-in-the-loop confirmation. The model can decide to
+                    call a tool that modifies state — make destructive actions require explicit
+                    user approval.</p>
+
+                <p>❌ <strong>Don't</strong> return sensitive data in tool responses. Everything
+                    returned from a tool is visible to the model and may appear in the output
+                    to the user.</p>
+
+                <p>❌ <strong>Don't</strong> build one large tool with many optional parameters.
+                    The model selects better from several small, well-described tools than from
+                    one Swiss-army-knife tool with a complex parameter schema.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+
+                    <p><strong>Q: What is tool calling in the context of LLMs?</strong><br>
+                    Tool calling is a mechanism where the model, instead of generating a text
+                    response, outputs a structured request to call a specific function with
+                    specific arguments. The application executes the function and returns the
+                    result to the model, which uses it to compose the final response. The model
+                    never executes code — it only requests execution.</p>
+
+                    <p><strong>Q: What is MCP and how does it relate to tool calling?</strong><br>
+                    MCP (Model Context Protocol) is an open standard that defines how AI
+                    applications discover and interact with external tools, data sources, and
+                    prompts. It wraps tool calling into a protocol with discovery, schema
+                    negotiation, and standardised transport. Without MCP, every tool integration
+                    is custom. With MCP, tools are described once and work with any MCP-compatible
+                    client.</p>
+
+                    <p><strong>Q: What are the three primitives an MCP server can
+                        expose?</strong><br>
+                    <strong>Tools</strong> — functions the model can call (e.g. look up an order).
+                    <strong>Resources</strong> — read-only data accessible by URI (e.g. order
+                    details). <strong>Prompts</strong> — reusable prompt templates the client can
+                    fetch and fill.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+
+                    <p><strong>Q: Why should tool arguments be treated as untrusted input, even
+                        though they come from the model?</strong><br>
+                    The model constructs tool arguments from user input interpreted through
+                    natural language. A user can craft a message that causes the model to pass
+                    malicious or unexpected values — SQL fragments, negative quantities,
+                    IDs belonging to other users. Tool arguments should be validated with the
+                    same rigour as <code>@RequestBody</code> parameters on a public API
+                    endpoint: null checks, range validation, authorisation checks, and input
+                    sanitisation.</p>
+
+                    <p><strong>Q: What is the difference between STDIO and Streamable HTTP
+                        transport in MCP, and when would you use each?</strong><br>
+                    STDIO runs locally — the host launches the MCP server as a subprocess
+                    and communicates via stdin/stdout. No network, no port, no TLS, no auth.
+                    It is ideal for local development and CLI integration (e.g. Claude Desktop,
+                    Claude Code). Streamable HTTP exposes the MCP server as a regular HTTP
+                    endpoint, supporting stateless operation, load balancing, caching, and
+                    standard web security (OAuth, API keys). It is the recommended transport
+                    for production deployment and the default in Spring AI 2.0.</p>
+
+                    <p><strong>Q: How would you prevent a tool from being abused by the model
+                        in a production system?</strong><br>
+                    Four layers: (1) validate all arguments — reject out-of-range values,
+                    enforce authorisation per tool call, (2) rate-limit tool invocations to
+                    prevent the model from calling a tool in a tight loop, (3) make destructive
+                    operations require human confirmation — the tool returns a confirmation
+                    token that a separate endpoint must approve before execution, (4) log every
+                    tool call with arguments and results for audit, and monitor for anomalous
+                    patterns.</p>
+
+                    <p><strong>Q: How does Spring AI 2.0 auto-register MCP tools, and what
+                        happens under the hood?</strong><br>
+                    At startup, Spring AI scans for Spring beans with <code>@McpTool</code>
+                    methods. For each method, it reads the parameter types and
+                    <code>@McpToolParam</code> annotations to generate a JSON schema conforming
+                    to the MCP specification. It registers these schemas with the MCP server
+                    transport (STDIO or Streamable HTTP). When a client connects and requests
+                    <code>tools/list</code>, the server returns the full schema. When the
+                    model requests a tool call, the server deserialises the arguments, invokes
+                    the Java method via reflection, serialises the return value via Jackson, and
+                    sends it back. Records work directly as return types — no adapter
+                    needed.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your AI &amp; Java journey:</p>
+                <div class="related-links">
+                    <a href="llm-integration.html" class="related-link">
+                        <span class="related-icon">🤖</span>Integrating LLMs from Java
+                    </a>
+                    <a href="rag-embeddings.html" class="related-link">
+                        <span class="related-icon">🔍</span>RAG &amp; Embeddings
+                    </a>
+                    <a href="testing-and-risks.html" class="related-link">
+                        <span class="related-icon">🧪</span>Testing AI Systems &amp; Risks
+                    </a>
+                    <a href="../spring/rest.html" class="related-link">
+                        <span class="related-icon">🌐</span>Spring REST
+                    </a>
+                    <a href="../spring/security.html" class="related-link">
+                        <span class="related-icon">🔒</span>Spring Security
+                    </a>
+                    <a href="../databases/relationships.html" class="related-link">
+                        <span class="related-icon">💾</span>Entity Relationships
+                    </a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+
+</html>
