@@ -92,18 +92,16 @@ function initializeBackToTop() {
 }
 
 // Keyboard shortcuts
+// Escape is deliberately not handled here: search.js owns the results panel
+// and closes it through its own state (data-open). Writing an inline
+// display:none from this file overrode that state and left search dead until
+// the next page load.
 document.addEventListener('keydown', function (e) {
-    // Ctrl/Cmd + K → foco en búsqueda
+    // Ctrl/Cmd + K → focus search
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.focus();
-    }
-
-    // Escape → cerrar resultados de búsqueda
-    if (e.key === 'Escape') {
-        const searchResults = document.getElementById('searchResults');
-        if (searchResults) searchResults.style.display = 'none';
     }
 });
 
