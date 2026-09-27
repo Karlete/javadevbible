@@ -9,7 +9,7 @@ Context for Claude Code and any other Claude instance working in this repo. Read
 - **Repo:** https://github.com/karlete/javadevbible
 - **What it is:** A static HTML reference covering Java from fundamentals through the wider ecosystem, written for junior and senior developers on the same page.
 - **Deploy:** GitHub Pages, branch `main`, folder `/javabible/`.
-- **Scale:** 90 topic pages across 12 categories.
+- **Scale:** 94 topic pages across 13 categories.
 
 ## Stack — non-negotiable
 
@@ -28,11 +28,11 @@ The stack is HTML5 + CSS3 + Vanilla JavaScript + JSON, and it stays that way.
 bash tools/verify.sh
 ```
 
-Four checks: internal links resolve, the search index matches what is on disk (both directions), no UTF-8 BOM, no `console.log` in shipped JS. It exits non-zero on failure and runs in CI on every push.
+The checks it runs are listed in the header comment of tools/verify.sh. It exits non-zero on failure and runs in CI on every push.
 
 **Run it after any change that touches a filename, a link, the search index, or `js/`.** It exists because a restructure once left 22 broken links, 16 index entries pointing at deleted files, and 11 pages that no search could reach — none of which anything caught. It is the closest thing this project has to a compiler.
 
-It does **not** verify behaviour. A page can pass all four checks and still be visually broken. Anything touching CSS or JS needs a browser:
+It does **not** verify behaviour. A page can pass every check and still be visually broken. Anything touching CSS or JS needs a browser:
 
 ```bash
 cd javabible && python -m http.server 8000
@@ -43,7 +43,7 @@ cd javabible && python -m http.server 8000
 ```
 /javabible/
 ├── index.html                     category navigation + instant search
-├── topics/{category}/{topic}.html 90 topic pages
+├── topics/{category}/{topic}.html 94 topic pages
 ├── css/                           main.css, syntax-highlighting.css, toc.css
 ├── js/                            search.js, navigation.js, toc.js, hero-effects.js
 └── data/search-index.json         must always match topics/ on disk — verify.sh checks this
@@ -55,7 +55,7 @@ cd javabible && python -m http.server 8000
 /LICENSE
 ```
 
-### Categories (12) and their folder names
+### Categories and their folder names
 
 | Category | Folder | Index anchor |
 |---|---|---|
@@ -71,6 +71,7 @@ cd javabible && python -m http.server 8000
 | Java Versions & Compatibility | `java-versions` | `#versions` |
 | Tools & Ecosystem | `tools` | `#tools` |
 | Best Practices | `best-practices` | `#bestpractices` |
+| AI & Java | `ai` | `#ai` |
 
 ## Non-negotiable template conventions
 

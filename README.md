@@ -8,9 +8,9 @@ A static reference covering the Java ecosystem — 94 topics across 13 categorie
 
 ## What this is
 
-Ninety-four hand-written HTML pages. No framework, no build step, no backend, no dependencies. Clone it, open `index.html`, and it works — on a plane, on a laptop with no network, in a directory on a USB stick.
+Hand-written HTML pages. No framework, no build step, no backend, no dependencies. Clone it, open `index.html`, and it works — on a plane, on a laptop with no network, in a directory on a USB stick.
 
-Every code example is drawn from a single running e-commerce domain (`Customer`, `Order`, `OrderItem`, `Product`, `Invoice`) rather than the usual disconnected `Foo`/`Bar` snippets, so the examples read like one coherent codebase across all 94 pages. Every page opens by explaining what the thing *is* and what problem it exists to solve, before showing how to use it. Every page ends with interview questions split by seniority.
+Every code example is drawn from a single running e-commerce domain (`Customer`, `Order`, `OrderItem`, `Product`, `Invoice`) rather than the usual disconnected `Foo`/`Bar` snippets, so the examples read like one coherent codebase across every page. Every page opens by explaining what the thing *is* and what problem it exists to solve, before showing how to use it. Every page ends with interview questions split by seniority.
 
 The baseline is Spring Boot 4.x and Java 17–25. Java 25 is the current LTS.
 
@@ -57,7 +57,7 @@ $ bash tools/verify.sh
 JavaDev Bible — integrity check
 
 1. Internal links
-  ✓ 1334 links checked, all resolve
+  ✓ 1392 links checked, all resolve
 
 2. Search index
   ✓ index and disk agree (94 pages)
@@ -74,10 +74,13 @@ JavaDev Bible — integrity check
 6. Meta description
   ✓ every topic page has a <meta name="description">
 
-✓ 6/6 checks passed.
+7. Hand-written counts
+  ✓ every stated count matches disk (94 topics, 13 categories)
+
+✓ 7/7 checks passed.
 ```
 
-[`tools/verify.sh`](tools/verify.sh) walks every `href` in every page and resolves it against the filesystem; diffs the search index against what is on disk, in both directions; catches the UTF-8 BOM that Windows editors reintroduce silently; fails on any `console.log` in production JS; catches a dead CSS class that styled nothing for months; and flags any topic page missing a meta description.
+[`tools/verify.sh`](tools/verify.sh) walks every `href` in every page and resolves it against the filesystem; diffs the search index against what is on disk, in both directions; catches the UTF-8 BOM that Windows editors reintroduce silently; fails on any `console.log` in production JS; catches a dead CSS class that styled nothing for months; flags any topic page missing a meta description; and fails when a hand-typed "N topics" or "N categories" in the site or the docs disagrees with what is on disk.
 
 It is **pure bash — no Node, no npm, no `package.json`**. Adding a dependency to check a project whose defining constraint is *zero dependencies* would have missed the point. It runs on every push via [GitHub Actions](.github/workflows/verify.yml) and blocks the merge if the site's internal references do not hold together.
 
@@ -93,7 +96,7 @@ The `mcp/` directory contains a Spring Boot MCP server that exposes the Bible's 
 
 | Tool | What it does |
 |---|---|
-| `search_topics` | Search across all 94 pages by keyword or concept |
+| `search_topics` | Search across every page by keyword or concept |
 | `get_topic_content` | Read the full content of a specific topic page |
 | `list_categories` | List all 13 categories and their topics |
 
@@ -142,9 +145,9 @@ See [`mcp/README.md`](mcp/README.md) for troubleshooting.
 
 ## Decisions, and what they cost
 
-**No framework.** Ninety-four pages of prose and code samples have no client-side state to manage. React would have added a build step, a dependency tree, and a hydration cost to solve a problem this project does not have. The trade-off is real: there are no components, so the page template is duplicated ninety-four times, and a structural change means touching ninety-four files. I accepted that, and `verify.sh` is part of how I live with it.
+**No framework.** Pages of prose and code samples have no client-side state to manage. React would have added a build step, a dependency tree, and a hydration cost to solve a problem this project does not have. The trade-off is real: there are no components, so the page template is duplicated in every page, and a structural change means touching every file. I accepted that, and `verify.sh` is part of how I live with it.
 
-**No i18n.** I built a Spanish translation layer — a 1,000-line dictionary and a language toggle — and then deleted it. Translating 94 pages doubles the maintenance cost of every future content change, and the audience for this content reads English. One well-maintained language beats two half-maintained ones. The commit that removes it is [`5839d62`](https://github.com/karlete/javadevbible/commit/5839d62).
+**No i18n.** I built a Spanish translation layer — a 1,000-line dictionary and a language toggle — and then deleted it. Translating every page doubles the maintenance cost of every future content change, and the audience for this content reads English. One well-maintained language beats two half-maintained ones. The commit that removes it is [`5839d62`](https://github.com/karlete/javadevbible/commit/5839d62).
 
 **Search results are real anchors.** They were `<div onclick="location.href=...">`, which is not focusable, not openable in a new tab, and not announced as a link by a screen reader. They are `<a href>` now, built with `createElement` and `textContent` rather than `innerHTML`, so index content cannot be interpreted as markup — there is nothing left to escape.
 
