@@ -591,7 +591,11 @@ else
   { printf 'index.html\n'; cat "$TMP/disk.txt"; } | sort -u > "$TMP/pages.txt"
   { comm -23 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/ghost:   /'
     comm -13 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/missing: /'
-    grep '<loc>' "$SITEMAP" | grep -v '<lastmod>' | sed 's/.*<loc>\([^<]*\)<\/loc>.*/no lastmod: \1/'; } > "$TMP/sitemap-diff.txt"
+    grep '<loc>' "$SITEMAP" | grep -v '<lastmod>' | sed 's/.*<loc>\([^<]*\)<\/loc>.*/no lastmod: \1/'
+    # Root sitemap index: what "sitemap.xml" in Search Console resolves to.
+    if ! grep -q "<loc>${CANON_BASE}sitemap.xml</loc>" "$REPO_ROOT/sitemap.xml" 2>/dev/null; then
+      printf 'sitemap.xml (repo root): missing, or not pointing at javabible/sitemap.xml\n'
+    fi; } > "$TMP/sitemap-diff.txt"
   SM_N=$(grep -c . "$TMP/sitemap-diff.txt" || true)
   if [[ "$SM_N" -eq 0 ]]; then
     pass "sitemap.xml lists exactly the $(grep -c . "$TMP/pages.txt") pages on disk"
