@@ -473,14 +473,21 @@ fi
 #
 # Two CLAUDE.md prohibitions that are greppable:
 #   - inline style="..." on topic pages (presentation belongs in main.css)
-#   - ASCII box diagrams with boxes side by side: two box corners on one line.
-#     They break at 320px; a vertical diagram or a directory tree is fine.
+#   - ASCII box diagrams with boxes side by side: two TOP corners (┌) on one
+#     line. They break at 320px; a vertical diagram or a directory tree is fine.
+#     Only ┌ is checked on purpose: └──┘ └──┘ on its own is an underline brace
+#     annotating the parts of a single line above it (JWT segments, URL parts),
+#     not a box — the first version of this check flagged three of those in CI.
+#
+# LC_ALL=C.UTF-8 makes grep treat ┌ as ONE character everywhere. Under the C
+# locale (Git Bash's default) [^┐] is byte-wise, also excludes the bytes of ─,
+# and the pattern silently never matched locally while it did match in CI.
 
 header "10. Forbidden markup"
 
 grep -rn 'style="' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
   | sed "s|^$REPO_ROOT/||" | cut -c1-140 > "$TMP/forbidden.txt" || true
-grep -rnE '┌[^┐]*┐.*┌|└[^┘]*┘ *└' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
+LC_ALL=C.UTF-8 grep -rnE '┌[^┌┐]*┐.*┌' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
   | sed "s|^$REPO_ROOT/||" | cut -c1-140 | sed 's/^/side-by-side boxes: /' >> "$TMP/forbidden.txt" || true
 
 FORBID_N=$(grep -c . "$TMP/forbidden.txt" || true)
