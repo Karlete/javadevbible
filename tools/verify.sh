@@ -20,8 +20,11 @@
 #   9. Undefined CSS classes  — class="x" that no stylesheet defines
 #  10. Forbidden markup       — inline style="", side-by-side ASCII box diagrams
 #  11. Index cards            — every topic page is listed on index.html
-#  12. SEO head               — canonical URL present and pointing at the page itself
-#  13. Sitemap                — sitemap.xml lists exactly the pages on disk
+#  12. SEO head               — self-referencing canonical, Open Graph, og:image on disk,
+#                               <title> format and length, JSON-LD breadcrumb,
+#                               Search Console verification file at the repo root
+#  13. Sitemap                — sitemap.xml lists exactly the pages on disk, with <lastmod>
+#                               (regenerate with tools/sitemap.sh)
 #  14. Field injection        — @Autowired on a field outside test code / ❌ examples
 #
 # Usage:
@@ -81,6 +84,29 @@ pass()   { [[ $QUIET -eq 0 ]] && printf '  %s✓%s %s\n' "$GREEN" "$RESET" "$1";
 fail()   { printf '  %s✗%s %s\n' "$RED" "$RESET" "$1"; CHECKS_FAILED=$((CHECKS_FAILED + 1)); }
 item()   { printf '      %s\n' "$1"; }
 hint()   { printf '      %s%s%s\n' "$DIM" "$1" "$RESET"; }
+
+# ─── Fork-free text helpers ───────────────────────────────────────────────────
+# Per-page loops used to pipe every field through grep | sed | wc. On Windows
+# (Git Bash) each of those is a process spawn, and 95 pages × ~10 spawns made a
+# run take minutes. These read and measure with bash builtins only.
+
+# Whole file into FILE_CONTENT, no subshell.
+slurp() { FILE_CONTENT=''; IFS= read -r -d '' FILE_CONTENT < "$1" || true; }
+
+# First capture group of regex $2 in FILE_CONTENT, into MATCH ('' if none).
+first_match() {
+  MATCH=''
+  if [[ "$FILE_CONTENT" =~ $1 ]]; then MATCH="${BASH_REMATCH[1]}"; fi
+}
+
+# Visible length of $1: UTF-8 characters, each &entity; counted as one. Into CHARLEN.
+charlen() {
+  local LC_ALL=C.UTF-8
+  local s="$1"
+  local ent='(.*)&[a-zA-Z#0-9]+;(.*)'
+  while [[ "$s" =~ $ent ]]; do s="${BASH_REMATCH[1]}x${BASH_REMATCH[2]}"; done
+  CHARLEN=${#s}
+}
 
 # Print at most MAX_SHOWN lines of a findings list, then summarise the rest.
 show_capped() {
@@ -210,7 +236,10 @@ header "3. UTF-8 BOM"
 
 : > "$TMP/bom.txt"
 while IFS= read -r -d '' f; do
-  if [[ "$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')" == "efbbbf" ]]; then
+  # Byte-level read of the first 3 bytes with builtins (LC_ALL=C: bytes, not chars).
+  bom=''
+  LC_ALL=C IFS= read -r -n 3 bom < "$f" || true
+  if [[ "$bom" == $'\xef\xbb\xbf' ]]; then
     printf '%s\n' "${f#"$REPO_ROOT/"}" >> "$TMP/bom.txt"
   fi
 done < <(find "$SITE_ROOT" -name '*.html' -print0)
@@ -289,14 +318,13 @@ fi
 # stub or — as happened on eleven pages — a sentence cut off mid-word. Entities
 # (&amp;) are counted as one character; multi-byte UTF-8 (—, é) is counted as one.
 : > "$TMP/desclen.txt"
+RX_DESC='<meta name="description" content="([^"]*)"'
 while IFS= read -r -d '' f; do
-  desc="$(grep -o '<meta name="description" content="[^"]*"' "$f" | head -1 \
-          | sed 's/^<meta name="description" content="//; s/"$//; s/&[a-zA-Z#0-9]*;/x/g')"
-  [[ -z "$desc" ]] && continue
-  len=$(printf '%s' "$desc" | LC_ALL=C.UTF-8 wc -m 2>/dev/null | tr -d ' ')
-  [[ -z "$len" ]] && len=${#desc}
-  if [[ "$len" -lt 70 || "$len" -gt 160 ]]; then
-    printf '%s  →  %s chars\n' "${f#"$REPO_ROOT/"}" "$len" >> "$TMP/desclen.txt"
+  slurp "$f"; first_match "$RX_DESC"
+  [[ -z "$MATCH" ]] && continue
+  charlen "$MATCH"
+  if [[ "$CHARLEN" -lt 70 || "$CHARLEN" -gt 160 ]]; then
+    printf '%s  →  %s chars\n' "${f#"$REPO_ROOT/"}" "$CHARLEN" >> "$TMP/desclen.txt"
   fi
 done < <(find "$SITE_ROOT" -name '*.html' -print0)
 
@@ -492,23 +520,61 @@ header "12. SEO head"
 
 CANON_BASE='https://karlete.github.io/javadevbible/javabible/'
 : > "$TMP/canon.txt"
+RX_CANON='<link rel="canonical" href="([^"]*)"'
+RX_OGIMG='<meta property="og:image" content="([^"]*)"'
+RX_TITLE='<title>([^<]*)</title>'
 while IFS= read -r -d '' f; do
   rel="${f#"$SITE_ROOT/"}"
-  canon="$(grep -o '<link rel="canonical" href="[^"]*"' "$f" | head -1 | sed 's/.*href="//; s/"$//')"
+  slurp "$f"
+
+  first_match "$RX_CANON"; canon="$MATCH"
   if [[ -z "$canon" ]]; then
     printf '%s  →  no <link rel="canonical">\n' "$rel" >> "$TMP/canon.txt"
   elif [[ "$canon" != "$CANON_BASE$rel" ]]; then
     printf '%s  →  canonical is %s\n' "$rel" "$canon" >> "$TMP/canon.txt"
-  elif ! grep -q 'property="og:title"' "$f"; then
+  elif [[ "$FILE_CONTENT" != *'property="og:title"'* ]]; then
     printf '%s  →  no Open Graph tags\n' "$rel" >> "$TMP/canon.txt"
+  fi
+
+  # og:image must be a file that exists in the repo, not just a URL.
+  first_match "$RX_OGIMG"
+  if [[ -n "$MATCH" && ! -f "$SITE_ROOT/${MATCH#"$CANON_BASE"}" ]]; then
+    printf '%s  →  og:image %s does not exist on disk\n' "$rel" "$MATCH" >> "$TMP/canon.txt"
+  fi
+
+  # <title>: "<something> - JavaDev Bible" on topic pages, at most 70 characters
+  # (Google cuts titles at roughly 60–70).
+  first_match "$RX_TITLE"; title="$MATCH"
+  charlen "$title"
+  if [[ "$CHARLEN" -gt 70 ]]; then
+    printf '%s  →  <title> is %s chars (max 70)\n' "$rel" "$CHARLEN" >> "$TMP/canon.txt"
+  fi
+  if [[ "$rel" == topics/* && "$title" != *' - JavaDev Bible' ]]; then
+    printf '%s  →  <title> does not end with " - JavaDev Bible"\n' "$rel" >> "$TMP/canon.txt"
+  fi
+
+  # Structured data: topic pages carry a BreadcrumbList whose last item is the page itself.
+  if [[ "$rel" == topics/* ]]; then
+    if [[ "$FILE_CONTENT" != *'"@type": "BreadcrumbList"'* ]]; then
+      printf '%s  →  no JSON-LD BreadcrumbList\n' "$rel" >> "$TMP/canon.txt"
+    elif [[ "$FILE_CONTENT" != *"\"item\": \"$CANON_BASE$rel\""* ]]; then
+      printf '%s  →  JSON-LD breadcrumb does not end at this page\n' "$rel" >> "$TMP/canon.txt"
+    fi
   fi
 done < <(find "$SITE_ROOT" -name '*.html' -not -path '*/features/*' -print0)
 
+# Google Search Console verifies ownership through this file. Deleting it
+# silently un-verifies the property; nothing else would notice.
+GSC_FILE="$(find "$REPO_ROOT" -maxdepth 1 -name 'google*.html' | head -1)"
+if [[ -z "$GSC_FILE" ]]; then
+  printf 'google*.html  →  Search Console verification file missing from the repo root\n' >> "$TMP/canon.txt"
+fi
+
 CANON_N=$(grep -c . "$TMP/canon.txt" || true)
 if [[ "$CANON_N" -eq 0 ]]; then
-  pass "every page has a self-referencing canonical and Open Graph tags"
+  pass "canonical, Open Graph, titles, JSON-LD breadcrumbs and Search Console file all in place"
 else
-  fail "$CANON_N page(s) with a missing or wrong canonical / Open Graph block"
+  fail "$CANON_N SEO problem(s) in <head> or the repo root"
   show_capped "$(cat "$TMP/canon.txt")"
   hint 'fix: copy the <head> block from topics/databases/relationships.html and adjust the URLs'
 fi
@@ -524,7 +590,8 @@ else
   grep -o '<loc>[^<]*</loc>' "$SITEMAP" | sed "s|<loc>$CANON_BASE||; s|</loc>||" | sort -u > "$TMP/sitemap.txt"
   { printf 'index.html\n'; cat "$TMP/disk.txt"; } | sort -u > "$TMP/pages.txt"
   { comm -23 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/ghost:   /'
-    comm -13 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/missing: /'; } > "$TMP/sitemap-diff.txt"
+    comm -13 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/missing: /'
+    grep '<loc>' "$SITEMAP" | grep -v '<lastmod>' | sed 's/.*<loc>\([^<]*\)<\/loc>.*/no lastmod: \1/'; } > "$TMP/sitemap-diff.txt"
   SM_N=$(grep -c . "$TMP/sitemap-diff.txt" || true)
   if [[ "$SM_N" -eq 0 ]]; then
     pass "sitemap.xml lists exactly the $(grep -c . "$TMP/pages.txt") pages on disk"
