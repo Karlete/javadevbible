@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Request/Response Cycle - JavaDev Bible</title>
     <meta name="description" content="The mechanics of a single HTTP exchange — request anatomy, the Spring MVC pipeline, and the response-handling bug nearly every developer ships at least once">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/web-concepts/request-response.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Request/Response Cycle — JavaDev Bible">
+    <meta property="og:description" content="The mechanics of a single HTTP exchange — request anatomy, the Spring MVC pipeline, and the response-handling bug nearly every developer ships at least once">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/web-concepts/request-response.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -55,10 +63,10 @@
  * BEFORE — the request is sent, and the response is trusted blindly.
  * This code "works" in every happy-path demo and manual test.
  */</span>
-<span class="keyword">async function</span> loadUserProfile(userId) {
-    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(`/api/users/${userId}`);
-    <span class="keyword">const</span> user = <span class="keyword">await</span> response.json();   <span class="comment">// assumes the body is always valid JSON</span>
-    renderProfile(user);
+<span class="keyword">async function</span> loadCustomerProfile(customerId) {
+    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(`/api/customers/${customerId}`);
+    <span class="keyword">const</span> customer = <span class="keyword">await</span> response.json();   <span class="comment">// assumes the body is always valid JSON</span>
+    renderProfile(customer);
 }
 <span class="comment">// The day the server returns a 500 with an HTML error page (a load balancer's</span>
 <span class="comment">// default error page, or an unhandled exception rendering Whitelabel Error Page),</span>
@@ -71,18 +79,18 @@
  * AFTER — the cycle is closed properly: status is checked before the body
  * is ever touched.
  */</span>
-<span class="keyword">async function</span> loadUserProfile(userId) {
-    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(`/api/users/${userId}`);
+<span class="keyword">async function</span> loadCustomerProfile(customerId) {
+    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(`/api/customers/${customerId}`);
 
     <span class="keyword">if</span> (!response.ok) {   <span class="comment">// true only for 2xx — fetch() does NOT reject on 4xx/5xx</span>
         <span class="keyword">if</span> (response.status === <span class="number">404</span>) {
-            <span class="keyword">throw new</span> <span class="class-name">UserNotFoundError</span>(userId);
+            <span class="keyword">throw new</span> <span class="class-name">CustomerNotFoundError</span>(customerId);
         }
         <span class="keyword">throw new</span> <span class="class-name">Error</span>(`Request failed with status ${response.status}`);
     }
 
-    <span class="keyword">const</span> user = <span class="keyword">await</span> response.json();   <span class="comment">// only parsed once we KNOW it's the success shape</span>
-    renderProfile(user);
+    <span class="keyword">const</span> customer = <span class="keyword">await</span> response.json();   <span class="comment">// only parsed once we KNOW it's the success shape</span>
+    renderProfile(customer);
 }</code></pre>
 
                 <div class="info-box important">
@@ -173,8 +181,8 @@ X-Request-Id: 7e4b1e2a-4f3c-4a1b-9c2d-8f1e2a3b4c5d
                 <h2>The Cycle on the Server: What Spring MVC Actually Saves You From</h2>
 
                 <h3>Raw Servlet — Everything Done by Hand</h3>
-                <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/api/users/*"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
+                <pre><code><span class="annotation">@WebServlet</span>(<span class="string">"/api/customers/*"</span>)
+<span class="keyword">public class</span> <span class="class-name">CustomerServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
 
     <span class="annotation">@Override</span>
     <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> request, <span class="class-name">HttpServletResponse</span> response)
@@ -182,38 +190,38 @@ X-Request-Id: 7e4b1e2a-4f3c-4a1b-9c2d-8f1e2a3b4c5d
 
         <span class="comment">// Manual path parsing — no @PathVariable to do this for you</span>
         <span class="class-name">String</span> pathInfo = request.getPathInfo();          <span class="comment">// "/123"</span>
-        <span class="class-name">Long</span> userId = <span class="class-name">Long</span>.parseLong(pathInfo.substring(<span class="number">1</span>));
+        <span class="class-name">Long</span> customerId = <span class="class-name">Long</span>.parseLong(pathInfo.substring(<span class="number">1</span>));
 
-        <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; user = userService.findById(userId);
-        <span class="keyword">if</span> (user.isEmpty()) {
+        <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; customer = customerService.findById(customerId);
+        <span class="keyword">if</span> (customer.isEmpty()) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             response.setContentType(<span class="string">"application/json"</span>);
-            response.getWriter().write(<span class="string">"{\"error\":\"User not found\"}"</span>);
+            response.getWriter().write(<span class="string">"{\"error\":\"Customer not found\"}"</span>);
             <span class="keyword">return</span>;
         }
 
         response.setStatus(HttpServletResponse.SC_OK);
         response.setContentType(<span class="string">"application/json"</span>);
         response.setCharacterEncoding(<span class="string">"UTF-8"</span>);
-        response.getWriter().write(objectMapper.writeValueAsString(user.get()));
+        response.getWriter().write(objectMapper.writeValueAsString(customer.get()));
     }
 }</code></pre>
 
                 <h3>Spring MVC — the Same Cycle, the Boilerplate Removed</h3>
                 <pre><code><span class="annotation">@RestController</span>
-<span class="annotation">@RequestMapping</span>(<span class="string">"/api/users"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">CustomerController</span> {
 
-    <span class="keyword">private final</span> <span class="class-name">UserService</span> userService;
+    <span class="keyword">private final</span> <span class="class-name">CustomerService</span> customerService;
 
-    <span class="keyword">public</span> <span class="function">UserController</span>(<span class="class-name">UserService</span> userService) {
-        <span class="keyword">this</span>.userService = userService;
+    <span class="keyword">public</span> <span class="function">CustomerController</span>(<span class="class-name">CustomerService</span> customerService) {
+        <span class="keyword">this</span>.customerService = customerService;
     }
 
     <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">UserResponse</span>&gt; <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-        <span class="keyword">return</span> userService.findById(id)
-            .map(<span class="class-name">UserResponse</span>::fromEntity)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">getCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> customerService.findById(id)
+            .map(<span class="class-name">CustomerResponse</span>::fromEntity)
             .map(<span class="class-name">ResponseEntity</span>::ok)
             .orElseGet(() -> <span class="class-name">ResponseEntity</span>.notFound().build());
         <span class="comment">// Spring parsed the path variable, will serialize the record to JSON,</span>
@@ -223,9 +231,9 @@ X-Request-Id: 7e4b1e2a-4f3c-4a1b-9c2d-8f1e2a3b4c5d
 }
 
 <span class="comment">// A record DTO, never the JPA entity — see client-server.html for why</span>
-<span class="keyword">public record</span> <span class="class-name">UserResponse</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> name, <span class="class-name">String</span> email) {
-    <span class="keyword">public static</span> <span class="class-name">UserResponse</span> <span class="function">fromEntity</span>(<span class="class-name">User</span> user) {
-        <span class="keyword">return new</span> <span class="class-name">UserResponse</span>(user.getId(), user.getName(), user.getEmail());
+<span class="keyword">public record</span> <span class="class-name">CustomerResponse</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> name, <span class="class-name">String</span> email) {
+    <span class="keyword">public static</span> <span class="class-name">CustomerResponse</span> <span class="function">fromEntity</span>(<span class="class-name">Customer</span> customer) {
+        <span class="keyword">return new</span> <span class="class-name">CustomerResponse</span>(customer.getId(), customer.getName(), customer.getEmail());
     }
 }</code></pre>
             </section>
@@ -368,12 +376,12 @@ X-Request-Id: 7e4b1e2a-4f3c-4a1b-9c2d-8f1e2a3b4c5d
                     actually produce.</p>
 
                 <pre><code><span class="comment">// Client prefers JSON, will accept XML at 90% preference</span>
-GET /api/users/123 HTTP/1.1
+GET /api/customers/123 HTTP/1.1
 Accept: application/json, application/xml;q=0.9
 
 <span class="annotation">@GetMapping</span>(value = <span class="string">"/{id}"</span>, produces = { MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE })
-<span class="keyword">public</span> <span class="class-name">UserResponse</span> <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-    <span class="keyword">return</span> userService.findById(id);   <span class="comment">// Spring picks JSON or XML based on the Accept header, automatically</span>
+<span class="keyword">public</span> <span class="class-name">CustomerResponse</span> <span class="function">getCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> customerService.findById(id);   <span class="comment">// Spring picks JSON or XML based on the Accept header, automatically</span>
 }</code></pre>
 
                 <div class="info-box note">
@@ -400,8 +408,8 @@ Accept: application/json, application/xml;q=0.9
                 <pre><code><span class="annotation">@RestControllerAdvice</span>
 <span class="keyword">public class</span> <span class="class-name">GlobalExceptionHandler</span> {
 
-    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">UserNotFoundException</span>.<span class="keyword">class</span>)
-    <span class="keyword">public</span> <span class="class-name">ProblemDetail</span> <span class="function">handleNotFound</span>(<span class="class-name">UserNotFoundException</span> ex) {
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">CustomerNotFoundException</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ProblemDetail</span> <span class="function">handleNotFound</span>(<span class="class-name">CustomerNotFoundException</span> ex) {
         <span class="keyword">return</span> <span class="class-name">ProblemDetail</span>.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 

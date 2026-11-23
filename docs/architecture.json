@@ -1,0 +1,653 @@
+{
+  "$comment": "Architecture map of JavaDevBible for the next agent. Updated 2026-11-23 after the bug/improvement sweep (uncommitted at time of writing; base commit 99eb5f8). Every fact was read from the repo, but it is a snapshot: CLAUDE.md and the code win when they disagree.",
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-23",
+  "generatedFromCommit": "99eb5f8 + working-tree changes of 2026-11-23",
+  "project": {
+    "name": "JavaDevBible",
+    "kind": "static-reference-site",
+    "live": "https://karlete.github.io/javadevbible/javabible/index.html",
+    "repo": "https://github.com/karlete/javadevbible",
+    "deploy": {
+      "host": "GitHub Pages",
+      "branch": "main",
+      "servesFrom": "repository root",
+      "siteFolder": "/javabible/",
+      "rootIndex": "index.html redirects to javabible/index.html",
+      "notFound": "404.html at repo root, root-relative links (/javadevbible/...)",
+      "buildStep": false
+    },
+    "counts": {
+      "topicPages": 94,
+      "categories": 13,
+      "searchIndexEntries": 94
+    },
+    "rulesFile": "CLAUDE.md",
+    "rulesPrecedence": "CLAUDE.md is authoritative over this file. Read it before editing anything."
+  },
+  "hardConstraints": [
+    "100% static: HTML5 + CSS3 + vanilla JS + JSON. No framework, no backend, no bundler, no build step, no CMS/login/comments.",
+    "Zero dependencies in the site AND in its tooling. No package.json, no node. tools/verify.sh is pure bash on purpose.",
+    "The only Java/Maven code allowed is the separate mcp/ module; it never ships to GitHub Pages and the site must never depend on it.",
+    "No console.log/debug/warn in javabible/js/ (verify.sh check 4).",
+    "No inline style=\"...\" on content elements in topic pages. New visuals -> a named class in main.css.",
+    "No UTF-8 BOM in any HTML file (verify.sh check 3).",
+    "Every count like 'N topics' / 'N categories' in index.html, README.md, CLAUDE.md must equal disk exactly, no '+' (verify.sh check 7)."
+  ],
+  "subsystems": [
+    {
+      "id": "site",
+      "path": "javabible/",
+      "role": "The deployed product. Served as-is by GitHub Pages; also works opened from file:// except search (fetch of JSON).",
+      "entry": "javabible/index.html"
+    },
+    {
+      "id": "verify",
+      "path": "tools/verify.sh",
+      "role": "Integrity checker — the project's 'compiler'. 7 checks, exits 1 on failure.",
+      "run": "bash tools/verify.sh   (flags: --quiet, --full)"
+    },
+    {
+      "id": "ci",
+      "path": ".github/workflows/verify.yml",
+      "role": "Runs verify.sh on push/PR to main and on workflow_dispatch. No setup-node, no cache. Does NOT build mcp/."
+    },
+    {
+      "id": "mcp",
+      "path": "mcp/",
+      "role": "Optional Spring Boot 4.0.0 + Spring AI 2.0.0 MCP server over STDIO that exposes the site's content to AI assistants. Reads javabible/ from disk. Not deployed, not covered by CI, not mentioned in CLAUDE.md's repository structure.",
+      "build": "cd mcp && ./mvnw clean package -DskipTests  -> mcp/target/javadevbible-mcp-1.0.0.jar",
+      "config": "mcp/src/main/resources/application.properties (stdio=true, web-application-type=none, banner off, console log pattern empty, logs to javadevbible-mcp.log)",
+      "rootResolution": [
+        "env JAVABIBLE_ROOT",
+        "../javabible relative to CWD",
+        "./javabible"
+      ],
+      "tools": [
+        {
+          "name": "search_topics",
+          "args": {
+            "query": "string",
+            "maxResults": "int? default 10, max 20"
+          },
+          "source": "data/search-index.json",
+          "scoring": "identical to search.js (see files.javabible/js/search.js.algorithm); scores all entries, sorts, then truncates"
+        },
+        {
+          "name": "get_topic_content",
+          "args": {
+            "topicPath": "must start with 'topics/' and contain no '..'"
+          },
+          "behaviour": "regex-strips script/style/nav/footer/header/aside, then all tags, decodes 6 entities, collapses whitespace, truncates at 24000 chars"
+        },
+        {
+          "name": "list_categories",
+          "args": {},
+          "behaviour": "groups search-index entries by category label in insertion order"
+        }
+      ],
+      "files": [
+        "mcp/pom.xml",
+        "mcp/src/main/java/dev/javadevbible/mcp/McpServerApplication.java",
+        "mcp/src/main/java/dev/javadevbible/mcp/JavaBibleTools.java",
+        "mcp/src/main/resources/application.properties",
+        "mcp/README.md"
+      ],
+      "tests": "cd mcp && ./mvnw -q test  (JavaBibleToolsTest: ranking regressions against the real index)"
+    }
+  ],
+  "files": {
+    "javabible/index.html": {
+      "role": "Home: hero (logo, typing subtitle, particle canvas, stats bar, search box, quick-link pills) + 13 category cards with hand-written topic lists.",
+      "css": [
+        "css/main.css (hero logo/stats/pills block moved here from an inline <style>)"
+      ],
+      "scripts": [
+        "js/search.js",
+        "js/navigation.js",
+        "js/hero-effects.js"
+      ],
+      "keyIds": [
+        "hero-particles",
+        "searchInput",
+        "searchBtn",
+        "searchResults"
+      ],
+      "cardContract": "<div class=\"category-card\" id=\"{anchor}\"> ... <ul class=\"topic-list\"><li><a href=\"topics/{folder}/{page}.html\">Label</a></li>. verify.sh check 7 requires one card-with-id per category folder."
+    },
+    "javabible/topics/{folder}/{page}.html": {
+      "role": "One self-contained topic page. 94 of them. No templating: header, TOC aside, footer and script tags are duplicated in every file.",
+      "css": [
+        "../../css/main.css",
+        "../../css/syntax-highlighting.css",
+        "../../css/toc.css"
+      ],
+      "scripts": [
+        "../../js/navigation.js",
+        "../../js/toc.js"
+      ],
+      "referenceFiles": [
+        "javabible/topics/databases/relationships.html (gold standard)",
+        "javabible/topics/java-versions/version-compatibility.html (structural template)"
+      ],
+      "headContract": "charset, viewport, title '{Title} - JavaDev Bible', meta description (70–160 chars), canonical https://karlete.github.io/javadevbible/javabible/{path}, og:type/site_name/title/description/url/image, twitter:card, favicon, 3 stylesheets"
+    },
+    "javabible/data/search-index.json": {
+      "role": "Flat JSON array, one object per topic page. Consumed by js/search.js (browser) and mcp JavaBibleTools (server).",
+      "entryShape": {
+        "title": "string",
+        "category": "string (display label, see categories[].indexLabel)",
+        "url": "topics/{folder}/{page}.html (relative to javabible/)",
+        "description": "string",
+        "keywords": "space-separated string"
+      },
+      "invariant": "Set of url values == set of topics/**/*.html on disk (verify.sh check 2). verify.sh parses it with grep, so keep it flat: one \"url\": \"...\" per entry, no nesting."
+    },
+    "javabible/js/search.js": {
+      "pages": [
+        "index.html"
+      ],
+      "role": "Instant search. IIFE. Fetches data/search-index.json; multi-word AND search, weighted score + bonuses, sort desc then title asc, top 10 + '+N more'.",
+      "constants": {
+        "INDEX_URL": "data/search-index.json",
+        "MIN_QUERY": 2,
+        "DEBOUNCE_MS": 200,
+        "MAX_RESULTS": 10,
+        "WEIGHT": {
+          "title": 10,
+          "category": 5,
+          "keywords": 3,
+          "description": 2
+        },
+        "BONUS": {
+          "wordStart": 4,
+          "phraseTitle": 12,
+          "phraseText": 4,
+          "titlePrefix": 6
+        }
+      },
+      "a11y": "ARIA combobox/listbox, ArrowUp/Down/Enter/Escape, aria-activedescendant and aria-selected kept in sync, results are real <a role=option>.",
+      "security": "No innerHTML from index data; createElement + textContent + <mark> nodes only.",
+      "failureMode": "If fetch fails, the panel shows 'Search is unavailable' — no silent fallback. Opening index.html via file:// triggers this in most browsers.",
+      "panelState": "data-open=\"true|false\" on #searchResults, styled by main.css. navigation.js must NOT touch it.",
+      "algorithm": [
+        "tokenize: lower-case, split on whitespace, drop 1-char words if longer ones exist",
+        "forms(token): token, plus singular if it ends in 's' and is longer than 3",
+        "per token: sum field weights where any form occurs; +wordStart if a form starts a word in the title; token with 0 -> entry excluded",
+        "multi-word: +phraseTitle if whole phrase in title, else +phraseText if in keywords/description",
+        "+titlePrefix if title starts with the phrase",
+        "sort score desc, then title asc"
+      ],
+      "mirroredIn": "mcp/src/main/java/dev/javadevbible/mcp/JavaBibleTools.java (tested by JavaBibleToolsTest)"
+    },
+    "javabible/js/navigation.js": {
+      "pages": [
+        "index.html",
+        "all topic pages"
+      ],
+      "role": "IIFE. Copy button on every pre>code (navigator.clipboard; .copied/.failed states), smooth scroll for a[href^='#'] honouring prefers-reduced-motion, Ctrl/Cmd+K focuses #searchInput on the index only.",
+      "notes": [
+        "Collapsibles, back-to-top and sharePage() were removed on 2026-11-23 (no page used them).",
+        "Writes no inline styles; pre { position: relative } lives in syntax-highlighting.css."
+      ]
+    },
+    "javabible/js/toc.js": {
+      "pages": [
+        "all topic pages"
+      ],
+      "role": "Builds the TOC from h2/h3 inside main.topic-content into #toc-nav, generates missing heading ids (slug + index), scroll-spy via IntersectionObserver (rootMargin -80px 0 -75% 0), collapse toggle (#toc-toggle), collapsed by default at <=900px, adds .toc-ready to #toc-sidebar after init to avoid CLS.",
+      "notes": [
+        "Click jumps to heading top - 16px (topic-header is not sticky) and marks the clicked link active immediately; reduced motion -> instant jump.",
+        "Runtime aria-labels are English."
+      ]
+    },
+    "javabible/js/hero-effects.js": {
+      "pages": [
+        "index.html"
+      ],
+      "role": "IIFE. Particle canvas (DPR-aware) paused when the hero is off-screen (IntersectionObserver) or the tab is hidden; typing effect is aria-hidden with a .visually-hidden copy of the subtitle for screen readers. Skipped under prefers-reduced-motion."
+    },
+    "javabible/css/main.css": {
+      "role": "Everything global: CSS variables, reset, hero, search panel (.search-result-*, .is-active, mark, .search-message), category grid, footer, topic header, topic content, code blocks, .info-box variants, related topics, collapsibles, bare <table> styling, responsive, print, selection. Also: tr.row-highlight, .best-practices, .visually-hidden, print rules hiding TOC/Copy, and the index hero block (last in file).",
+      "lines": 859
+    },
+    "javabible/css/syntax-highlighting.css": {
+      "role": "Token colours for hand-annotated code: keyword, class-name, annotation, comment, string, function, number, operator, attribute. pre { position: relative } for the Copy button. Dead classes (.code-block, .line-numbers, .language-badge, .variable…) removed.",
+      "lines": 134
+    },
+    "javabible/css/toc.css": {
+      "role": ".topic-layout grid, sticky .toc-sidebar on desktop (>=901px), collapsible TOC on mobile, .toc-link/.toc-h2/.toc-h3/.toc-active, .toc-ready gate.",
+      "lines": 279,
+      "breakpoint": "901px — must stay in sync with the matchMedia queries in toc.js"
+    },
+    "javabible/favicon.svg": {
+      "role": "Site icon, linked from every page."
+    },
+    "javabible/img/javadevlogo.jpg": {
+      "role": "Hero logo, index.html only."
+    },
+    "javabible/sitemap.xml": {
+      "role": "One <url><loc> per page (95). verify.sh check 13 keeps it equal to disk."
+    },
+    "index.html (repo root)": {
+      "role": "Meta-refresh redirect to javabible/index.html, noindex."
+    },
+    "404.html (repo root)": {
+      "role": "GitHub Pages not-found page. Root-relative /javadevbible/... links. Not testable with python http.server."
+    }
+  },
+  "topicPageTemplate": {
+    "skeleton": [
+      "<!DOCTYPE html><html lang=\"en\">",
+      "<head>: charset, viewport, <title>{Title} - JavaDev Bible</title>, <meta name=\"description\"> (required, check 6), favicon ../../favicon.svg, 3 stylesheets",
+      "<body class=\"topic-page\">",
+      "header.topic-header > .header-content > nav.breadcrumb (Home / index.html#{anchor} / Title) + h1 + p.topic-subtitle + a.back-btn",
+      "div.topic-layout",
+      "  aside.toc-sidebar#toc-sidebar > .toc-header(span.toc-title + button.toc-toggle#toc-toggle) + nav.toc-nav#toc-nav (empty; filled by toc.js). Copy verbatim from relationships.html.",
+      "  main.topic-content > section.content-section* > h2 ...",
+      "    Section 0: what it is + why it exists + before/after code",
+      "    body sections",
+      "    Best Practices: ✅ Do / ❌ Don't lists (never 'Summary')",
+      "    Interview Questions: div.info-box.note '🎓 Junior level' (>=3) + div.info-box.important '🔥 Senior level' (>=3)",
+      "    section.related-topics > h3 + p.related-intro + div.related-links > a.related-link > span.related-icon",
+      "footer.site-footer",
+      "<script src=\"../../js/navigation.js\"> <script src=\"../../js/toc.js\">"
+    ],
+    "components": {
+      "infoBox": "<div class=\"info-box {note|important|warning|...}\"><div class=\"info-box-title\">...</div>...</div>",
+      "code": "<pre><code> with manual <span class=\"keyword\"> etc. navigation.js injects a .copy-btn into every pre.",
+      "table": "bare <table>, no class (comparison-table is banned, check 5)"
+    },
+    "currentCompliance": {
+      "allPagesHaveTocAndTocJs": true,
+      "allPagesHaveJuniorAndSeniorQuestions": true,
+      "allPagesHaveRelatedTopics": true,
+      "inlineStyleInTopics": 0,
+      "h2TitledSummary": 0
+    }
+  },
+  "categories": [
+    {
+      "folder": "fundamentals",
+      "anchor": "fundamentals",
+      "indexLabel": "Java Fundamentals",
+      "count": 13,
+      "pages": [
+        "access-modifiers",
+        "collections",
+        "constructors",
+        "exceptions",
+        "generics",
+        "interfaces-abstract",
+        "lambda-streams",
+        "methods",
+        "oop-principles",
+        "optional",
+        "static-instance",
+        "variables-datatypes",
+        "what-is-java"
+      ]
+    },
+    {
+      "folder": "advanced",
+      "anchor": "advanced",
+      "indexLabel": "Advanced Java Concepts",
+      "count": 8,
+      "pages": [
+        "annotations",
+        "design-patterns",
+        "garbage-collection",
+        "jvm-internals",
+        "multithreading",
+        "reflection",
+        "synchronization",
+        "thread-pools"
+      ]
+    },
+    {
+      "folder": "build-tools",
+      "anchor": "build-tools",
+      "indexLabel": "Build Tools & Project Management",
+      "count": 7,
+      "pages": [
+        "dependencies",
+        "gradle",
+        "lifecycle",
+        "maven",
+        "pom",
+        "scopes",
+        "versions"
+      ]
+    },
+    {
+      "folder": "spring",
+      "anchor": "spring",
+      "indexLabel": "Spring Framework",
+      "count": 9,
+      "pages": [
+        "boot",
+        "core",
+        "data-jpa",
+        "mvc",
+        "profiles",
+        "properties",
+        "rest",
+        "security",
+        "starters"
+      ]
+    },
+    {
+      "folder": "jakarta-ee",
+      "anchor": "jakarta-ee",
+      "indexLabel": "Jakarta EE & Enterprise Java",
+      "count": 7,
+      "pages": [
+        "cdi",
+        "ejb",
+        "jax-rs",
+        "jpa",
+        "overview",
+        "servlets-jsp",
+        "transactions"
+      ]
+    },
+    {
+      "folder": "web-concepts",
+      "anchor": "web-concepts",
+      "indexLabel": "Web Concepts & Architecture",
+      "count": 8,
+      "pages": [
+        "client-server",
+        "cors",
+        "http",
+        "request-response",
+        "rest-principles",
+        "server-vs-client",
+        "sessions-cookies",
+        "websocket"
+      ]
+    },
+    {
+      "folder": "databases",
+      "anchor": "databases",
+      "indexLabel": "Databases & Persistence",
+      "count": 6,
+      "pages": [
+        "connection-pooling",
+        "jdbc",
+        "orms",
+        "relationships",
+        "sql",
+        "transactions"
+      ]
+    },
+    {
+      "folder": "security",
+      "anchor": "security",
+      "indexLabel": "Security & Authentication",
+      "count": 6,
+      "pages": [
+        "auth-vs-authz",
+        "https-ssl",
+        "jwt",
+        "oauth",
+        "password-hashing",
+        "session-mgmt"
+      ]
+    },
+    {
+      "folder": "servers",
+      "anchor": "servers",
+      "indexLabel": "Application Servers & Deployment",
+      "count": 6,
+      "pages": [
+        "app-server",
+        "context",
+        "servlet-container",
+        "tomcat",
+        "war-jar",
+        "web-xml"
+      ]
+    },
+    {
+      "folder": "java-versions",
+      "anchor": "versions",
+      "indexLabel": "Java Versions & Compatibility",
+      "count": 6,
+      "pages": [
+        "backward-compatibility",
+        "jdk-jre-jvm",
+        "runtime-compile-time",
+        "source-target-compatibility",
+        "version-compatibility",
+        "version-history"
+      ]
+    },
+    {
+      "folder": "tools",
+      "anchor": "tools",
+      "indexLabel": "Tools & Ecosystem",
+      "count": 7,
+      "pages": [
+        "cicd",
+        "code-quality",
+        "git",
+        "ides",
+        "jackson",
+        "logging",
+        "testing"
+      ]
+    },
+    {
+      "folder": "best-practices",
+      "anchor": "bestpractices",
+      "indexLabel": "Best Practices",
+      "count": 7,
+      "pages": [
+        "clean-code",
+        "code-conventions",
+        "error-handling-patterns",
+        "performance-optimization",
+        "security-best-practices",
+        "solid-principles",
+        "sonarqube-code-quality"
+      ]
+    },
+    {
+      "folder": "ai",
+      "anchor": "ai",
+      "indexLabel": "AI & Java",
+      "count": 4,
+      "pages": [
+        "llm-integration",
+        "rag-embeddings",
+        "testing-and-risks",
+        "tool-calling-mcp"
+      ]
+    }
+  ],
+  "categoryNamingWarning": "Three different names exist per category: folder name, index.html anchor (java-versions -> #versions, best-practices -> #bestpractices), and the search-index 'category' label, which for 5 categories differs from the CLAUDE.md table (e.g. 'Advanced Java Concepts' vs 'Advanced Java'). Copy the label from an existing entry of the same folder.",
+  "dataFlows": [
+    {
+      "id": "search",
+      "steps": [
+        "index.html loads js/search.js",
+        "fetch data/search-index.json",
+        "user types >=2 chars, 200ms debounce",
+        "score each entry, sort desc",
+        "render top 10 <a href=entry.url>",
+        "browser navigates to topics/{folder}/{page}.html"
+      ]
+    },
+    {
+      "id": "topic-render",
+      "steps": [
+        "static HTML parsed",
+        "navigation.js adds Copy buttons, smooth-scroll handlers",
+        "toc.js reads h2/h3 of main.topic-content, fills #toc-nav, starts scroll-spy, adds .toc-ready"
+      ]
+    },
+    {
+      "id": "integrity",
+      "steps": [
+        "git push / PR to main",
+        "GitHub Actions verify.yml",
+        "bash tools/verify.sh",
+        "exit 1 blocks merge"
+      ]
+    },
+    {
+      "id": "mcp",
+      "steps": [
+        "host (Claude Desktop/Code) spawns java -jar",
+        "JSON-RPC over stdin/stdout",
+        "JavaBibleTools reads javabible/data/search-index.json and topics/*.html from disk"
+      ]
+    }
+  ],
+  "verifyChecks": [
+    {
+      "n": 1,
+      "name": "Internal links",
+      "what": "Every local href in javabible/**/*.html resolves to a file (fragments not validated)."
+    },
+    {
+      "n": 2,
+      "name": "Search index",
+      "what": "url set in search-index.json == topics/**/*.html on disk."
+    },
+    {
+      "n": 3,
+      "name": "UTF-8 BOM",
+      "what": "No HTML file starts with EF BB BF."
+    },
+    {
+      "n": 4,
+      "name": "Debug leftovers",
+      "what": "No console.log/debug/warn in javabible/js/."
+    },
+    {
+      "n": 5,
+      "name": "Dead CSS class",
+      "what": "No class=\"comparison-table\"."
+    },
+    {
+      "n": 6,
+      "name": "Meta description",
+      "what": "Present on every topic page; 70–160 characters on every page."
+    },
+    {
+      "n": 7,
+      "name": "Hand-written counts",
+      "what": "Cards with id == category folders; 'N topic'/'N categor' in index.html, README.md, CLAUDE.md, mcp/README.md == disk, no '+'."
+    },
+    {
+      "n": 8,
+      "name": "Code blocks",
+      "what": "Per <pre>: <span> opens == closes, no '</tag&gt;', only span/code/mark/b/strong/em/i/a/br tags inside."
+    },
+    {
+      "n": 9,
+      "name": "Undefined CSS classes",
+      "what": "Every class used in HTML (and 404.html) is defined in css/. Dotted names (Java classes in XML samples) ignored."
+    },
+    {
+      "n": 10,
+      "name": "Forbidden markup",
+      "what": "No style=\"\" in topics/; no two box corners (┌…┐ ┌ / └…┘ └) on one line."
+    },
+    {
+      "n": 11,
+      "name": "Index cards",
+      "what": "Every topic page linked from index.html, no dead card links."
+    },
+    {
+      "n": 12,
+      "name": "SEO head",
+      "what": "Self-referencing canonical + og:title on every page."
+    },
+    {
+      "n": 13,
+      "name": "Sitemap",
+      "what": "sitemap.xml locs == index.html + topic pages on disk."
+    },
+    {
+      "n": 14,
+      "name": "Field injection",
+      "what": "No '@Autowired private' in a <pre> unless the block has a test annotation or a ❌ marker."
+    }
+  ],
+  "notVerified": [
+    "Visual/behavioural correctness (browser needed)",
+    "Anchor fragments in links",
+    "Page structure conventions (Section 0, Do/Don't, interview question counts)",
+    "Most Java conventions in samples (jakarta.*, LAZY, records, ProblemDetail, e-commerce domain) — only field injection is checked",
+    "Check 14 is block-level: a block mixing a test annotation with application code is not inspected",
+    "404.html behaviour (only reproducible on GitHub Pages)",
+    "mcp/ is not built in CI"
+  ],
+  "howTo": {
+    "addTopicPage": [
+      "Copy topics/databases/relationships.html; keep head/header/aside/footer/scripts; rewrite title, description, canonical + og:url/og:title/og:description, breadcrumb, h1, subtitle, content.",
+      "Add an entry to data/search-index.json (category label from a sibling; keywords from the page's real headings).",
+      "Add <li> to the category card in index.html.",
+      "Add <url> to javabible/sitemap.xml.",
+      "Link from Related Topics of a sibling.",
+      "Update counts in index.html (meta, hero-stats, aria-label), README.md, CLAUDE.md, mcp/README.md.",
+      "bash tools/verify.sh; cd mcp && ./mvnw -q test; browser check."
+    ],
+    "addCategory": [
+      "Create javabible/topics/{folder}/ with pages.",
+      "Add a <div class=\"category-card\" id=\"{anchor}\"> to index.html (id is mandatory, check 7). Optionally a hero-pill.",
+      "Search-index entries with a new category label.",
+      "Update CLAUDE.md category table and all category counts (index.html, README.md, CLAUDE.md). Also the list_categories description in JavaBibleTools.java ('all 13 categories').",
+      "verify.sh."
+    ],
+    "addSiteWideJsFeature": [
+      "New file in javabible/js/ wrapped in an IIFE ('use strict'), early-return if its DOM hooks are absent (pattern from search.js/toc.js).",
+      "No innerHTML with data, no console.*, no dependencies, respect prefers-reduced-motion for any animation.",
+      "Add the <script> tag by hand to every page that needs it — there is no include mechanism; 94 topic pages means 94 edits (use a scripted, reviewed sed and verify the diff).",
+      "Styles go in main.css (or a new css file linked everywhere), never inline.",
+      "verify.sh + browser at 320px, 900px/901px and desktop."
+    ],
+    "changeSearch": [
+      "Index shape changes must stay flat (verify.sh greps it) and must be mirrored in mcp/JavaBibleTools.java, which reads the same file and duplicates the scoring weights."
+    ]
+  },
+  "knownIssues": [
+    {
+      "severity": "convention",
+      "where": "spring/security.html, security/oauth.html, web-concepts/sessions-cookies.html, advanced/garbage-collection.html (UserContext)",
+      "what": "'user' kept on purpose where it is the security principal (Spring Boot's default user is literally 'user', role USER, /user/**). Toy User models were renamed to Customer in 31 pages on 2026-11-23."
+    },
+    {
+      "severity": "content",
+      "where": "topics/tools/logging.html",
+      "what": "log4j-core 2.24.0 labelled 'always the latest patch' — version not re-checked against current releases."
+    },
+    {
+      "severity": "content",
+      "where": "all pages",
+      "what": "Only the facts touched on 2026-11-23 were re-verified (spring.factories removal in Boot 3.0, CDI jakarta package, spring.session.store-type removal). Other version claims are unreviewed."
+    },
+    {
+      "severity": "search",
+      "where": "data/search-index.json",
+      "what": "Keywords were enriched automatically from each page's h2/h3 headings; they are broad, not curated. 'records' has no dedicated page."
+    }
+  ],
+  "gitignored": [
+    ".claude/",
+    "AUDIT_RESULT.md",
+    "task.md",
+    "javabible/features/",
+    "mcp target/",
+    "node_modules/",
+    ".vscode/* except settings.json"
+  ],
+  "workingAgreements": [
+    "Delivery format per CLAUDE.md: Entendido / Análisis / Propuesta / Plan de implementación / Auto-revisión crítica (the user writes in Spanish; site content is English).",
+    "Do not commit scratch/audit files; check git status before committing.",
+    "Commit or push only when asked."
+  ]
+}

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JavaDevBible — Mapa de arquitectura</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c232d; --line: #2a3340;
+    --text: #d7dee8; --muted: #8b97a8; --accent: #00ffb4; --accent2: #5aa9ff;
+    --warn: #ffb547; --bad: #ff6b6b; --violet: #b68cff;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 2.2rem 1.5rem 1.4rem; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #0f1a1a, var(--bg)); }
+  header h1 { margin: 0 0 .3rem; font-size: 1.9rem; letter-spacing: -.01em; }
+  header h1 span { color: var(--accent); }
+  header p { margin: 0; color: var(--muted); }
+  nav.jump { position: sticky; top: 0; z-index: 5; background: rgba(13,17,23,.94); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); padding: .55rem 1.5rem; display: flex; gap: .4rem 1rem; flex-wrap: wrap; font-size: .85rem; }
+  nav.jump a { color: var(--muted); text-decoration: none; }
+  nav.jump a:hover { color: var(--accent); }
+  main { max-width: 1180px; margin: 0 auto; padding: 1.5rem; }
+  section { margin: 0 0 2.6rem; }
+  h2 { font-size: 1.3rem; margin: 0 0 1rem; padding-bottom: .4rem; border-bottom: 1px solid var(--line); }
+  h2 small { color: var(--muted); font-weight: 400; font-size: .85rem; margin-left: .5rem; }
+  h3 { font-size: 1rem; margin: 0 0 .5rem; }
+  code, .mono { font-family: var(--mono); font-size: .86em; }
+  code { background: #0b0f14; border: 1px solid var(--line); padding: .05em .35em; border-radius: 4px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .8rem; margin-top: 1.2rem; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: .8rem 1rem; }
+  .stat b { display: block; font-size: 1.6rem; color: var(--accent); line-height: 1.1; }
+  .stat span { color: var(--muted); font-size: .82rem; }
+  .grid { display: grid; gap: 1rem; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; }
+  .card p { margin: .3rem 0; }
+  .card ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+  .card li { margin: .2rem 0; }
+  .tag { display: inline-block; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: .12rem .45rem; border-radius: 4px; margin-right: .35rem; vertical-align: 1px; }
+  .t-site { background: rgba(0,255,180,.12); color: var(--accent); }
+  .t-tool { background: rgba(90,169,255,.14); color: var(--accent2); }
+  .t-java { background: rgba(182,140,255,.15); color: var(--violet); }
+  .t-warn { background: rgba(255,181,71,.14); color: var(--warn); }
+  .t-bad  { background: rgba(255,107,107,.14); color: var(--bad); }
+  .muted { color: var(--muted); }
+
+  /* Diagrama de capas */
+  .layers { display: grid; gap: .7rem; }
+  .layer { display: grid; grid-template-columns: 170px 1fr; gap: .8rem; align-items: stretch; }
+  .layer-label { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: .6rem .8rem; font-weight: 600; font-size: .88rem; display: flex; align-items: center; }
+  .layer-boxes { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: .5rem .75rem; min-width: 150px; flex: 1 1 150px; }
+  .box b { display: block; font-family: var(--mono); font-size: .84rem; }
+  .box span { color: var(--muted); font-size: .8rem; }
+  .box.blue { border-left-color: var(--accent2); }
+  .box.violet { border-left-color: var(--violet); }
+  .box.warn { border-left-color: var(--warn); }
+  .arrow-down { text-align: center; color: var(--muted); font-size: .8rem; }
+  @media (max-width: 640px) { .layer { grid-template-columns: 1fr; } }
+
+  /* Flujos */
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; margin: .5rem 0 .2rem; }
+  .step { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: .3rem .6rem; font-size: .82rem; }
+  .flow .to { color: var(--accent); font-weight: 700; }
+
+  /* Tablas */
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; background: var(--panel2); }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+
+  /* Categorías */
+  .cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .7rem; }
+  .cat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: .7rem .8rem; }
+  .cat-head { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
+  .cat-head b { font-size: .9rem; }
+  .cat-head em { font-style: normal; color: var(--accent); font-weight: 700; font-family: var(--mono); }
+  .cat .meta { font-family: var(--mono); font-size: .72rem; color: var(--muted); margin: .2rem 0 .4rem; }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; margin-bottom: .45rem; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+  .pages { display: flex; flex-wrap: wrap; gap: .25rem; }
+  .pages span { font-family: var(--mono); font-size: .7rem; background: #0b0f14; border: 1px solid var(--line); padding: .05rem .35rem; border-radius: 3px; color: #b8c3d1; }
+
+  /* Plantilla de página */
+  .page-mock { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: .8rem; }
+  .pm-head { background: #12201d; padding: .6rem .8rem; border-bottom: 1px solid var(--line); }
+  .pm-body { display: grid; grid-template-columns: 170px 1fr; }
+  .pm-toc { background: var(--panel2); padding: .6rem .8rem; border-right: 1px solid var(--line); color: var(--muted); }
+  .pm-main { padding: .6rem .8rem; display: grid; gap: .35rem; }
+  .pm-sec { border: 1px dashed var(--line); border-radius: 6px; padding: .35rem .55rem; }
+  .pm-sec.req { border-style: solid; border-color: rgba(0,255,180,.35); }
+  .pm-foot { background: var(--panel2); padding: .45rem .8rem; border-top: 1px solid var(--line); color: var(--muted); }
+  @media (max-width: 640px) { .pm-body { grid-template-columns: 1fr; } .pm-toc { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+  .checks { counter-reset: c; list-style: none; padding: 0; margin: 0; display: grid; gap: .45rem; }
+  .checks li { counter-increment: c; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .8rem .5rem 2.6rem; position: relative; }
+  .checks li::before { content: counter(c); position: absolute; left: .8rem; top: .5rem; width: 1.3rem; height: 1.3rem; border-radius: 50%; background: rgba(0,255,180,.15); color: var(--accent); font-weight: 700; font-size: .75rem; display: grid; place-items: center; }
+  ol.steps { margin: .3rem 0 0; padding-left: 1.2rem; }
+  ol.steps li { margin: .25rem 0; }
+  footer { color: var(--muted); font-size: .8rem; text-align: center; padding: 1.5rem; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>JavaDev<span>Bible</span> — mapa de arquitectura</h1>
+  <p>Foto del repositorio: commit <code>99eb5f8</code> + limpieza del 23-11-2026 · compañero legible por máquina: <code>docs/architecture.json</code></p>
+  <div class="stats">
+    <div class="stat"><b>94</b><span>páginas de tema</span></div>
+    <div class="stat"><b>13</b><span>categorías</span></div>
+    <div class="stat"><b>4</b><span>archivos JS (≈830 líneas)</span></div>
+    <div class="stat"><b>3</b><span>hojas CSS (≈1270 líneas)</span></div>
+    <div class="stat"><b>14/14</b><span>checks de verify.sh en verde</span></div>
+    <div class="stat"><b>0</b><span>dependencias en el sitio</span></div>
+  </div>
+</header>
+
+<nav class="jump" aria-label="Secciones">
+  <a href="#capas">Capas</a><a href="#flujos">Flujos</a><a href="#archivos">Archivos</a><a href="#plantilla">Plantilla de página</a>
+  <a href="#categorias">Categorías</a><a href="#verify">verify.sh</a><a href="#mcp">Servidor MCP</a><a href="#recetas">Recetas</a><a href="#hallazgos">Hallazgos</a>
+</nav>
+
+<main>
+
+<section id="capas">
+  <h2>Vista general por capas <small>qué existe y quién depende de quién</small></h2>
+  <div class="layers">
+    <div class="layer">
+      <div class="layer-label">Entrega</div>
+      <div class="layer-boxes">
+        <div class="box"><b>GitHub Pages</b><span>rama <code>main</code>, sirve la <strong>raíz</strong> del repo; <code>/index.html</code> redirige a <code>/javabible/</code>, <code>/404.html</code> propio</span></div>
+        <div class="box blue"><b>GitHub Actions · verify.yml</b><span>push / PR a main → <code>bash tools/verify.sh</code></span></div>
+      </div>
+    </div>
+    <div class="arrow-down">▼ sirve tal cual</div>
+    <div class="layer">
+      <div class="layer-label">Páginas HTML</div>
+      <div class="layer-boxes">
+        <div class="box"><b>index.html</b><span>hero, buscador, 13 tarjetas de categoría con listas escritas a mano</span></div>
+        <div class="box"><b>topics/{cat}/{tema}.html × 94</b><span>autocontenidas; cabecera, TOC, footer y scripts duplicados en cada archivo</span></div>
+      </div>
+    </div>
+    <div class="arrow-down">▼ cargan</div>
+    <div class="layer">
+      <div class="layer-label">Comportamiento (JS)</div>
+      <div class="layer-boxes">
+        <div class="box"><b>search.js</b><span>solo index · búsqueda instantánea</span></div>
+        <div class="box"><b>hero-effects.js</b><span>solo index · partículas + tecleo</span></div>
+        <div class="box"><b>navigation.js</b><span>todas · copiar código, scroll suave, Ctrl+K (IIFE)</span></div>
+        <div class="box"><b>toc.js</b><span>temas · índice lateral + scroll-spy</span></div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-label">Presentación (CSS)</div>
+      <div class="layer-boxes">
+        <div class="box"><b>main.css</b><span>variables, hero, buscador, tarjetas, info-box, tablas, responsive, print</span></div>
+        <div class="box"><b>syntax-highlighting.css</b><span>colores de tokens marcados a mano con &lt;span&gt;</span></div>
+        <div class="box"><b>toc.css</b><span>layout de 2 columnas, sidebar sticky, breakpoint 901px</span></div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-label">Datos</div>
+      <div class="layer-boxes">
+        <div class="box"><b>data/search-index.json</b><span>array plano, 94 entradas: title · category · url · description · keywords</span></div>
+        <div class="box"><b>sitemap.xml</b><span>95 URLs, comprobado contra disco</span></div>
+      </div>
+    </div>
+    <div class="arrow-down">▲ también lo leen</div>
+    <div class="layer">
+      <div class="layer-label">Fuera del sitio</div>
+      <div class="layer-boxes">
+        <div class="box blue"><b>tools/verify.sh</b><span>bash puro, 7 checks de integridad</span></div>
+        <div class="box violet"><b>mcp/</b><span>Spring Boot 4 + Spring AI 2 · servidor MCP por STDIO que lee <code>javabible/</code> del disco</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="flujos">
+  <h2>Flujos principales</h2>
+  <div class="grid g2">
+    <div class="card">
+      <h3><span class="tag t-site">sitio</span>Búsqueda</h3>
+      <div class="flow"><span class="step">index.html</span><span class="to">→</span><span class="step">fetch search-index.json</span><span class="to">→</span><span class="step">≥2 caracteres · debounce 200 ms</span><span class="to">→</span><span class="step">trocea en palabras (todas deben aparecer)</span><span class="to">→</span><span class="step">puntúa y ordena</span><span class="to">→</span><span class="step">top 10 como &lt;a&gt;</span><span class="to">→</span><span class="step">página de tema</span></div>
+      <p class="muted">Pesos: título 10 · categoría 5 · keywords 3 · descripción 2, más bonus por inicio de palabra en el título, frase exacta y prefijo. Plural → singular ("threads" encuentra "Multithreading"). Idéntico en el servidor MCP, con tests. Si el fetch falla, lo dice (con <code>file://</code> suele fallar: usa <code>python -m http.server</code>).</p>
+    </div>
+    <div class="card">
+      <h3><span class="tag t-site">sitio</span>Carga de una página de tema</h3>
+      <div class="flow"><span class="step">HTML estático</span><span class="to">→</span><span class="step">navigation.js: botón Copy en cada pre</span><span class="to">→</span><span class="step">toc.js: lee h2/h3</span><span class="to">→</span><span class="step">rellena #toc-nav + scroll-spy</span><span class="to">→</span><span class="step">.toc-ready</span></div>
+      <p class="muted">Los IDs de encabezado que falten se generan como <code>slug-índice</code>. En móvil (≤900px) el TOC arranca colapsado.</p>
+    </div>
+    <div class="card">
+      <h3><span class="tag t-tool">CI</span>Integridad</h3>
+      <div class="flow"><span class="step">git push / PR</span><span class="to">→</span><span class="step">verify.yml</span><span class="to">→</span><span class="step">verify.sh</span><span class="to">→</span><span class="step">exit 1 bloquea el merge</span></div>
+      <p class="muted">No compila <code>mcp/</code> ni comprueba nada visual.</p>
+    </div>
+    <div class="card">
+      <h3><span class="tag t-java">MCP</span>Asistente de IA</h3>
+      <div class="flow"><span class="step">Claude Desktop/Code</span><span class="to">→</span><span class="step">java -jar (subproceso)</span><span class="to">→</span><span class="step">JSON-RPC por stdin/stdout</span><span class="to">→</span><span class="step">lee search-index.json y topics/*.html</span></div>
+      <p class="muted">Sin red ni puertos. Raíz: <code>JAVABIBLE_ROOT</code> → <code>../javabible</code> → <code>./javabible</code>.</p>
+    </div>
+  </div>
+</section>
+
+<section id="archivos">
+  <h2>Archivos y responsabilidades</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Archivo</th><th>Dónde se usa</th><th>Qué hace</th><th>Detalles a tener en cuenta</th></tr></thead>
+    <tbody>
+      <tr><td><code>js/search.js</code></td><td>index</td><td>Combobox ARIA, teclado (↑↓ Enter Esc), resaltado con &lt;mark&gt;</td><td>IIFE. Cero <code>innerHTML</code> con datos. Estado del panel vía <code>data-open</code>.</td></tr>
+      <tr><td><code>js/navigation.js</code></td><td>todas</td><td>Copy en bloques de código, scroll suave, Ctrl/Cmd+K, colapsables, back-to-top, <code>sharePage()</code></td><td>IIFE. Sin estilos inline. Respeta <code>prefers-reduced-motion</code>. El código muerto (colapsables, back-to-top, <code>sharePage</code>) se eliminó.</td></tr>
+      <tr><td><code>js/toc.js</code></td><td>temas</td><td>Construye el índice lateral, scroll-spy con IntersectionObserver, toggle</td><td>Media queries 900/901px acopladas a <code>toc.css</code>. El salto deja el título a 16 px (antes, ~300 px).</td></tr>
+      <tr><td><code>js/hero-effects.js</code></td><td>index</td><td>40 partículas de código en canvas + efecto de tecleo</td><td>Se desactiva con <code>prefers-reduced-motion</code>; se pausa fuera de pantalla y con la pestaña oculta.</td></tr>
+      <tr><td><code>css/main.css</code></td><td>todas</td><td>Todo lo global</td><td><code>&lt;table&gt;</code> se estiliza sin clase.</td></tr>
+      <tr><td><code>css/syntax-highlighting.css</code></td><td>temas</td><td>Colores para <code>.keyword .class-name .annotation .comment .string .function .number</code></td><td>No hay librería: los tokens se marcan a mano. verify.sh comprueba que cada <code>&lt;pre&gt;</code> esté equilibrado y escapado.</td></tr>
+      <tr><td><code>css/toc.css</code></td><td>temas</td><td>Layout 2 columnas, sidebar sticky</td><td>Puerta <code>.toc-ready</code> evita CLS.</td></tr>
+      <tr><td><code>data/search-index.json</code></td><td>search.js, MCP, verify.sh</td><td>Índice de las 94 páginas</td><td>Debe ser plano: verify.sh lo lee con grep.</td></tr>
+      <tr><td><code>/index.html</code>, <code>/404.html</code></td><td>raíz del repo</td><td>Redirección al sitio y página de error de Pages</td><td>El 404 usa rutas <code>/javadevbible/…</code>; solo se puede probar en Pages.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="plantilla">
+  <h2>Anatomía de una página de tema <small>referencia: databases/relationships.html</small></h2>
+  <div class="grid g2">
+    <div class="page-mock">
+      <div class="pm-head"><b>header.topic-header</b> — breadcrumb (Home / index.html#ancla / Tema) · h1 · subtítulo · botón volver</div>
+      <div class="pm-body">
+        <div class="pm-toc"><b>aside#toc-sidebar</b><br>nav#toc-nav vacío<br>(lo rellena toc.js)</div>
+        <div class="pm-main">
+          <div class="pm-sec req"><b>Sección 0</b> — qué es, por qué existe, antes/después en código</div>
+          <div class="pm-sec">Secciones propias del tema · <code>.info-box</code> · <code>&lt;pre&gt;&lt;code&gt;</code></div>
+          <div class="pm-sec req"><b>Best Practices</b> — ✅ Do / ❌ Don't</div>
+          <div class="pm-sec req"><b>Interview Questions</b> — 🎓 Junior ≥3 (note) · 🔥 Senior ≥3 (important)</div>
+          <div class="pm-sec req"><b>section.related-topics</b> — a.related-link</div>
+        </div>
+      </div>
+      <div class="pm-foot">footer.site-footer · navigation.js · toc.js</div>
+    </div>
+    <div class="card">
+      <h3>Estado actual de cumplimiento</h3>
+      <ul>
+        <li>94/94 tienen TOC, toc.js, preguntas Junior y Senior y Related Topics.</li>
+        <li>0 <code>style="..."</code> en temas · 0 secciones "Summary" · 0 BOM.</li>
+        <li><span class="tag t-site">hecho</span>Modelo <code>User</code> de juguete → <code>Customer</code> en 31 páginas; <code>Employee</code> → <code>Product</code>.</li>
+        <li><span class="tag t-site">hecho</span>8 diagramas ASCII de columnas convertidos en tablas.</li>
+        <li><span class="tag t-site">hecho</span>Todas las páginas con <code>canonical</code> y Open Graph; meta descriptions en 70–160 caracteres.</li>
+        <li><span class="tag t-warn">a propósito</span>"user" se mantiene donde es el principal de seguridad (Spring Security, OAuth, sesiones).</li>
+      </ul>
+      <p class="muted">Los <code>javax.*</code> restantes son legítimos: paquetes de Java SE (<code>javax.sql</code>) o ejemplos legacy explícitos.</p>
+    </div>
+  </div>
+</section>
+
+<section id="categorias">
+  <h2>Categorías <small>carpeta · ancla en index · etiqueta en el índice de búsqueda</small></h2>
+  <div class="cats">
+    <div class="cat"><div class="cat-head"><b>Java Fundamentals</b><em>13</em></div><div class="meta">fundamentals · #fundamentals</div><div class="bar"><i style="width:100%"></i></div><div class="pages"><span>access-modifiers</span><span>collections</span><span>constructors</span><span>exceptions</span><span>generics</span><span>interfaces-abstract</span><span>lambda-streams</span><span>methods</span><span>oop-principles</span><span>optional</span><span>static-instance</span><span>variables-datatypes</span><span>what-is-java</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Spring Framework</b><em>9</em></div><div class="meta">spring · #spring</div><div class="bar"><i style="width:69%"></i></div><div class="pages"><span>boot</span><span>core</span><span>data-jpa</span><span>mvc</span><span>profiles</span><span>properties</span><span>rest</span><span>security</span><span>starters</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Advanced Java Concepts</b><em>8</em></div><div class="meta">advanced · #advanced</div><div class="bar"><i style="width:62%"></i></div><div class="pages"><span>annotations</span><span>design-patterns</span><span>garbage-collection</span><span>jvm-internals</span><span>multithreading</span><span>reflection</span><span>synchronization</span><span>thread-pools</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Web Concepts &amp; Architecture</b><em>8</em></div><div class="meta">web-concepts · #web-concepts</div><div class="bar"><i style="width:62%"></i></div><div class="pages"><span>client-server</span><span>cors</span><span>http</span><span>request-response</span><span>rest-principles</span><span>server-vs-client</span><span>sessions-cookies</span><span>websocket</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Build Tools &amp; Project Mgmt</b><em>7</em></div><div class="meta">build-tools · #build-tools</div><div class="bar"><i style="width:54%"></i></div><div class="pages"><span>dependencies</span><span>gradle</span><span>lifecycle</span><span>maven</span><span>pom</span><span>scopes</span><span>versions</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Jakarta EE &amp; Enterprise</b><em>7</em></div><div class="meta">jakarta-ee · #jakarta-ee</div><div class="bar"><i style="width:54%"></i></div><div class="pages"><span>cdi</span><span>ejb</span><span>jax-rs</span><span>jpa</span><span>overview</span><span>servlets-jsp</span><span>transactions</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Tools &amp; Ecosystem</b><em>7</em></div><div class="meta">tools · #tools</div><div class="bar"><i style="width:54%"></i></div><div class="pages"><span>cicd</span><span>code-quality</span><span>git</span><span>ides</span><span>jackson</span><span>logging</span><span>testing</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Best Practices</b><em>7</em></div><div class="meta">best-practices · #bestpractices</div><div class="bar"><i style="width:54%"></i></div><div class="pages"><span>clean-code</span><span>code-conventions</span><span>error-handling-patterns</span><span>performance-optimization</span><span>security-best-practices</span><span>solid-principles</span><span>sonarqube-code-quality</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Databases &amp; Persistence</b><em>6</em></div><div class="meta">databases · #databases</div><div class="bar"><i style="width:46%"></i></div><div class="pages"><span>connection-pooling</span><span>jdbc</span><span>orms</span><span>relationships</span><span>sql</span><span>transactions</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Security &amp; Authentication</b><em>6</em></div><div class="meta">security · #security</div><div class="bar"><i style="width:46%"></i></div><div class="pages"><span>auth-vs-authz</span><span>https-ssl</span><span>jwt</span><span>oauth</span><span>password-hashing</span><span>session-mgmt</span></div></div>
+    <div class="cat"><div class="cat-head"><b>App Servers &amp; Deployment</b><em>6</em></div><div class="meta">servers · #servers</div><div class="bar"><i style="width:46%"></i></div><div class="pages"><span>app-server</span><span>context</span><span>servlet-container</span><span>tomcat</span><span>war-jar</span><span>web-xml</span></div></div>
+    <div class="cat"><div class="cat-head"><b>Java Versions &amp; Compat.</b><em>6</em></div><div class="meta">java-versions · #versions</div><div class="bar"><i style="width:46%"></i></div><div class="pages"><span>backward-compatibility</span><span>jdk-jre-jvm</span><span>runtime-compile-time</span><span>source-target-compatibility</span><span>version-compatibility</span><span>version-history</span></div></div>
+    <div class="cat"><div class="cat-head"><b>AI &amp; Java</b><em>4</em></div><div class="meta">ai · #ai</div><div class="bar"><i style="width:31%"></i></div><div class="pages"><span>llm-integration</span><span>rag-embeddings</span><span>testing-and-risks</span><span>tool-calling-mcp</span></div></div>
+  </div>
+  <p class="muted">Ojo: cada categoría tiene tres nombres (carpeta, ancla, etiqueta del índice). <code>java-versions</code> → <code>#versions</code> y <code>best-practices</code> → <code>#bestpractices</code>; y en 5 categorías la etiqueta del índice no coincide con la tabla de CLAUDE.md (p. ej. "Advanced Java Concepts").</p>
+</section>
+
+<section id="verify">
+  <h2>tools/verify.sh <small>el "compilador" del proyecto</small></h2>
+  <div class="grid g2">
+    <ol class="checks">
+      <li><b>Enlaces internos</b> — todo <code>href</code> local resuelve a un archivo</li>
+      <li><b>Índice de búsqueda</b> — URLs del JSON = archivos en <code>topics/</code></li>
+      <li><b>BOM UTF-8</b> — ningún HTML empieza por EF BB BF</li>
+      <li><b>Restos de debug</b> — sin <code>console.*</code> en <code>js/</code></li>
+      <li><b>Clase muerta</b> — sin <code>comparison-table</code></li>
+      <li><b>Meta description</b> — presente y de 70–160 caracteres</li>
+      <li><b>Cifras escritas a mano</b> — index, README, CLAUDE.md y mcp/README = disco</li>
+      <li><b>Bloques de código</b> — spans equilibrados, sin <code>&lt;/tag&amp;gt;</code>, sin etiquetas crudas</li>
+      <li><b>Clases CSS</b> — toda clase usada está definida</li>
+      <li><b>Marcado prohibido</b> — sin <code>style=""</code> ni cajas ASCII lado a lado</li>
+      <li><b>Tarjetas del índice</b> — toda página aparece en su categoría</li>
+      <li><b>Cabecera SEO</b> — canonical propio + Open Graph</li>
+      <li><b>Sitemap</b> — igual al disco</li>
+      <li><b>Inyección por campo</b> — sin <code>@Autowired private</code> fuera de tests y ejemplos ❌</li>
+    </ol>
+    <div class="card">
+      <h3>Lo que <em>no</em> comprueba</h3>
+      <ul>
+        <li>Que algo se vea o funcione bien (hace falta navegador).</li>
+        <li>Anclas <code>#seccion</code> dentro de enlaces.</li>
+        <li>La estructura de la plantilla (Sección 0, Do/Don't, nº de preguntas).</li>
+        <li>El resto de convenciones Java (jakarta, LAZY, records, ProblemDetail, dominio).</li>
+        <li>Que <code>mcp/</code> compile: para eso, <code>./mvnw -q test</code>.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="mcp">
+  <h2>Servidor MCP (<code>mcp/</code>) <small>no se despliega · no está en CLAUDE.md</small></h2>
+  <div class="grid g3">
+    <div class="card"><h3><code>search_topics(query, maxResults?)</code></h3><p>Mismo algoritmo que <code>search.js</code>: puntúa todo, ordena y luego recorta (antes cortaba en orden de archivo). Máx. 20. Cubierto por <code>JavaBibleToolsTest</code>.</p></div>
+    <div class="card"><h3><code>get_topic_content(topicPath)</code></h3><p>Solo rutas <code>topics/…</code> sin <code>..</code>. Quita script/style/nav/header/aside/footer, luego etiquetas; trunca a 24 000 caracteres.</p></div>
+    <div class="card"><h3><code>list_categories()</code></h3><p>Agrupa las entradas del índice por etiqueta de categoría.</p></div>
+  </div>
+  <p class="muted">Spring Boot 4.0.0 · Spring AI 2.0.0 · Jackson 3 (<code>tools.jackson</code>) · Java 17 · <code>web-application-type=none</code> · logs a <code>javadevbible-mcp.log</code> porque stdout es el canal del protocolo.</p>
+</section>
+
+<section id="recetas">
+  <h2>Recetas para una nueva feature</h2>
+  <div class="grid g3">
+    <div class="card">
+      <h3>Añadir una página de tema</h3>
+      <ol class="steps">
+        <li>Copiar <code>relationships.html</code> y reescribir el contenido.</li>
+        <li>Entrada en <code>search-index.json</code> con la etiqueta de categoría de sus hermanas.</li>
+        <li><code>&lt;li&gt;</code> en la tarjeta de <code>index.html</code>.</li>
+        <li>Enlazarla desde Related Topics de alguna hermana.</li>
+        <li>Actualizar "94" en index (meta, stats, aria-label), README y CLAUDE.md.</li>
+        <li><code>verify.sh</code> + navegador.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>Añadir JS para todo el sitio</h3>
+      <ol class="steps">
+        <li>Archivo nuevo en <code>js/</code>, IIFE + <code>'use strict'</code>, salir si no existe su DOM.</li>
+        <li>Nada de <code>innerHTML</code> con datos, ni <code>console.*</code>, ni dependencias.</li>
+        <li>No hay includes: el <code>&lt;script&gt;</code> se añade a mano en las 94 páginas (sed revisado).</li>
+        <li>Estilos en <code>main.css</code>; respetar <code>prefers-reduced-motion</code>.</li>
+        <li>Probar a 320px, 900/901px y escritorio.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>Tocar la búsqueda</h3>
+      <ol class="steps">
+        <li>El JSON debe seguir plano (verify.sh usa grep).</li>
+        <li>Cualquier cambio de forma o de pesos se replica en <code>JavaBibleTools.java</code>.</li>
+        <li>No tocar <code>data-open</code> desde otros scripts.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="hallazgos">
+  <h2>Estado tras la limpieza del 23-11-2026</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Estado</th><th>Qué</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag t-site">resuelto</span></td><td>TOC que dejaba el título a ~300 px; <code>&lt;pid&gt;</code> invisible; <code>&lt;/idactivation&gt;</code> en Maven; tres bloques con color de comentario erróneo.</td></tr>
+      <tr><td><span class="tag t-site">resuelto</span></td><td>Búsqueda multipalabra, plurales, orden estable y <code>aria-selected</code>; MCP ordenando por puntuación, con tests.</td></tr>
+      <tr><td><span class="tag t-site">resuelto</span></td><td>Errores de contenido: <code>spring.factories</code> (eliminado en Boot 3.0), <code>jakarta.enterprise</code> en CDI, <code>spring.session.store-type</code> (eliminado en Boot 3.0).</td></tr>
+      <tr><td><span class="tag t-site">resuelto</span></td><td>Clases CSS sin definir (<code>best-practices</code>, <code>row-highlight</code>, <code>attribute</code>, <code>topic-navigation</code>) y clases muertas eliminadas.</td></tr>
+      <tr><td><span class="tag t-warn">pendiente</span></td><td>Versiones concretas no revisadas (p. ej. log4j 2.24.0 como "latest patch").</td></tr>
+      <tr><td><span class="tag t-warn">pendiente</span></td><td>Las keywords del índice se ampliaron automáticamente a partir de los encabezados: amplias, no curadas.</td></tr>
+      <tr><td><span class="tag t-warn">pendiente</span></td><td>El 404 solo se puede comprobar una vez desplegado en GitHub Pages.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+</main>
+
+<footer>Generado leyendo el repo (commit 99eb5f8 + cambios del 23-11-2026). Es una foto fija: si el repo cambia, este mapa envejece.</footer>
+</body>
+</html>

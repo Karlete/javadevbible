@@ -2,7 +2,7 @@
 
 Exposes the content of [JavaDevBible](../javabible/index.html) to any
 MCP-compatible AI assistant. Add it to Claude Desktop or Claude Code and ask
-your assistant Java questions backed by the Bible's 90+ topic pages.
+your assistant Java questions backed by the Bible's 94 topic pages.
 
 No API keys. No network. No ports. The host launches this JAR as a subprocess
 and communicates through stdin/stdout.
@@ -13,7 +13,7 @@ and communicates through stdin/stdout.
 
 | Tool | What it does |
 |---|---|
-| `search_topics` | Search across all 90+ pages by keyword or concept |
+| `search_topics` | Ranked multi-word search across all 94 topic pages (every word must match) |
 | `get_topic_content` | Read the full content of a specific topic page |
 | `list_categories` | List all 13 categories and their topics |
 

@@ -13,8 +13,16 @@
 #   3. UTF-8 BOM              — forbidden by CLAUDE.md, present anyway
 #   4. Debug leftovers        — console.log shipped to production
 #   5. Dead CSS class         — class="comparison-table", defined in no stylesheet
-#   6. Missing meta description — topic page with no <meta name="description">
+#   6. Meta description       — missing, or outside 70–160 characters
 #   7. Hand-written counts    — "N topics" / "N categories" that disagree with disk
+#   8. Code blocks            — unbalanced <span>, malformed close tags, raw tags
+#                               inside <pre> (an unescaped <pid> silently vanishes)
+#   9. Undefined CSS classes  — class="x" that no stylesheet defines
+#  10. Forbidden markup       — inline style="", side-by-side ASCII box diagrams
+#  11. Index cards            — every topic page is listed on index.html
+#  12. SEO head               — canonical URL present and pointing at the page itself
+#  13. Sitemap                — sitemap.xml lists exactly the pages on disk
+#  14. Field injection        — @Autowired on a field outside test code / ❌ examples
 #
 # Usage:
 #   bash tools/verify.sh            run all checks
@@ -277,6 +285,30 @@ else
   hint 'fix: add <meta name="description" content="..."> after the <title>'
 fi
 
+# Length. Google truncates snippets beyond ~160 characters; under 70 is either a
+# stub or — as happened on eleven pages — a sentence cut off mid-word. Entities
+# (&amp;) are counted as one character; multi-byte UTF-8 (—, é) is counted as one.
+: > "$TMP/desclen.txt"
+while IFS= read -r -d '' f; do
+  desc="$(grep -o '<meta name="description" content="[^"]*"' "$f" | head -1 \
+          | sed 's/^<meta name="description" content="//; s/"$//; s/&[a-zA-Z#0-9]*;/x/g')"
+  [[ -z "$desc" ]] && continue
+  len=$(printf '%s' "$desc" | LC_ALL=C.UTF-8 wc -m 2>/dev/null | tr -d ' ')
+  [[ -z "$len" ]] && len=${#desc}
+  if [[ "$len" -lt 70 || "$len" -gt 160 ]]; then
+    printf '%s  →  %s chars\n' "${f#"$REPO_ROOT/"}" "$len" >> "$TMP/desclen.txt"
+  fi
+done < <(find "$SITE_ROOT" -name '*.html' -print0)
+
+DESCLEN_N=$(grep -c . "$TMP/desclen.txt" || true)
+if [[ "$DESCLEN_N" -eq 0 ]]; then
+  pass 'every meta description is 70–160 characters'
+else
+  fail "$DESCLEN_N meta description(s) outside 70–160 characters"
+  show_capped "$(cat "$TMP/desclen.txt")"
+  hint 'fix: rewrite it as one complete sentence of 120–160 characters'
+fi
+
 # ─── Check 7: Hand-written counts match disk ──────────────────────────────────
 #
 # "94 topics" and "13 categories" are typed by hand into the hero, the meta
@@ -302,7 +334,7 @@ if [[ "$CARD_N" -ne "$CAT_N" ]]; then
     "$CARD_N" "$CAT_N" >> "$TMP/counts.txt"
 fi
 
-for doc in "$SITE_ROOT/index.html" "$REPO_ROOT/README.md" "$REPO_ROOT/CLAUDE.md"; do
+for doc in "$SITE_ROOT/index.html" "$REPO_ROOT/README.md" "$REPO_ROOT/CLAUDE.md" "$REPO_ROOT/mcp/README.md"; do
   [[ -f "$doc" ]] || continue
   while IFS=: read -r line_no claim; do
     n="${claim%%[!0-9]*}"                  # leading digits only: "94+ topic" → 94
@@ -326,6 +358,212 @@ else
   fail "$COUNTS_N stated count(s) disagree with disk"
   show_capped "$(cat "$TMP/counts.txt")"
   hint 'fix: state the exact number, or rephrase without one'
+fi
+
+# ─── Check 8: Code blocks are well-formed ─────────────────────────────────────
+#
+# Code is hand-highlighted HTML. Three failures were found on live pages, all
+# invisible to the eye in the source and obvious on screen:
+#   - "<pid>" written raw inside <pre>: the browser parsed it as a tag and the
+#     text vanished from a jmap command line
+#   - "</span&gt;": a mistyped close tag that ate the next XML element
+#   - an unclosed <span class="comment"> that painted a whole config block grey
+# Per <pre> block: <span> opens must equal closes, no "</tag&gt;", and the only
+# tags allowed inside are the inline ones highlighting uses.
+
+header "8. Code blocks"
+
+awk '
+  FNR == 1 { inpre = 0 }
+  /<pre[ >]/ && !inpre { inpre = 1; buf = ""; start = FNR }
+  inpre { buf = buf $0 "\n" }
+  inpre && /<\/pre>/ {
+    inpre = 0
+    body = buf
+    sub(/^[^<]*<pre[^>]*>/, "", body)
+    sub(/<\/pre>.*$/, "", body)
+    opens  = gsub(/<span[ >]/, "&", body)
+    closes = gsub(/<\/span>/, "&", body)
+    if (opens != closes)
+      printf "%s:%d  →  %d <span> vs %d </span>\n", FILENAME, start, opens, closes
+    if (body ~ /<\/[a-zA-Z]+&gt;/)
+      printf "%s:%d  →  malformed close tag (</tag&gt;)\n", FILENAME, start
+    tmp = body
+    while (match(tmp, /<[a-zA-Z][a-zA-Z0-9]*/)) {
+      tag = substr(tmp, RSTART + 1, RLENGTH - 1)
+      if (tag !~ /^(span|code|mark|b|strong|em|i|a|br)$/)
+        printf "%s:%d  →  raw <%s> inside <pre> (escape it as &lt;%s&gt;)\n", FILENAME, start, tag, tag
+      tmp = substr(tmp, RSTART + RLENGTH)
+    }
+  }
+' $(find "$TOPICS_DIR" -name '*.html' | sort) 2>/dev/null \
+  | sed "s|^$REPO_ROOT/||" > "$TMP/pre.txt"
+
+PRE_N=$(grep -c . "$TMP/pre.txt" || true)
+if [[ "$PRE_N" -eq 0 ]]; then
+  pass "every <pre> block is balanced and escaped"
+else
+  fail "$PRE_N malformed code block(s)"
+  show_capped "$(cat "$TMP/pre.txt")"
+fi
+
+# ─── Check 9: Every CSS class used is defined ─────────────────────────────────
+#
+# The comparison-table lesson, generalised. A class no stylesheet defines does
+# nothing, and the next person to copy the markup assumes it does. Three were
+# found: best-practices (48 pages), row-highlight and attribute.
+
+header "9. Undefined CSS classes"
+
+grep -rhoE '\.[a-zA-Z][a-zA-Z0-9_-]*' "$SITE_ROOT/css" | sed 's/^\.//' | sort -u > "$TMP/defined.txt"
+CLASS_SOURCES=("$SITE_ROOT")
+[[ -f "$REPO_ROOT/404.html" ]] && CLASS_SOURCES+=("$REPO_ROOT/404.html")
+grep -rhoE 'class="[^"]*"' --include='*.html' "${CLASS_SOURCES[@]}" \
+  | sed 's/^class="//; s/"$//' | tr ' ' '\n' | grep . \
+  | grep -v '[.]' | sort -u > "$TMP/used.txt"
+# (grep -v '[.]': a "class" containing a dot is a Java class name inside an
+# escaped XML sample, e.g. class="ch.qos.logback.core.ConsoleAppender" — text, not markup.)
+comm -23 "$TMP/used.txt" "$TMP/defined.txt" > "$TMP/undefined.txt"
+
+: > "$TMP/undefined-where.txt"
+while IFS= read -r cls; do
+  where="$(grep -rlE "class=\"([^\"]* )?$cls( [^\"]*)?\"" --include='*.html' "$SITE_ROOT" | head -1)"
+  n="$(grep -rlE "class=\"([^\"]* )?$cls( [^\"]*)?\"" --include='*.html' "$SITE_ROOT" | grep -c . || true)"
+  printf '%s  (%s file(s), e.g. %s)\n' "$cls" "$n" "${where#"$REPO_ROOT/"}" >> "$TMP/undefined-where.txt"
+done < "$TMP/undefined.txt"
+
+UNDEF_N=$(grep -c . "$TMP/undefined.txt" || true)
+if [[ "$UNDEF_N" -eq 0 ]]; then
+  pass "every class used in HTML is defined in css/"
+else
+  fail "$UNDEF_N class(es) used but defined in no stylesheet"
+  show_capped "$(cat "$TMP/undefined-where.txt")"
+  hint 'fix: define it in main.css, or remove it from the markup'
+fi
+
+# ─── Check 10: Forbidden markup ───────────────────────────────────────────────
+#
+# Two CLAUDE.md prohibitions that are greppable:
+#   - inline style="..." on topic pages (presentation belongs in main.css)
+#   - ASCII box diagrams with boxes side by side: two box corners on one line.
+#     They break at 320px; a vertical diagram or a directory tree is fine.
+
+header "10. Forbidden markup"
+
+grep -rn 'style="' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
+  | sed "s|^$REPO_ROOT/||" | cut -c1-140 > "$TMP/forbidden.txt" || true
+grep -rnE '┌[^┐]*┐.*┌|└[^┘]*┘ *└' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
+  | sed "s|^$REPO_ROOT/||" | cut -c1-140 | sed 's/^/side-by-side boxes: /' >> "$TMP/forbidden.txt" || true
+
+FORBID_N=$(grep -c . "$TMP/forbidden.txt" || true)
+if [[ "$FORBID_N" -eq 0 ]]; then
+  pass "no inline styles and no side-by-side box diagrams in topics/"
+else
+  fail "$FORBID_N forbidden construct(s)"
+  show_capped "$(cat "$TMP/forbidden.txt")"
+  hint 'fix: a named class in main.css; a multi-column diagram becomes a <table>'
+fi
+
+# ─── Check 11: Every page is listed on the index ──────────────────────────────
+#
+# Check 7 counts category cards; it never checked what is inside them. A page
+# missing from its card is reachable only through search.
+
+header "11. Index cards"
+
+grep -o 'href="topics/[^"#]*"' "$SITE_ROOT/index.html" | sed 's/^href="//; s/"$//' | sort -u > "$TMP/cards.txt"
+comm -13 "$TMP/cards.txt" "$TMP/disk.txt" > "$TMP/uncarded.txt"
+comm -23 "$TMP/cards.txt" "$TMP/disk.txt" | sed 's/^/dead: /' >> "$TMP/uncarded.txt"
+
+UNCARD_N=$(grep -c . "$TMP/uncarded.txt" || true)
+if [[ "$UNCARD_N" -eq 0 ]]; then
+  pass "every topic page is linked from a category card"
+else
+  fail "$UNCARD_N page(s) missing from, or dead in, the index cards"
+  show_capped "$(cat "$TMP/uncarded.txt")"
+fi
+
+# ─── Check 12: Canonical URL ──────────────────────────────────────────────────
+#
+# Each page declares its own absolute URL. A canonical copied from another page
+# with the template tells search engines to drop this one as a duplicate.
+
+header "12. SEO head"
+
+CANON_BASE='https://karlete.github.io/javadevbible/javabible/'
+: > "$TMP/canon.txt"
+while IFS= read -r -d '' f; do
+  rel="${f#"$SITE_ROOT/"}"
+  canon="$(grep -o '<link rel="canonical" href="[^"]*"' "$f" | head -1 | sed 's/.*href="//; s/"$//')"
+  if [[ -z "$canon" ]]; then
+    printf '%s  →  no <link rel="canonical">\n' "$rel" >> "$TMP/canon.txt"
+  elif [[ "$canon" != "$CANON_BASE$rel" ]]; then
+    printf '%s  →  canonical is %s\n' "$rel" "$canon" >> "$TMP/canon.txt"
+  elif ! grep -q 'property="og:title"' "$f"; then
+    printf '%s  →  no Open Graph tags\n' "$rel" >> "$TMP/canon.txt"
+  fi
+done < <(find "$SITE_ROOT" -name '*.html' -not -path '*/features/*' -print0)
+
+CANON_N=$(grep -c . "$TMP/canon.txt" || true)
+if [[ "$CANON_N" -eq 0 ]]; then
+  pass "every page has a self-referencing canonical and Open Graph tags"
+else
+  fail "$CANON_N page(s) with a missing or wrong canonical / Open Graph block"
+  show_capped "$(cat "$TMP/canon.txt")"
+  hint 'fix: copy the <head> block from topics/databases/relationships.html and adjust the URLs'
+fi
+
+# ─── Check 13: Sitemap ↔ disk ─────────────────────────────────────────────────
+
+header "13. Sitemap"
+
+SITEMAP="$SITE_ROOT/sitemap.xml"
+if [[ ! -f "$SITEMAP" ]]; then
+  fail "sitemap.xml not found"
+else
+  grep -o '<loc>[^<]*</loc>' "$SITEMAP" | sed "s|<loc>$CANON_BASE||; s|</loc>||" | sort -u > "$TMP/sitemap.txt"
+  { printf 'index.html\n'; cat "$TMP/disk.txt"; } | sort -u > "$TMP/pages.txt"
+  { comm -23 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/ghost:   /'
+    comm -13 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/missing: /'; } > "$TMP/sitemap-diff.txt"
+  SM_N=$(grep -c . "$TMP/sitemap-diff.txt" || true)
+  if [[ "$SM_N" -eq 0 ]]; then
+    pass "sitemap.xml lists exactly the $(grep -c . "$TMP/pages.txt") pages on disk"
+  else
+    fail "sitemap.xml out of sync ($SM_N difference(s))"
+    show_capped "$(cat "$TMP/sitemap-diff.txt")"
+    hint "fix: add/remove the <url><loc>${CANON_BASE}...</loc></url> line"
+  fi
+fi
+
+# ─── Check 14: Field injection in sample code ─────────────────────────────────
+#
+# CLAUDE.md: constructor injection always. Allowed: test classes (Spring's
+# TestContext injects fields; it is the documented idiom) and blocks that show
+# field injection on purpose as the ❌ example.
+
+header "14. Field injection"
+
+awk '
+  FNR == 1 { inpre = 0 }
+  /<pre[ >]/ && !inpre { inpre = 1; buf = ""; start = FNR }
+  inpre { buf = buf $0 "\n" }
+  inpre && /<\/pre>/ {
+    inpre = 0
+    if (buf ~ /@Autowired<\/span> *<span class="keyword">(private|protected)/ &&
+        buf !~ /@(Test|SpringBootTest|WebMvcTest|DataJpaTest|ParameterizedTest)/ &&
+        buf !~ /❌/)
+      printf "%s:%d\n", FILENAME, start
+  }
+' $(find "$TOPICS_DIR" -name '*.html' | sort) 2>/dev/null \
+  | sed "s|^$REPO_ROOT/||" > "$TMP/fieldinj.txt"
+
+FI_N=$(grep -c . "$TMP/fieldinj.txt" || true)
+if [[ "$FI_N" -eq 0 ]]; then
+  pass "no @Autowired field injection outside tests and ❌ examples"
+else
+  fail "$FI_N code block(s) with @Autowired field injection"
+  show_capped "$(cat "$TMP/fieldinj.txt")"
+  hint 'fix: a final field + a single constructor (no @Autowired needed since Spring 4.3)'
 fi
 
 # ─── Summary ──────────────────────────────────────────────────────────────────

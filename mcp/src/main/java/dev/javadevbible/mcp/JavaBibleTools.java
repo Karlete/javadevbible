@@ -14,6 +14,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +30,7 @@ import java.util.regex.Pattern;
  *
  * <p>Three tools are exposed:
  * <ul>
- *   <li>{@code search_topics} — full-text search over the search index</li>
+ *   <li>{@code search_topics} — ranked multi-word search over the search index</li>
  *   <li>{@code get_topic_content} — read and clean a specific topic page</li>
  *   <li>{@code list_categories} — list all 13 categories with their topics</li>
  * </ul>
@@ -102,38 +104,112 @@ public class JavaBibleTools {
                 + indexPath));
         }
 
-        List<Map<String, String>> results = new ArrayList<>();
+        List<String> tokens = tokenize(needle);
+        if (tokens.isEmpty()) {
+            return List.of();
+        }
+        String phrase = String.join(" ", tokens);
 
+        // Score EVERY entry, then sort, then cut. The previous version stopped
+        // at the first `limit` entries with any score at all, in file order —
+        // so a title match near the end of the index could lose its place to
+        // weak description matches that happened to come first.
+        record Hit(JsonNode entry, int score) { }
+        List<Hit> hits = new ArrayList<>();
         for (JsonNode entry : index) {
-            if (results.size() >= limit) break;
-
-            int score = score(entry, needle);
+            int score = score(entry, tokens, phrase);
             if (score > 0) {
-                Map<String, String> result = new LinkedHashMap<>();
-                result.put("title",       textOf(entry, "title"));
-                result.put("category",    textOf(entry, "category"));
-                result.put("url",         textOf(entry, "url"));
-                result.put("description", textOf(entry, "description"));
-                results.add(result);
+                hits.add(new Hit(entry, score));
             }
         }
+        hits.sort(Comparator.comparingInt(Hit::score).reversed()
+                .thenComparing(h -> textOf(h.entry(), "title").toLowerCase()));
 
-        log.debug("search_topics('{}') → {} results", query, results.size());
+        List<Map<String, String>> results = new ArrayList<>();
+        for (Hit hit : hits.subList(0, Math.min(limit, hits.size()))) {
+            Map<String, String> result = new LinkedHashMap<>();
+            result.put("title",       textOf(hit.entry(), "title"));
+            result.put("category",    textOf(hit.entry(), "category"));
+            result.put("url",         textOf(hit.entry(), "url"));
+            result.put("description", textOf(hit.entry(), "description"));
+            results.add(result);
+        }
+
+        log.debug("search_topics('{}') → {} of {} hits", query, results.size(), hits.size());
         return results;
     }
 
-    private int score(JsonNode entry, String needle) {
-        int score = 0;
-        if (contains(entry, "title",       needle)) score += 10;
-        if (contains(entry, "category",    needle)) score += 5;
-        if (contains(entry, "keywords",    needle)) score += 3;
-        if (contains(entry, "description", needle)) score += 2;
-        return score;
+    // ── Ranking ──────────────────────────────────────────────────────────
+    // MIRRORS javabible/js/search.js exactly (weights, bonuses, AND semantics,
+    // tie-break by title). Change both or neither.
+
+    private static final int W_TITLE = 10, W_CATEGORY = 5, W_KEYWORDS = 3, W_DESCRIPTION = 2;
+    private static final int B_WORD_START = 4, B_PHRASE_TITLE = 12, B_PHRASE_TEXT = 4, B_TITLE_PREFIX = 6;
+
+    /** Same as search.js: drop one-character words when there are longer ones. */
+    private static List<String> tokenize(String query) {
+        List<String> words = Arrays.stream(query.trim().split("\\s+"))
+                .filter(t -> !t.isEmpty())
+                .toList();
+        List<String> longer = words.stream().filter(w -> w.length() > 1).toList();
+        return longer.isEmpty() ? words : longer;
     }
 
-    private boolean contains(JsonNode node, String field, String needle) {
-        JsonNode f = node.get(field);
-        return f != null && f.asText("").toLowerCase().contains(needle);
+    /** Same as search.js: the word, plus its singular for plurals longer than three letters. */
+    private static List<String> forms(String token) {
+        return (token.length() > 3 && token.endsWith("s"))
+                ? List.of(token, token.substring(0, token.length() - 1))
+                : List.of(token);
+    }
+
+    private static boolean has(String field, List<String> forms) {
+        return forms.stream().anyMatch(field::contains);
+    }
+
+    private int score(JsonNode entry, List<String> tokens, String phrase) {
+        String title    = textOf(entry, "title").toLowerCase();
+        String category = textOf(entry, "category").toLowerCase();
+        String keywords = textOf(entry, "keywords").toLowerCase();
+        String desc     = textOf(entry, "description").toLowerCase();
+
+        int total = 0;
+        for (String t : tokens) {
+            List<String> fs = forms(t);
+            int s = 0;
+            if (has(title, fs)) {
+                s += W_TITLE;
+                if (fs.stream().anyMatch(f -> startsWord(title, f))) s += B_WORD_START;
+            }
+            if (has(category, fs)) s += W_CATEGORY;
+            if (has(keywords, fs)) s += W_KEYWORDS;
+            if (has(desc, fs))     s += W_DESCRIPTION;
+
+            if (s == 0) return 0;   // every word must match somewhere
+            total += s;
+        }
+
+        if (tokens.size() > 1) {
+            if (title.contains(phrase)) {
+                total += B_PHRASE_TITLE;
+            } else if (keywords.contains(phrase) || desc.contains(phrase)) {
+                total += B_PHRASE_TEXT;
+            }
+        }
+        if (title.startsWith(phrase)) total += B_TITLE_PREFIX;
+        return total;
+    }
+
+    /** True if {@code needle} occurs in {@code haystack} at the start of a word. */
+    private static boolean startsWord(String haystack, String needle) {
+        int at = haystack.indexOf(needle);
+        while (at != -1) {
+            char before = at == 0 ? ' ' : haystack.charAt(at - 1);
+            // Same character class as search.js: /[a-z0-9]/ on lower-cased text.
+            boolean inWord = (before >= 'a' && before <= 'z') || (before >= '0' && before <= '9');
+            if (!inWord) return true;
+            at = haystack.indexOf(needle, at + 1);
+        }
+        return false;
     }
 
     private String textOf(JsonNode node, String field) {

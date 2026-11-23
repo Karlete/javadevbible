@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CDI — Contexts &amp; Dependency Injection - JavaDev Bible</title>
     <meta name="description" content="The Jakarta EE standard for DI — how it compares to Spring, why proxies exist, and what bean-discovery-mode controls">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/jakarta-ee/cdi.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="CDI — Contexts &amp; Dependency Injection — JavaDev Bible">
+    <meta property="og:description" content="The Jakarta EE standard for DI — how it compares to Spring, why proxies exist, and what bean-discovery-mode controls">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/jakarta-ee/cdi.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -128,12 +136,12 @@
                 <pre><code><span class="comment">// ✅ Constructor injection — preferred in CDI and Spring alike</span>
 <span class="annotation">@ApplicationScoped</span>
 <span class="keyword">public class</span> <span class="class-name">ReportService</span> {
-    <span class="keyword">private final</span> <span class="class-name">UserRepository</span> users;
+    <span class="keyword">private final</span> <span class="class-name">CustomerRepository</span> customers;
     <span class="keyword">private final</span> <span class="class-name">PdfGenerator</span>   pdf;
 
     <span class="annotation">@Inject</span>
-    <span class="keyword">public</span> <span class="function">ReportService</span>(<span class="class-name">UserRepository</span> users, <span class="class-name">PdfGenerator</span> pdf) {
-        <span class="keyword">this</span>.users = users;
+    <span class="keyword">public</span> <span class="function">ReportService</span>(<span class="class-name">CustomerRepository</span> customers, <span class="class-name">PdfGenerator</span> pdf) {
+        <span class="keyword">this</span>.customers = customers;
         <span class="keyword">this</span>.pdf   = pdf;
         <span class="comment">// fields are final — can't accidentally be null or reassigned</span>
     }
@@ -142,7 +150,7 @@
 <span class="comment">// ⚠️  Field injection — tempting but problematic</span>
 <span class="annotation">@ApplicationScoped</span>
 <span class="keyword">public class</span> <span class="class-name">ReportService</span> {
-    <span class="annotation">@Inject</span> <span class="keyword">private</span> <span class="class-name">UserRepository</span> users;  <span class="comment">// can't be final</span>
+    <span class="annotation">@Inject</span> <span class="keyword">private</span> <span class="class-name">CustomerRepository</span> customers;  <span class="comment">// can't be final</span>
     <span class="annotation">@Inject</span> <span class="keyword">private</span> <span class="class-name">PdfGenerator</span>   pdf;    <span class="comment">// invisible dependencies in unit tests</span>
     <span class="comment">// to unit test, you need a CDI container or reflection-based injection</span>
 }</code></pre>
@@ -150,7 +158,7 @@
                 <div class="info-box warning">
                     <div class="info-box-title">Field injection makes unit testing genuinely harder</div>
                     <p>With constructor injection you can test without any container at all:
-                        <code>new ReportService(mockUsers, mockPdf)</code>. With field
+                        <code>new ReportService(mockCustomers, mockPdf)</code>. With field
                         injection, the fields are private and injected by the container —
                         in a plain unit test they remain <code>null</code>. You either need a
                         CDI test runner (slow), or you resort to reflection-based injection
@@ -194,10 +202,10 @@
     <span class="comment">// getters, no setters — this data doesn't change within one request</span>
 }
 
-<span class="comment">// @SessionScoped — user state across multiple requests</span>
+<span class="comment">// @SessionScoped — customer state across multiple requests</span>
 <span class="annotation">@SessionScoped</span>
-<span class="keyword">public class</span> <span class="class-name">UserSession</span> <span class="keyword">implements</span> <span class="class-name">Serializable</span> {  <span class="comment">// Serializable required for clustering</span>
-    <span class="keyword">private</span> <span class="class-name">Long</span> userId;
+<span class="keyword">public class</span> <span class="class-name">CustomerSession</span> <span class="keyword">implements</span> <span class="class-name">Serializable</span> {  <span class="comment">// Serializable required for clustering</span>
+    <span class="keyword">private</span> <span class="class-name">Long</span> customerId;
     <span class="keyword">private</span> <span class="class-name">String</span> username;
     <span class="keyword">private</span> <span class="class-name">Set</span>&lt;<span class="class-name">String</span>&gt; roles = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();
     <span class="comment">// keep small — sessions are replicated across cluster nodes</span>
@@ -290,7 +298,7 @@
                             without arguments</li>
                     </ul>
                     <p>Violation is a deployment error at startup — a
-                        <code>javax.enterprise.inject.spi.DeploymentException</code> — not a
+                        <code>jakarta.enterprise.inject.spi.DeploymentException</code> — not a
                         <code>NullPointerException</code> at runtime. This is better than it
                         sounds: it fails fast and loudly, before any request is served. The
                         same three constraints apply to Spring's CGLIB proxies (used for
@@ -402,18 +410,18 @@
                     interface contract — pure type-based dispatch.</p>
 
                 <pre><code><span class="comment">// Event payload — a plain class, no CDI annotation needed</span>
-<span class="keyword">public record</span> <span class="class-name">UserRegisteredEvent</span>(<span class="class-name">Long</span> userId, <span class="class-name">String</span> email) {}
+<span class="keyword">public record</span> <span class="class-name">CustomerRegisteredEvent</span>(<span class="class-name">Long</span> customerId, <span class="class-name">String</span> email) {}
 
 <span class="comment">// Publisher — injects Event&lt;T&gt; and fires it</span>
 <span class="annotation">@ApplicationScoped</span>
 <span class="keyword">public class</span> <span class="class-name">RegistrationService</span> {
 
     <span class="annotation">@Inject</span>
-    <span class="keyword">private</span> <span class="class-name">Event</span>&lt;<span class="class-name">UserRegisteredEvent</span>&gt; registrationEvent;
+    <span class="keyword">private</span> <span class="class-name">Event</span>&lt;<span class="class-name">CustomerRegisteredEvent</span>&gt; registrationEvent;
 
     <span class="keyword">public void</span> <span class="function">register</span>(<span class="class-name">String</span> email) {
-        <span class="class-name">User</span> user = createUser(email);
-        registrationEvent.fire(<span class="keyword">new</span> <span class="class-name">UserRegisteredEvent</span>(user.getId(), email));
+        <span class="class-name">Customer</span> customer = createCustomer(email);
+        registrationEvent.fire(<span class="keyword">new</span> <span class="class-name">CustomerRegisteredEvent</span>(customer.getId(), email));
         <span class="comment">// all @Observes methods run synchronously before this line returns</span>
     }
 }
@@ -421,22 +429,22 @@
 <span class="comment">// Observers — registered automatically, no explicit subscription needed</span>
 <span class="annotation">@ApplicationScoped</span>
 <span class="keyword">public class</span> <span class="class-name">WelcomeEmailSender</span> {
-    <span class="keyword">public void</span> <span class="function">onRegistration</span>(<span class="annotation">@Observes</span> <span class="class-name">UserRegisteredEvent</span> event) {
+    <span class="keyword">public void</span> <span class="function">onRegistration</span>(<span class="annotation">@Observes</span> <span class="class-name">CustomerRegisteredEvent</span> event) {
         sendWelcomeEmail(event.email());
     }
 }
 
 <span class="annotation">@ApplicationScoped</span>
 <span class="keyword">public class</span> <span class="class-name">AnalyticsTracker</span> {
-    <span class="keyword">public void</span> <span class="function">onRegistration</span>(<span class="annotation">@Observes</span> <span class="class-name">UserRegisteredEvent</span> event) {
-        track(<span class="string">"user_registered"</span>, event.userId());
+    <span class="keyword">public void</span> <span class="function">onRegistration</span>(<span class="annotation">@Observes</span> <span class="class-name">CustomerRegisteredEvent</span> event) {
+        track(<span class="string">"customer_registered"</span>, event.customerId());
     }
 }
 
 <span class="comment">// Async event — fire and continue, observer runs in a separate thread</span>
 <span class="keyword">public void</span> <span class="function">registerAsync</span>(<span class="class-name">String</span> email) {
-    <span class="class-name">User</span> user = createUser(email);
-    registrationEvent.fireAsync(<span class="keyword">new</span> <span class="class-name">UserRegisteredEvent</span>(user.getId(), email));
+    <span class="class-name">Customer</span> customer = createCustomer(email);
+    registrationEvent.fireAsync(<span class="keyword">new</span> <span class="class-name">CustomerRegisteredEvent</span>(customer.getId(), email));
     <span class="comment">// returns immediately — observers run concurrently</span>
 }</code></pre>
 
@@ -490,7 +498,7 @@
 <span class="keyword">public class</span> <span class="class-name">ReportService</span> {
 
     <span class="annotation">@Timed</span>  <span class="comment">// interceptor runs transparently — zero change to business logic</span>
-    <span class="keyword">public</span> <span class="class-name">Report</span> <span class="function">generate</span>(<span class="class-name">Long</span> userId) { ... }
+    <span class="keyword">public</span> <span class="class-name">Report</span> <span class="function">generate</span>(<span class="class-name">Long</span> customerId) { ... }
 }</code></pre>
 
                 <div class="info-box tip">

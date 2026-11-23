@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sessions &amp; Cookies - JavaDev Bible</title>
-    <meta name="description" content="HTTP is stateless by design — cookies and sessions are the mechanisms that add memory back, each with a different security surface and a different set of production pitfalls">
+    <meta name="description" content="HTTP is stateless by design; cookies and sessions add memory back. How each works, its security surface, and the pitfalls of scaling sessions out.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/web-concepts/sessions-cookies.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Sessions &amp; Cookies — JavaDev Bible">
+    <meta property="og:description" content="HTTP is stateless by design; cookies and sessions add memory back. How each works, its security surface, and the pitfalls of scaling sessions out.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/web-concepts/sessions-cookies.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -140,7 +148,7 @@ Response 2: 200 OK  {user: "Ada Lovelace", ...}   <span class="comment">// serve
 
 <span class="comment">// Reading — @CookieValue is cleaner than scanning request.getCookies()</span>
 <span class="annotation">@GetMapping</span>(<span class="string">"/profile"</span>)
-<span class="keyword">public</span> <span class="class-name">UserResponse</span> <span class="function">getProfile</span>(
+<span class="keyword">public</span> <span class="class-name">CustomerResponse</span> <span class="function">getProfile</span>(
         <span class="annotation">@CookieValue</span>(name = <span class="string">"session_id"</span>, required = <span class="keyword">false</span>) <span class="class-name">String</span> sessionId) {
     <span class="keyword">if</span> (sessionId == <span class="keyword">null</span>) {
         <span class="keyword">throw new</span> <span class="class-name">UnauthorizedException</span>(<span class="string">"No session"</span>);
@@ -225,19 +233,19 @@ Response 2: 200 OK  {user: "Ada Lovelace", ...}   <span class="comment">// serve
                 </div>
 
                 <h3>The Horizontal Scaling Problem — and Its Fix</h3>
-                <pre><code><span class="comment">// DEFAULT: sessions live in each instance's JVM heap</span>
-┌─────────────────┐     ┌─────────────────┐
-│   Instance A    │     │   Instance B    │
-│  session abc123 │     │  (no sessions)  │
-└────────┬────────┘     └────────┬────────┘
-         │ Load Balancer                   │
-         └─────────────────────────────────┘
-
-<span class="comment">// Request 1 → Instance A: login succeeds, session abc123 created</span>
-<span class="comment">// Request 2 → Instance B: no session abc123 → user appears logged out</span>
-<span class="comment">// This is why sticky sessions (pinning a user to one instance) exist —</span>
-<span class="comment">// but they're a workaround, not a solution. They make deployments and</span>
-<span class="comment">// failovers fragile.</span></code></pre>
+                <p>By default, sessions live in each instance's JVM heap:</p>
+                <table>
+                    <thead>
+                        <tr><th>Request</th><th>Load balancer sends it to</th><th>Session <code>abc123</code></th><th>Result</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1 — login</td><td>Instance A</td><td>Created in A's heap</td><td>Logged in</td></tr>
+                        <tr><td>2 — view cart</td><td>Instance B</td><td>Does not exist in B</td><td><strong>Customer appears logged out</strong></td></tr>
+                    </tbody>
+                </table>
+                <p>This is why sticky sessions (pinning a customer to one instance) exist — but
+                    they are a workaround, not a solution. They make deployments and failovers
+                    fragile: restart Instance A and every session on it is gone.</p>
 
                 <pre><code><span class="comment">// FIX: Spring Session externalises session storage transparently</span>
 <span class="comment">// The application code doesn't change — only the dependency and one property line.</span>
@@ -252,32 +260,30 @@ Response 2: 200 OK  {user: "Ada Lovelace", ...}   <span class="comment">// serve
     &lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;
 &lt;/dependency&gt;</code></pre>
 
-                <pre><code><span class="comment"># application.properties</span>
-spring.session.store-type=redis
+                <pre><code><span class="comment"># application.properties
+# No spring.session.store-type: that property was removed in Boot 3.0.
+# Boot picks the store from the classpath — spring-session-data-redis here.</span>
 spring.session.timeout=30m
 spring.data.redis.host=${REDIS_HOST}
 spring.data.redis.port=6379</code></pre>
 
-                <pre><code><span class="comment">// Now all instances share the same session store.</span>
-<span class="comment">// Any request to any instance finds the same session.</span>
-
-┌─────────────────┐     ┌─────────────────┐
-│   Instance A    │     │   Instance B    │
-└────────┬────────┘     └────────┬────────┘
-         │                       │
-         └───────────┬───────────┘
-                     │
-              ┌──────┴──────┐
-              │    Redis    │
-              │  session    │
-              │  abc123     │
-              └─────────────┘</code></pre>
+                <table>
+                    <thead>
+                        <tr><th>Request</th><th>Load balancer sends it to</th><th>Session <code>abc123</code></th><th>Result</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1 — login</td><td>Instance A</td><td>Written to Redis</td><td>Logged in</td></tr>
+                        <tr><td>2 — view cart</td><td>Instance B</td><td>Read from Redis</td><td>Still logged in</td></tr>
+                    </tbody>
+                </table>
+                <p>Every instance reads and writes the same external store, so any request can
+                    land on any instance — and an instance can be restarted without logging anyone out.</p>
 
                 <div class="info-box note">
                     <div class="info-box-title">JDBC sessions are a valid alternative when you already have a relational DB</div>
                     <p>If Redis isn't in your stack and you already have a database,
-                        <code>spring-session-jdbc</code> + <code>spring.session.store-type=jdbc</code>
-                        works the same way. It's slower than Redis for session lookups
+                        swapping <code>spring-session-data-redis</code> for <code>spring-session-jdbc</code>
+                        works the same way — Spring Boot detects the store from the classpath. It's slower than Redis for session lookups
                         at high volume, but eliminates the operational overhead of a
                         separate Redis cluster for teams that don't yet need that scale.</p>
                 </div>

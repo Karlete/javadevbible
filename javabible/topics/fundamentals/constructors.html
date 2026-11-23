@@ -5,7 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Constructors - JavaDev Bible</title>
-    <meta name="description" content="Enforcing valid object state from the moment of">
+    <meta name="description" content="Enforcing valid object state from the moment of creation — constructor chaining with this() and super(), validation, and static factory methods.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/fundamentals/constructors.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Constructors — JavaDev Bible">
+    <meta property="og:description" content="Enforcing valid object state from the moment of creation — constructor chaining with this() and super(), validation, and static factory methods.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/fundamentals/constructors.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -283,39 +291,41 @@
                 </p>
 
                 <h3>this() — delegate within the class</h3>
-                <pre><code><span class="keyword">public class</span> <span class="class-name">Employee</span> {
-    <span class="keyword">private final</span> <span class="class-name">String</span> name;
-    <span class="keyword">private final</span> <span class="keyword">int</span>    id;
-    <span class="keyword">private final</span> <span class="keyword">double</span> salary;
-    <span class="keyword">private final</span> <span class="class-name">String</span> department;
+                <pre><code><span class="keyword">public class</span> <span class="class-name">Product</span> {
+    <span class="keyword">private final</span> <span class="class-name">String</span>     name;
+    <span class="keyword">private final</span> <span class="class-name">String</span>     sku;
+    <span class="keyword">private final</span> <span class="class-name">BigDecimal</span> price;
+    <span class="keyword">private final</span> <span class="class-name">String</span>     category;
 
     <span class="comment">// PRIMARY constructor — validation and assignment in one place</span>
-    <span class="keyword">public</span> <span class="function">Employee</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> id, <span class="keyword">double</span> salary, <span class="class-name">String</span> department) {
+    <span class="keyword">public</span> <span class="function">Product</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> sku, <span class="class-name">BigDecimal</span> price, <span class="class-name">String</span> category) {
         <span class="keyword">if</span> (name == <span class="keyword">null</span> || name.isBlank()) <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Name required"</span>);
-        <span class="keyword">if</span> (salary &lt; <span class="number">0</span>)                   <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Salary &gt;= 0"</span>);
-        <span class="keyword">this</span>.name       = name;
-        <span class="keyword">this</span>.id         = id;
-        <span class="keyword">this</span>.salary     = salary;
-        <span class="keyword">this</span>.department = department;
+        <span class="keyword">if</span> (price.signum() &lt; <span class="number">0</span>)          <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Price must be &gt;= 0"</span>);
+        <span class="keyword">this</span>.name     = name;
+        <span class="keyword">this</span>.sku      = sku;
+        <span class="keyword">this</span>.price    = price;
+        <span class="keyword">this</span>.category = category;
     }
 
     <span class="comment">// Convenience overloads — chain to primary, no duplicated logic</span>
-    <span class="keyword">public</span> <span class="function">Employee</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> id, <span class="keyword">double</span> salary) {
-        <span class="keyword">this</span>(name, id, salary, <span class="string">"Unassigned"</span>);
+    <span class="keyword">public</span> <span class="function">Product</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> sku, <span class="class-name">BigDecimal</span> price) {
+        <span class="keyword">this</span>(name, sku, price, <span class="string">"Uncategorised"</span>);
     }
-    <span class="keyword">public</span> <span class="function">Employee</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> id) {
-        <span class="keyword">this</span>(name, id, <span class="number">50_000.0</span>);
+    <span class="keyword">public</span> <span class="function">Product</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> sku) {
+        <span class="keyword">this</span>(name, sku, <span class="class-name">BigDecimal</span>.ZERO);   <span class="comment">// draft product: priced before it goes on sale</span>
     }
-    <span class="keyword">public</span> <span class="function">Employee</span>(<span class="class-name">String</span> name) {
-        <span class="keyword">this</span>(name, generateId());
+    <span class="keyword">public</span> <span class="function">Product</span>(<span class="class-name">String</span> name) {
+        <span class="keyword">this</span>(name, generateSku());
     }
 
-    <span class="keyword">private static int</span> nextId = <span class="number">1000</span>;
-    <span class="keyword">private static int</span> <span class="function">generateId</span>() { <span class="keyword">return</span> nextId++; }
+    <span class="comment">// Not thread-safe: two threads can read the same value. Real code takes the
+    // SKU from a database sequence or an AtomicInteger.</span>
+    <span class="keyword">private static int</span> nextSku = <span class="number">1000</span>;
+    <span class="keyword">private static</span> <span class="class-name">String</span> <span class="function">generateSku</span>() { <span class="keyword">return</span> <span class="string">"SKU-"</span> + nextSku++; }
 }
 
-<span class="comment">// Employee("Alice") → this("Alice", 1000) → this("Alice", 1000, 50000) →
-//   this("Alice", 1000, 50000, "Unassigned") → validation + assignment</span></code></pre>
+<span class="comment">// new Product("Desk Lamp") → this("Desk Lamp", "SKU-1000") → this("Desk Lamp", "SKU-1000", 0) →
+//   this("Desk Lamp", "SKU-1000", 0, "Uncategorised") → validation + assignment</span></code></pre>
 
                 <h3>super() — call the parent constructor</h3>
                 <pre><code><span class="keyword">public class</span> <span class="class-name">Animal</span> {

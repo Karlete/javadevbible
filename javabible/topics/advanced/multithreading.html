@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Multithreading &amp; Concurrency - JavaDev Bible</title>
     <meta name="description" content="Threads, synchronisation, thread pools, and virtual threads in production Java">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/advanced/multithreading.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Multithreading &amp; Concurrency — JavaDev Bible">
+    <meta property="og:description" content="Threads, synchronisation, thread pools, and virtual threads in production Java">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/advanced/multithreading.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -57,13 +65,13 @@
                     across cores.</p>
 
                 <pre><code><span class="comment">// Single-threaded: sequential, each task blocks until complete</span>
-<span class="class-name">User</span>    user    = db.findUser(id);       <span class="comment">// 50ms — CPU waits</span>
+<span class="class-name">Customer</span>    customer    = db.findCustomer(id);       <span class="comment">// 50ms — CPU waits</span>
 <span class="class-name">Account</span> account = db.findAccount(id);   <span class="comment">// 50ms — CPU waits</span>
 <span class="class-name">Orders</span>  orders  = db.findOrders(id);    <span class="comment">// 50ms — CPU waits</span>
 <span class="comment">// Total: ~150ms</span>
 
 <span class="comment">// Concurrent: all three queries in flight simultaneously</span>
-<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">User</span>&gt;    fu = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findUser(id));
+<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Customer</span>&gt;    fu = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findCustomer(id));
 <span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Account</span>&gt; fa = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findAccount(id));
 <span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Orders</span>&gt;  fo = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findOrders(id));
 <span class="class-name">CompletableFuture</span>.allOf(fu, fa, fo).join();
@@ -183,9 +191,9 @@ t.getState();  <span class="comment">// Thread.State.TERMINATED</span></code></p
 pool.execute(() -&gt; processOrder(order));
 
 <span class="comment">// Submit Callable — returns a Future with the result</span>
-<span class="class-name">Future</span>&lt;<span class="class-name">User</span>&gt; future = pool.submit(() -&gt; db.findUser(id));
-<span class="class-name">User</span> user = future.get();            <span class="comment">// blocks until done</span>
-<span class="class-name">User</span> user = future.get(<span class="number">5</span>, <span class="class-name">TimeUnit</span>.SECONDS);  <span class="comment">// timeout</span>
+<span class="class-name">Future</span>&lt;<span class="class-name">Customer</span>&gt; future = pool.submit(() -&gt; db.findCustomer(id));
+<span class="class-name">Customer</span> customer = future.get();            <span class="comment">// blocks until done</span>
+<span class="class-name">Customer</span> customer = future.get(<span class="number">5</span>, <span class="class-name">TimeUnit</span>.SECONDS);  <span class="comment">// timeout</span>
 
 <span class="comment">// Always shut down the pool — otherwise the JVM won't exit</span>
 pool.shutdown();                     <span class="comment">// stop accepting new tasks, finish queued ones</span>
@@ -438,17 +446,17 @@ queue.offer(task, <span class="number">1</span>, <span class="class-name">TimeUn
                     composition — with a fluent pipeline model.</p>
 
                 <pre><code><span class="comment">// Basic async task</span>
-<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">User</span>&gt; future = <span class="class-name">CompletableFuture</span>
-    .supplyAsync(() -&gt; db.findUser(id));         <span class="comment">// runs on ForkJoinPool.commonPool()</span>
+<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Customer</span>&gt; future = <span class="class-name">CompletableFuture</span>
+    .supplyAsync(() -&gt; db.findCustomer(id));         <span class="comment">// runs on ForkJoinPool.commonPool()</span>
 
 <span class="comment">// Chain transformations (non-blocking)</span>
 <span class="class-name">CompletableFuture</span>&lt;<span class="class-name">String</span>&gt; emailFuture = future
-    .thenApply(<span class="class-name">User</span>::getEmail)                 <span class="comment">// transform result</span>
+    .thenApply(<span class="class-name">Customer</span>::getEmail)                 <span class="comment">// transform result</span>
     .thenApply(<span class="class-name">String</span>::toLowerCase);
 
 <span class="comment">// Compose: next step is itself async</span>
 <span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Order</span>&gt; orderFuture = future
-    .thenCompose(user -&gt; orderService.loadAsync(user.getId()));  <span class="comment">// flatMap equivalent</span>
+    .thenCompose(customer -&gt; orderService.loadAsync(customer.getId()));  <span class="comment">// flatMap equivalent</span>
 
 <span class="comment">// Combine two independent futures</span>
 <span class="class-name">CompletableFuture</span>&lt;<span class="class-name">String</span>&gt; page = <span class="class-name">CompletableFuture</span>
@@ -466,7 +474,7 @@ queue.offer(task, <span class="number">1</span>, <span class="class-name">TimeUn
 
 <span class="comment">// Error handling</span>
 future
-    .exceptionally(ex -&gt; { log.error(<span class="string">"failed"</span>, ex); <span class="keyword">return</span> defaultUser; })
+    .exceptionally(ex -&gt; { log.error(<span class="string">"failed"</span>, ex); <span class="keyword">return</span> defaultCustomer; })
     .whenComplete((result, ex) -&gt; audit.log(result, ex));  <span class="comment">// always runs</span>
 
 <span class="comment">// Custom executor — avoid blocking ForkJoinPool with I/O</span>
@@ -544,19 +552,19 @@ future
                     thread" problem where a subtask fails silently while the parent continues.</p>
 
                 <pre><code><span class="comment">// Classic problem: manual subtask management is error-prone</span>
-<span class="class-name">Future</span>&lt;<span class="class-name">User</span>&gt;    fu = exec.submit(() -&gt; fetchUser(id));
+<span class="class-name">Future</span>&lt;<span class="class-name">Customer</span>&gt;    fu = exec.submit(() -&gt; fetchCustomer(id));
 <span class="class-name">Future</span>&lt;<span class="class-name">Product</span>&gt; fp = exec.submit(() -&gt; fetchProduct(id));
-<span class="comment">// If fetchUser() throws, fetchProduct() keeps running — wasted resources</span>
+<span class="comment">// If fetchCustomer() throws, fetchProduct() keeps running — wasted resources</span>
 
 <span class="comment">// Structured concurrency: tasks live and die together</span>
 <span class="keyword">try</span> (<span class="keyword">var</span> scope = <span class="keyword">new</span> <span class="class-name">StructuredTaskScope</span>.<span class="class-name">ShutdownOnFailure</span>()) {
-    <span class="class-name">Subtask</span>&lt;<span class="class-name">User</span>&gt;    su = scope.fork(() -&gt; fetchUser(id));
+    <span class="class-name">Subtask</span>&lt;<span class="class-name">Customer</span>&gt;    su = scope.fork(() -&gt; fetchCustomer(id));
     <span class="class-name">Subtask</span>&lt;<span class="class-name">Product</span>&gt; sp = scope.fork(() -&gt; fetchProduct(id));
 
     scope.join();           <span class="comment">// wait for all subtasks</span>
     scope.throwIfFailed();  <span class="comment">// propagate first failure, cancels remaining</span>
 
-    <span class="class-name">User</span>    user    = su.get();
+    <span class="class-name">Customer</span>    customer    = su.get();
     <span class="class-name">Product</span> product = sp.get();
 }
 <span class="comment">// Scope closes: any running subtasks are automatically cancelled</span></code></pre>

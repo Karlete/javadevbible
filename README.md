@@ -73,14 +73,36 @@ JavaDev Bible — integrity check
 
 6. Meta description
   ✓ every topic page has a <meta name="description">
+  ✓ every meta description is 70–160 characters
 
 7. Hand-written counts
   ✓ every stated count matches disk (94 topics, 13 categories)
 
-✓ 7/7 checks passed.
+8. Code blocks
+  ✓ every <pre> block is balanced and escaped
+
+9. Undefined CSS classes
+  ✓ every class used in HTML is defined in css/
+
+10. Forbidden markup
+  ✓ no inline styles and no side-by-side box diagrams in topics/
+
+11. Index cards
+  ✓ every topic page is linked from a category card
+
+12. SEO head
+  ✓ every page has a self-referencing canonical and Open Graph tags
+
+13. Sitemap
+  ✓ sitemap.xml lists exactly the 95 pages on disk
+
+14. Field injection
+  ✓ no @Autowired field injection outside tests and ❌ examples
+
+✓ 14/14 checks passed.
 ```
 
-[`tools/verify.sh`](tools/verify.sh) walks every `href` in every page and resolves it against the filesystem; diffs the search index against what is on disk, in both directions; catches the UTF-8 BOM that Windows editors reintroduce silently; fails on any `console.log` in production JS; catches a dead CSS class that styled nothing for months; flags any topic page missing a meta description; and fails when a hand-typed "N topics" or "N categories" in the site or the docs disagrees with what is on disk.
+[`tools/verify.sh`](tools/verify.sh) walks every `href` in every page and resolves it against the filesystem; diffs the search index, the sitemap and the index-page category cards against what is on disk; catches the UTF-8 BOM that Windows editors reintroduce silently; fails on any `console.log` in production JS; checks that every CSS class used is defined somewhere (a dead class once styled nothing on 78 tables for months); parses every hand-highlighted code block for unbalanced `<span>`s and unescaped tags (an unescaped `<pid>` once vanished from a `jmap` command); rejects inline styles, side-by-side ASCII diagrams that break on phones and `@Autowired` field injection in sample code; checks every meta description and canonical URL; and fails when a hand-typed "N topics" or "N categories" in the site or the docs disagrees with what is on disk.
 
 It is **pure bash — no Node, no npm, no `package.json`**. Adding a dependency to check a project whose defining constraint is *zero dependencies* would have missed the point. It runs on every push via [GitHub Actions](.github/workflows/verify.yml) and blocks the merge if the site's internal references do not hold together.
 
@@ -96,7 +118,7 @@ The `mcp/` directory contains a Spring Boot MCP server that exposes the Bible's 
 
 | Tool | What it does |
 |---|---|
-| `search_topics` | Search across every page by keyword or concept |
+| `search_topics` | Ranked multi-word search across every page (same algorithm as the site's search box) |
 | `get_topic_content` | Read the full content of a specific topic page |
 | `list_categories` | List all 13 categories and their topics |
 

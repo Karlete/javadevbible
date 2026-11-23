@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Servlets &amp; JSP - JavaDev Bible</title>
     <meta name="description" content="The foundation of Java web development — what Spring MVC is built on, and why understanding it matters even if you never write one directly">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/jakarta-ee/servlets-jsp.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Servlets &amp; JSP — JavaDev Bible">
+    <meta property="og:description" content="The foundation of Java web development — what Spring MVC is built on, and why understanding it matters even if you never write one directly">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/jakarta-ee/servlets-jsp.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -183,18 +191,18 @@
     <span class="class-name">String</span> name   = request.getParameter(<span class="string">"name"</span>);        <span class="comment">// query param or form field</span>
     <span class="class-name">String</span> auth   = request.getHeader(<span class="string">"Authorization"</span>);  <span class="comment">// request header</span>
     <span class="class-name">String</span> method = request.getMethod();                  <span class="comment">// "GET", "POST", etc.</span>
-    <span class="class-name">String</span> uri    = request.getRequestURI();              <span class="comment">// "/myapp/users"</span>
+    <span class="class-name">String</span> uri    = request.getRequestURI();              <span class="comment">// "/myapp/customers"</span>
     <span class="class-name">String</span> body   = request.getReader().lines()           <span class="comment">// raw body as string</span>
         .collect(java.util.stream.Collectors.joining());
 
     <span class="comment">// Attributes (server-side data attached to THIS request, not from client)</span>
-    request.setAttribute(<span class="string">"user"</span>, currentUser);
-    <span class="class-name">Object</span> user = request.getAttribute(<span class="string">"user"</span>);
+    request.setAttribute(<span class="string">"customer"</span>, currentCustomer);
+    <span class="class-name">Object</span> customer = request.getAttribute(<span class="string">"customer"</span>);
 
     <span class="comment">// ── Building the response ─────────────────────────────────────────────</span>
     response.setStatus(<span class="class-name">HttpServletResponse</span>.SC_CREATED);         <span class="comment">// 201</span>
     response.setContentType(<span class="string">"application/json;charset=UTF-8"</span>);
-    response.setHeader(<span class="string">"Location"</span>, <span class="string">"/api/users/123"</span>);
+    response.setHeader(<span class="string">"Location"</span>, <span class="string">"/api/customers/123"</span>);
 
     response.getWriter().println(<span class="string">"{\"id\":123,\"name\":\""</span> + name + <span class="string">"\"}"</span>);
 
@@ -290,23 +298,23 @@
                     routing through a servlet for every page. It was the dominant server-side
                     rendering technology in Java from the late 1990s through the mid-2000s.</p>
 
-                <pre><code><span class="comment">&lt;!-- users.jsp — a realistic example showing WHY JSP fell out of favour --&gt;</span>
+                <pre><code><span class="comment">&lt;!-- customers.jsp — a realistic example showing WHY JSP fell out of favour --&gt;</span>
 &lt;%@ page import="java.util.List" %&gt;
 &lt;%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %&gt;
 
 &lt;html&gt;&lt;body&gt;
-&lt;h1&gt;Users&lt;/h1&gt;
+&lt;h1&gt;Customers&lt;/h1&gt;
 
 &lt;%-- Scriptlet (avoid) — mixes Java and HTML, untestable, unmaintainable --%&gt;
 &lt;%
-    List users = (List) request.getAttribute("users");
-    for (Object u : users) {
+    List customers = (List) request.getAttribute("customers");
+    for (Object u : customers) {
         out.println("&lt;p&gt;" + u + "&lt;/p&gt;");  // XSS risk: no escaping
     }
 %&gt;
 
 &lt;%-- JSTL (the "clean" JSP way) — still JSP, but at least no scriptlets --%&gt;
-&lt;c:forEach var="user" items="${users}"&gt;
+&lt;c:forEach var="customer" items="${customers}"&gt;
     &lt;p&gt;&lt;c:out value="${user.name}"/&gt;&lt;/p&gt;  &lt;%-- c:out escapes HTML --%&gt;
 &lt;/c:forEach&gt;
 
@@ -340,37 +348,37 @@
                 <pre><code><span class="comment">/*
  * Classic Servlet + JSP MVC — the pattern that Spring MVC formalized:
  *
- *  Browser → GET /users
+ *  Browser → GET /customers
  *                │
  *                ▼
- *  UserListServlet.doGet()          ← Controller: fetch data, put in request scope
- *      userService.findAll()
- *      request.setAttribute("users", users)
- *      request.getRequestDispatcher("/WEB-INF/views/users.jsp").forward(req, res)
+ *  CustomerListServlet.doGet()          ← Controller: fetch data, put in request scope
+ *      customerService.findAll()
+ *      request.setAttribute("customers", customers)
+ *      request.getRequestDispatcher("/WEB-INF/views/customers.jsp").forward(req, res)
  *                │
  *                ▼
- *  users.jsp                        ← View: render the data, no business logic
- *      ${users} — display the list
+ *  customers.jsp                        ← View: render the data, no business logic
+ *      ${customers} — display the list
  *
  * Spring MVC is exactly this pattern, with DispatcherServlet as the single
  * front controller instead of one servlet per URL, and Thymeleaf instead of JSP.
  */</span>
 
-<span class="annotation">@WebServlet</span>(<span class="string">"/users"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserListServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
+<span class="annotation">@WebServlet</span>(<span class="string">"/customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">CustomerListServlet</span> <span class="keyword">extends</span> <span class="class-name">HttpServlet</span> {
 
-    <span class="keyword">private</span> <span class="class-name">UserService</span> userService;  <span class="comment">// can't @Inject here without CDI — see CDI page</span>
+    <span class="keyword">private</span> <span class="class-name">CustomerService</span> customerService;  <span class="comment">// can't @Inject here without CDI — see CDI page</span>
 
     <span class="annotation">@Override</span>
     <span class="keyword">public void</span> <span class="function">init</span>() {
-        userService = <span class="keyword">new</span> <span class="class-name">UserService</span>();  <span class="comment">// manual wiring without a DI container</span>
+        customerService = <span class="keyword">new</span> <span class="class-name">CustomerService</span>();  <span class="comment">// manual wiring without a DI container</span>
     }
 
     <span class="annotation">@Override</span>
     <span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> res)
             <span class="keyword">throws</span> <span class="class-name">ServletException</span>, <span class="class-name">IOException</span> {
-        req.setAttribute(<span class="string">"users"</span>, userService.findAll());
-        req.getRequestDispatcher(<span class="string">"/WEB-INF/views/users.jsp"</span>).forward(req, res);
+        req.setAttribute(<span class="string">"customers"</span>, customerService.findAll());
+        req.getRequestDispatcher(<span class="string">"/WEB-INF/views/customers.jsp"</span>).forward(req, res);
     }
 }</code></pre>
             </section>

@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Client-Server Architecture - JavaDev Bible</title>
-    <meta name="description" content="Roles, not machines: how clients and servers divide responsibility, why three-tier architecture won, and where your Spring Boot app is both client and server at once">
+    <meta name="description" content="Roles, not machines: how clients and servers split responsibility, why three-tier architecture won, and how one Spring Boot app is both at once.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/web-concepts/client-server.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Client-Server Architecture — JavaDev Bible">
+    <meta property="og:description" content="Roles, not machines: how clients and servers split responsibility, why three-tier architecture won, and how one Spring Boot app is both at once.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/web-concepts/client-server.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -74,7 +82,7 @@
         <span class="comment">// The client owns a raw JDBC connection with real DB credentials.</span>
         <span class="comment">// Anyone who decompiles this .jar has your database password.</span>
         <span class="class-name">Connection</span> conn = <span class="class-name">DriverManager</span>.getConnection(
-            <span class="string">"jdbc:postgresql://prod-db:5432/shop"</span>, <span class="string">"app_user"</span>, <span class="string">"h4rdc0d3d"</span>);
+            <span class="string">"jdbc:postgresql://prod-db:5432/shop"</span>, <span class="string">"shop_app"</span>, <span class="string">"h4rdc0d3d"</span>);
 
         <span class="comment">// Business rule ("check stock before selling") lives in the CLIENT.</span>
         <span class="comment">// Every desktop installation must be updated to change this rule,</span>
@@ -130,22 +138,19 @@
                     request in a given exchange</strong>. The exact same process can be a
                     server in one connection and a client in another, simultaneously.</p>
 
-                <pre><code><span class="comment">// A single Spring Boot application, two roles at once:</span>
-
-                    Acts as SERVER                Acts as CLIENT
-                    (for the browser)             (for the database)
-                          │                             │
-┌──────────┐         ┌────┴─────────────────────────────┴────┐         ┌──────────┐
-│ Browser  │ Request │                                       │ Query   │ Postgres │
-│ (Client) │ ──────▶ │           OrderController             │ ──────▶ │ (Server) │
-│          │ ◀────── │                 ↓                     │ ◀────── │          │
-└──────────┘ Response│           OrderService                │ Result  └──────────┘
-                      │                 ↓                     │
-                      │           PaymentClient  ──────────▶  │  Payment Service
-                      └───────────────────────────────────────┘  (server, elsewhere)
-
-<span class="comment">// In a microservice chain the same rule holds at every hop:</span>
-Order Service ──(client)──▶ Payment Service ──(client)──▶ Fraud-Check Service</code></pre>
+                <table>
+                    <thead>
+                        <tr><th>Connection</th><th>Client (opens it)</th><th>Server (answers it)</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Browser → shop</td><td>Browser</td><td><strong>Your Spring Boot app</strong> (<code>OrderController</code>)</td></tr>
+                        <tr><td>Shop → database</td><td><strong>Your Spring Boot app</strong> (<code>OrderService</code> via its repository)</td><td>PostgreSQL</td></tr>
+                        <tr><td>Shop → payments</td><td><strong>Your Spring Boot app</strong> (<code>PaymentClient</code>)</td><td>Payment Service, running elsewhere</td></tr>
+                    </tbody>
+                </table>
+                <p>One process, three connections, two roles — at the same moment. In a
+                    microservice chain the rule holds at every hop: Order Service is the client of
+                    Payment Service, which is in turn the client of Fraud-Check Service.</p>
 
                 <p>This matters in real code, not just in diagrams. A service class that
                     calls out to another microservice is acting as a client the moment it
@@ -294,7 +299,7 @@ Port 6379  →  Redis
 
 <span class="comment">// One host, several independently deployed services on different ports:</span>
 192.168.1.100
-├── :8080 → user-service
+├── :8080 → customer-service
 ├── :8081 → order-service
 └── :8082 → payment-service</code></pre>
 
@@ -315,49 +320,50 @@ Port 6379  →  Redis
                 <h2>Architecture Patterns: Two-Tier, Three-Tier, and Microservices</h2>
 
                 <h3>Two-Tier — Client Talks Directly to the Database</h3>
-                <pre><code>┌──────────┐              ┌──────────┐
-│  CLIENT  │  ──────────▶ │ DATABASE │
-│ (Desktop)│  ◀────────── │ (MySQL)  │
-└──────────┘              └──────────┘
-
-<span class="comment">// Still seen in legacy internal tools and quick scripts.</span>
-<span class="comment">// Acceptable for a single trusted internal user; wrong for anything</span>
-<span class="comment">// exposed to the public internet — see Section 0's before/after example.</span></code></pre>
+                <table>
+                    <thead>
+                        <tr><th>Tier</th><th>Example</th><th>Holds</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Client</td><td>Desktop application</td><td>UI, business rules <em>and</em> the database credentials</td></tr>
+                        <tr><td>Database</td><td>MySQL</td><td>Data</td></tr>
+                    </tbody>
+                </table>
+                <p>Still seen in legacy internal tools and quick scripts. Acceptable for a
+                    single trusted internal user; wrong for anything exposed to the public internet,
+                    because every client ships the credentials — see Section 0's before/after example.</p>
 
                 <h3>Three-Tier — The Default for Good Reason</h3>
-                <pre><code>┌──────────┐       ┌──────────┐       ┌──────────┐
-│  CLIENT  │ ────▶ │  SERVER  │ ────▶ │ DATABASE │
-│ (Browser)│       │ (Spring  │       │ (Postgre │
-│          │ ◀──── │   Boot)  │ ◀──── │   SQL)   │
-└──────────┘       └──────────┘       └──────────┘
-                        │
-              ┌─────────┴─────────┐
-         Presentation        Business logic
-          (Controllers)         (Services)
-
-<span class="comment">// One deployable server holds business logic; database credentials never</span>
-<span class="comment">// leave it; the client is replaceable (web, mobile, CLI) without touching</span>
-<span class="comment">// the rules that govern the business.</span></code></pre>
+                <table>
+                    <thead>
+                        <tr><th>Tier</th><th>Example</th><th>Holds</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Client</td><td>Browser, mobile app, CLI</td><td>Presentation only — replaceable</td></tr>
+                        <tr><td>Server</td><td>Spring Boot: controllers (presentation layer) and services (business logic)</td><td>Business rules and the only copy of the database credentials</td></tr>
+                        <tr><td>Database</td><td>PostgreSQL</td><td>Data</td></tr>
+                    </tbody>
+                </table>
+                <p>One deployable server holds the business logic; database credentials never
+                    leave it; the client can be swapped (web, mobile, CLI) without touching the rules
+                    that govern the business.</p>
 
                 <h3>N-Tier / Microservices — Splitting the Middle Tier Itself</h3>
-                <pre><code>┌──────────┐       ┌─────────────────────────────────────┐
-│  CLIENT  │ ────▶ │            API Gateway               │
-└──────────┘       └─────────────────────────────────────┘
-                                   │
-                    ┌──────────────┼──────────────┐
-                    ▼              ▼              ▼
-              ┌──────────┐  ┌──────────┐  ┌──────────┐
-              │   User   │  │  Order   │  │ Payment  │
-              │ Service  │  │ Service  │  │ Service  │
-              └────┬─────┘  └────┬─────┘  └────┬─────┘
-                   ▼             ▼             ▼
-              ┌──────────┐ ┌──────────┐ ┌──────────┐
-              │  User DB │ │ Order DB │ │Payment DB│
-              └──────────┘ └──────────┘ └──────────┘
-
-<span class="comment">// Each service is independently deployable and independently scalable —</span>
-<span class="comment">// the trade-off is that "the server" is no longer one thing you can reason</span>
-<span class="comment">// about locally: distributed failure modes replace in-process ones.</span></code></pre>
+                <table>
+                    <thead>
+                        <tr><th>Component</th><th>Reached through</th><th>Owns</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>API Gateway</td><td>The client, directly</td><td>Routing, authentication, rate limiting</td></tr>
+                        <tr><td>Customer Service</td><td>API Gateway</td><td>Customer DB</td></tr>
+                        <tr><td>Order Service</td><td>API Gateway</td><td>Order DB</td></tr>
+                        <tr><td>Payment Service</td><td>API Gateway</td><td>Payment DB</td></tr>
+                    </tbody>
+                </table>
+                <p>Each service is independently deployable and independently scalable, and no
+                    service reads another's database. The trade-off is that "the server" is no
+                    longer one thing you can reason about locally: distributed failure modes replace
+                    in-process ones.</p>
 
                 <div class="info-box important">
                     <div class="info-box-title">Splitting into microservices is an organizational decision before it's a technical one</div>
@@ -393,16 +399,16 @@ Port 6379  →  Redis
 
                 <pre><code><span class="comment">// STATELESS — every request is self-describing; any instance can serve it</span>
 <span class="annotation">@GetMapping</span>(<span class="string">"/api/profile"</span>)
-<span class="keyword">public</span> <span class="class-name">UserResponse</span> <span class="function">getProfile</span>(<span class="annotation">@RequestHeader</span>(<span class="string">"Authorization"</span>) <span class="class-name">String</span> bearerToken) {
-    <span class="class-name">Long</span> userId = jwtService.extractUserId(bearerToken);
-    <span class="keyword">return</span> userService.findById(userId);
+<span class="keyword">public</span> <span class="class-name">CustomerResponse</span> <span class="function">getProfile</span>(<span class="annotation">@RequestHeader</span>(<span class="string">"Authorization"</span>) <span class="class-name">String</span> bearerToken) {
+    <span class="class-name">Long</span> customerId = jwtService.extractCustomerId(bearerToken);
+    <span class="keyword">return</span> customerService.findById(customerId);
 }
 
 <span class="comment">// STATEFUL — the server must remember which instance holds this session</span>
 <span class="annotation">@GetMapping</span>(<span class="string">"/api/profile"</span>)
-<span class="keyword">public</span> <span class="class-name">UserResponse</span> <span class="function">getProfile</span>(<span class="class-name">HttpSession</span> session) {
-    <span class="class-name">Long</span> userId = (<span class="class-name">Long</span>) session.getAttribute(<span class="string">"userId"</span>);
-    <span class="keyword">return</span> userService.findById(userId);
+<span class="keyword">public</span> <span class="class-name">CustomerResponse</span> <span class="function">getProfile</span>(<span class="class-name">HttpSession</span> session) {
+    <span class="class-name">Long</span> customerId = (<span class="class-name">Long</span>) session.getAttribute(<span class="string">"customerId"</span>);
+    <span class="keyword">return</span> customerService.findById(customerId);
 }</code></pre>
 
                 <p>Session and cookie mechanics — how a session ID actually gets to the

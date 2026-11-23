@@ -5,7 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spring MVC Architecture - JavaDev Bible</title>
-    <meta name="description" content="The Front Controller pattern, the request">
+    <meta name="description" content="Spring MVC's front controller: how DispatcherServlet routes a request to a controller method, resolves arguments, and turns the result into a response.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/spring/mvc.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Spring MVC Architecture — JavaDev Bible">
+    <meta property="og:description" content="Spring MVC's front controller: how DispatcherServlet routes a request to a controller method, resolves arguments, and turns the result into a response.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/spring/mvc.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -98,25 +106,20 @@
             <section class="content-section">
                 <h2>The Request Lifecycle</h2>
 
-                <pre><code><span class="comment">/*
- *  Browser ──▶ DispatcherServlet ──▶ HandlerMapping ──▶ Controller method
- *                    │                                        │
- *                    │                          returns "view name" + Model
- *                    │                          OR a @ResponseBody / ResponseEntity
- *                    │                                        │
- *          ┌─────────┴─────────┐                  ┌───────────┴───────────┐
- *          ▼                   ▼                  ▼                       ▼
- *   HandlerAdapter      ViewResolver        HttpMessageConverter    (nothing to convert:
- *  (invokes the method   (view name →          (object → JSON,       void / already sent)
- *   with the right         View instance)        via Jackson)
- *   arguments resolved)         │                       │
- *                               ▼                       ▼
- *                          View.render()          Response body written
- *                               │                       │
- *                               └───────────┬───────────┘
- *                                           ▼
- *                                   HTTP Response to Browser
- */</span></code></pre>
+                <table>
+                    <thead>
+                        <tr><th>Step</th><th>View-rendering controller (<code>@Controller</code>)</th><th>REST controller (<code>@RestController</code> / <code>@ResponseBody</code>)</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1</td><td colspan="2"><code>DispatcherServlet</code> receives the request — the single entry point</td></tr>
+                        <tr><td>2</td><td colspan="2"><code>HandlerMapping</code> finds the controller method that matches URL, HTTP method, headers and content type</td></tr>
+                        <tr><td>3</td><td colspan="2"><code>HandlerAdapter</code> invokes the method, resolving every argument (<code>@PathVariable</code>, <code>@RequestBody</code>, <code>Model</code>…)</td></tr>
+                        <tr><td>4</td><td>Method returns a view name and fills the <code>Model</code></td><td>Method returns an object or a <code>ResponseEntity</code></td></tr>
+                        <tr><td>5</td><td><code>ViewResolver</code> turns the name into a <code>View</code></td><td><code>HttpMessageConverter</code> serialises the object (JSON via Jackson)</td></tr>
+                        <tr><td>6</td><td><code>View.render()</code> writes HTML</td><td>The converter writes the response body</td></tr>
+                        <tr><td>7</td><td colspan="2">HTTP response goes back to the browser (a <code>void</code> method that wrote the response itself skips steps 5–6)</td></tr>
+                    </tbody>
+                </table>
 
                 <ol>
                     <li><strong>DispatcherServlet</strong> receives the request — the single entry point for the whole
@@ -230,9 +233,9 @@
                 <pre><code><span class="annotation">@RestController</span>
 <span class="keyword">public class</span> <span class="class-name">SearchController</span> {
 
-    <span class="comment">// Path variable — /users/123 → id = 123</span>
-    <span class="annotation">@GetMapping</span>(<span class="string">"/users/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
+    <span class="comment">// Path variable — /customers/123 → id = 123</span>
+    <span class="annotation">@GetMapping</span>(<span class="string">"/customers/{id}"</span>)
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">getCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
 
     <span class="comment">// Query parameters — /search?q=java&page=2</span>
     <span class="annotation">@GetMapping</span>(<span class="string">"/search"</span>)
@@ -247,8 +250,8 @@
                             <span class="annotation">@CookieValue</span>(<span class="string">"theme"</span>) <span class="class-name">String</span> theme) { ... }
 
     <span class="comment">// JSON body — converted by an HttpMessageConverter (Jackson), based on Content-Type</span>
-    <span class="annotation">@PostMapping</span>(<span class="string">"/users"</span>)
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">createUser</span>(<span class="annotation">@RequestBody</span> <span class="class-name">User</span> user) { ... }
+    <span class="annotation">@PostMapping</span>(<span class="string">"/customers"</span>)
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">createCustomer</span>(<span class="annotation">@RequestBody</span> <span class="class-name">Customer</span> customer) { ... }
 
     <span class="comment">// Form fields (application/x-www-form-urlencoded) — bound to object properties</span>
     <span class="annotation">@PostMapping</span>(<span class="string">"/register"</span>)
@@ -612,7 +615,7 @@ spring.web.resources.cache.period=31536000  <span class="comment"># seconds — 
 
                     <p><strong>Q: What's the difference between @PathVariable and @RequestParam?</strong><br>
                         <code>@PathVariable</code> extracts a value from the URL path itself
-                        (<code>/users/{id}</code>). <code>@RequestParam</code> extracts a value from
+                        (<code>/customers/{id}</code>). <code>@RequestParam</code> extracts a value from
                         the query string (<code>?page=2</code>) or form data.
                     </p>
                 </div>

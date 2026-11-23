@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Optional Class - JavaDev Bible</title>
-    <meta name="description" content="Make absence explicit — eliminate NullPointerException by design">
+    <meta name="description" content="Make absence explicit and design NullPointerException out: when to return Optional, how to chain it, and the misuses that make code worse than null.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/fundamentals/optional.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Optional Class — JavaDev Bible">
+    <meta property="og:description" content="Make absence explicit and design NullPointerException out: when to return Optional, how to chain it, and the misuses that make code worse than null.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/fundamentals/optional.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -57,20 +65,20 @@
                     appearing far from the code that caused it.</p>
 
                 <pre><code><span class="comment">// ❌ null return: absence invisible in the signature, NPE risk</span>
-<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findById</span>(<span class="keyword">long</span> id) {
+<span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">findById</span>(<span class="keyword">long</span> id) {
     <span class="keyword">return</span> db.find(id);  <span class="comment">// returns null if not found — caller has no idea</span>
 }
 
-<span class="class-name">User</span> user = findById(<span class="number">123</span>);
-user.getEmail();  <span class="comment">// 💥 NullPointerException if user was not found</span>
+<span class="class-name">Customer</span> customer = findById(<span class="number">123</span>);
+customer.getEmail();  <span class="comment">// 💥 NullPointerException if customer was not found</span>
 
 <span class="comment">// ✅ Optional: absence is part of the contract — caller MUST handle it</span>
-<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) {
+<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) {
     <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(db.find(id));
 }
 
 findById(<span class="number">123</span>)
-    .map(<span class="class-name">User</span>::getEmail)
+    .map(<span class="class-name">Customer</span>::getEmail)
     .ifPresent(emailService::sendWelcome);  <span class="comment">// safe — no NPE possible</span></code></pre>
 
                 <div class="info-box note">
@@ -97,11 +105,11 @@ findById(<span class="number">123</span>)
 
 <span class="comment">// Optional.ofNullable() — value might be null (safe wrapping)</span>
 <span class="comment">// Use when wrapping values from external sources (DB, APIs, legacy code)</span>
-<span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; user = <span class="class-name">Optional</span>.ofNullable(db.findById(id));
+<span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; customer = <span class="class-name">Optional</span>.ofNullable(db.findById(id));
 
 <span class="comment">// Optional.empty() — explicitly no value</span>
 <span class="comment">// Use for early returns or as the "not found" result</span>
-<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email) {
+<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email) {
     <span class="keyword">if</span> (email == <span class="keyword">null</span> || email.isBlank()) <span class="keyword">return</span> <span class="class-name">Optional</span>.empty();
     <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(db.findByEmail(email));
 }</code></pre>
@@ -125,7 +133,7 @@ findById(<span class="number">123</span>)
 <span class="class-name">String</span> name = opt.orElseGet(() -&gt; generateGuestName());  <span class="comment">// preferred for expensive defaults</span>
 
 <span class="comment">// ─── orElseThrow: required value — throw meaningful exception ───</span>
-<span class="class-name">String</span> name = opt.orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">UserNotFoundException</span>(id));
+<span class="class-name">String</span> name = opt.orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">CustomerNotFoundException</span>(id));
 
 <span class="comment">// ─── ifPresent: side effect only when present ───</span>
 opt.ifPresent(emailService::send);
@@ -133,11 +141,11 @@ opt.ifPresent(emailService::send);
 <span class="comment">// ─── ifPresentOrElse (Java 9+): handle both cases ───</span>
 opt.ifPresentOrElse(
     u  -&gt; log.info(<span class="string">"Found: {}"</span>, u),
-    () -&gt; log.warn(<span class="string">"User {} not found"</span>, id)
+    () -&gt; log.warn(<span class="string">"Customer {} not found"</span>, id)
 );
 
 <span class="comment">// ─── or (Java 9+): fallback Optional — cascading lookups ───</span>
-<span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; found = findInCache(id)
+<span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; found = findInCache(id)
     .or(() -&gt; findInDatabase(id))
     .or(() -&gt; findInExternalService(id));</code></pre>
 
@@ -176,24 +184,24 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
 
                 <pre><code><span class="comment">// map(): transform the value — returns Optional of the result</span>
 <span class="comment">// If empty, stays empty. If mapper returns null, becomes empty.</span>
-<span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; email = findUser(id)
-    .map(<span class="class-name">User</span>::getName)         <span class="comment">// Optional&lt;String&gt;</span>
+<span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; email = findCustomer(id)
+    .map(<span class="class-name">Customer</span>::getName)         <span class="comment">// Optional&lt;String&gt;</span>
     .map(<span class="class-name">String</span>::toUpperCase);  <span class="comment">// Optional&lt;String&gt;</span>
 
 <span class="comment">// flatMap(): mapper returns Optional — prevents Optional&lt;Optional&lt;T&gt;&gt;</span>
-<span class="keyword">class</span> <span class="class-name">User</span> {
+<span class="keyword">class</span> <span class="class-name">Customer</span> {
     <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Address</span>&gt; <span class="function">getAddress</span>() { ... }  <span class="comment">// already returns Optional</span>
 }
 
 <span class="comment">// ❌ map() gives Optional&lt;Optional&lt;Address&gt;&gt; — wrong</span>
-<span class="class-name">Optional</span>&lt;<span class="class-name">Optional</span>&lt;<span class="class-name">Address</span>&gt;&gt; nested = findUser(id).map(<span class="class-name">User</span>::getAddress);
+<span class="class-name">Optional</span>&lt;<span class="class-name">Optional</span>&lt;<span class="class-name">Address</span>&gt;&gt; nested = findCustomer(id).map(<span class="class-name">Customer</span>::getAddress);
 
 <span class="comment">// ✅ flatMap() flattens to Optional&lt;Address&gt; — correct</span>
-<span class="class-name">Optional</span>&lt;<span class="class-name">Address</span>&gt; address = findUser(id).flatMap(<span class="class-name">User</span>::getAddress);
+<span class="class-name">Optional</span>&lt;<span class="class-name">Address</span>&gt; address = findCustomer(id).flatMap(<span class="class-name">Customer</span>::getAddress);
 
 <span class="comment">// Deep chain — null-safe at every step, no explicit checks</span>
-<span class="class-name">String</span> city = findUser(id)
-    .flatMap(<span class="class-name">User</span>::getAddress)
+<span class="class-name">String</span> city = findCustomer(id)
+    .flatMap(<span class="class-name">Customer</span>::getAddress)
     .flatMap(<span class="class-name">Address</span>::getCity)
     .map(<span class="class-name">City</span>::getName)
     .orElse(<span class="string">"Unknown"</span>);
@@ -206,9 +214,9 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
 
 <span class="comment">// stream() (Java 9+): convert to Stream of 0 or 1 elements
 // Most useful to filter a stream of Optionals</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; found = userIds.stream()
-    .map(<span class="keyword">this</span>::findById)        <span class="comment">// Stream&lt;Optional&lt;User&gt;&gt;</span>
-    .flatMap(<span class="class-name">Optional</span>::stream)  <span class="comment">// Stream&lt;User&gt; — empties discarded</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; found = customerIds.stream()
+    .map(<span class="keyword">this</span>::findById)        <span class="comment">// Stream&lt;Optional&lt;Customer&gt;&gt;</span>
+    .flatMap(<span class="class-name">Optional</span>::stream)  <span class="comment">// Stream&lt;Customer&gt; — empties discarded</span>
     .toList();</code></pre>
             </section>
 
@@ -220,33 +228,33 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
 
                 <h3>Repository pattern — the canonical use case</h3>
                 <pre><code><span class="comment">// Interface declares absence explicitly at the type level</span>
-<span class="keyword">public interface</span> <span class="class-name">UserRepository</span> {
-    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findById</span>(<span class="class-name">Long</span> id);
-    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email);
-    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt;     <span class="function">findAll</span>();          <span class="comment">// collection: empty list, NOT Optional&lt;List&gt;</span>
-    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt;     <span class="function">findByRole</span>(<span class="class-name">String</span> role);
+<span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> {
+    <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findById</span>(<span class="class-name">Long</span> id);
+    <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email);
+    <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt;     <span class="function">findAll</span>();          <span class="comment">// collection: empty list, NOT Optional&lt;List&gt;</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt;     <span class="function">findByRole</span>(<span class="class-name">String</span> role);
 }
 
 <span class="comment">// Service layer — each operation selects the right handler</span>
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+<span class="keyword">public class</span> <span class="class-name">CustomerService</span> {
 
     <span class="comment">// Required: not found = domain error</span>
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getOrThrow</span>(<span class="class-name">Long</span> id) {
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">getOrThrow</span>(<span class="class-name">Long</span> id) {
         <span class="keyword">return</span> repo.findById(id)
-            .orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">UserNotFoundException</span>(id));
+            .orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">CustomerNotFoundException</span>(id));
     }
 
     <span class="comment">// Optional display — not found = show default</span>
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getDisplayName</span>(<span class="class-name">Long</span> id) {
         <span class="keyword">return</span> repo.findById(id)
-            .map(<span class="class-name">User</span>::getDisplayName)
+            .map(<span class="class-name">Customer</span>::getDisplayName)
             .orElse(<span class="string">"Anonymous"</span>);
     }
 
     <span class="comment">// Conditional action — only act if found AND has email</span>
     <span class="keyword">public void</span> <span class="function">sendWelcome</span>(<span class="class-name">Long</span> id) {
         repo.findById(id)
-            .flatMap(<span class="class-name">User</span>::getEmail)
+            .flatMap(<span class="class-name">Customer</span>::getEmail)
             .ifPresent(emailService::sendWelcome);
     }
 }</code></pre>
@@ -290,12 +298,12 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
                 <div class="info-box warning">
                     <div class="info-box-title">Optional as a field — breaks Serialization</div>
                     <pre><code><span class="comment">// ❌ Optional is not Serializable — breaks JPA, Jackson, caching</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> {
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
     <span class="keyword">private</span> <span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; middleName;  <span class="comment">// never do this</span>
 }
 
 <span class="comment">// ✅ Nullable field, Optional only in the getter</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> {
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
     <span class="keyword">private</span> <span class="class-name">String</span> middleName;  <span class="comment">// null if absent</span>
 
     <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; <span class="function">getMiddleName</span>() {
@@ -306,12 +314,12 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
 
                 <div class="info-box warning">
                     <div class="info-box-title">Optional as method parameter — forces callers to wrap</div>
-                    <pre><code><span class="comment">// ❌ Caller must write: createUser("Bob", Optional.empty()) — ugly</span>
-<span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">String</span> name, <span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; email) { ... }
+                    <pre><code><span class="comment">// ❌ Caller must write: createCustomer("Bob", Optional.empty()) — ugly</span>
+<span class="keyword">public void</span> <span class="function">createCustomer</span>(<span class="class-name">String</span> name, <span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; email) { ... }
 
 <span class="comment">// ✅ Overloading is cleaner</span>
-<span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">String</span> name)                   { createUser(name, <span class="keyword">null</span>); }
-<span class="keyword">public void</span> <span class="function">createUser</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email)    { ... }
+<span class="keyword">public void</span> <span class="function">createCustomer</span>(<span class="class-name">String</span> name)                   { createCustomer(name, <span class="keyword">null</span>); }
+<span class="keyword">public void</span> <span class="function">createCustomer</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email)    { ... }
 
 <span class="comment">// ✅ Or Builder for many optional parameters</span></code></pre>
                 </div>
@@ -319,21 +327,21 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
                 <div class="info-box warning">
                     <div class="info-box-title">Optional of collection — redundant</div>
                     <pre><code><span class="comment">// ❌ Collections already represent emptiness with .isEmpty()</span>
-<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt;&gt; <span class="function">findAll</span>() { ... }
+<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt;&gt; <span class="function">findAll</span>() { ... }
 
 <span class="comment">// ✅ Return empty collection — callers don't need double unwrapping</span>
-<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findAll</span>() {
-    <span class="keyword">return</span> users != <span class="keyword">null</span> ? users : <span class="class-name">List</span>.of();
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findAll</span>() {
+    <span class="keyword">return</span> customers != <span class="keyword">null</span> ? customers : <span class="class-name">List</span>.of();
 }</code></pre>
                 </div>
 
                 <div class="info-box warning">
                     <div class="info-box-title">Nested Optional — use flatMap</div>
                     <pre><code><span class="comment">// ❌ Optional&lt;Optional&lt;String&gt;&gt; — always wrong</span>
-<span class="class-name">Optional</span>&lt;<span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt;&gt; nested = user.map(<span class="class-name">User</span>::getEmail);  <span class="comment">// getEmail returns Optional</span>
+<span class="class-name">Optional</span>&lt;<span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt;&gt; nested = customer.map(<span class="class-name">Customer</span>::getEmail);  <span class="comment">// getEmail returns Optional</span>
 
 <span class="comment">// ✅ flatMap flattens the nesting</span>
-<span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; email = user.flatMap(<span class="class-name">User</span>::getEmail);</code></pre>
+<span class="class-name">Optional</span>&lt;<span class="class-name">String</span>&gt; email = customer.flatMap(<span class="class-name">Customer</span>::getEmail);</code></pre>
                 </div>
             </section>
 
@@ -360,25 +368,25 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
 <span class="keyword">int</span>          value     = optInt.orElse(<span class="number">0</span>);   <span class="comment">// no Integer allocation</span>
 
 <span class="comment">// ✅ In hot paths: consider returning null internally + wrapping at boundaries</span>
-<span class="keyword">private</span> <span class="class-name">User</span> <span class="function">findInternal</span>(<span class="keyword">long</span> id) { <span class="keyword">return</span> cache.get(id); }  <span class="comment">// null ok internally</span>
-<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) { <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(findInternal(id)); }</code></pre>
+<span class="keyword">private</span> <span class="class-name">Customer</span> <span class="function">findInternal</span>(<span class="keyword">long</span> id) { <span class="keyword">return</span> cache.get(id); }  <span class="comment">// null ok internally</span>
+<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) { <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(findInternal(id)); }</code></pre>
 
                 <h3>Optional with Spring Data JPA</h3>
                 <pre><code><span class="comment">// Spring Data automatically generates Optional-returning methods</span>
-<span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
-    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email);
-    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByUsernameAndActive</span>(<span class="class-name">String</span> username, <span class="keyword">boolean</span> active);
+<span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
+    <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email);
+    <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByUsernameAndActive</span>(<span class="class-name">String</span> username, <span class="keyword">boolean</span> active);
 }
 
 <span class="comment">// JpaRepository.findById() returns Optional&lt;T&gt; — idiomatic since Spring 5</span>
-<span class="class-name">User</span> user = userRepository.findById(id)
+<span class="class-name">Customer</span> customer = customerRepository.findById(id)
     .orElseThrow(() -&gt; <span class="keyword">new</span> <span class="class-name">ResponseStatusException</span>(
-        <span class="class-name">HttpStatus</span>.NOT_FOUND, <span class="string">"User "</span> + id + <span class="string">" not found"</span>));</code></pre>
+        <span class="class-name">HttpStatus</span>.NOT_FOUND, <span class="string">"Customer "</span> + id + <span class="string">" not found"</span>));</code></pre>
 
                 <h3>Optional vs exceptions: when to use each</h3>
                 <pre><code><span class="comment">/*
  *  Use Optional when:
- *  - "Not found" is a NORMAL, expected outcome (user search, config lookup)
+ *  - "Not found" is a NORMAL, expected outcome (customer search, config lookup)
  *  - The caller decides what to do with absence
  *
  *  Use exception when:
@@ -411,8 +419,8 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
                     <p><strong>Q: What is Optional and what problem does it solve?</strong><br>
                     A container that either holds a value or is empty. It solves the
                     <code>NullPointerException</code> problem by making absence explicit in a
-                    method's return type. When a method returns <code>Optional&lt;User&gt;</code>
-                    instead of <code>User</code>, the caller knows at compile time that the result
+                    method's return type. When a method returns <code>Optional&lt;Customer&gt;</code>
+                    instead of <code>Customer</code>, the caller knows at compile time that the result
                     may be absent and must handle it — unlike a null return, which gives no
                     indication in the signature.</p>
 
@@ -444,7 +452,7 @@ opt.ifPresent(<span class="keyword">this</span>::process);</code></pre>
                     breaks JPA entity serialization, Jackson JSON mapping, caching frameworks,
                     and RMI. Store nullable fields, expose Optional only in getters. As a
                     <strong>parameter</strong>: it forces every caller to explicitly wrap arguments
-                    in Optional even when they have a concrete value — <code>createUser("Bob",
+                    in Optional even when they have a concrete value — <code>createCustomer("Bob",
                     Optional.of("email"))</code>. Method overloading or a builder are cleaner.
                     Brian Goetz (Java language architect) has stated Optional was designed
                     exclusively as a return type.</p>

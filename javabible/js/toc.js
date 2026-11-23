@@ -63,6 +63,7 @@
 
             link.addEventListener('click', function (e) {
                 e.preventDefault();
+                setActive(tocNav, link);
                 smoothScrollTo(heading);
                 history.pushState(null, '', '#' + heading.id);
             });
@@ -93,11 +94,11 @@
         if (collapse) {
             nav.classList.add('toc-collapsed');
             btn.setAttribute('aria-expanded', 'false');
-            btn.setAttribute('aria-label', 'Expandir tabla de contenidos');
+            btn.setAttribute('aria-label', 'Expand table of contents');
         } else {
             nav.classList.remove('toc-collapsed');
             btn.setAttribute('aria-expanded', 'true');
-            btn.setAttribute('aria-label', 'Colapsar tabla de contenidos');
+            btn.setAttribute('aria-label', 'Collapse table of contents');
         }
     }
 
@@ -114,8 +115,6 @@
             if (el) targets.push({ el: el, link: link });
         });
 
-        let activeLink = null;
-
         const observer = new IntersectionObserver(function (entries) {
             entries.forEach(function (entry) {
                 if (!entry.isIntersecting) return;
@@ -125,9 +124,7 @@
                 });
                 if (!match) return;
 
-                if (activeLink) activeLink.classList.remove('toc-active');
-                match.link.classList.add('toc-active');
-                activeLink = match.link;
+                setActive(tocNav, match.link);
 
                 // Auto-scroll de la ToC hacia el ítem activo.
                 // Solo en el sidebar de escritorio: es el único caso en que la
@@ -154,12 +151,27 @@
 
     /* ── Helpers ─────────────────────────────────────────────── */
 
+    /*
+     * Marca un único enlace como activo. Lo usan tanto el scroll spy como el
+     * clic: sin el segundo, al saltar a una sección cuyo título no llega a
+     * entrar en la banda del observer (pantallas bajas, última sección de la
+     * página) la ToC seguía resaltando la sección anterior.
+     */
+    function setActive(tocNav, link) {
+        const current = tocNav.querySelector('.toc-active');
+        if (current === link) return;
+        if (current) current.classList.remove('toc-active');
+        link.classList.add('toc-active');
+    }
+
     function smoothScrollTo(el) {
-        // Compensar header fijo si lo hubiera
-        const header = document.querySelector('.topic-header');
-        const offset = header ? header.getBoundingClientRect().height : 0;
-        const top = el.getBoundingClientRect().top + window.scrollY - offset - 16;
-        window.scrollTo({ top: top, behavior: 'smooth' });
+        // .topic-header NO es fija (position: static): solo ocupa el principio
+        // de la página. La versión anterior restaba su altura (~300px) a cada
+        // salto, así que el título aterrizaba en mitad de la pantalla. Solo
+        // se deja un margen visual pequeño.
+        const top = el.getBoundingClientRect().top + window.scrollY - 16;
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        window.scrollTo({ top: top, behavior: reduce ? 'auto' : 'smooth' });
 
         // Foco accesible
         el.setAttribute('tabindex', '-1');

@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spring Boot Basics - JavaDev Bible</title>
     <meta name="description" content="How auto-configuration actually works under the hood, not just &quot;it's magic&quot;">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/spring/boot.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Spring Boot Basics — JavaDev Bible">
+    <meta property="og:description" content="How auto-configuration actually works under the hood, not just &quot;it's magic&quot;">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/spring/boot.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -138,7 +146,7 @@ java -Dserver.port=9090 -jar my-app.jar                 <span class="comment"># 
  *
  *  1. Spring Boot reads a file bundled inside every starter JAR:
  *     META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
- *     (renamed from the old spring.factories in Boot 2.7+)
+ *     (added in Boot 2.7; since 3.0 the ONLY way — spring.factories is ignored)
  *
  *  2. This file lists candidate @Configuration classes — e.g. spring-boot-
  *     autoconfigure.jar lists DataSourceAutoConfiguration, WebMvcAutoConfiguration,
@@ -198,52 +206,52 @@ java -jar my-app.jar --debug
                 <h2>A Minimal REST API</h2>
                 <pre><code><span class="comment">// Model — a record, not a class with manual getters/setters/constructors.
 // Immutable, equals/hashCode/toString generated, accessors without "get" prefix.</span>
-<span class="keyword">public record</span> <span class="class-name">User</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> name, <span class="class-name">String</span> email) {}
+<span class="keyword">public record</span> <span class="class-name">Customer</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> name, <span class="class-name">String</span> email) {}
 
 <span class="comment">// Service — stateless singleton bean, constructor injection</span>
 <span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
-    <span class="keyword">private final</span> <span class="class-name">Map</span>&lt;<span class="class-name">Long</span>, <span class="class-name">User</span>&gt; users = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
+<span class="keyword">public class</span> <span class="class-name">CustomerService</span> {
+    <span class="keyword">private final</span> <span class="class-name">Map</span>&lt;<span class="class-name">Long</span>, <span class="class-name">Customer</span>&gt; customers = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
     <span class="keyword">private final</span> <span class="class-name">AtomicLong</span> nextId = <span class="keyword">new</span> <span class="class-name">AtomicLong</span>(<span class="number">1</span>);
 
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findAll</span>() { <span class="keyword">return new</span> <span class="class-name">ArrayList</span>&lt;&gt;(users.values()); }
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findAll</span>() { <span class="keyword">return new</span> <span class="class-name">ArrayList</span>&lt;&gt;(customers.values()); }
 
-    <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findById</span>(<span class="class-name">Long</span> id) { <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(users.get(id)); }
+    <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findById</span>(<span class="class-name">Long</span> id) { <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(customers.get(id)); }
 
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">create</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {
-        <span class="class-name">User</span> user = <span class="keyword">new</span> <span class="class-name">User</span>(nextId.getAndIncrement(), name, email);
-        users.put(user.id(), user);
-        <span class="keyword">return</span> user;
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">create</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {
+        <span class="class-name">Customer</span> customer = <span class="keyword">new</span> <span class="class-name">Customer</span>(nextId.getAndIncrement(), name, email);
+        customers.put(customer.id(), customer);
+        <span class="keyword">return</span> customer;
     }
 }
 
 <span class="comment">// Controller — thin, delegates everything to the service</span>
 <span class="annotation">@RestController</span>
-<span class="annotation">@RequestMapping</span>(<span class="string">"/api/users"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserController</span> {
-    <span class="keyword">private final</span> <span class="class-name">UserService</span> userService;
-    <span class="keyword">public</span> <span class="function">UserController</span>(<span class="class-name">UserService</span> userService) { <span class="keyword">this</span>.userService = userService; }
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">CustomerController</span> {
+    <span class="keyword">private final</span> <span class="class-name">CustomerService</span> customerService;
+    <span class="keyword">public</span> <span class="function">CustomerController</span>(<span class="class-name">CustomerService</span> customerService) { <span class="keyword">this</span>.customerService = customerService; }
 
     <span class="annotation">@GetMapping</span>
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getAll</span>() { <span class="keyword">return</span> userService.findAll(); }
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">getAll</span>() { <span class="keyword">return</span> customerService.findAll(); }
 
     <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getOne</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-        <span class="keyword">return</span> userService.findById(id)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">getOne</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> customerService.findById(id)
             .map(<span class="class-name">ResponseEntity</span>::ok)
             .orElse(<span class="class-name">ResponseEntity</span>.notFound().build());
     }
 
     <span class="annotation">@PostMapping</span>
     <span class="annotation">@ResponseStatus</span>(HttpStatus.CREATED)
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">create</span>(<span class="annotation">@RequestBody</span> <span class="class-name">CreateUserRequest</span> request) {
-        <span class="keyword">return</span> userService.create(request.name(), request.email());
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">create</span>(<span class="annotation">@RequestBody</span> <span class="class-name">CreateCustomerRequest</span> request) {
+        <span class="keyword">return</span> customerService.create(request.name(), request.email());
     }
 }
 
 <span class="comment">// Separate request DTO from the domain record — never bind @RequestBody
 // directly to your entity/domain type in real applications (see Spring REST page)</span>
-<span class="keyword">public record</span> <span class="class-name">CreateUserRequest</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {}</code></pre>
+<span class="keyword">public record</span> <span class="class-name">CreateCustomerRequest</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {}</code></pre>
 
                 <p>Full HTTP verb coverage, validation, error handling, and DTO patterns are
                     covered in depth in <a href="rest.html">Spring REST</a> — this is the minimal
@@ -391,7 +399,7 @@ management.endpoint.health.show-details=when-authorized</code></pre>
                     <p><strong>Q: Explain the mechanism behind auto-configuration — not just what it does, but how.</strong><br>
                     At startup, <code>@EnableAutoConfiguration</code> reads
                     <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code>
-                    (the modern replacement for <code>spring.factories</code>, since Boot 2.7)
+                    (introduced in Boot 2.7, and the only mechanism since Boot 3.0 removed the <code>spring.factories</code> route)
                     from every starter on the classpath. This lists candidate
                     <code>@Configuration</code> classes. Each candidate is evaluated against
                     conditions — typically <code>@ConditionalOnClass</code> (is the relevant

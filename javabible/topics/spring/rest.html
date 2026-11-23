@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spring REST - JavaDev Bible</title>
     <meta name="description" content="Building production-grade REST APIs with Spring — DTOs, validation, error handling, HTTP semantics, versioning, and calling external APIs">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/spring/rest.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Spring REST — JavaDev Bible">
+    <meta property="og:description" content="Building production-grade REST APIs with Spring — DTOs, validation, error handling, HTTP semantics, versioning, and calling external APIs">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/spring/rest.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -59,8 +67,8 @@
                     requires no special libraries to consume.</p>
 
                 <p>A <strong>RESTful API</strong> organises everything around
-                    <strong>resources</strong> (nouns, not verbs — <code>/users</code>,
-                    not <code>/getUsers</code>), uses standard <strong>HTTP verbs</strong>
+                    <strong>resources</strong> (nouns, not verbs — <code>/customers</code>,
+                    not <code>/getCustomers</code>), uses standard <strong>HTTP verbs</strong>
                     to express what operation to perform on those resources, and is
                     <strong>stateless</strong> — each request carries all the context the
                     server needs; no server-side session remembers who you are between calls.
@@ -70,20 +78,20 @@
                 <pre><code><span class="comment">/*
  *  WITHOUT REST (RPC-style, pre-2000 approach):
  *
- *  POST /getUserById        POST /createNewUser
- *  POST /updateUserEmail    POST /deleteUserAccount
- *  POST /getAllActiveUsers   POST /searchUsersByName
+ *  POST /getCustomerById        POST /createNewCustomer
+ *  POST /updateCustomerEmail    POST /deleteCustomerAccount
+ *  POST /getAllActiveCustomers   POST /searchUsersByName
  *
  *  The verb is in the URL — every operation needs its own endpoint.
  *
  *  WITH REST (resource + HTTP verb):
  *
- *  GET    /users         → list users
- *  POST   /users         → create a user
- *  GET    /users/123     → get user 123
- *  PUT    /users/123     → replace user 123
- *  PATCH  /users/123     → partially update user 123
- *  DELETE /users/123     → delete user 123
+ *  GET    /customers         → list customers
+ *  POST   /customers         → create a customer
+ *  GET    /customers/123     → get customer 123
+ *  PUT    /customers/123     → replace customer 123
+ *  PATCH  /customers/123     → partially update customer 123
+ *  DELETE /customers/123     → delete customer 123
  *
  *  One resource URL, six operations — the verb is the HTTP method, not the URL.
  */</span></code></pre>
@@ -137,38 +145,38 @@
                     stores it.</p>
 
                 <pre><code><span class="comment">// The JPA entity — internal, never the API contract</span>
-<span class="annotation">@Entity</span> <span class="annotation">@Table</span>(name = <span class="string">"users"</span>)
-<span class="keyword">public class</span> <span class="class-name">User</span> {
+<span class="annotation">@Entity</span> <span class="annotation">@Table</span>(name = <span class="string">"customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
     <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = <span class="class-name">GenerationType</span>.IDENTITY) <span class="keyword">private</span> <span class="class-name">Long</span> id;
     <span class="keyword">private</span> <span class="class-name">String</span> name;
     <span class="keyword">private</span> <span class="class-name">String</span> email;
     <span class="keyword">private</span> <span class="class-name">String</span> passwordHash;     <span class="comment">// NEVER expose this</span>
     <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> createdAt;
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"user"</span>, fetch = <span class="class-name">FetchType</span>.LAZY)
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"customer"</span>, fetch = <span class="class-name">FetchType</span>.LAZY)
     <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders;        <span class="comment">// serialising this triggers N+1 queries</span>
 }
 
 <span class="comment">// Response DTO — record: immutable, concise, zero boilerplate (Java 16+)</span>
-<span class="keyword">public record</span> <span class="class-name">UserResponse</span>(
+<span class="keyword">public record</span> <span class="class-name">CustomerResponse</span>(
     <span class="class-name">Long</span> id,
     <span class="class-name">String</span> name,
     <span class="class-name">String</span> email,
     <span class="class-name">LocalDateTime</span> createdAt
 ) {
     <span class="comment">// Factory method keeps mapping logic in the DTO, not scattered across controllers</span>
-    <span class="keyword">public static</span> <span class="class-name">UserResponse</span> <span class="function">from</span>(<span class="class-name">User</span> user) {
-        <span class="keyword">return new</span> <span class="class-name">UserResponse</span>(user.getId(), user.getName(), user.getEmail(), user.getCreatedAt());
+    <span class="keyword">public static</span> <span class="class-name">CustomerResponse</span> <span class="function">from</span>(<span class="class-name">Customer</span> customer) {
+        <span class="keyword">return new</span> <span class="class-name">CustomerResponse</span>(customer.getId(), customer.getName(), customer.getEmail(), customer.getCreatedAt());
     }
 }
 
 <span class="comment">// Separate request DTOs — create and update have different validation rules</span>
-<span class="keyword">public record</span> <span class="class-name">CreateUserRequest</span>(
+<span class="keyword">public record</span> <span class="class-name">CreateCustomerRequest</span>(
     <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">100</span>) <span class="class-name">String</span> name,
     <span class="annotation">@NotBlank</span> <span class="annotation">@Email</span> <span class="class-name">String</span> email,
     <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">8</span>, max = <span class="number">72</span>) <span class="class-name">String</span> password  <span class="comment">// 72 = bcrypt max useful input length</span>
 ) {}
 
-<span class="keyword">public record</span> <span class="class-name">UpdateUserRequest</span>(
+<span class="keyword">public record</span> <span class="class-name">UpdateCustomerRequest</span>(
     <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">100</span>) <span class="class-name">String</span> name,
     <span class="annotation">@NotBlank</span> <span class="annotation">@Email</span> <span class="class-name">String</span> email
     <span class="comment">// no password — changes go through a dedicated /change-password endpoint</span>
@@ -188,61 +196,61 @@
                 <h2>A Complete REST Controller</h2>
 
                 <pre><code><span class="annotation">@RestController</span>
-<span class="annotation">@RequestMapping</span>(<span class="string">"/api/v1/users"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/v1/customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">CustomerController</span> {
 
-    <span class="keyword">private final</span> <span class="class-name">UserService</span> userService;
+    <span class="keyword">private final</span> <span class="class-name">CustomerService</span> customerService;
 
-    <span class="keyword">public</span> <span class="function">UserController</span>(<span class="class-name">UserService</span> userService) { <span class="keyword">this</span>.userService = userService; }
+    <span class="keyword">public</span> <span class="function">CustomerController</span>(<span class="class-name">CustomerService</span> customerService) { <span class="keyword">this</span>.customerService = customerService; }
 
-    <span class="comment">// GET /api/v1/users?page=0&size=20&sort=name</span>
+    <span class="comment">// GET /api/v1/customers?page=0&size=20&sort=name</span>
     <span class="annotation">@GetMapping</span>
-    <span class="keyword">public</span> <span class="class-name">Page</span>&lt;<span class="class-name">UserResponse</span>&gt; <span class="function">listUsers</span>(
+    <span class="keyword">public</span> <span class="class-name">Page</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">listCustomers</span>(
             <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"0"</span>) <span class="keyword">int</span> page,
             <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"20"</span>) <span class="annotation">@Max</span>(<span class="number">100</span>) <span class="keyword">int</span> size,
             <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"id"</span>) <span class="class-name">String</span> sort) {
-        <span class="keyword">return</span> userService.findAll(<span class="class-name">PageRequest</span>.of(page, size, <span class="class-name">Sort</span>.by(sort)));
+        <span class="keyword">return</span> customerService.findAll(<span class="class-name">PageRequest</span>.of(page, size, <span class="class-name">Sort</span>.by(sort)));
     }
 
-    <span class="comment">// GET /api/v1/users/123</span>
+    <span class="comment">// GET /api/v1/customers/123</span>
     <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">UserResponse</span>&gt; <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-        <span class="keyword">return</span> userService.findById(id)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">getCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> customerService.findById(id)
             .map(<span class="class-name">ResponseEntity</span>::ok)
             .orElseGet(() -&gt; <span class="class-name">ResponseEntity</span>.notFound().build());
     }
 
-    <span class="comment">// POST /api/v1/users  →  201 Created + Location: /api/v1/users/124</span>
+    <span class="comment">// POST /api/v1/customers  →  201 Created + Location: /api/v1/customers/124</span>
     <span class="annotation">@PostMapping</span>
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">UserResponse</span>&gt; <span class="function">createUser</span>(<span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> <span class="class-name">CreateUserRequest</span> req) {
-        <span class="class-name">UserResponse</span> created = userService.create(req);
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">createCustomer</span>(<span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> <span class="class-name">CreateCustomerRequest</span> req) {
+        <span class="class-name">CustomerResponse</span> created = customerService.create(req);
         <span class="class-name">URI</span> location = <span class="class-name">ServletUriComponentsBuilder</span>.fromCurrentRequest()
             .path(<span class="string">"/{id}"</span>).buildAndExpand(created.id()).toUri();
         <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.created(location).body(created);
     }
 
-    <span class="comment">// PUT /api/v1/users/123  — FULL replace: client MUST send ALL fields</span>
+    <span class="comment">// PUT /api/v1/customers/123  — FULL replace: client MUST send ALL fields</span>
     <span class="annotation">@PutMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">UserResponse</span>&gt; <span class="function">replaceUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id,
-                                                <span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> <span class="class-name">UpdateUserRequest</span> req) {
-        <span class="keyword">return</span> userService.replace(id, req)
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">replaceCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id,
+                                                <span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> <span class="class-name">UpdateCustomerRequest</span> req) {
+        <span class="keyword">return</span> customerService.replace(id, req)
             .map(<span class="class-name">ResponseEntity</span>::ok)
             .orElseGet(() -&gt; <span class="class-name">ResponseEntity</span>.notFound().build());
     }
 
-    <span class="comment">// PATCH /api/v1/users/123  — partial update: only provided fields change</span>
+    <span class="comment">// PATCH /api/v1/customers/123  — partial update: only provided fields change</span>
     <span class="annotation">@PatchMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">UserResponse</span>&gt; <span class="function">patchUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id,
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">patchCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id,
                                               <span class="annotation">@RequestBody</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; updates) {
-        <span class="keyword">return</span> userService.patch(id, updates)
+        <span class="keyword">return</span> customerService.patch(id, updates)
             .map(<span class="class-name">ResponseEntity</span>::ok)
             .orElseGet(() -&gt; <span class="class-name">ResponseEntity</span>.notFound().build());
     }
 
-    <span class="comment">// DELETE /api/v1/users/123  →  204 No Content (idempotent: 204 even if already gone)</span>
+    <span class="comment">// DELETE /api/v1/customers/123  →  204 No Content (idempotent: 204 even if already gone)</span>
     <span class="annotation">@DeleteMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">Void</span>&gt; <span class="function">deleteUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-        userService.delete(id);
+    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">Void</span>&gt; <span class="function">deleteCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        customerService.delete(id);
         <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.noContent().build();
     }
 }</code></pre>
@@ -264,7 +272,7 @@
                         Location URI from the actual incoming request — correct scheme, host,
                         port, and context path automatically, regardless of whether the app
                         runs locally, behind a reverse proxy, or under a context path.
-                        Hard-coding <code>URI.create("/api/v1/users/" + id)</code> breaks the
+                        Hard-coding <code>URI.create("/api/v1/customers/" + id)</code> breaks the
                         moment a reverse proxy or context path is in play.</p>
                 </div>
             </section>
@@ -287,7 +295,7 @@
                 </div>
 
                 <pre><code><span class="comment">// Constraint annotations compose directly on record components</span>
-<span class="keyword">public record</span> <span class="class-name">CreateUserRequest</span>(
+<span class="keyword">public record</span> <span class="class-name">CreateCustomerRequest</span>(
     <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">100</span>) <span class="class-name">String</span> name,
     <span class="annotation">@NotBlank</span> <span class="annotation">@Email</span> <span class="class-name">String</span> email,
     <span class="annotation">@NotNull</span> <span class="annotation">@Min</span>(<span class="number">18</span>) <span class="annotation">@Max</span>(<span class="number">120</span>) <span class="class-name">Integer</span> age,
@@ -384,7 +392,7 @@ spring.mvc.problemdetails.enabled=true</code></pre>
                     <tr><th>Strategy</th><th>Example</th><th>Real trade-off</th></tr>
                     <tr>
                         <td>URI versioning</td>
-                        <td><code>/api/v1/users</code></td>
+                        <td><code>/api/v1/customers</code></td>
                         <td>Explicit, cacheable, trivially testable in a browser. Most teams choose this for operational simplicity despite the REST-purist objection that a version isn't part of a resource identifier</td>
                     </tr>
                     <tr>
@@ -400,19 +408,19 @@ spring.mvc.problemdetails.enabled=true</code></pre>
                 </table>
 
                 <pre><code><span class="comment">// URI versioning</span>
-<span class="annotation">@RestController</span> <span class="annotation">@RequestMapping</span>(<span class="string">"/api/v1/users"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserControllerV1</span> { ... }
+<span class="annotation">@RestController</span> <span class="annotation">@RequestMapping</span>(<span class="string">"/api/v1/customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">CustomerControllerV1</span> { ... }
 
-<span class="annotation">@RestController</span> <span class="annotation">@RequestMapping</span>(<span class="string">"/api/v2/users"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserControllerV2</span> { ... }
+<span class="annotation">@RestController</span> <span class="annotation">@RequestMapping</span>(<span class="string">"/api/v2/customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">CustomerControllerV2</span> { ... }
 
 <span class="comment">// Header versioning</span>
-<span class="annotation">@GetMapping</span>(value = <span class="string">"/api/users/{id}"</span>, headers = <span class="string">"X-API-Version=2"</span>)
-<span class="keyword">public</span> <span class="class-name">UserResponseV2</span> <span class="function">getUserV2</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
+<span class="annotation">@GetMapping</span>(value = <span class="string">"/api/customers/{id}"</span>, headers = <span class="string">"X-API-Version=2"</span>)
+<span class="keyword">public</span> <span class="class-name">CustomerResponseV2</span> <span class="function">getCustomerV2</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
 
 <span class="comment">// Content negotiation</span>
-<span class="annotation">@GetMapping</span>(value = <span class="string">"/api/users/{id}"</span>, produces = <span class="string">"application/vnd.company.user.v2+json"</span>)
-<span class="keyword">public</span> <span class="class-name">UserResponseV2</span> <span class="function">getUserV2</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }</code></pre>
+<span class="annotation">@GetMapping</span>(value = <span class="string">"/api/customers/{id}"</span>, produces = <span class="string">"application/vnd.company.customer.v2+json"</span>)
+<span class="keyword">public</span> <span class="class-name">CustomerResponseV2</span> <span class="function">getCustomerV2</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }</code></pre>
 
                 <div class="info-box tip">
                     <div class="info-box-title">The real goal: never need v3 — be additive, not breaking</div>
@@ -428,12 +436,12 @@ spring.mvc.problemdetails.enabled=true</code></pre>
             <section class="content-section">
                 <h2>Pagination</h2>
                 <pre><code><span class="annotation">@GetMapping</span>
-<span class="keyword">public</span> <span class="class-name">Page</span>&lt;<span class="class-name">UserResponse</span>&gt; <span class="function">listUsers</span>(
+<span class="keyword">public</span> <span class="class-name">Page</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">listCustomers</span>(
         <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"0"</span>) <span class="keyword">int</span> page,
         <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"20"</span>) <span class="annotation">@Max</span>(<span class="number">100</span>) <span class="keyword">int</span> size,   <span class="comment">// @Max protects the DB</span>
         <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"id"</span>) <span class="class-name">String</span> sort) {
-    <span class="keyword">return</span> userService.findAll(<span class="class-name">PageRequest</span>.of(page, size, <span class="class-name">Sort</span>.by(sort)))
-        .map(<span class="class-name">UserResponse</span>::from);
+    <span class="keyword">return</span> customerService.findAll(<span class="class-name">PageRequest</span>.of(page, size, <span class="class-name">Sort</span>.by(sort)))
+        .map(<span class="class-name">CustomerResponse</span>::from);
 }
 
 <span class="comment">// Page&lt;T&gt; serialises to:
@@ -467,32 +475,32 @@ spring.mvc.problemdetails.enabled=true</code></pre>
     }
 
     <span class="comment">// GET — deserialise body directly</span>
-    <span class="keyword">public</span> <span class="class-name">UserResponse</span> <span class="function">getUser</span>(<span class="class-name">Long</span> id) {
+    <span class="keyword">public</span> <span class="class-name">CustomerResponse</span> <span class="function">getCustomer</span>(<span class="class-name">Long</span> id) {
         <span class="keyword">return</span> restClient.get()
-            .uri(<span class="string">"/users/{id}"</span>, id)
+            .uri(<span class="string">"/customers/{id}"</span>, id)
             .retrieve()
             .onStatus(<span class="class-name">HttpStatusCode</span>::is4xxClientError, (req, res) -&gt; {
-                <span class="keyword">throw new</span> <span class="class-name">ResourceNotFoundException</span>(<span class="string">"User not found: "</span> + id);
+                <span class="keyword">throw new</span> <span class="class-name">ResourceNotFoundException</span>(<span class="string">"Customer not found: "</span> + id);
             })
-            .body(<span class="class-name">UserResponse</span>.<span class="keyword">class</span>);
+            .body(<span class="class-name">CustomerResponse</span>.<span class="keyword">class</span>);
     }
 
     <span class="comment">// GET list — ParameterizedTypeReference for generic types</span>
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">UserResponse</span>&gt; <span class="function">getAllUsers</span>() {
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">getAllCustomers</span>() {
         <span class="keyword">return</span> restClient.get()
-            .uri(<span class="string">"/users"</span>)
+            .uri(<span class="string">"/customers"</span>)
             .retrieve()
-            .body(<span class="keyword">new</span> <span class="class-name">ParameterizedTypeReference</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">UserResponse</span>&gt;&gt;() {});
+            .body(<span class="keyword">new</span> <span class="class-name">ParameterizedTypeReference</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">CustomerResponse</span>&gt;&gt;() {});
     }
 
     <span class="comment">// POST with request body</span>
-    <span class="keyword">public</span> <span class="class-name">UserResponse</span> <span class="function">createUser</span>(<span class="class-name">CreateUserRequest</span> request) {
+    <span class="keyword">public</span> <span class="class-name">CustomerResponse</span> <span class="function">createCustomer</span>(<span class="class-name">CreateCustomerRequest</span> request) {
         <span class="keyword">return</span> restClient.post()
-            .uri(<span class="string">"/users"</span>)
+            .uri(<span class="string">"/customers"</span>)
             .contentType(<span class="class-name">MediaType</span>.APPLICATION_JSON)
             .body(request)
             .retrieve()
-            .body(<span class="class-name">UserResponse</span>.<span class="keyword">class</span>);
+            .body(<span class="class-name">CustomerResponse</span>.<span class="keyword">class</span>);
     }
 }</code></pre>
 
@@ -520,19 +528,19 @@ spring.mvc.problemdetails.enabled=true</code></pre>
             <section class="content-section">
                 <h2>Testing REST Endpoints with MockMvc</h2>
 
-                <pre><code><span class="annotation">@WebMvcTest</span>(<span class="class-name">UserController</span>.<span class="keyword">class</span>)  <span class="comment">// loads ONLY the web layer — no DB, no full context</span>
-<span class="keyword">class</span> <span class="class-name">UserControllerTest</span> {
+                <pre><code><span class="annotation">@WebMvcTest</span>(<span class="class-name">CustomerController</span>.<span class="keyword">class</span>)  <span class="comment">// loads ONLY the web layer — no DB, no full context</span>
+<span class="keyword">class</span> <span class="class-name">CustomerControllerTest</span> {
 
     <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">MockMvc</span> mockMvc;
     <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">ObjectMapper</span> objectMapper;
-    <span class="annotation">@MockitoBean</span> <span class="keyword">private</span> <span class="class-name">UserService</span> userService;  <span class="comment">// @MockBean before Boot 3.4</span>
+    <span class="annotation">@MockitoBean</span> <span class="keyword">private</span> <span class="class-name">CustomerService</span> customerService;  <span class="comment">// @MockBean before Boot 3.4</span>
 
     <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">getUser_whenExists_returns200</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="keyword">var</span> user = <span class="keyword">new</span> <span class="class-name">UserResponse</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="class-name">LocalDateTime</span>.now());
-        when(userService.findById(<span class="number">1L</span>)).thenReturn(<span class="class-name">Optional</span>.of(user));
+    <span class="keyword">void</span> <span class="function">getCustomer_whenExists_returns200</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">var</span> customer = <span class="keyword">new</span> <span class="class-name">CustomerResponse</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="class-name">LocalDateTime</span>.now());
+        when(customerService.findById(<span class="number">1L</span>)).thenReturn(<span class="class-name">Optional</span>.of(customer));
 
-        mockMvc.perform(get(<span class="string">"/api/v1/users/1"</span>).accept(<span class="class-name">MediaType</span>.APPLICATION_JSON))
+        mockMvc.perform(get(<span class="string">"/api/v1/customers/1"</span>).accept(<span class="class-name">MediaType</span>.APPLICATION_JSON))
             .andExpect(status().isOk())
             .andExpect(jsonPath(<span class="string">"$.id"</span>).value(<span class="number">1</span>))
             .andExpect(jsonPath(<span class="string">"$.name"</span>).value(<span class="string">"Ana"</span>))
@@ -540,19 +548,19 @@ spring.mvc.problemdetails.enabled=true</code></pre>
     }
 
     <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">getUser_whenNotFound_returns404</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        when(userService.findById(<span class="number">99L</span>)).thenReturn(<span class="class-name">Optional</span>.empty());
-        mockMvc.perform(get(<span class="string">"/api/v1/users/99"</span>))
+    <span class="keyword">void</span> <span class="function">getCustomer_whenNotFound_returns404</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        when(customerService.findById(<span class="number">99L</span>)).thenReturn(<span class="class-name">Optional</span>.empty());
+        mockMvc.perform(get(<span class="string">"/api/v1/customers/99"</span>))
             .andExpect(status().isNotFound());
     }
 
     <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">createUser_whenValid_returns201WithLocation</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="keyword">var</span> req = <span class="keyword">new</span> <span class="class-name">CreateUserRequest</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="string">"securepass"</span>, <span class="keyword">null</span>);
-        <span class="keyword">var</span> res = <span class="keyword">new</span> <span class="class-name">UserResponse</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="class-name">LocalDateTime</span>.now());
-        when(userService.create(any())).thenReturn(res);
+    <span class="keyword">void</span> <span class="function">createCustomer_whenValid_returns201WithLocation</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">var</span> req = <span class="keyword">new</span> <span class="class-name">CreateCustomerRequest</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="string">"securepass"</span>, <span class="keyword">null</span>);
+        <span class="keyword">var</span> res = <span class="keyword">new</span> <span class="class-name">CustomerResponse</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="class-name">LocalDateTime</span>.now());
+        when(customerService.create(any())).thenReturn(res);
 
-        mockMvc.perform(post(<span class="string">"/api/v1/users"</span>)
+        mockMvc.perform(post(<span class="string">"/api/v1/customers"</span>)
                 .contentType(<span class="class-name">MediaType</span>.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)).with(csrf()))
             .andExpect(status().isCreated())
@@ -561,10 +569,10 @@ spring.mvc.problemdetails.enabled=true</code></pre>
     }
 
     <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">createUser_whenInvalidEmail_returns400</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="keyword">var</span> req = <span class="keyword">new</span> <span class="class-name">CreateUserRequest</span>(<span class="string">"Ana"</span>, <span class="string">"not-an-email"</span>, <span class="string">"securepass"</span>, <span class="keyword">null</span>);
+    <span class="keyword">void</span> <span class="function">createCustomer_whenInvalidEmail_returns400</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">var</span> req = <span class="keyword">new</span> <span class="class-name">CreateCustomerRequest</span>(<span class="string">"Ana"</span>, <span class="string">"not-an-email"</span>, <span class="string">"securepass"</span>, <span class="keyword">null</span>);
 
-        mockMvc.perform(post(<span class="string">"/api/v1/users"</span>)
+        mockMvc.perform(post(<span class="string">"/api/v1/customers"</span>)
                 .contentType(<span class="class-name">MediaType</span>.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)).with(csrf()))
             .andExpect(status().isBadRequest())

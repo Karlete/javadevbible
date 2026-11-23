@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jackson — JSON in Java - JavaDev Bible</title>
     <meta name="description" content="The de-facto standard for JSON serialisation in Java — how it works, how Spring Boot configures it, and the gotchas that will bite you in production">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/tools/jackson.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Jackson — JSON in Java — JavaDev Bible">
+    <meta property="og:description" content="The de-facto standard for JSON serialisation in Java — how it works, how Spring Boot configures it, and the gotchas that will bite you in production">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/tools/jackson.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -61,8 +69,8 @@
                 <pre><code><span class="comment">/*
  * Before Jackson — manual JSON construction (real pre-2010 code):
  *
- *   String json = "{\"name\":\"" + user.getName() + "\","
- *               + "\"email\":\"" + user.getEmail() + "\"}";
+ *   String json = "{\"name\":\"" + customer.getName() + "\","
+ *               + "\"email\":\"" + customer.getEmail() + "\"}";
  *
  * Problem: escaping, null handling, nested objects, arrays — all manual.
  * No type safety, no refactoring support, wrong JSON on one typo.
@@ -70,8 +78,8 @@
  * With Jackson:
  */</span>
 <span class="class-name">ObjectMapper</span> mapper = <span class="keyword">new</span> <span class="class-name">ObjectMapper</span>();
-<span class="class-name">String</span> json = mapper.writeValueAsString(user);          <span class="comment">// → {"name":"Ana","email":"ana@example.com"}</span>
-<span class="class-name">User</span> parsed = mapper.readValue(json, <span class="class-name">User</span>.<span class="keyword">class</span>);       <span class="comment">// back to User</span></code></pre>
+<span class="class-name">String</span> json = mapper.writeValueAsString(customer);          <span class="comment">// → {"name":"Ana","email":"ana@example.com"}</span>
+<span class="class-name">Customer</span> parsed = mapper.readValue(json, <span class="class-name">Customer</span>.<span class="keyword">class</span>);       <span class="comment">// back to Customer</span></code></pre>
 
                 <div class="info-box note">
                     <div class="info-box-title">Jackson in Spring Boot — you're already using it</div>
@@ -127,18 +135,18 @@
 <span class="class-name">ObjectMapper</span> mapper = <span class="keyword">new</span> <span class="class-name">ObjectMapper</span>();
 
 <span class="comment">// Serialise — object to JSON string</span>
-<span class="class-name">String</span> json        = mapper.writeValueAsString(user);
-<span class="class-name">String</span> prettyJson  = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(user);
+<span class="class-name">String</span> json        = mapper.writeValueAsString(customer);
+<span class="class-name">String</span> prettyJson  = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(customer);
 
 <span class="comment">// Deserialise — JSON string to object</span>
-<span class="class-name">User</span> user          = mapper.readValue(json, <span class="class-name">User</span>.<span class="keyword">class</span>);
+<span class="class-name">Customer</span> customer          = mapper.readValue(json, <span class="class-name">Customer</span>.<span class="keyword">class</span>);
 
 <span class="comment">// Generic types — List, Map, Page&lt;T&gt; require TypeReference</span>
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; users   = mapper.readValue(json, <span class="keyword">new</span> <span class="class-name">TypeReference</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt;&gt;() {});
+<span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; customers   = mapper.readValue(json, <span class="keyword">new</span> <span class="class-name">TypeReference</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt;&gt;() {});
 
 <span class="comment">// Convert between types (e.g. Map → POJO, useful for dynamic structures)</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; map = mapper.convertValue(user, <span class="keyword">new</span> <span class="class-name">TypeReference</span>&lt;&gt;() {});
-<span class="class-name">User</span> fromMap       = mapper.convertValue(map, <span class="class-name">User</span>.<span class="keyword">class</span>);</code></pre>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Object</span>&gt; map = mapper.convertValue(customer, <span class="keyword">new</span> <span class="class-name">TypeReference</span>&lt;&gt;() {});
+<span class="class-name">Customer</span> fromMap       = mapper.convertValue(map, <span class="class-name">Customer</span>.<span class="keyword">class</span>);</code></pre>
 
                 <div class="info-box warning">
                     <div class="info-box-title">new ObjectMapper() per request is a real performance bug</div>
@@ -157,7 +165,7 @@
             <section class="content-section">
                 <h2>Core Annotations</h2>
 
-                <pre><code><span class="keyword">public class</span> <span class="class-name">UserDto</span> {
+                <pre><code><span class="keyword">public class</span> <span class="class-name">CustomerDto</span> {
 
     <span class="annotation">@JsonProperty</span>(<span class="string">"full_name"</span>)          <span class="comment">// serialises as "full_name" in JSON, even though the field is "name"</span>
     <span class="keyword">private</span> <span class="class-name">String</span> name;
@@ -209,7 +217,7 @@
                     — all Boot 3.x versions qualify).</p>
 
                 <pre><code><span class="comment">// Records deserialise via constructor — no default constructor needed, no setters needed</span>
-<span class="keyword">public record</span> <span class="class-name">UserResponse</span>(
+<span class="keyword">public record</span> <span class="class-name">CustomerResponse</span>(
     <span class="class-name">Long</span> id,
     <span class="class-name">String</span> name,
     <span class="annotation">@JsonProperty</span>(<span class="string">"email_address"</span>) <span class="class-name">String</span> email,  <span class="comment">// annotations on record components work</span>
@@ -414,7 +422,7 @@ mapper.registerModule(module);</code></pre>
     <span class="keyword">public interface</span> <span class="class-name">Admin</span> <span class="keyword">extends</span> <span class="class-name">Public</span> {}  <span class="comment">// Admin extends Public — inherits Public fields</span>
 }
 
-<span class="keyword">public class</span> <span class="class-name">UserDto</span> {
+<span class="keyword">public class</span> <span class="class-name">CustomerDto</span> {
     <span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Public</span>.<span class="keyword">class</span>)
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
@@ -429,13 +437,13 @@ mapper.registerModule(module);</code></pre>
 }
 
 <span class="comment">// In a Spring MVC controller — activate the view per endpoint</span>
-<span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{id}"</span>)
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/customers/{id}"</span>)
 <span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Public</span>.<span class="keyword">class</span>)         <span class="comment">// returns: {id, name}</span>
-<span class="keyword">public</span> <span class="class-name">UserDto</span> <span class="function">getPublic</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
+<span class="keyword">public</span> <span class="class-name">CustomerDto</span> <span class="function">getPublic</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
 
-<span class="annotation">@GetMapping</span>(<span class="string">"/admin/users/{id}"</span>)
+<span class="annotation">@GetMapping</span>(<span class="string">"/admin/customers/{id}"</span>)
 <span class="annotation">@JsonView</span>(<span class="class-name">Views</span>.<span class="class-name">Admin</span>.<span class="keyword">class</span>)          <span class="comment">// returns: {id, name, email, lastLogin}</span>
-<span class="keyword">public</span> <span class="class-name">UserDto</span> <span class="function">getAdmin</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }</code></pre>
+<span class="keyword">public</span> <span class="class-name">CustomerDto</span> <span class="function">getAdmin</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }</code></pre>
 
                 <div class="info-box tip">
                     <div class="info-box-title">@JsonView vs separate DTOs — when to use each</div>
@@ -456,16 +464,16 @@ mapper.registerModule(module);</code></pre>
                 <h2>Jackson in Tests</h2>
 
                 <pre><code><span class="comment">// In @WebMvcTest — ObjectMapper is auto-configured and injectable</span>
-<span class="annotation">@WebMvcTest</span>(<span class="class-name">UserController</span>.<span class="keyword">class</span>)
-<span class="keyword">class</span> <span class="class-name">UserControllerTest</span> {
+<span class="annotation">@WebMvcTest</span>(<span class="class-name">CustomerController</span>.<span class="keyword">class</span>)
+<span class="keyword">class</span> <span class="class-name">CustomerControllerTest</span> {
     <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">MockMvc</span> mockMvc;
     <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">ObjectMapper</span> objectMapper;  <span class="comment">// same instance as the app uses</span>
 
     <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">createUser_serialisesCorrectly</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="keyword">var</span> request = <span class="keyword">new</span> <span class="class-name">CreateUserRequest</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="string">"pass1234"</span>);
+    <span class="keyword">void</span> <span class="function">createCustomer_serialisesCorrectly</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+        <span class="keyword">var</span> request = <span class="keyword">new</span> <span class="class-name">CreateCustomerRequest</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="string">"pass1234"</span>);
 
-        mockMvc.perform(post(<span class="string">"/api/users"</span>)
+        mockMvc.perform(post(<span class="string">"/api/customers"</span>)
                 .contentType(<span class="class-name">MediaType</span>.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))  <span class="comment">// use the injected mapper</span>
             .andExpect(status().isCreated());
@@ -473,15 +481,15 @@ mapper.registerModule(module);</code></pre>
 }
 
 <span class="comment">// Pure unit test — no Spring context needed for serialisation logic</span>
-<span class="keyword">class</span> <span class="class-name">UserDtoSerializationTest</span> {
+<span class="keyword">class</span> <span class="class-name">CustomerDtoSerializationTest</span> {
     <span class="keyword">private final</span> <span class="class-name">ObjectMapper</span> mapper = <span class="keyword">new</span> <span class="class-name">ObjectMapper</span>()
         .registerModule(<span class="keyword">new</span> <span class="class-name">JavaTimeModule</span>())
         .disable(<span class="class-name">SerializationFeature</span>.WRITE_DATES_AS_TIMESTAMPS);
 
     <span class="annotation">@Test</span>
     <span class="keyword">void</span> <span class="function">passwordHash_isNeverSerialised</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="keyword">var</span> user = <span class="keyword">new</span> <span class="class-name">UserDto</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"$2a$10$abc..."</span>);
-        <span class="class-name">String</span> json = mapper.writeValueAsString(user);
+        <span class="keyword">var</span> customer = <span class="keyword">new</span> <span class="class-name">CustomerDto</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"$2a$10$abc..."</span>);
+        <span class="class-name">String</span> json = mapper.writeValueAsString(customer);
 
         assertThat(json).doesNotContain(<span class="string">"passwordHash"</span>);
         assertThat(json).doesNotContain(<span class="string">"$2a$"</span>);  <span class="comment">// assert the actual hash value isn't there either</span>

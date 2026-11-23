@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connection Pooling - JavaDev Bible</title>
     <meta name="description" content="Why every production Java application uses a connection pool, how to size it correctly, and how to diagnose the most common production failures">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/databases/connection-pooling.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Connection Pooling — JavaDev Bible">
+    <meta property="og:description" content="Why every production Java application uses a connection pool, how to size it correctly, and how to diagnose the most common production failures">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/databases/connection-pooling.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -79,25 +87,24 @@
     <span class="comment">// conn.close() returns it to the pool; no TCP teardown</span>
 }</code></pre>
 
-                <pre><code><span class="comment">// The pool lifecycle — what actually happens at startup and per request</span>
-
-┌─────────────────────────────────────────────────────────────────────┐
-│                         CONNECTION POOL                              │
-│                                                                      │
-│  At startup (minimumIdle connections pre-created):                  │
-│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐                  │
-│  │ C-01 │  │ C-02 │  │ C-03 │  │ C-04 │  │ C-05 │  ← idle          │
-│  └──────┘  └──────┘  └──────┘  └──────┘  └──────┘                  │
-│                                                                      │
-│  Under load (some connections active):                              │
-│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐                  │
-│  │ C-01 │  │ C-02 │  │ C-03 │  │ C-04 │  │ C-05 │                  │
-│  │ BUSY │  │ idle │  │ BUSY │  │ BUSY │  │ idle │                  │
-│  └──────┘  └──────┘  └──────┘  └──────┘  └──────┘                  │
-│                                                                      │
-│  dataSource.getConnection()  → picks an idle connection             │
-│  conn.close()                → returns to idle pool                 │
-└─────────────────────────────────────────────────────────────────────┘</code></pre>
+                <p>The pool lifecycle — what actually happens at startup and per request:</p>
+                <table>
+                    <thead>
+                        <tr><th>Connection</th><th>At startup (<code>minimumIdle</code> pre-created)</th><th>Under load</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>C-01</td><td>idle</td><td><strong>busy</strong></td></tr>
+                        <tr><td>C-02</td><td>idle</td><td>idle</td></tr>
+                        <tr><td>C-03</td><td>idle</td><td><strong>busy</strong></td></tr>
+                        <tr><td>C-04</td><td>idle</td><td><strong>busy</strong></td></tr>
+                        <tr><td>C-05</td><td>idle</td><td>idle</td></tr>
+                    </tbody>
+                </table>
+                <p><code>dataSource.getConnection()</code> hands out an idle connection that is
+                    already open — no TCP handshake, no authentication. <code>conn.close()</code> does
+                    <strong>not</strong> close the socket: the pool intercepts it and marks the
+                    connection idle again. That is why forgetting <code>close()</code> is a leak, not
+                    just untidiness.</p>
 
                 <p>The pool also has a second, less obvious benefit: it limits the
                     total number of concurrent database connections your application
@@ -351,9 +358,9 @@ logging.level.com.zaxxer.hikari=INFO
 // This means the pool was exhausted for 5+ seconds. Root causes in order of frequency:
 //
 // A) Connection leak — code obtained a connection and never returned it.
-//    Fix: enable leak detection. The next leak will log a stack trace showing where.
-spring.datasource.hikari.leak-detection-threshold=5000   <span class="comment">// log if held >5s</span>
-//
+//    Fix: enable leak detection. The next leak will log a stack trace showing where.</span>
+spring.datasource.hikari.leak-detection-threshold=5000   <span class="comment">// log if held &gt;5s</span>
+<span class="comment">//
 // B) Slow queries holding connections for too long.
 //    Fix: find and optimize the slow queries with EXPLAIN ANALYZE.
 //    Check: logging.level.org.hibernate.SQL=DEBUG + format_sql=true
@@ -369,7 +376,7 @@ spring.datasource.hikari.leak-detection-threshold=5000   <span class="comment">/
 //
 // Root cause: max-lifetime is longer than the database's idle connection timeout.
 // Fix: set max-lifetime shorter than the database's wait_timeout.
-//      Also set keepalive-time to periodically validate idle connections.
+//      Also set keepalive-time to periodically validate idle connections.</span>
 spring.datasource.hikari.max-lifetime=1680000      <span class="comment">// 28 min if DB timeout is 30 min</span>
 spring.datasource.hikari.keepalive-time=60000      <span class="comment">// 1 min keepalive ping</span></code></pre>
 

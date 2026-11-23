@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spring Data JPA - JavaDev Bible</title>
     <meta name="description" content="Repository abstraction over JPA — and the N+1 queries, lazy loading traps, and transaction boundaries it doesn't save you from">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/spring/data-jpa.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Spring Data JPA — JavaDev Bible">
+    <meta property="og:description" content="Repository abstraction over JPA — and the N+1 queries, lazy loading traps, and transaction boundaries it doesn't save you from">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/spring/data-jpa.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -79,8 +87,8 @@
                     <code>EntityManager</code>, injected and managed by hand. Spring Data JPA
                     replaces all of that with an interface:</p>
 
-                <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
-    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email);
+                <pre><code><span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
+    <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmail</span>(<span class="class-name">String</span> email);
     <span class="comment">// No implementation anywhere in your codebase. Spring generates one at startup.</span>
 }</code></pre>
 
@@ -137,8 +145,8 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                 <pre><code><span class="keyword">import</span> jakarta.persistence.*;
 
 <span class="annotation">@Entity</span>
-<span class="annotation">@Table</span>(name = <span class="string">"users"</span>)
-<span class="keyword">public class</span> <span class="class-name">User</span> {
+<span class="annotation">@Table</span>(name = <span class="string">"customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
 
     <span class="annotation">@Id</span>
     <span class="annotation">@GeneratedValue</span>(strategy = <span class="class-name">GenerationType</span>.IDENTITY)
@@ -153,12 +161,12 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
     <span class="annotation">@Enumerated</span>(<span class="class-name">EnumType</span>.STRING)  <span class="comment">// ALWAYS STRING — ORDINAL breaks silently if the enum is ever reordered</span>
     <span class="keyword">private</span> <span class="class-name">Status</span> status = <span class="class-name">Status</span>.ACTIVE;
 
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"user"</span>, cascade = <span class="class-name">CascadeType</span>.ALL)
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"customer"</span>, cascade = <span class="class-name">CascadeType</span>.ALL)
     <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();  <span class="comment">// LAZY by default</span>
 
     <span class="annotation">@ManyToOne</span>
-    <span class="annotation">@JoinColumn</span>(name = <span class="string">"department_id"</span>)
-    <span class="keyword">private</span> <span class="class-name">Department</span> department;  <span class="comment">// EAGER by default — see note below</span>
+    <span class="annotation">@JoinColumn</span>(name = <span class="string">"loyalty_tier_id"</span>)
+    <span class="keyword">private</span> <span class="class-name">LoyaltyTier</span> loyaltyTier;  <span class="comment">// EAGER by default — see note below</span>
 
     <span class="annotation">@PrePersist</span>
     <span class="keyword">protected void</span> <span class="function">onCreate</span>() { createdAt = <span class="class-name">LocalDateTime</span>.now(); }
@@ -202,7 +210,7 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
  * JpaRepository&lt;T, ID&gt;                 ← flush(), saveAndFlush(), batch deletes
  */</span>
 
-<span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
+<span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
     <span class="comment">// You write zero implementation. Ever.</span>
 }</code></pre>
 
@@ -247,7 +255,7 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                     <div class="info-box-title">When a method name would need 5+ keywords, stop and write @Query</div>
                     <p>Derived queries are excellent up to two or three conditions. Beyond that,
                         method names become unreadable
-                        (<code>findByStatusAndDepartmentNameAndCreatedAtBetweenOrderByNameDesc</code>)
+                        (<code>findByStatusAndLoyaltyTierNameAndCreatedAtBetweenOrderByNameDesc</code>)
                         and provide no compile-time guarantee the generated query is what you
                         think it is. Past that point, an explicit <code>@Query</code> with named
                         parameters is more readable and just as concise to write.</p>
@@ -260,19 +268,19 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
             <section class="content-section">
                 <h2>Custom Queries with @Query</h2>
 
-                <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
+                <pre><code><span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
 
     <span class="comment">// JPQL — portable across databases, always prefer this over native SQL</span>
-    <span class="annotation">@Query</span>(<span class="string">"SELECT u FROM User u WHERE u.email = :email"</span>)
-    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmailAddress</span>(<span class="annotation">@Param</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email);
+    <span class="annotation">@Query</span>(<span class="string">"SELECT u FROM Customer u WHERE u.email = :email"</span>)
+    <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmailAddress</span>(<span class="annotation">@Param</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email);
 
     <span class="comment">// Native SQL — only when JPQL genuinely can't express it (DB-specific functions, hints)</span>
-    <span class="annotation">@Query</span>(value = <span class="string">"SELECT * FROM users WHERE email = :email"</span>, nativeQuery = <span class="keyword">true</span>)
-    <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByEmailNative</span>(<span class="annotation">@Param</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email);
+    <span class="annotation">@Query</span>(value = <span class="string">"SELECT * FROM customers WHERE email = :email"</span>, nativeQuery = <span class="keyword">true</span>)
+    <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmailNative</span>(<span class="annotation">@Param</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email);
 
     <span class="comment">// Bulk update/delete — @Modifying is mandatory, or Spring throws at runtime</span>
     <span class="annotation">@Modifying</span>(clearAutomatically = <span class="keyword">true</span>)  <span class="comment">// clears the persistence context — see note below</span>
-    <span class="annotation">@Query</span>(<span class="string">"UPDATE User u SET u.status = :status WHERE u.id = :id"</span>)
+    <span class="annotation">@Query</span>(<span class="string">"UPDATE Customer u SET u.status = :status WHERE u.id = :id"</span>)
     <span class="keyword">int</span> <span class="function">updateStatus</span>(<span class="annotation">@Param</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id, <span class="annotation">@Param</span>(<span class="string">"status"</span>) <span class="class-name">Status</span> status);
 }</code></pre>
 
@@ -290,7 +298,7 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                     <div class="info-box-title">@Modifying(clearAutomatically = true) — why this matters</div>
                     <p>A bulk <code>UPDATE</code>/<code>DELETE</code> via <code>@Query</code>
                         bypasses the persistence context entirely — it hits the database
-                        directly. Any <code>User</code> entity already loaded and cached in the
+                        directly. Any <code>Customer</code> entity already loaded and cached in the
                         current session keeps its <strong>stale</strong> in-memory value even
                         though the database row changed. <code>clearAutomatically = true</code>
                         clears the persistence context after the bulk operation, forcing the
@@ -300,18 +308,18 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
 
                 <h3>Projections — Interface-Based and Record-Based DTOs</h3>
                 <pre><code><span class="comment">// Interface projection — Spring Data generates a proxy matching these getters</span>
-<span class="keyword">public interface</span> <span class="class-name">UserSummary</span> {
+<span class="keyword">public interface</span> <span class="class-name">CustomerSummary</span> {
     <span class="class-name">String</span> <span class="function">getName</span>();
     <span class="class-name">String</span> <span class="function">getEmail</span>();
 }
 
 <span class="comment">// Record (DTO) projection — Java 17+ idiom, matches constructor params to entity
 // property names. No @Query needed even for a derived query method.</span>
-<span class="keyword">public record</span> <span class="class-name">UserView</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {}
+<span class="keyword">public record</span> <span class="class-name">CustomerView</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {}
 
-<span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
-    <span class="class-name">List</span>&lt;<span class="class-name">UserSummary</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">Status</span> status);  <span class="comment">// interface projection</span>
-    <span class="class-name">List</span>&lt;<span class="class-name">UserView</span>&gt;    <span class="function">findByStatusOrderByName</span>(<span class="class-name">Status</span> status);  <span class="comment">// record projection</span>
+<span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
+    <span class="class-name">List</span>&lt;<span class="class-name">CustomerSummary</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">Status</span> status);  <span class="comment">// interface projection</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">CustomerView</span>&gt;    <span class="function">findByStatusOrderByName</span>(<span class="class-name">Status</span> status);  <span class="comment">// record projection</span>
 }</code></pre>
 
                 <div class="info-box tip">
@@ -333,15 +341,15 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                 <p>This is the single most common Spring Data JPA performance bug in production,
                     and it's invisible in development with a handful of test rows.</p>
 
-                <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
-    <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findAll</span>();  <span class="comment">// inherited — 1 query</span>
+                <pre><code><span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
+    <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findAll</span>();  <span class="comment">// inherited — 1 query</span>
 }
 
-<span class="keyword">for</span> (<span class="class-name">User</span> user : userRepository.findAll()) {    <span class="comment">// query #1: SELECT * FROM users        (1 query)</span>
-    user.getOrders().size();                    <span class="comment">// orders is LAZY — triggers a query PER user</span>
-}                                                <span class="comment">// query #2..#N+1: SELECT * FROM orders WHERE user_id = ?  (N queries)</span>
+<span class="keyword">for</span> (<span class="class-name">Customer</span> customer : customerRepository.findAll()) {    <span class="comment">// query #1: SELECT * FROM customers        (1 query)</span>
+    customer.getOrders().size();                    <span class="comment">// orders is LAZY — triggers a query PER customer</span>
+}                                                <span class="comment">// query #2..#N+1: SELECT * FROM orders WHERE customer_id = ?  (N queries)</span>
 
-<span class="comment">// 1 query to fetch 100 users + 100 separate queries to fetch each user's orders = 101 total</span></code></pre>
+<span class="comment">// 1 query to fetch 100 customers + 100 separate queries to fetch each customer's orders = 101 total</span></code></pre>
 
                 <p>The name literally describes the bug: <strong>1 query</strong> to fetch the
                     parent rows, plus <strong>N queries</strong> — one per row — to lazily fetch
@@ -350,13 +358,13 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                     users.</p>
 
                 <h3>Fix 1: JOIN FETCH — one query instead of N+1</h3>
-                <pre><code><span class="annotation">@Query</span>(<span class="string">"SELECT u FROM User u LEFT JOIN FETCH u.orders WHERE u.status = :status"</span>)
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findWithOrdersByStatus</span>(<span class="annotation">@Param</span>(<span class="string">"status"</span>) <span class="class-name">Status</span> status);
-<span class="comment">// Single query: users LEFT JOIN orders — the association is populated immediately, no follow-up queries</span></code></pre>
+                <pre><code><span class="annotation">@Query</span>(<span class="string">"SELECT u FROM Customer u LEFT JOIN FETCH u.orders WHERE u.status = :status"</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findWithOrdersByStatus</span>(<span class="annotation">@Param</span>(<span class="string">"status"</span>) <span class="class-name">Status</span> status);
+<span class="comment">// Single query: customers LEFT JOIN orders — the association is populated immediately, no follow-up queries</span></code></pre>
 
                 <h3>Fix 2: @EntityGraph — same result, without hand-writing JPQL</h3>
-                <pre><code><span class="annotation">@EntityGraph</span>(attributePaths = {<span class="string">"orders"</span>, <span class="string">"department"</span>})
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">Status</span> status);
+                <pre><code><span class="annotation">@EntityGraph</span>(attributePaths = {<span class="string">"orders"</span>, <span class="string">"loyaltyTier"</span>})
+<span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">Status</span> status);
 <span class="comment">// Works with a plain derived query method — no @Query needed. Declaratively lists
 // which lazy associations to eagerly fetch, for THIS query only.</span></code></pre>
 
@@ -435,11 +443,11 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                     run the follow-up query:</p>
 
                 <pre><code><span class="annotation">@Transactional</span>
-<span class="keyword">public</span> <span class="class-name">User</span> <span class="function">findUser</span>(<span class="class-name">Long</span> id) {
-    <span class="keyword">return</span> userRepository.findById(id).orElseThrow();  <span class="comment">// session open, method returns fine</span>
+<span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">findCustomer</span>(<span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> customerRepository.findById(id).orElseThrow();  <span class="comment">// session open, method returns fine</span>
 }
 <span class="comment">// ... later, in the controller, outside any transaction:</span>
-user.getOrders().size();  <span class="comment">// throws LazyInitializationException — session is already closed</span></code></pre>
+customer.getOrders().size();  <span class="comment">// throws LazyInitializationException — session is already closed</span></code></pre>
 
                 <div class="info-box important">
                     <div class="info-box-title">Open Session in View is Spring Boot's default — and most teams disable it</div>
@@ -469,13 +477,13 @@ user.getOrders().size();  <span class="comment">// throws LazyInitializationExce
             <section class="content-section">
                 <h2>Pagination and Sorting</h2>
 
-                <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt; {
-    <span class="class-name">Page</span>&lt;<span class="class-name">User</span>&gt;  <span class="function">findByStatus</span>(<span class="class-name">Status</span> status, <span class="class-name">Pageable</span> pageable);   <span class="comment">// includes a COUNT(*) query for total pages</span>
-    <span class="class-name">Slice</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByNameContaining</span>(<span class="class-name">String</span> name, <span class="class-name">Pageable</span> pageable);  <span class="comment">// no COUNT query — cheaper</span>
+                <pre><code><span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
+    <span class="class-name">Page</span>&lt;<span class="class-name">Customer</span>&gt;  <span class="function">findByStatus</span>(<span class="class-name">Status</span> status, <span class="class-name">Pageable</span> pageable);   <span class="comment">// includes a COUNT(*) query for total pages</span>
+    <span class="class-name">Slice</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByNameContaining</span>(<span class="class-name">String</span> name, <span class="class-name">Pageable</span> pageable);  <span class="comment">// no COUNT query — cheaper</span>
 }
 
 <span class="class-name">Pageable</span> pageable = <span class="class-name">PageRequest</span>.of(<span class="number">0</span>, <span class="number">20</span>, <span class="class-name">Sort</span>.by(<span class="string">"name"</span>).ascending());
-<span class="class-name">Page</span>&lt;<span class="class-name">User</span>&gt; result = userRepository.findByStatus(<span class="class-name">Status</span>.ACTIVE, pageable);</code></pre>
+<span class="class-name">Page</span>&lt;<span class="class-name">Customer</span>&gt; result = customerRepository.findByStatus(<span class="class-name">Status</span>.ACTIVE, pageable);</code></pre>
 
                 <div class="info-box tip">
                     <div class="info-box-title">Page vs Slice — the COUNT query is the actual difference</div>
@@ -495,23 +503,23 @@ user.getOrders().size();  <span class="comment">// throws LazyInitializationExce
             <section class="content-section">
                 <h2>Specifications — Composable Dynamic Queries</h2>
 
-                <pre><code><span class="keyword">public interface</span> <span class="class-name">UserRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">User</span>, <span class="class-name">Long</span>&gt;,
-                                       <span class="class-name">JpaSpecificationExecutor</span>&lt;<span class="class-name">User</span>&gt; {}
+                <pre><code><span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt;,
+                                       <span class="class-name">JpaSpecificationExecutor</span>&lt;<span class="class-name">Customer</span>&gt; {}
 
-<span class="keyword">public class</span> <span class="class-name">UserSpecifications</span> {
-    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">User</span>&gt; <span class="function">hasStatus</span>(<span class="class-name">Status</span> status) {
+<span class="keyword">public class</span> <span class="class-name">CustomerSpecifications</span> {
+    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">hasStatus</span>(<span class="class-name">Status</span> status) {
         <span class="keyword">return</span> (root, query, cb) -> cb.equal(root.get(<span class="string">"status"</span>), status);
     }
-    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">User</span>&gt; <span class="function">nameLike</span>(<span class="class-name">String</span> name) {
+    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">nameLike</span>(<span class="class-name">String</span> name) {
         <span class="keyword">return</span> (root, query, cb) -> cb.like(cb.lower(root.get(<span class="string">"name"</span>)), <span class="string">"%"</span> + name.toLowerCase() + <span class="string">"%"</span>);
     }
 }
 
 <span class="comment">// Compose conditionally — only the filters actually provided end up in the query</span>
-<span class="class-name">Specification</span>&lt;<span class="class-name">User</span>&gt; spec = <span class="class-name">Specification</span>.where(<span class="keyword">null</span>);
-<span class="keyword">if</span> (criteria.status() != <span class="keyword">null</span>) spec = spec.and(<span class="class-name">UserSpecifications</span>.hasStatus(criteria.status()));
-<span class="keyword">if</span> (criteria.name()   != <span class="keyword">null</span>) spec = spec.and(<span class="class-name">UserSpecifications</span>.nameLike(criteria.name()));
-<span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; results = userRepository.findAll(spec);</code></pre>
+<span class="class-name">Specification</span>&lt;<span class="class-name">Customer</span>&gt; spec = <span class="class-name">Specification</span>.where(<span class="keyword">null</span>);
+<span class="keyword">if</span> (criteria.status() != <span class="keyword">null</span>) spec = spec.and(<span class="class-name">CustomerSpecifications</span>.hasStatus(criteria.status()));
+<span class="keyword">if</span> (criteria.name()   != <span class="keyword">null</span>) spec = spec.and(<span class="class-name">CustomerSpecifications</span>.nameLike(criteria.name()));
+<span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; results = customerRepository.findAll(spec);</code></pre>
 
                 <div class="info-box note">
                     <div class="info-box-title">When to reach for Specifications instead of derived queries</div>
@@ -551,7 +559,7 @@ user.getOrders().size();  <span class="comment">// throws LazyInitializationExce
 }
 
 <span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> <span class="keyword">extends</span> <span class="class-name">Auditable</span> { <span class="comment">/* id + own fields */</span> }
+<span class="keyword">public class</span> <span class="class-name">Customer</span> <span class="keyword">extends</span> <span class="class-name">Auditable</span> { <span class="comment">/* id + own fields */</span> }
 
 <span class="comment">// Supplies the value for @CreatedBy / @LastModifiedBy</span>
 <span class="annotation">@Component</span>
@@ -572,17 +580,17 @@ user.getOrders().size();  <span class="comment">// throws LazyInitializationExce
                 <h2>Testing the Repository Layer: @DataJpaTest</h2>
 
                 <pre><code><span class="annotation">@DataJpaTest</span>  <span class="comment">// loads ONLY JPA config + repositories — no web layer, no full context</span>
-<span class="keyword">class</span> <span class="class-name">UserRepositoryTest</span> {
+<span class="keyword">class</span> <span class="class-name">CustomerRepositoryTest</span> {
 
-    <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">UserRepository</span> userRepository;
+    <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">CustomerRepository</span> customerRepository;
     <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">TestEntityManager</span> entityManager;  <span class="comment">// direct EntityManager access for test setup</span>
 
     <span class="annotation">@Test</span>
-    <span class="keyword">void</span> <span class="function">findByEmail_returnsMatchingUser</span>() {
-        entityManager.persist(<span class="keyword">new</span> <span class="class-name">User</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>));
+    <span class="keyword">void</span> <span class="function">findByEmail_returnsMatchingCustomer</span>() {
+        entityManager.persist(<span class="keyword">new</span> <span class="class-name">Customer</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>));
         entityManager.flush();
 
-        <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; found = userRepository.findByEmail(<span class="string">"ana@example.com"</span>);
+        <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; found = customerRepository.findByEmail(<span class="string">"ana@example.com"</span>);
 
         assertThat(found).isPresent();
     }

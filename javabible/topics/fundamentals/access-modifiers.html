@@ -5,7 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Access Modifiers - JavaDev Bible</title>
-    <meta name="description" content="Controlling visibility — and why getting it wrong">
+    <meta name="description" content="public, protected, package-private and private in Java — how visibility protects invariants, and what exposing too much costs you once others depend on it.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/fundamentals/access-modifiers.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Access Modifiers — JavaDev Bible">
+    <meta property="og:description" content="public, protected, package-private and private in Java — how visibility protects invariants, and what exposing too much costs you once others depend on it.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/fundamentals/access-modifiers.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -61,16 +69,16 @@
                     guarantee that an object is always in a valid state.</p>
 
                 <pre><code><span class="comment">// Without access control: anyone can corrupt state</span>
-            <span class="keyword">public class</span> <span class="class-name">User</span> {
+            <span class="keyword">public class</span> <span class="class-name">Customer</span> {
                 <span class="keyword">public</span> <span class="class-name">String</span> password;  <span class="comment">// anyone can read or overwrite this</span>
                 <span class="keyword">public int</span>    age;       <span class="comment">// anyone can set age = -999</span>
             }
             
-            user.password = <span class="string">"plaintext"</span>;  <span class="comment">// no hashing, no validation, no control</span>
-            user.age = -<span class="number">999</span>;             <span class="comment">// completely invalid, silently accepted</span>
+            customer.password = <span class="string">"plaintext"</span>;  <span class="comment">// no hashing, no validation, no control</span>
+            customer.age = -<span class="number">999</span>;             <span class="comment">// completely invalid, silently accepted</span>
             
             <span class="comment">// With access control: the class enforces its own rules</span>
-            <span class="keyword">public class</span> <span class="class-name">User</span> {
+            <span class="keyword">public class</span> <span class="class-name">Customer</span> {
                 <span class="keyword">private</span> <span class="class-name">String</span> passwordHash;  <span class="comment">// internal detail, hidden</span>
                 <span class="keyword">private int</span>    age;
             
@@ -193,29 +201,29 @@
                 <h3>package-private (no modifier) — internal implementation</h3>
                 <p>No keyword needed — just omit the modifier. Useful for implementation classes that
                     belong to a module but shouldn't be part of its public API.</p>
-                <pre><code><span class="comment">// com/app/internal/UserRepository.java</span>
+                <pre><code><span class="comment">// com/app/internal/CustomerRepository.java</span>
 <span class="keyword">package</span> com.app.internal;
 
-<span class="keyword">class</span> <span class="class-name">UserRepository</span> {          <span class="comment">// ← no modifier = package-private</span>
-    <span class="class-name">User</span> <span class="function">findById</span>(<span class="keyword">long</span> id) { ... }
-    <span class="keyword">void</span> <span class="function">save</span>(<span class="class-name">User</span> user) { ... }
+<span class="keyword">class</span> <span class="class-name">CustomerRepository</span> {          <span class="comment">// ← no modifier = package-private</span>
+    <span class="class-name">Customer</span> <span class="function">findById</span>(<span class="keyword">long</span> id) { ... }
+    <span class="keyword">void</span> <span class="function">save</span>(<span class="class-name">Customer</span> customer) { ... }
 }
 
-<span class="comment">// com/app/service/UserService.java — DIFFERENT package</span>
-<span class="keyword">import</span> com.app.internal.UserRepository;  <span class="comment">// ❌ ERROR: not visible</span></code></pre>
+<span class="comment">// com/app/service/CustomerService.java — DIFFERENT package</span>
+<span class="keyword">import</span> com.app.internal.CustomerRepository;  <span class="comment">// ❌ ERROR: not visible</span></code></pre>
 
                 <div class="info-box tip">
                     <div class="info-box-title">Package structure as an API boundary</div>
                     <pre><code><span class="comment">/*
  *  com.mylib
  *  ├── api/           ← public classes only — this IS your API
- *  │   ├── UserService.java   (public)
- *  │   └── User.java          (public)
+ *  │   ├── CustomerService.java   (public)
+ *  │   └── Customer.java          (public)
  *  └── internal/      ← package-private classes — implementation detail
- *      ├── UserRepository.java   (package-private)
+ *      ├── CustomerRepository.java   (package-private)
  *      └── CacheManager.java     (package-private)
  *
- *  Library users can only see api/. You can refactor internal/ freely.
+ *  Library customers can only see api/. You can refactor internal/ freely.
  */</span></code></pre>
                 </div>
 
@@ -245,25 +253,25 @@
 }</code></pre>
 
                 <h3>public — your API contract</h3>
-                <pre><code><span class="keyword">public class</span> <span class="class-name">UserService</span> {
+                <pre><code><span class="keyword">public class</span> <span class="class-name">CustomerService</span> {
     <span class="keyword">public static final int</span> MAX_USERNAME_LENGTH = <span class="number">50</span>;  <span class="comment">// OK: constant</span>
 
-    <span class="keyword">public</span> <span class="class-name">User</span>    <span class="function">createUser</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) { ... }
-    <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">User</span>&gt; <span class="function">findByUsername</span>(<span class="class-name">String</span> username) { ... }
-    <span class="keyword">public void</span>     <span class="function">deleteUser</span>(<span class="keyword">long</span> id) { ... }
+    <span class="keyword">public</span> <span class="class-name">Customer</span>    <span class="function">createCustomer</span>(<span class="class-name">String</span> username, <span class="class-name">String</span> email) { ... }
+    <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByUsername</span>(<span class="class-name">String</span> username) { ... }
+    <span class="keyword">public void</span>     <span class="function">deleteCustomer</span>(<span class="keyword">long</span> id) { ... }
 
-    <span class="comment">// These are private — users of UserService don't need to know about them</span>
+    <span class="comment">// These are private — customers of CustomerService don't need to know about them</span>
     <span class="keyword">private void</span>    <span class="function">validateInput</span>(<span class="class-name">String</span> input) { ... }
-    <span class="keyword">private void</span>    <span class="function">saveToDatabase</span>(<span class="class-name">User</span> user) { ... }
+    <span class="keyword">private void</span>    <span class="function">saveToDatabase</span>(<span class="class-name">Customer</span> customer) { ... }
 }</code></pre>
 
                 <div class="info-box warning">
                     <div class="info-box-title">Public mutable fields — almost always wrong</div>
                     <pre><code><span class="comment">// ❌ Anyone can set password to anything — no validation possible</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> { <span class="keyword">public</span> <span class="class-name">String</span> password; }
+<span class="keyword">public class</span> <span class="class-name">Customer</span> { <span class="keyword">public</span> <span class="class-name">String</span> password; }
 
 <span class="comment">// ✅ Controlled: validation lives in one place, changeable without breaking API</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> {
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
     <span class="keyword">private</span> <span class="class-name">String</span> passwordHash;
 
     <span class="keyword">public void</span> <span class="function">setPassword</span>(<span class="class-name">String</span> raw) {
@@ -400,8 +408,8 @@ team.getPlayers().clear();  <span class="comment">// 💥 wipes the team's roste
 <span class="comment">// Another module:</span>
 <span class="keyword">module</span> com.myapp {
     <span class="keyword">requires</span> com.mylib;
-    <span class="comment">// Can use com.mylib.api.UserService (public + exported)</span>
-    <span class="comment">// Cannot use com.mylib.internal.UserRepository (not exported)</span>
+    <span class="comment">// Can use com.mylib.api.CustomerService (public + exported)</span>
+    <span class="comment">// Cannot use com.mylib.internal.CustomerRepository (not exported)</span>
 }</code></pre>
 
                 <div class="info-box note">
@@ -471,7 +479,7 @@ team.getPlayers().clear();  <span class="comment">// 💥 wipes the team's roste
                     <p><strong>Q: When would you use package-private instead of private?</strong><br>
                         When you need access from test classes in the same package, or when related classes
                         in a package need to collaborate on internals without exposing that to the world.
-                        Example: a <code>UserRepository</code> used only by <code>UserService</code> in
+                        Example: a <code>CustomerRepository</code> used only by <code>CustomerService</code> in
                         the same package. Making it package-private keeps it invisible to the rest of the
                         application while avoiding the overhead of a formal API.</p>
                 </div>

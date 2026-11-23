@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spring Security - JavaDev Bible</title>
     <meta name="description" content="The filter chain architecture behind authentication and authorization — and where session-based and stateless (JWT) configuration genuinely diverge">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/spring/security.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Spring Security — JavaDev Bible">
+    <meta property="og:description" content="The filter chain architecture behind authentication and authorization — and where session-based and stateless (JWT) configuration genuinely diverge">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/spring/security.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -226,25 +234,25 @@
                 <pre><code><span class="annotation">@Service</span>
 <span class="keyword">public class</span> <span class="class-name">CustomUserDetailsService</span> <span class="keyword">implements</span> <span class="class-name">UserDetailsService</span> {
 
-    <span class="keyword">private final</span> <span class="class-name">UserRepository</span> userRepository;
+    <span class="keyword">private final</span> <span class="class-name">CustomerRepository</span> customerRepository;
 
-    <span class="keyword">public</span> <span class="function">CustomUserDetailsService</span>(<span class="class-name">UserRepository</span> userRepository) {
-        <span class="keyword">this</span>.userRepository = userRepository;
+    <span class="keyword">public</span> <span class="function">CustomUserDetailsService</span>(<span class="class-name">CustomerRepository</span> customerRepository) {
+        <span class="keyword">this</span>.customerRepository = customerRepository;
     }
 
     <span class="annotation">@Override</span>
     <span class="keyword">public</span> <span class="class-name">UserDetails</span> <span class="function">loadUserByUsername</span>(<span class="class-name">String</span> username) {
-        <span class="class-name">AppUser</span> appUser = userRepository.findByUsername(username)
+        <span class="class-name">Customer</span> customer = customerRepository.findByEmail(username)  <span class="comment">// customers sign in with their e-mail address</span>
             .orElseThrow(() -> <span class="keyword">new</span> <span class="class-name">UsernameNotFoundException</span>(<span class="string">"User not found: "</span> + username));
 
         <span class="comment">// stored password is ALREADY a BCrypt hash — never re-encode it here</span>
         <span class="keyword">return</span> org.springframework.security.core.userdetails.<span class="class-name">User</span>.builder()
-            .username(appUser.getUsername())
-            .password(appUser.getPassword())
-            .authorities(appUser.getRoles().stream()
+            .username(customer.getEmail())
+            .password(customer.getPassword())
+            .authorities(customer.getRoles().stream()
                 .map(r -> <span class="keyword">new</span> <span class="class-name">SimpleGrantedAuthority</span>(<span class="string">"ROLE_"</span> + r.getName()))
                 .toList())
-            .disabled(!appUser.isEnabled())
+            .disabled(!customer.isEnabled())
             .build();
     }
 }</code></pre>
@@ -384,7 +392,7 @@
 <span class="keyword">public class</span> <span class="class-name">MethodSecurityConfig</span> {}
 
 <span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">UserService</span> {
+<span class="keyword">public class</span> <span class="class-name">CustomerService</span> {
 
     <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)                              <span class="comment">// checked BEFORE the method body runs</span>
     <span class="keyword">public void</span> <span class="function">deleteUser</span>(<span class="class-name">Long</span> id) { }
@@ -487,7 +495,7 @@
             <section class="content-section">
                 <h2>Testing Secured Endpoints</h2>
 
-                <pre><code><span class="annotation">@WebMvcTest</span>(<span class="class-name">UserController</span>.<span class="keyword">class</span>)
+                <pre><code><span class="annotation">@WebMvcTest</span>(<span class="class-name">CustomerController</span>.<span class="keyword">class</span>)
 <span class="keyword">class</span> <span class="class-name">UserControllerSecurityTest</span> {
 
     <span class="annotation">@Autowired</span> <span class="keyword">private</span> <span class="class-name">MockMvc</span> mockMvc;

@@ -2,13 +2,17 @@
 
 Context for Claude Code and any other Claude instance working in this repo. Read this before editing anything.
 
+**Last reviewed against the repository: 2026-11-23.** If that date is more than a few months old, treat every claim below as a hypothesis and check it against the code before relying on it.
+
+A machine-readable architecture map lives in `docs/architecture.json` (human version: `docs/architecture.html`). It is a snapshot; this file and the code win when they disagree.
+
 ## Project identity
 
 - **Name:** JavaDevBible
 - **Live:** https://karlete.github.io/javadevbible/javabible/index.html
 - **Repo:** https://github.com/karlete/javadevbible
 - **What it is:** A static HTML reference covering Java from fundamentals through the wider ecosystem, written for junior and senior developers on the same page.
-- **Deploy:** GitHub Pages, branch `main`, folder `/javabible/`.
+- **Deploy:** GitHub Pages serves the **repository root** of branch `main`. The site itself lives in `/javabible/`; the root `index.html` only redirects there, and the root `404.html` is what Pages shows for any missing URL. Because the whole repo root is public, anything committed anywhere (including `docs/`) is published.
 - **Scale:** 94 topic pages across 13 categories.
 
 ## Stack — non-negotiable
@@ -22,15 +26,17 @@ Context for Claude Code and any other Claude instance working in this repo. Read
 
 The stack is HTML5 + CSS3 + Vanilla JavaScript + JSON, and it stays that way.
 
+The one exception is `mcp/`, a separate Maven module (Spring Boot 4 + Spring AI) that exposes the site's content to AI assistants over MCP/STDIO. It is never deployed, the site never depends on it, and nothing in `javabible/` may import or reference it.
+
 ## Verify before you claim anything is done
 
 ```bash
 bash tools/verify.sh
 ```
 
-The checks it runs are listed in the header comment of tools/verify.sh. It exits non-zero on failure and runs in CI on every push.
+The checks it runs are listed in the header comment of `tools/verify.sh` — that header is the source of truth, not this file. It exits non-zero on failure and runs in CI on every push and pull request.
 
-**Run it after any change that touches a filename, a link, the search index, or `js/`.** It exists because a restructure once left 22 broken links, 16 index entries pointing at deleted files, and 11 pages that no search could reach — none of which anything caught. It is the closest thing this project has to a compiler.
+**Run it after any change that touches a filename, a link, the search index, a code block, a `<head>`, or `js/`.** It exists because a restructure once left 22 broken links, 16 index entries pointing at deleted files, and 11 pages that no search could reach — none of which anything caught. It is the closest thing this project has to a compiler.
 
 It does **not** verify behaviour. A page can pass every check and still be visually broken. Anything touching CSS or JS needs a browser:
 
@@ -38,40 +44,55 @@ It does **not** verify behaviour. A page can pass every check and still be visua
 cd javabible && python -m http.server 8000
 ```
 
+Search does not work from `file://` (the index is fetched), so always test through the server. Check 320px, 900px/901px (the TOC breakpoint) and desktop.
+
+If you changed `mcp/` **or the search index / search algorithm**, also run `cd mcp && ./mvnw -q test`. `JavaBibleToolsTest` holds the ranking regressions (multi-word, plural, one-character words, sort order) against the real index. CI does not build `mcp/`.
+
 ## Repository structure
 
 ```
+/index.html                        redirect to javabible/index.html (Pages serves the repo root)
+/404.html                          Pages' not-found page; root-relative links only
 /javabible/
 ├── index.html                     category navigation + instant search
 ├── topics/{category}/{topic}.html 94 topic pages
 ├── css/                           main.css, syntax-highlighting.css, toc.css
 ├── js/                            search.js, navigation.js, toc.js, hero-effects.js
-└── data/search-index.json         must always match topics/ on disk — verify.sh checks this
+├── data/search-index.json         must always match topics/ on disk — verify.sh checks this
+├── favicon.svg, img/              icon and hero logo (also used as og:image)
+├── sitemap.xml                    one <url> per page; verify.sh fails if it drifts from disk
+│                                  (no robots.txt: crawlers only read it at the domain root,
+│                                  karlete.github.io/robots.txt, which is a different repo)
+└── features/                      gitignored personal notes; not part of the site
 
 /tools/verify.sh                   integrity checker
-/.github/workflows/verify.yml      runs it on every push
-/README.md
-/CLAUDE.md
-/LICENSE
+/.github/workflows/verify.yml      runs it on every push and PR
+/mcp/                              optional MCP server (see "MCP server" below)
+/docs/                             architecture map (architecture.html / architecture.json)
+/README.md  /CLAUDE.md  /LICENSE
+/.editorconfig  /.gitattributes    UTF-8, LF, 4-space indent — enforced in the working tree
+/.vscode/settings.json             format-on-save disabled on purpose: small edits must give small diffs
 ```
 
-### Categories and their folder names
+### Categories and their three names
 
-| Category | Folder | Index anchor |
-|---|---|---|
-| Java Fundamentals | `fundamentals` | `#fundamentals` |
-| Advanced Java | `advanced` | `#advanced` |
-| Build Tools | `build-tools` | `#build-tools` |
-| Spring Framework | `spring` | `#spring` |
-| Jakarta EE | `jakarta-ee` | `#jakarta-ee` |
-| Web Concepts | `web-concepts` | `#web-concepts` |
-| Databases & Persistence | `databases` | `#databases` |
-| Security & Authentication | `security` | `#security` |
-| Application Servers & Deployment | `servers` | `#servers` |
-| Java Versions & Compatibility | `java-versions` | `#versions` |
-| Tools & Ecosystem | `tools` | `#tools` |
-| Best Practices | `best-practices` | `#bestpractices` |
-| AI & Java | `ai` | `#ai` |
+Every category has a folder name, an anchor on `index.html`, and a label used in `search-index.json`. They differ. When adding an index entry, copy the label from a sibling entry; do not invent one from the table header.
+
+| Category | Folder | Index anchor | `search-index.json` label |
+|---|---|---|---|
+| Java Fundamentals | `fundamentals` | `#fundamentals` | `Java Fundamentals` |
+| Advanced Java | `advanced` | `#advanced` | `Advanced Java Concepts` |
+| Build Tools | `build-tools` | `#build-tools` | `Build Tools & Project Management` |
+| Spring Framework | `spring` | `#spring` | `Spring Framework` |
+| Jakarta EE | `jakarta-ee` | `#jakarta-ee` | `Jakarta EE & Enterprise Java` |
+| Web Concepts | `web-concepts` | `#web-concepts` | `Web Concepts & Architecture` |
+| Databases & Persistence | `databases` | `#databases` | `Databases & Persistence` |
+| Security & Authentication | `security` | `#security` | `Security & Authentication` |
+| Application Servers & Deployment | `servers` | `#servers` | `Application Servers & Deployment` |
+| Java Versions & Compatibility | `java-versions` | `#versions` | `Java Versions & Compatibility` |
+| Tools & Ecosystem | `tools` | `#tools` | `Tools & Ecosystem` |
+| Best Practices | `best-practices` | `#bestpractices` | `Best Practices` |
+| AI & Java | `ai` | `#ai` | `AI & Java` |
 
 ## Non-negotiable template conventions
 
@@ -96,32 +117,52 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
 - **Analogies** (restaurant, apartment building, moving boxes). If you catch yourself reframing a request into an analogy, that is the signal to write the literal technical explanation instead.
 - **Emojis in body prose.** Header icons (`🎓` `🔥` `✅` `❌`) and `related-icon` spans are expected and fine.
 - **A section titled "Summary."**
-- **ASCII-art box diagrams with side-by-side columns** (`┌──┐` style) — they break at 320px. A *vertical* ASCII tree (a directory listing) is fine; it only needs horizontal scroll, not layout integrity. Multi-column diagrams become an HTML `<table>`.
-- **Toy domain models.** No `User` with `name`/`age`/`email`. No generic `Employee`/`Department`. All business-domain examples use the site's e-commerce domain: `Customer`, `Product`, `Order`, `OrderItem`, `Invoice`, `ShippingAddress`, `order_items`. (Exception: a pure language mechanic like polymorphism may use `Animal`/`Dog` — that is not a business-domain model.)
+- **ASCII-art box diagrams with side-by-side columns** (`┌──┐ ┌──┐` style) — they break at 320px. A *vertical* ASCII diagram or a directory tree is fine; it only needs horizontal scroll, not layout integrity. Multi-column diagrams become an HTML `<table>`. `verify.sh` flags two box corners on one line.
+- **Toy domain models.** No `User` with `name`/`age`/`email`, no `UserService`/`UserController`/`UserRepository`. No generic `Employee`/`Department`. All business-domain examples use the site's e-commerce domain: `Customer`, `Product`, `Order`, `OrderItem`, `Invoice`, `ShippingAddress`, `order_items`. (Exceptions: a pure language mechanic like polymorphism may use `Animal`/`Dog`; security pages may talk about the authenticated *user* as a concept — Spring Security's own `UserDetails` type is not a toy model.)
 - **A UTF-8 BOM** at the start of the file. Windows editors add it silently. `verify.sh` catches it.
-- **Inline `style="..."`** on content elements. If a new visual treatment is genuinely needed, propose a named class for `main.css` instead.
+- **Inline `style="..."`** on content elements. If a new visual treatment is genuinely needed, add a named class to `main.css`. `verify.sh` catches it in topic pages.
 - **`console.log`** in anything under `js/`.
+- **A CSS class that no stylesheet defines.** It does nothing and misleads the next reader (see `comparison-table` below). `verify.sh` catches it.
 
 ### Required HTML conventions
 
 - `<html lang="en">`
+- `<head>`, in this order: charset, viewport, `<title>{Title} - JavaDev Bible</title>`, `<meta name="description">` (120–160 characters is the target; Google truncates beyond ~160), `<link rel="canonical">`, Open Graph tags (`og:type`, `og:site_name`, `og:title`, `og:description`, `og:url`, `og:image`), favicon, stylesheets. Canonical and `og:url` are absolute URLs under `https://karlete.github.io/javadevbible/javabible/`. `verify.sh` checks description and canonical.
 - Stylesheets: `main.css`, `syntax-highlighting.css`, `toc.css`.
 - Scripts at the end of `<body>`: `navigation.js`, `toc.js` on topic pages. `index.html` additionally loads `search.js` and `hero-effects.js`.
 - TOC sidebar (`<aside class="toc-sidebar" id="toc-sidebar">`) — copy the exact markup from a reference page below. Do not hand-roll it.
-- Tables need **no class**. `main.css` styles `<table>` globally. (A `comparison-table` class was previously mandated here; it was never defined in any stylesheet and did nothing. It has been removed from this document — do not reintroduce it.)
+- Tables need **no class**. `main.css` styles `<table>` globally. Use `<tr class="row-highlight">` to emphasise a row.
+- **Code blocks are hand-highlighted HTML.** There is no highlighter library. Inside `<pre><code>`, every literal `<`, `>` and `&` must be written `&lt;`, `&gt;`, `&amp;` — an unescaped `<pid>` or `List<Order>` is parsed as a tag and silently disappears from the page. Token classes are `keyword`, `class-name`, `annotation`, `comment`, `string`, `function`, `number`, `attribute`; every `<span>` must be closed on the line it means to end. `verify.sh` catches tags inside `<pre>` that are not `span`/`mark`/`b`/`strong`/`em`/`code`.
+
+### Required JavaScript conventions (`javabible/js/`)
+
+- One IIFE per file with `'use strict'`; exit early if the DOM hooks the script needs are absent (every page loads `navigation.js`).
+- Never build DOM from data with `innerHTML`. Use `createElement` + `textContent`.
+- No inline styles written from JS for presentation; toggle a class or a `data-` attribute and style it in CSS.
+- Decoration must respect `prefers-reduced-motion` and must stop when off-screen.
+- `search.js` owns `#searchResults` and its `data-open` state. Nothing else touches it.
+- The search algorithm (tokenising, weights, bonuses) is duplicated in `mcp/.../JavaBibleTools.java`. Change both or neither.
 
 ### Required Java/Spring conventions in every code sample
 
 - Spring Boot 4.x / Java 17–25 baseline. Java 25 is the current LTS (September 2025); Java 25 recommended for all new projects.
-- `jakarta.*`, never `javax.*` — unless the code is explicitly illustrating pre-Jakarta-EE-9 legacy behaviour.
-- **Constructor injection always.** Never `@Autowired` field injection. Never `@Autowired` on a single constructor (unnecessary since Spring 4.3).
+- `jakarta.*`, never `javax.*` — unless the code is explicitly illustrating pre-Jakarta-EE-9 legacy behaviour. (`javax.sql` and `javax.annotation.processing` are Java SE packages and were never renamed; they are correct.)
+- **Constructor injection always** in application code. Never `@Autowired` field injection. Never `@Autowired` on a single constructor (unnecessary since Spring 4.3). **Exception:** fields in test classes (`@SpringBootTest`, `@WebMvcTest`, `@DataJpaTest`) may use `@Autowired` — the Spring TestContext framework does not inject test constructors without either `@Autowired` or extra configuration, and field injection is the documented idiom there.
 - `record` for all DTOs.
 - `ProblemDetail` (RFC 9457) for all error responses. Never a hand-rolled `ApiError` / `ErrorResponse`.
 - `LAZY` fetch on every JPA association. `@ManyToOne` and `@OneToOne` default to EAGER — override them explicitly. Cross-reference `topics/databases/relationships.html` when EAGER looks tempting.
-- `@MockitoBean`, not `@MockBean` (renamed in Spring Boot 3.4+).
-- `AutoConfiguration.imports`, not `spring.factories`.
+- `@MockitoBean`, not `@MockBean` (introduced in Spring Boot 3.4; `@MockBean` is removed in Boot 4).
+- `AutoConfiguration.imports`, not `spring.factories`. Registering auto-configurations under the `EnableAutoConfiguration` key of `spring.factories` stopped working in **Spring Boot 3.0** — it is not "still supported for compatibility". Other `spring.factories` keys still work.
 - No Lombok `@Data` on JPA entities.
+- Spring Session: no `spring.session.store-type` (removed in Boot 3.0 — the store is detected from the classpath); Redis options live under `spring.session.data.redis.*`, not `spring.session.redis.*`.
 - Every code comment must teach something. A comment that restates the line above it is noise.
+
+## MCP server (`mcp/`)
+
+- Spring Boot 4.0 + Spring AI 2.0, Java 17, STDIO transport, `web-application-type=none`. Stdout is the protocol channel: never print to it. Logs go to `javadevbible-mcp.log`.
+- Tools: `search_topics`, `get_topic_content`, `list_categories`. All read `javabible/` from disk (`JAVABIBLE_ROOT` env var, else `../javabible`, else `./javabible`).
+- `search_topics` must rank exactly like `search.js`: every word must match (AND), plurals also match their singular, one-character words are dropped when longer ones exist, ties sort by title. When one changes, the other changes in the same commit, and `JavaBibleToolsTest` gets a case for it.
+- `mcp/README.md` is included in `verify.sh`'s count check, so its "N topic pages" must be exact.
 
 ## Workflow
 
@@ -136,11 +177,25 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
    - **Plan de implementación** — concrete steps, which files are touched
    - **Auto-revisión crítica** — an honest, specific list of the response's own limitations, unverified claims, and deliberate scope choices. Not boilerplate. Each point must be useful to whoever reviews the work.
 
+   The person writes in Spanish; the site content is English. Reply in Spanish, write pages in English.
+
 4. **Verify currency for anything version-, date- or release-specific.** Java moves fast. LTS status, JEP numbers, deprecation timelines and library defaults should be checked against current sources rather than recalled from training data — particularly anything that could have changed in the last 12–18 months.
 
 5. **Flag cross-file consequences proactively.** If a fix, a renamed link, or a corrected fact implies another completed page needs the same change, say so explicitly. And say so when you *cannot* check, because the related file was not provided.
 
 6. **Run `bash tools/verify.sh` before declaring anything done.**
+
+7. **Do not commit scratch or audit files.** Check `git status` before committing; commit or push only when asked.
+
+## Adding a topic page — the full checklist
+
+1. Copy `topics/databases/relationships.html`; keep `<head>` structure, header, TOC aside, footer and scripts; rewrite title, description, canonical/OG, breadcrumb, h1, subtitle and content.
+2. Add an entry to `data/search-index.json` (label from the table above, real keywords — search quality depends on them).
+3. Add an `<li>` to the matching category card in `javabible/index.html`.
+4. Link it from the Related Topics of at least one sibling.
+5. Add its URL to `javabible/sitemap.xml`.
+6. Update every stated topic count: `javabible/index.html` (meta description, hero stats, aria-label), `README.md`, `CLAUDE.md`, `mcp/README.md`.
+7. `bash tools/verify.sh`, then check it in a browser.
 
 ## Reference files
 
@@ -157,6 +212,6 @@ Anything less is a draft, not a deliverable.
 
 Every convention here is a claim about the repository. Claims rot.
 
-The `comparison-table` rule sat in this document for months, was applied to 78 tables, and did nothing — the class was never defined in any stylesheet. An `i18n` section mandated `data-i18n` attributes on every text node in 90 files; the i18n system was deleted. A `PROJECT_STATUS.md` declared 95 pages complete when 90 existed.
+The `comparison-table` rule sat in this document for months, was applied to 78 tables, and did nothing — the class was never defined in any stylesheet. An `i18n` section mandated `data-i18n` attributes on every text node in 90 files; the i18n system was deleted. A `PROJECT_STATUS.md` declared 95 pages complete when 90 existed. This file once said the site deployed from "folder `/javabible/`" (Pages actually serves the repo root), omitted `mcp/` entirely, and told agents `spring.factories` was a valid fallback two major versions after it was removed.
 
-**A convention nothing verifies will eventually be a lie.** If you add a rule here, ask whether `verify.sh` can enforce it. If it can, add the check. If it cannot, expect this document to drift from reality and treat every unverified claim in it with suspicion — starting with the ones above.
+**A convention nothing verifies will eventually be a lie.** If you add a rule here, ask whether `verify.sh` can enforce it. If it can, add the check. If it cannot, expect this document to drift from reality and treat every unverified claim in it with suspicion — starting with the ones above. Update the "Last reviewed" date at the top whenever you re-check it.

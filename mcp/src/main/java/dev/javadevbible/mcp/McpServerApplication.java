@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * JavaDevBible MCP Server.
  *
- * <p>Exposes the content of JavaDevBible (90+ topic pages across 13 categories)
+ * <p>Exposes the content of JavaDevBible (94 topic pages across 13 categories)
  * to any MCP-compatible AI assistant via the STDIO transport.
  *
  * <p>Run via Claude Desktop or Claude Code — the host launches this JAR

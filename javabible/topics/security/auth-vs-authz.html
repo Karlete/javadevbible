@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Authentication vs Authorization - JavaDev Bible</title>
-    <meta name="description" content="Two different questions the security layer must answer — who is this, and what are they allowed to do — and why conflating them is the source of most access-control bugs">
+    <meta name="description" content="Authentication asks who you are; authorisation asks what you may do. Why conflating the two questions causes most access-control bugs in Java apps.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/security/auth-vs-authz.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Authentication vs Authorization — JavaDev Bible">
+    <meta property="og:description" content="Authentication asks who you are; authorisation asks what you may do. Why conflating the two questions causes most access-control bugs in Java apps.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/security/auth-vs-authz.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/javadevlogo.jpg">
+    <meta name="twitter:card" content="summary">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="../../css/main.css">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css">
@@ -69,12 +77,12 @@
     <span class="class-name">String</span> username = req.<span class="function">getParameter</span>(<span class="string">"username"</span>);
     <span class="class-name">String</span> password = req.<span class="function">getParameter</span>(<span class="string">"password"</span>);
 
-    <span class="class-name">User</span> user = userDao.<span class="function">findByUsername</span>(username);
-    <span class="keyword">if</span> (user == <span class="keyword">null</span> || !user.<span class="function">getPassword</span>().<span class="function">equals</span>(password)) {
+    <span class="class-name">Customer</span> customer = customerDao.<span class="function">findByUsername</span>(username);
+    <span class="keyword">if</span> (customer == <span class="keyword">null</span> || !customer.<span class="function">getPassword</span>().<span class="function">equals</span>(password)) {
         resp.<span class="function">setStatus</span>(<span class="number">401</span>);   <span class="comment">// hand-rolled, plaintext comparison, no timing-attack protection</span>
         <span class="keyword">return</span>;
     }
-    <span class="keyword">if</span> (!user.<span class="function">getRole</span>().<span class="function">equals</span>(<span class="string">"ADMIN"</span>)) {
+    <span class="keyword">if</span> (!customer.<span class="function">getRole</span>().<span class="function">equals</span>(<span class="string">"ADMIN"</span>)) {
         resp.<span class="function">setStatus</span>(<span class="number">403</span>);   <span class="comment">// bolted onto the same method as identity verification</span>
         <span class="keyword">return</span>;
     }
@@ -83,9 +91,9 @@
 
 <span class="comment">// AFTER — authentication is a filter-chain concern; authorization is declarative</span>
 <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)
-<span class="annotation">@DeleteMapping</span>(<span class="string">"/api/admin/users/{id}"</span>)
-<span class="keyword">public void</span> <span class="function">deleteUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-    userService.<span class="function">delete</span>(id);
+<span class="annotation">@DeleteMapping</span>(<span class="string">"/api/admin/customers/{id}"</span>)
+<span class="keyword">public void</span> <span class="function">deleteCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+    customerService.<span class="function">delete</span>(id);
     <span class="comment">// By the time this line runs, Spring Security's filter chain has already
     // verified identity, and @PreAuthorize has already verified permission.
     // Neither concern is application code's responsibility here.</span>
@@ -168,27 +176,27 @@
     }
 }
 
-<span class="comment">// Custom UserDetailsService — the bridge between your User entity and Spring Security</span>
+<span class="comment">// Custom UserDetailsService — the bridge between your Customer entity and Spring Security</span>
 <span class="annotation">@Service</span>
 <span class="keyword">public class</span> <span class="class-name">CustomUserDetailsService</span> <span class="keyword">implements</span> <span class="class-name">UserDetailsService</span> {
 
-    <span class="keyword">private final</span> <span class="class-name">UserRepository</span> userRepository;
+    <span class="keyword">private final</span> <span class="class-name">CustomerRepository</span> customerRepository;
 
-    <span class="keyword">public</span> <span class="function">CustomUserDetailsService</span>(<span class="class-name">UserRepository</span> userRepository) {
-        <span class="keyword">this</span>.userRepository = userRepository;
+    <span class="keyword">public</span> <span class="function">CustomUserDetailsService</span>(<span class="class-name">CustomerRepository</span> customerRepository) {
+        <span class="keyword">this</span>.customerRepository = customerRepository;
     }
 
     <span class="annotation">@Override</span>
     <span class="keyword">public</span> <span class="class-name">UserDetails</span> <span class="function">loadUserByUsername</span>(<span class="class-name">String</span> username) {
-        <span class="class-name">User</span> user = userRepository.<span class="function">findByUsername</span>(username)
-            .<span class="function">orElseThrow</span>(() -> <span class="keyword">new</span> <span class="class-name">UsernameNotFoundException</span>(<span class="string">"User not found: "</span> + username));
+        <span class="class-name">Customer</span> customer = customerRepository.<span class="function">findByUsername</span>(username)
+            .<span class="function">orElseThrow</span>(() -> <span class="keyword">new</span> <span class="class-name">UsernameNotFoundException</span>(<span class="string">"Customer not found: "</span> + username));
 
         <span class="keyword">return new</span> <span class="class-name">org.springframework.security.core.userdetails.User</span>(
-            user.<span class="function">getUsername</span>(),
-            user.<span class="function">getPassword</span>(),        <span class="comment">// already hashed — never store or compare raw</span>
-            user.<span class="function">isEnabled</span>(),
+            customer.<span class="function">getUsername</span>(),
+            customer.<span class="function">getPassword</span>(),        <span class="comment">// already hashed — never store or compare raw</span>
+            customer.<span class="function">isEnabled</span>(),
             <span class="keyword">true</span>, <span class="keyword">true</span>, <span class="keyword">true</span>,      <span class="comment">// accountNonExpired, credentialsNonExpired, accountNonLocked</span>
-            <span class="function">toAuthorities</span>(user.<span class="function">getRoles</span>())
+            <span class="function">toAuthorities</span>(customer.<span class="function">getRoles</span>())
         );
     }
 }</code></pre>
@@ -199,12 +207,12 @@
 
     <span class="keyword">private final</span> <span class="class-name">GoogleAuthenticator</span> gAuth = <span class="keyword">new</span> <span class="class-name">GoogleAuthenticator</span>();
 
-    <span class="comment">// Generate a per-user secret, shown to the user as a QR code once</span>
+    <span class="comment">// Generate a per-customer secret, shown to the customer as a QR code once</span>
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">generateSecret</span>() {
         <span class="keyword">return</span> gAuth.<span class="function">createCredentials</span>().<span class="function">getKey</span>();   <span class="comment">// store encrypted, never in plaintext logs</span>
     }
 
-    <span class="comment">// Verify the 6-digit code from the user's authenticator app</span>
+    <span class="comment">// Verify the 6-digit code from the customer's authenticator app</span>
     <span class="keyword">public boolean</span> <span class="function">verifyCode</span>(<span class="class-name">String</span> secret, <span class="keyword">int</span> code) {
         <span class="keyword">return</span> gAuth.<span class="function">authorize</span>(secret, code);
     }
@@ -217,13 +225,13 @@
         <span class="keyword">new</span> <span class="class-name">UsernamePasswordAuthenticationToken</span>(request.username(), request.password())
     );
 
-    <span class="class-name">User</span> user = userService.<span class="function">findByUsername</span>(request.username());
+    <span class="class-name">Customer</span> customer = customerService.<span class="function">findByUsername</span>(request.username());
 
-    <span class="keyword">if</span> (user.<span class="function">isTwoFactorEnabled</span>()) {
+    <span class="keyword">if</span> (customer.<span class="function">isTwoFactorEnabled</span>()) {
         <span class="keyword">if</span> (request.totpCode() == <span class="keyword">null</span>) {
             <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(<span class="keyword">new</span> <span class="class-name">TwoFactorRequiredResponse</span>());
         }
-        <span class="keyword">if</span> (!twoFactorService.<span class="function">verifyCode</span>(user.<span class="function">getTotpSecret</span>(), request.totpCode())) {
+        <span class="keyword">if</span> (!twoFactorService.<span class="function">verifyCode</span>(customer.<span class="function">getTotpSecret</span>(), request.totpCode())) {
             <span class="keyword">throw new</span> <span class="class-name">BadCredentialsException</span>(<span class="string">"Invalid 2FA code"</span>);
         }
     }
@@ -238,7 +246,7 @@
 <span class="annotation">@PostMapping</span>(<span class="string">"/biometric-auth"</span>)
 <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">AuthResponse</span>&gt; <span class="function">biometricAuth</span>(<span class="annotation">@RequestBody</span> <span class="class-name">BiometricAuthRequest</span> request) {
     <span class="keyword">boolean</span> valid = webAuthnService.<span class="function">verifyAssertion</span>(
-        request.userId(), request.authenticatorData(),
+        request.customerId(), request.authenticatorData(),
         request.signature(), request.clientDataJson()
     );
 
@@ -246,8 +254,8 @@
         <span class="keyword">throw new</span> <span class="class-name">BadCredentialsException</span>(<span class="string">"Biometric verification failed"</span>);
     }
 
-    <span class="class-name">User</span> user = userService.<span class="function">findById</span>(request.userId());
-    <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(<span class="keyword">new</span> <span class="class-name">AuthResponse</span>(jwtService.<span class="function">generateToken</span>(user)));
+    <span class="class-name">Customer</span> customer = customerService.<span class="function">findById</span>(request.customerId());
+    <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.<span class="function">ok</span>(<span class="keyword">new</span> <span class="class-name">AuthResponse</span>(jwtService.<span class="function">generateToken</span>(customer)));
 }</code></pre>
 
                 <table>
@@ -299,9 +307,9 @@
                     sufficed adds maintenance cost with no corresponding benefit.</p>
 
                 <h3>1. Role-Based Access Control (RBAC)</h3>
-                <pre><code><span class="comment">// Simple RBAC: users have roles, roles have permissions</span>
+                <pre><code><span class="comment">// Simple RBAC: customers have roles, roles have permissions</span>
 <span class="annotation">@Entity</span>
-<span class="keyword">public class</span> <span class="class-name">User</span> {
+<span class="keyword">public class</span> <span class="class-name">Customer</span> {
     <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
@@ -309,8 +317,8 @@
 
     <span class="annotation">@ManyToMany</span>(fetch = FetchType.LAZY)   <span class="comment">// LAZY by default — see the note below before reaching for EAGER</span>
     <span class="annotation">@JoinTable</span>(
-        name = <span class="string">"user_roles"</span>,
-        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"user_id"</span>),
+        name = <span class="string">"customer_roles"</span>,
+        joinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"customer_id"</span>),
         inverseJoinColumns = <span class="annotation">@JoinColumn</span>(name = <span class="string">"role_id"</span>)
     )
     <span class="keyword">private</span> <span class="class-name">Set</span>&lt;<span class="class-name">Role</span>&gt; roles = <span class="keyword">new</span> <span class="class-name">HashSet</span>&lt;&gt;();
@@ -334,32 +342,32 @@
 
 <span class="comment">// Declarative role checks — Spring AOP evaluates these before the method body runs</span>
 <span class="annotation">@RestController</span>
-<span class="annotation">@RequestMapping</span>(<span class="string">"/api/users"</span>)
-<span class="keyword">public class</span> <span class="class-name">UserController</span> {
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/customers"</span>)
+<span class="keyword">public class</span> <span class="class-name">CustomerController</span> {
 
-    <span class="keyword">private final</span> <span class="class-name">UserService</span> userService;
+    <span class="keyword">private final</span> <span class="class-name">CustomerService</span> customerService;
 
-    <span class="keyword">public</span> <span class="function">UserController</span>(<span class="class-name">UserService</span> userService) {
-        <span class="keyword">this</span>.userService = userService;
+    <span class="keyword">public</span> <span class="function">CustomerController</span>(<span class="class-name">CustomerService</span> customerService) {
+        <span class="keyword">this</span>.customerService = customerService;
     }
 
     <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)
     <span class="annotation">@GetMapping</span>
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">User</span>&gt; <span class="function">getAllUsers</span>() {
-        <span class="keyword">return</span> userService.<span class="function">findAll</span>();
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">getAllCustomers</span>() {
+        <span class="keyword">return</span> customerService.<span class="function">findAll</span>();
     }
 
     <span class="annotation">@PreAuthorize</span>(<span class="string">"hasAnyRole('ADMIN', 'MANAGER')"</span>)
     <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getUser</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
-        <span class="keyword">return</span> userService.<span class="function">findById</span>(id);
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">getCustomer</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+        <span class="keyword">return</span> customerService.<span class="function">findById</span>(id);
     }
 }</code></pre>
 
                 <div class="info-box warning">
                     <div class="info-box-title">Blanket <code>FetchType.EAGER</code> on role/permission collections reintroduces N+1</div>
                     <p>Loading a <code>Set&lt;Role&gt;</code> eagerly on every
-                        <code>User</code> means every query that touches a user — not just
+                        <code>Customer</code> means every query that touches a user — not just
                         login — joins two extra tables it may never need. This is the exact
                         anti-pattern described in
                         <a href="../databases/relationships.html">Entity Relationships</a>:
@@ -434,16 +442,16 @@
 
     <span class="comment">// Policy: finance staff can read invoices from their own department;
     // writing also requires business hours and a trusted network location.</span>
-    <span class="keyword">public boolean</span> <span class="function">canAccess</span>(<span class="class-name">User</span> user, <span class="class-name">Invoice</span> invoice, <span class="class-name">String</span> action, <span class="class-name">AccessContext</span> context) {
-        <span class="keyword">boolean</span> sameDepartment = user.<span class="function">getDepartment</span>().<span class="function">equals</span>(invoice.<span class="function">getDepartment</span>());
-        <span class="keyword">boolean</span> hasClearance   = user.<span class="function">getClearanceLevel</span>() >= invoice.<span class="function">getClassificationLevel</span>();
+    <span class="keyword">public boolean</span> <span class="function">canAccess</span>(<span class="class-name">StaffMember</span> staff, <span class="class-name">Invoice</span> invoice, <span class="class-name">String</span> action, <span class="class-name">AccessContext</span> context) {
+        <span class="keyword">boolean</span> sameDepartment = staff.<span class="function">getDepartment</span>().<span class="function">equals</span>(invoice.<span class="function">getDepartment</span>());
+        <span class="keyword">boolean</span> hasClearance   = staff.<span class="function">getClearanceLevel</span>() >= invoice.<span class="function">getClassificationLevel</span>();
         <span class="keyword">boolean</span> businessHours  = <span class="function">isWithinBusinessHours</span>(context.<span class="function">time</span>());
         <span class="keyword">boolean</span> trustedNetwork = trustedIps.<span class="function">contains</span>(context.<span class="function">ipAddress</span>());
 
         <span class="keyword">return switch</span> (action) {
             <span class="keyword">case</span> <span class="string">"READ"</span>  -> sameDepartment && hasClearance;
             <span class="keyword">case</span> <span class="string">"WRITE"</span> -> sameDepartment && hasClearance && businessHours && trustedNetwork;
-            <span class="keyword">case</span> <span class="string">"DELETE"</span> -> invoice.<span class="function">getOwner</span>().<span class="function">equals</span>(user.<span class="function">getId</span>()) && user.<span class="function">getClearanceLevel</span>() >= <span class="number">4</span>;
+            <span class="keyword">case</span> <span class="string">"DELETE"</span> -> invoice.<span class="function">getOwner</span>().<span class="function">equals</span>(staff.<span class="function">getId</span>()) && staff.<span class="function">getClearanceLevel</span>() >= <span class="number">4</span>;
             <span class="keyword">default</span> -> <span class="keyword">false</span>;
         };
     }
@@ -556,10 +564,10 @@
 
                 <h3>Resource Ownership — Verify at the Layer Where the Data Lives</h3>
                 <pre><code><span class="comment">// Option A: express ownership directly in the @PreAuthorize expression</span>
-<span class="annotation">@GetMapping</span>(<span class="string">"/api/users/{userId}/orders"</span>)
-<span class="annotation">@PreAuthorize</span>(<span class="string">"#userId == authentication.principal.id or hasRole('ADMIN')"</span>)
-<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">getUserOrders</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> userId) {
-    <span class="keyword">return</span> orderService.<span class="function">findByUserId</span>(userId);
+<span class="annotation">@GetMapping</span>(<span class="string">"/api/customers/{customerId}/orders"</span>)
+<span class="annotation">@PreAuthorize</span>(<span class="string">"#customerId == authentication.principal.id or hasRole('ADMIN')"</span>)
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">getCustomerOrders</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> customerId) {
+    <span class="keyword">return</span> orderService.<span class="function">findByCustomerId</span>(customerId);
 }
 
 <span class="comment">// Option B: verify ownership in the service layer — necessary when the check
@@ -579,8 +587,8 @@
         <span class="class-name">Order</span> order = orderRepository.<span class="function">findById</span>(orderId)
             .<span class="function">orElseThrow</span>(() -> <span class="keyword">new</span> <span class="class-name">OrderNotFoundException</span>(orderId));
 
-        <span class="class-name">String</span> currentUser = <span class="class-name">SecurityContextHolder</span>.<span class="function">getContext</span>().<span class="function">getAuthentication</span>().<span class="function">getName</span>();
-        <span class="keyword">if</span> (!order.<span class="function">getOwner</span>().<span class="function">equals</span>(currentUser)) {
+        <span class="class-name">String</span> currentCustomer = <span class="class-name">SecurityContextHolder</span>.<span class="function">getContext</span>().<span class="function">getAuthentication</span>().<span class="function">getName</span>();
+        <span class="keyword">if</span> (!order.<span class="function">getOwner</span>().<span class="function">equals</span>(currentCustomer)) {
             <span class="keyword">throw new</span> <span class="class-name">AccessDeniedException</span>(<span class="string">"Not your order"</span>);
         }
         <span class="keyword">return</span> order;
@@ -676,9 +684,9 @@
                     call through that reference, or move the method to a separate
                     Spring-managed bean so the call crosses a real proxy boundary.</p>
 
-                    <p><strong>Q: Why is loading a <code>User</code>'s roles with <code>FetchType.EAGER</code> a scaling risk, even though the role list is small?</strong><br>
+                    <p><strong>Q: Why is loading a <code>Customer</code>'s roles with <code>FetchType.EAGER</code> a scaling risk, even though the role list is small?</strong><br>
                     The risk isn't the size of the role set — it's that EAGER forces the
-                    join on every single query that touches <code>User</code>, including
+                    join on every single query that touches <code>Customer</code>, including
                     ones that have nothing to do with authorization: profile lookups,
                     admin listings, batch exports. Every one of those queries now pays for
                     two extra joins it doesn't need, and because EAGER is unconditional,
