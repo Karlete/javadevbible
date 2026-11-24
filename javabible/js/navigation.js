@@ -34,19 +34,25 @@
         document.querySelectorAll('pre > code').forEach(function (codeBlock) {
             const pre = codeBlock.parentElement;
 
-            // The button is positioned against the <pre>; syntax-highlighting.css
-            // makes every <pre> position: relative, so nothing is written inline.
+            // Inside a .code-file the button goes in the file header, where it
+            // never covers code. On a bare <pre> it floats top-right
+            // (syntax-highlighting.css makes every <pre> position: relative).
+            const figure = pre.parentElement;
+            const caption = figure && figure.classList.contains('code-file')
+                ? figure.querySelector(':scope > figcaption')
+                : null;
+
             const copyBtn = document.createElement('button');
             copyBtn.type = 'button';
             copyBtn.className = 'copy-btn';
             copyBtn.textContent = 'Copy';
             copyBtn.setAttribute('aria-label', 'Copy code to clipboard');
-            pre.appendChild(copyBtn);
+            (caption || pre).appendChild(copyBtn);
 
             let resetTimer = null;
 
             copyBtn.addEventListener('click', function () {
-                navigator.clipboard.writeText(codeBlock.textContent).then(function () {
+                navigator.clipboard.writeText(copyableText(codeBlock)).then(function () {
                     show(copyBtn, 'Copied!', 'copied');
                 }, function () {
                     show(copyBtn, 'Failed', 'failed');
@@ -64,6 +70,22 @@
                 }, COPY_RESET_MS);
             }
         });
+    }
+
+    // In a diff, copy the code as it ends up: drop the removed (.line-del)
+    // lines together with their line break, so no blank line is left behind.
+    function copyableText(codeBlock) {
+        if (!codeBlock.querySelector('.line-del')) return codeBlock.textContent;
+
+        const clone = codeBlock.cloneNode(true);
+        clone.querySelectorAll('.line-del').forEach(function (line) {
+            const next = line.nextSibling;
+            if (next && next.nodeType === Node.TEXT_NODE) {
+                next.textContent = next.textContent.replace(/^\n/, '');
+            }
+            line.remove();
+        });
+        return clone.textContent;
     }
 
     // ── Keyboard shortcuts ──────────────────────────────────────────────────

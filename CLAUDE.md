@@ -143,6 +143,12 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
 - TOC sidebar (`<aside class="toc-sidebar" id="toc-sidebar">`) — copy the exact markup from a reference page below. Do not hand-roll it.
 - Tables need **no class**. `main.css` styles `<table>` globally. Use `<tr class="row-highlight">` to emphasise a row.
 - **Code blocks are hand-highlighted HTML.** There is no highlighter library. Inside `<pre><code>`, every literal `<`, `>` and `&` must be written `&lt;`, `&gt;`, `&amp;` — an unescaped `<pid>` or `List<Order>` is parsed as a tag and silently disappears from the page. Token classes are `keyword`, `class-name`, `annotation`, `comment`, `string`, `function`, `number`, `attribute`; every `<span>` must be closed on the line it means to end. `verify.sh` catches tags inside `<pre>` that are not `span`/`mark`/`b`/`strong`/`em`/`code`.
+- **Code files, before/after and diffs** (`syntax-highlighting.css`; pilot: `topics/databases/relationships.html`):
+  - Wrap a block in `<figure class="code-file">` with `<figcaption><span class="code-path">order/Order.java</span></figcaption>` to say where it lives. An optional `<span class="code-label">Fix</span>` goes before the path.
+  - A before/after pair is two figures: `class="code-file is-before"` (label `Before`) and `class="code-file is-after"` (label `After`). Do not also write `// BAD` / `// CORRECT` comments — the label says it.
+  - Line-level changes: `<span class="line-del">…</span>` and `<span class="line-add">…</span>`, one per line, closed before the newline. The −/+ markers come from CSS; the Copy button copies the code without the deleted lines.
+  - `navigation.js` puts the Copy button in the figcaption. A bare `<pre>` still works and gets a floating button.
+  - File paths are provisional until the shared example project (redesign phase 2) is fixed; do not roll the headers out site-wide before that.
 
 ### Required JavaScript conventions (`javabible/js/`)
 

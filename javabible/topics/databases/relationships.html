@@ -113,19 +113,24 @@
                     gets executed. Understanding the mechanics — not just the
                     annotations — is what separates correct from accidental.</p>
 
-                <pre><code><span class="comment">// BEFORE JPA — you manage the foreign key yourself</span>
-<span class="keyword">public record</span> <span class="class-name">OrderRow</span>(<span class="keyword">long</span> id, <span class="keyword">long</span> customerId, <span class="class-name">String</span> status) {}
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderRow.java — the foreign key is a plain long</span></figcaption>
+                    <pre><code><span class="keyword">public record</span> <span class="class-name">OrderRow</span>(<span class="keyword">long</span> id, <span class="keyword">long</span> customerId, <span class="class-name">String</span> status) {}
 
+<span class="comment">// Every caller that needs the customer has to remember this second lookup</span>
 <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">getCustomer</span>(<span class="class-name">OrderRow</span> order) {
     <span class="keyword">return</span> customerRepo.findById(order.customerId());   <span class="comment">// separate query every time</span>
-}
+}</code></pre>
+                </figure>
 
-<span class="comment">// AFTER JPA — the ORM manages the join for you</span>
-<span class="annotation">@Entity</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/Order.java — the ORM manages the join</span></figcaption>
+                    <pre><code><span class="annotation">@Entity</span>
 <span class="keyword">public class</span> <span class="class-name">Order</span> {
     <span class="annotation">@ManyToOne</span>(fetch = FetchType.LAZY)
     <span class="keyword">private</span> <span class="class-name">Customer</span> customer;   <span class="comment">// loaded on demand, or joined with JOIN FETCH</span>
 }</code></pre>
+                </figure>
 
                 <table>
                     <tr><th>Annotation</th><th>Cardinality</th><th>E-commerce example</th><th>Default fetch</th></tr>
@@ -148,7 +153,9 @@
                     decide what SQL to write. If you only update the inverse side,
                     the change is not persisted.</p>
 
-                <pre><code><span class="annotation">@Entity</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/Order.java · customer/Customer.java</span></figcaption>
+                    <pre><code><span class="annotation">@Entity</span>
 <span class="keyword">public class</span> <span class="class-name">Order</span> {
     <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
@@ -165,17 +172,20 @@
 
     <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"customer"</span>)   <span class="comment">// inverse side — mappedBy = field name in Order</span>
     <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-}
+}</code></pre>
+                </figure>
 
-<span class="comment">// WRONG — updates only the inverse side; Hibernate ignores it</span>
-customer.getOrders().add(order);     <span class="comment">// no SQL UPDATE issued</span>
+                <p>Assigning an order to a customer from the inverse side looks
+                    correct and silently does nothing. The fix is to set the owning
+                    side — and, to keep the in-memory graph consistent, the
+                    collection as well:</p>
 
-<span class="comment">// CORRECT — update the owning side</span>
-order.setCustomer(customer);         <span class="comment">// UPDATE orders SET customer_id = ? WHERE id = ?</span>
-
-<span class="comment">// ALSO CORRECT — update both sides so the in-memory object graph is consistent</span>
-order.setCustomer(customer);
-customer.getOrders().add(order);     <span class="comment">// keeps the collection accurate without a DB roundtrip</span></code></pre>
+                <figure class="code-file">
+                    <figcaption><span class="code-label">Fix</span> <span class="code-path">order/OrderService.java</span></figcaption>
+                    <pre><code><span class="line-del">customer.getOrders().add(order);     <span class="comment">// inverse side only: Hibernate issues no SQL UPDATE</span></span>
+<span class="line-add">order.setCustomer(customer);         <span class="comment">// owning side: UPDATE orders SET customer_id = ? WHERE id = ?</span></span>
+<span class="line-add">customer.getOrders().add(order);     <span class="comment">// keeps the loaded collection accurate without a DB roundtrip</span></span></code></pre>
+                </figure>
 
                 <div class="info-box important">
                     <div class="info-box-title">The rule: <code>mappedBy</code> = "I am not the owner; look over there"</div>
@@ -385,8 +395,9 @@ customer.getOrders().add(order);     <span class="comment">// keeps the collecti
                     <code>@ManyToMany</code> join table without converting it to an
                     intermediate entity anyway. Start with the intermediate entity.</p>
 
-                <pre><code><span class="comment">// BAD — pure @ManyToMany — join table has only (order_id, product_id),
-// no room for quantity or unit_price</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/Order.java — pure @ManyToMany</span></figcaption>
+                    <pre><code><span class="comment">// The join table has only (order_id, product_id): no room for quantity or unit_price</span>
 <span class="annotation">@Entity</span>
 <span class="keyword">public class</span> <span class="class-name">Order</span> {
     <span class="annotation">@ManyToMany</span>
@@ -396,10 +407,11 @@ customer.getOrders().add(order);     <span class="comment">// keeps the collecti
     )
     <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; products;   <span class="comment">// ✗ can't store quantity or price here</span>
 }</code></pre>
+                </figure>
 
-                <pre><code><span class="comment">// CORRECT — intermediate entity with composite key via @EmbeddedId + @MapsId</span>
-
-<span class="annotation">@Embeddable</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderItem.java — intermediate entity, composite key via @EmbeddedId + @MapsId</span></figcaption>
+                    <pre><code><span class="annotation">@Embeddable</span>
 <span class="keyword">public class</span> <span class="class-name">OrderItemId</span> <span class="keyword">implements</span> <span class="class-name">Serializable</span> {
     <span class="keyword">private</span> <span class="class-name">Long</span> orderId;
     <span class="keyword">private</span> <span class="class-name">Long</span> productId;
@@ -451,6 +463,7 @@ customer.getOrders().add(order);     <span class="comment">// keeps the collecti
         items.add(item);
     }
 }</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -516,14 +529,19 @@ customer.getOrders().add(order);     <span class="comment">// keeps the collecti
 <span class="class-name">Optional</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findByIdWithDetails</span>(<span class="annotation">@Param</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id);</code></pre>
 
                 <h3>Fix 3: Batch size (global fallback for collections)</h3>
-                <pre><code><span class="comment"># application.properties — Hibernate fetches lazy collections in batches
-# Instead of 50 queries (one per order), Hibernate does ceiling(50/20) = 3 queries</span>
-spring.jpa.properties.hibernate.default_batch_fetch_size=20
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/application.properties — global</span></figcaption>
+                    <pre><code><span class="comment"># Hibernate fetches lazy collections in batches:
+# instead of 50 queries (one per order) it runs ceiling(50/20) = 3</span>
+spring.jpa.properties.hibernate.default_batch_fetch_size=20</code></pre>
+                </figure>
 
-<span class="comment">// Or per-collection for fine-grained control</span>
-<span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"order"</span>, fetch = FetchType.LAZY)
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/Order.java — per collection, for fine-grained control</span></figcaption>
+                    <pre><code><span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"order"</span>, fetch = FetchType.LAZY)
 <span class="annotation">@BatchSize</span>(size = 20)
 <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items;</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">EAGER fetch does not solve N+1 — it makes it worse</div>
