@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kafka with Spring Boot: Producers, Consumers &amp; Retries - JavaDev Bible</title>
+    <meta name="description" content="How to publish and consume events with Spring Boot and Kafka: partitions and keys, the dual-write problem and the outbox, idempotent consumers and DLTs.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/kafka.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Kafka with Spring Boot: Producers, Consumers &amp; Retries">
+    <meta property="og:description" content="How to publish and consume events with Spring Boot and Kafka: partitions and keys, the dual-write problem and the outbox, idempotent consumers and DLTs.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/kafka.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Apache Kafka with Spring Boot",
+              "name": "Kafka with Spring Boot: Producers, Consumers & Retries",
+              "description": "How to publish and consume events with Spring Boot and Kafka: partitions and keys, the dual-write problem and the outbox, idempotent consumers and DLTs.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/kafka.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Apache Kafka with Spring Boot",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/kafka.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Apache Kafka with Spring Boot
+            </nav>
+            <h1>Apache Kafka with Spring Boot</h1>
+            <p class="topic-subtitle">Publishing an <code>OrderPlaced</code> event instead of calling five services from the checkout — and the three things that make it reliable: keys for ordering, an outbox for the database-and-Kafka write, and consumers that survive duplicates</p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Kafka Is — and Why the Checkout Should Not Call Everyone</h2>
+                <p>When a customer places an order, several parts of the shop have
+                    to react: inventory reserves stock, invoicing creates an
+                    <code>Invoice</code>, notification sends a confirmation email,
+                    analytics records the sale. The obvious implementation calls
+                    each of them from <code>OrderService</code>. That makes the
+                    checkout as slow as the sum of all of them, and as fragile as the
+                    least reliable one: if the email provider is down, nobody can
+                    buy anything.</p>
+
+                <p><strong>Apache Kafka</strong> is a distributed, durable,
+                    append-only <em>log</em>. Producers append records to a
+                    <em>topic</em>; consumers read them at their own pace and
+                    remember how far they got. Records are not deleted when they are
+                    read — they stay for the configured retention — so a new
+                    consumer can start from the beginning and a crashed one can
+                    resume where it stopped. The checkout publishes one fact, "this
+                    order was placed", and stops caring who listens.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderService.java — every consumer is a synchronous call</span></figcaption>
+                    <pre><code><span class="annotation">@Transactional</span>
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">placeOrder</span>(<span class="class-name">PlaceOrderRequest</span> request) {
+    <span class="class-name">Order</span> order = orderRepository.save(<span class="class-name">Order</span>.from(request));
+    <span class="comment">// Each call adds its latency to the checkout, and each failure rolls it back:
+    // a slow SMTP server now decides whether the shop can take money</span>
+    inventoryService.reserve(order);
+    invoiceService.createFor(order);
+    emailService.sendConfirmation(order);
+    analyticsClient.recordSale(order);
+    <span class="comment">// A sixth reaction means editing, testing and redeploying the checkout</span>
+    <span class="keyword">return</span> order;
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderService.java — record the fact, let others react</span></figcaption>
+                    <pre><code><span class="annotation">@Transactional</span>
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">placeOrder</span>(<span class="class-name">PlaceOrderRequest</span> request) {
+    <span class="class-name">Order</span> order = orderRepository.save(<span class="class-name">Order</span>.from(request));
+    <span class="comment">// Written in the same database transaction as the order (the outbox, section 3):
+    // either both exist or neither does, and Kafka being down cannot fail a checkout</span>
+    outbox.add(<span class="class-name">OrderPlacedEvent</span>.of(order));
+    <span class="keyword">return</span> order;
+}
+<span class="comment">// inventory, invoice, notification and analytics each consume "orders.placed"
+// in their own consumer group, at their own pace, and fail independently</span></code></pre>
+                </figure>
+
+                <table>
+                    <tr><th></th><th>Synchronous calls</th><th>Events through Kafka</th></tr>
+                    <tr><td>Checkout latency</td><td>Sum of every downstream call</td><td>One database transaction</td></tr>
+                    <tr><td>A downstream service is down</td><td>The checkout fails</td><td>Its events wait in the topic until it is back</td></tr>
+                    <tr><td>Adding a new reaction</td><td>Change and redeploy the checkout</td><td>A new consumer group; the producer is untouched</td></tr>
+                    <tr><td>Cost</td><td>Simple to follow and debug</td><td>Eventual consistency, duplicates to handle, a broker to run</td></tr>
+                </table>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Not everything should become an event</div>
+                    <p>If the checkout cannot continue without the answer — "is the
+                        card authorised?" — that is a request, not an event, and a
+                        synchronous call with a timeout is the honest design. Events
+                        are for facts that other parts of the system react to
+                        afterwards.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — CORE CONCEPTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Topics, Partitions, Offsets and Keys</h2>
+                <p>Every Kafka question in an interview comes back to these five
+                    terms, and every production incident does too:</p>
+
+                <table>
+                    <tr><th>Term</th><th>What it is</th><th>In the shop</th></tr>
+                    <tr><td>Topic</td><td>A named log of records</td><td><code>orders.placed</code></td></tr>
+                    <tr><td>Partition</td><td>A topic is split into ordered, independent partitions; the unit of parallelism and of ordering</td><td>12 partitions, spread across brokers</td></tr>
+                    <tr><td>Offset</td><td>A record's position inside its partition</td><td>Notification has processed partition 3 up to offset 18 204</td></tr>
+                    <tr class="row-highlight"><td>Key</td><td>Records with the same key always go to the same partition</td><td>Key = order id: every event for one order stays in order</td></tr>
+                    <tr><td>Consumer group</td><td>Consumers sharing a <code>group.id</code> split the partitions between them; each group gets every record</td><td><code>notification</code> and <code>invoicing</code> each see every order</td></tr>
+                </table>
+
+                <p>Two consequences follow directly. <strong>Ordering is guaranteed
+                    only inside a partition</strong> — so whatever must stay in order
+                    has to share a key. And <strong>a group cannot have more active
+                    consumers than the topic has partitions</strong>: with 12
+                    partitions, a 13th notification instance sits idle. Choose the
+                    partition count for the parallelism you will need; adding
+                    partitions later changes which partition a key maps to.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — PRODUCER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Producing Events with <code>KafkaTemplate</code></h2>
+                <p>The event is a <code>record</code>: an immutable fact, named in the
+                    past tense, carrying what consumers need so they do not have to
+                    call back into the order module. The <code>eventId</code> lets
+                    consumers recognise a record they have already processed.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderPlacedEvent.java</span></figcaption>
+                    <pre><code><span class="keyword">public record</span> <span class="class-name">OrderPlacedEvent</span>(
+        <span class="class-name">UUID</span> eventId,
+        <span class="class-name">Long</span> orderId,
+        <span class="class-name">Long</span> customerId,
+        <span class="class-name">String</span> customerEmail,
+        <span class="class-name">BigDecimal</span> total,
+        <span class="class-name">Instant</span> placedAt) {
+
+    <span class="keyword">public static</span> <span class="class-name">OrderPlacedEvent</span> <span class="function">of</span>(<span class="class-name">Order</span> order) {
+        <span class="keyword">return new</span> <span class="class-name">OrderPlacedEvent</span>(<span class="class-name">UUID</span>.randomUUID(), order.getId(),
+                order.getCustomer().getId(), order.getCustomer().getEmail(),
+                order.getTotal(), order.getPlacedAt());
+    }
+}</code></pre>
+                </figure>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderEventPublisher.java</span></figcaption>
+                    <pre><code><span class="annotation">@Component</span>
+<span class="keyword">class</span> <span class="class-name">OrderEventPublisher</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">KafkaTemplate</span>&lt;<span class="class-name">String</span>, <span class="class-name">OrderPlacedEvent</span>&gt; kafkaTemplate;
+
+    <span class="class-name">OrderEventPublisher</span>(<span class="class-name">KafkaTemplate</span>&lt;<span class="class-name">String</span>, <span class="class-name">OrderPlacedEvent</span>&gt; kafkaTemplate) {
+        <span class="keyword">this</span>.kafkaTemplate = kafkaTemplate;
+    }
+
+    <span class="class-name">CompletableFuture</span>&lt;<span class="class-name">SendResult</span>&lt;<span class="class-name">String</span>, <span class="class-name">OrderPlacedEvent</span>&gt;&gt; <span class="function">publish</span>(<span class="class-name">OrderPlacedEvent</span> event) {
+        <span class="comment">// The key decides the partition: all events of one order stay in order</span>
+        <span class="keyword">return</span> kafkaTemplate.send(<span class="string">"orders.placed"</span>, event.orderId().toString(), event);
+    }
+}</code></pre>
+                </figure>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/application.yaml — producer</span></figcaption>
+                    <pre><code><span class="attribute">spring</span>:
+  <span class="attribute">kafka</span>:
+    <span class="attribute">producer</span>:
+      <span class="attribute">key-serializer</span>: org.apache.kafka.common.serialization.StringSerializer
+      <span class="comment"># Spring for Apache Kafka 4 serialises with Jackson 3; JsonSerializer is the deprecated Jackson 2 class</span>
+      <span class="attribute">value-serializer</span>: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      <span class="comment"># Kafka 3.0+ already defaults to acks=all with idempotence on; stating it
+      # documents the intent and fails loudly if someone weakens it elsewhere</span>
+      <span class="attribute">acks</span>: all</code></pre>
+                </figure>
+
+                <p><code>send()</code> is asynchronous: it returns a
+                    <code>CompletableFuture</code> as soon as the record is in the
+                    producer's buffer. Ignoring the future means never learning that
+                    the broker rejected a record. With <code>acks=all</code> and
+                    idempotence (the defaults since Kafka 3.0), the producer retries
+                    transient failures without creating duplicates or reordering
+                    records within a partition.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — DUAL WRITE AND OUTBOX
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Dual-Write Problem and the Transactional Outbox</h2>
+                <p>The checkout must do two things: commit the order to PostgreSQL
+                    and publish the event to Kafka. They are two systems, and no
+                    transaction spans both. Every naive ordering loses something:</p>
+
+                <table>
+                    <tr><th>Approach</th><th>Failure</th><th>Result</th></tr>
+                    <tr><td>Send inside the <code>@Transactional</code> method</td><td>The transaction rolls back after the send</td><td>An email for an order that does not exist</td></tr>
+                    <tr><td>Send after commit (<code>@TransactionalEventListener(AFTER_COMMIT)</code>)</td><td>The process crashes, or Kafka is down, between commit and send</td><td>A paid order nobody invoices — silently</td></tr>
+                    <tr class="row-highlight"><td>Transactional outbox</td><td>Any crash</td><td>The event is retried until published; at worst it is published twice</td></tr>
+                </table>
+
+                <p>The <strong>outbox</strong> turns two writes into one. The event
+                    is stored in an <code>outbox_events</code> table in the same
+                    transaction as the order; a relay publishes unpublished rows to
+                    Kafka and marks them as sent.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OutboxRelay.java</span></figcaption>
+                    <pre><code><span class="annotation">@Component</span>
+<span class="keyword">class</span> <span class="class-name">OutboxRelay</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">OutboxRepository</span> outbox;
+    <span class="keyword">private final</span> <span class="class-name">OrderEventPublisher</span> publisher;
+
+    <span class="class-name">OutboxRelay</span>(<span class="class-name">OutboxRepository</span> outbox, <span class="class-name">OrderEventPublisher</span> publisher) {
+        <span class="keyword">this</span>.outbox = outbox;
+        <span class="keyword">this</span>.publisher = publisher;
+    }
+
+    <span class="annotation">@Scheduled</span>(fixedDelay = 500)
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">void</span> <span class="function">publishPending</span>() {
+        <span class="comment">// Oldest first keeps per-order ordering; FOR UPDATE SKIP LOCKED in the query
+        // stops two shop instances from publishing the same row concurrently</span>
+        <span class="keyword">for</span> (<span class="class-name">OutboxEvent</span> row : outbox.lockOldestUnpublished(100)) {
+            <span class="comment">// join() waits for the broker's ack: a row is marked only once Kafka has it</span>
+            publisher.publish(row.toOrderPlacedEvent()).join();
+            row.markPublished();
+        }
+    }
+}</code></pre>
+                </figure>
+
+                <p>A crash after <code>join()</code> and before the commit publishes
+                    the same rows again on the next run. That is the trade the
+                    outbox makes: <strong>at-least-once</strong> delivery instead of
+                    lost events — which is exactly why consumers must be idempotent.
+                    In larger systems, change data capture (Debezium reading the
+                    outbox table from the PostgreSQL write-ahead log) replaces the
+                    polling relay with the same guarantees.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — CONSUMER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Consuming with <code>@KafkaListener</code> — and Surviving Duplicates</h2>
+                <p>The notification module declares its own copy of the event. It
+                    depends on the <em>shape</em> of the message, not on the order
+                    module's classes, so the two can be deployed separately.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">notification/OrderConfirmationListener.java</span></figcaption>
+                    <pre><code><span class="annotation">@Component</span>
+<span class="keyword">class</span> <span class="class-name">OrderConfirmationListener</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">ProcessedEventRepository</span> processedEvents;
+    <span class="keyword">private final</span> <span class="class-name">EmailService</span> emailService;
+
+    <span class="class-name">OrderConfirmationListener</span>(<span class="class-name">ProcessedEventRepository</span> processedEvents, <span class="class-name">EmailService</span> emailService) {
+        <span class="keyword">this</span>.processedEvents = processedEvents;
+        <span class="keyword">this</span>.emailService = emailService;
+    }
+
+    <span class="annotation">@KafkaListener</span>(topics = <span class="string">"orders.placed"</span>, groupId = <span class="string">"notification"</span>)
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">void</span> <span class="function">on</span>(<span class="class-name">OrderPlaced</span> event) {
+        <span class="comment">// processed_events.event_id is a primary key: a redelivered event fails the
+        // insert check and is skipped instead of emailing the customer twice</span>
+        <span class="keyword">if</span> (!processedEvents.markProcessed(event.eventId())) {
+            <span class="keyword">return</span>;
+        }
+        emailService.sendOrderConfirmation(event.customerEmail(), event.orderId(), event.total());
+    }
+}</code></pre>
+                </figure>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/application.yaml — consumer</span></figcaption>
+                    <pre><code><span class="attribute">spring</span>:
+  <span class="attribute">kafka</span>:
+    <span class="attribute">consumer</span>:
+      <span class="attribute">auto-offset-reset</span>: earliest      <span class="comment"># a brand-new group starts from the oldest record</span>
+      <span class="attribute">key-deserializer</span>: org.apache.kafka.common.serialization.StringDeserializer
+      <span class="comment"># Wraps the real deserializer: a malformed record becomes an error the
+      # error handler can route to the DLT, instead of an endless failure loop</span>
+      <span class="attribute">value-deserializer</span>: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      <span class="attribute">properties</span>:
+        <span class="attribute">spring.deserializer.value.delegate.class</span>: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        <span class="comment"># Ignore the producer's class name in the type header and map to our own record</span>
+        <span class="attribute">spring.json.use.type.headers</span>: <span class="keyword">false</span>
+        <span class="attribute">spring.json.value.default.type</span>: com.javadevbible.shop.notification.OrderPlaced</code></pre>
+                </figure>
+
+                <div class="info-box important">
+                    <div class="info-box-title">When is the offset committed?</div>
+                    <p>By default the listener container commits offsets after the
+                        listener returns. If the instance dies after sending the
+                        email but before the commit, the next owner of the partition
+                        receives the record again. "Exactly once" between Kafka and an
+                        external side effect such as an email does not exist; an
+                        idempotent consumer is how you get <em>effectively</em> once.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — ERRORS AND DLT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Retries and Dead-Letter Topics</h2>
+                <p>Without configuration, a failing record is retried in place
+                    (ten attempts in total) and then logged and skipped — the
+                    customer simply never gets the email. Production needs two
+                    decisions: how to retry, and where a record goes when retrying
+                    is pointless.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">notification/KafkaErrorConfig.java — blocking retries + DLT</span></figcaption>
+                    <pre><code><span class="annotation">@Configuration</span>
+<span class="keyword">class</span> <span class="class-name">KafkaErrorConfig</span> {
+
+    <span class="comment">// Spring Boot attaches a CommonErrorHandler bean to the auto-configured
+    // listener container factory; no factory needs to be declared</span>
+    <span class="annotation">@Bean</span>
+    <span class="class-name">DefaultErrorHandler</span> <span class="function">errorHandler</span>(<span class="class-name">KafkaTemplate</span>&lt;<span class="class-name">Object</span>, <span class="class-name">Object</span>&gt; template) {
+        <span class="comment">// After the retries, publish to "orders.placed-dlt", same partition</span>
+        <span class="keyword">var</span> recoverer = <span class="keyword">new</span> <span class="class-name">DeadLetterPublishingRecoverer</span>(template);
+        <span class="comment">// 1s, 2s, 4s — then give up; the record keeps its headers with the exception</span>
+        <span class="keyword">var</span> backOff = <span class="keyword">new</span> <span class="class-name">ExponentialBackOff</span>(1_000L, 2.0);
+        backOff.setMaxAttempts(3);
+        <span class="keyword">var</span> handler = <span class="keyword">new</span> <span class="class-name">DefaultErrorHandler</span>(recoverer, backOff);
+        <span class="comment">// A bad e-mail address will not fix itself: straight to the DLT</span>
+        handler.addNotRetryableExceptions(<span class="class-name">InvalidEmailAddressException</span>.<span class="keyword">class</span>);
+        <span class="keyword">return</span> handler;
+    }
+}</code></pre>
+                </figure>
+
+                <p>These retries are <em>blocking</em>: while one record waits for
+                    its back-off, the rest of its partition waits too. That preserves
+                    order and is fine for short retries. For long ones — the email
+                    provider is down for ten minutes — <strong>non-blocking
+                    retries</strong> move the record to retry topics and keep the main
+                    partition flowing, at the cost of ordering:</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">notification/OrderConfirmationListener.java — non-blocking retries</span></figcaption>
+                    <pre><code><span class="comment">// Creates orders.placed-retry-1000, -retry-2000, -retry-4000 and orders.placed-dlt</span>
+<span class="annotation">@RetryableTopic</span>(attempts = <span class="string">"4"</span>, backOff = <span class="annotation">@BackOff</span>(delay = 1_000, multiplier = 2))
+<span class="annotation">@KafkaListener</span>(topics = <span class="string">"orders.placed"</span>, groupId = <span class="string">"notification"</span>)
+<span class="keyword">void</span> <span class="function">on</span>(<span class="class-name">OrderPlaced</span> event) { ... }</code></pre>
+                </figure>
+
+                <table>
+                    <tr><th></th><th>Blocking (<code>DefaultErrorHandler</code>)</th><th>Non-blocking (<code>@RetryableTopic</code>)</th></tr>
+                    <tr><td>Ordering within the partition</td><td>Preserved</td><td>Lost for retried records</td></tr>
+                    <tr><td>Other records while one retries</td><td>Wait</td><td>Keep flowing</td></tr>
+                    <tr><td>Fits</td><td>Short, transient failures</td><td>Long outages of a dependency, order-independent events</td></tr>
+                </table>
+                <p>A DLT is only useful if someone reads it: alert on its growth and
+                    give operations a way to replay records once the cause is
+                    fixed.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — SCALING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Scaling Consumers and Rebalances</h2>
+                <p>Each partition is consumed by exactly one member of a group.
+                    Scaling the notification module means more instances, or more
+                    listener threads per instance
+                    (<code>spring.kafka.listener.concurrency</code>), up to the
+                    partition count. When a member joins, leaves or stops polling,
+                    the group <em>rebalances</em> partitions between the remaining
+                    members.</p>
+
+                <p>The most common cause of mysterious rebalances is a listener
+                    that takes longer than <code>max.poll.interval.ms</code> (five
+                    minutes by default) to process one batch: the broker assumes the
+                    consumer is dead, reassigns its partitions, and the batch is
+                    processed again by someone else. Reduce
+                    <code>max.poll.records</code> or move slow work out of the
+                    listener.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Kafka 4 and the new consumer group protocol</div>
+                    <p>Kafka 4.0 made the consumer rebalance protocol of KIP-848
+                        generally available: the broker coordinates assignments
+                        incrementally, so a rebalance no longer pauses the whole
+                        group. Clients opt in with <code>group.protocol=consumer</code>;
+                        the classic protocol stays the client default for now.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Key records by the entity whose events must stay in order (<code>orderId</code>)</li>
+                        <li>Write events through a transactional outbox when they must match a database change</li>
+                        <li>Make every consumer idempotent: an <code>eventId</code> plus a processed-events table or a natural unique constraint</li>
+                        <li>Configure a <code>DefaultErrorHandler</code> with a dead-letter topic, mark non-recoverable exceptions as not retryable, and alert on DLT growth</li>
+                        <li>Wrap deserializers in <code>ErrorHandlingDeserializer</code> so one malformed record cannot block a partition</li>
+                        <li>Name events as past-tense facts and include what consumers need, so they do not call back synchronously</li>
+                        <li>Choose the partition count for the consumer parallelism you will need</li>
+                        <li>Monitor consumer lag per group — it is the first sign that consumers cannot keep up</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't call <code>kafkaTemplate.send()</code> inside a database transaction and assume both happen or neither does</li>
+                        <li>Don't ignore the <code>CompletableFuture</code> from <code>send()</code> — a rejected record is otherwise invisible</li>
+                        <li>Don't share the producer's event class with consumers through type headers; it couples deployments by class name</li>
+                        <li>Don't do slow work longer than <code>max.poll.interval.ms</code> inside a listener</li>
+                        <li>Don't turn request/response interactions ("is this card authorised?") into events</li>
+                        <li>Don't expect ordering across partitions, or after adding partitions to a keyed topic</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is the difference between a topic, a partition and an offset?</strong><br>
+                    A topic is a named log of records. It is split into partitions,
+                    each an ordered, append-only sequence stored on a broker;
+                    partitions are what Kafka parallelises and replicates. An offset
+                    is the position of a record within one partition, and a consumer
+                    group tracks, per partition, the offset it has processed up to.</p>
+
+                    <p><strong>Q: Why do we send the order id as the record key?</strong><br>
+                    Records with the same key always land in the same partition, and
+                    Kafka guarantees order only within a partition. Keying by order
+                    id keeps every event of one order — placed, paid, shipped — in the
+                    order they were produced, while different orders are spread
+                    across partitions and processed in parallel.</p>
+
+                    <p><strong>Q: What is a consumer group?</strong><br>
+                    A set of consumers sharing a <code>group.id</code>. Kafka assigns
+                    each partition to exactly one member, so the group shares the
+                    work; different groups each receive every record. Notification and
+                    invoicing use different groups, so both see every order.</p>
+
+                    <p><strong>Q: What does "at-least-once delivery" mean for the code you write?</strong><br>
+                    A record may be delivered more than once — after a crash before
+                    the offset commit, a rebalance, or a producer or outbox retry. The
+                    consumer has to produce the same result when it sees the same
+                    event twice, typically by recording processed event ids.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: An order is saved and an <code>OrderPlaced</code> event is sent from the same <code>@Transactional</code> method. What can go wrong, and how do you fix it?</strong><br>
+                    The database and Kafka are separate systems; the Spring
+                    transaction covers only the database. If the send succeeds and the
+                    transaction then rolls back, consumers react to an order that does
+                    not exist. Sending after commit fixes that but loses the event if
+                    the process crashes or Kafka is unavailable between commit and
+                    send. The standard fix is a transactional outbox: write the event
+                    to an outbox table in the same transaction, then publish it with a
+                    relay or CDC (Debezium). That gives at-least-once publication,
+                    which in turn requires idempotent consumers.</p>
+
+                    <p><strong>Q: Consumer lag keeps growing and the logs show frequent rebalances. How do you diagnose it?</strong><br>
+                    Frequent rebalances with growing lag usually mean processing a
+                    batch exceeds <code>max.poll.interval.ms</code>: the member is
+                    evicted, its partitions move, and the batch is reprocessed
+                    elsewhere — so work is repeated and little progresses. Check
+                    processing time per record against <code>max.poll.records</code>,
+                    slow downstream calls inside the listener, and blocking retries
+                    with long back-offs. Fixes: smaller batches, faster or
+                    asynchronous downstream work, non-blocking retries for long
+                    outages, more partitions and consumers if throughput is the real
+                    limit. Kafka 4's KIP-848 protocol reduces the cost of each
+                    rebalance but not the cause.</p>
+
+                    <p><strong>Q: A record that can never be deserialised arrives on a partition. What happens with a default setup, and what should happen?</strong><br>
+                    Without <code>ErrorHandlingDeserializer</code>, deserialisation
+                    fails inside the consumer before the listener is called; depending
+                    on the version and configuration, the container cannot get past
+                    that offset and the partition stalls — a poison pill. Wrapping the
+                    real deserializer in <code>ErrorHandlingDeserializer</code> turns
+                    the failure into a <code>DeserializationException</code>, which
+                    <code>DefaultErrorHandler</code> treats as not retryable and sends
+                    straight to the dead-letter topic with the original bytes and the
+                    exception in the headers.</p>
+
+                    <p><strong>Q: Does Kafka's exactly-once semantics mean the customer gets exactly one email?</strong><br>
+                    No. Kafka's exactly-once semantics — idempotent producers plus
+                    transactions — covers read-process-write loops <em>within
+                    Kafka</em>: consuming from one topic, producing to another and
+                    committing the offsets atomically. An email, an HTTP call or a
+                    database write outside that transaction is a side effect Kafka
+                    cannot roll back. For those, the guarantee is at-least-once
+                    delivery plus an idempotent consumer, which gives effectively-once
+                    results.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="docker.html" class="related-link"><span class="related-icon">🐳</span>Docker for Spring Boot</a>
+                    <a href="../databases/transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions (ACID)</a>
+                    <a href="../spring/boot.html" class="related-link"><span class="related-icon">🍃</span>Spring Boot Basics</a>
+                    <a href="../tools/jackson.html" class="related-link"><span class="related-icon">🧾</span>Jackson (JSON)</a>
+                    <a href="../web-concepts/rest-principles.html" class="related-link"><span class="related-icon">🌐</span>RESTful API Principles</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
