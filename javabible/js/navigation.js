@@ -5,6 +5,8 @@
    Loaded on every page (index and all topic pages). Each helper exits quietly
    when the elements it needs are absent.
 
+   - Light/dark theme button in the page's dark band (stored choice wins
+     over the OS preference)
    - Copy button on every <pre><code> block
    - "Show all answers" for interview questions (<details class="qa">),
      and every answer opened while printing
@@ -17,9 +19,76 @@
 (function () {
     'use strict';
 
+    // ── Theme ───────────────────────────────────────────────────────────────
+    // The stored choice is applied immediately, not on DOMContentLoaded, so it
+    // lands as early as a script at the end of <body> can. A reader whose
+    // choice differs from the OS may still see one frame in the OS theme on a
+    // slow first load; avoiding that entirely would need a script in <head>.
+    // No stored choice = follow the operating system (CSS color-scheme).
+
+    const THEME_KEY = 'javadevbible-theme';
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+    function storedTheme() {
+        try {
+            const value = localStorage.getItem(THEME_KEY);
+            return value === 'light' || value === 'dark' ? value : null;
+        } catch (e) {
+            return null;    // storage disabled (privacy mode, file://): follow the OS
+        }
+    }
+
+    function effectiveTheme() {
+        return storedTheme() || (systemDark.matches ? 'dark' : 'light');
+    }
+
+    const initialTheme = storedTheme();
+    if (initialTheme) document.documentElement.dataset.theme = initialTheme;
+
+    function initializeThemeToggle() {
+        const band = document.querySelector('.hero-section, .topic-header');
+        if (!band) return;
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'theme-toggle';
+        const icon = document.createElement('span');
+        icon.className = 'theme-toggle-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        const label = document.createElement('span');
+        button.appendChild(icon);
+        button.appendChild(label);
+
+        // The button names the theme it switches TO, the convention readers
+        // expect from a single toggle.
+        function render() {
+            const dark = effectiveTheme() === 'dark';
+            icon.textContent = dark ? '☀' : '☾';    // ☀ / ☾
+            label.textContent = dark ? 'Light' : 'Dark';
+            button.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+        }
+
+        button.addEventListener('click', function () {
+            const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = next;
+            try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* not persisted */ }
+            render();
+        });
+
+        // While no choice is stored, keep the label right if the OS switches
+        // (e.g. automatic dark mode at sunset).
+        systemDark.addEventListener('change', function () {
+            if (!storedTheme()) render();
+        });
+
+        render();
+        band.appendChild(button);
+    }
+
     const COPY_RESET_MS = 2000;
 
     document.addEventListener('DOMContentLoaded', function () {
+        initializeThemeToggle();
         initializeCopyButtons();
         initializeInterviewAnswers();
     });
