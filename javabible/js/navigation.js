@@ -6,7 +6,6 @@
    when the elements it needs are absent.
 
    - Copy button on every <pre><code> block
-   - Smooth scrolling for in-page anchors (toc.js handles its own links)
    - Ctrl/Cmd + K focuses the search box on the index page
 
    Removed on 2026-11-23 because no page used them: collapsible sections,
@@ -18,33 +17,14 @@
 
     const COPY_RESET_MS = 2000;
 
-    // Checked once: someone who asked the OS to reduce motion gets instant
-    // jumps instead of animated scrolling.
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.addEventListener('DOMContentLoaded', initializeCopyButtons);
 
-    document.addEventListener('DOMContentLoaded', function () {
-        initializeSmoothScrolling();
-        initializeCopyButtons();
-    });
-
-    // ── In-page anchors ─────────────────────────────────────────────────────
-
-    function initializeSmoothScrolling() {
-        document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
-            anchor.addEventListener('click', function (e) {
-                const targetId = this.getAttribute('href').substring(1);
-                const targetElement = targetId && document.getElementById(targetId);
-                if (!targetElement) return;
-
-                e.preventDefault();
-                targetElement.scrollIntoView({
-                    behavior: reduceMotion ? 'auto' : 'smooth',
-                    block: 'start'
-                });
-                history.pushState(null, '', '#' + targetId);
-            });
-        });
-    }
+    // In-page anchors are left to the browser on purpose. This file used to
+    // intercept every a[href^="#"], scroll with JS and update the URL with
+    // history.pushState — but pushState does not update :target, so CSS that
+    // marks the destination (.category-card:target) never matched. Native
+    // navigation sets :target, and main.css already gives it smooth scrolling
+    // (html { scroll-behavior: smooth }) that prefers-reduced-motion turns off.
 
     // ── Copy buttons ────────────────────────────────────────────────────────
 

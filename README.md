@@ -173,7 +173,7 @@ See [`mcp/README.md`](mcp/README.md) for troubleshooting.
 
 **Search results are real anchors.** They were `<div onclick="location.href=...">`, which is not focusable, not openable in a new tab, and not announced as a link by a screen reader. They are `<a href>` now, built with `createElement` and `textContent` rather than `innerHTML`, so index content cannot be interpreted as markup — there is nothing left to escape.
 
-**Motion is opt-out.** The hero runs an animated gradient, a particle canvas, a pulse, a typing effect and a blinking cursor. Under `prefers-reduced-motion`, all five stop — including the `requestAnimationFrame` loop, which would otherwise keep burning CPU to paint a canvas the CSS has already hidden.
+**Motion is minimal and opt-out.** The home hero is static. The only animations are the category card flashing when you land on it and small hover transitions; under `prefers-reduced-motion` they are reduced to a single instant frame.
 
 **A meta description on every page, but no SEO strategy.** This project does not chase search rankings — a personal portfolio with no backlinks and no domain authority is not going to outrank Baeldung, and trying would be effort spent on the wrong problem. The meta description exists because Lighthouse scores it and because a shared link should preview cleanly.
 
@@ -210,7 +210,7 @@ javabible/
 ├── index.html              category navigation and search
 ├── topics/{category}/      94 topic pages across 13 categories
 ├── css/                    main, syntax-highlighting, toc
-├── js/                     search, navigation, toc, hero-effects
+├── js/                     search, navigation, toc
 └── data/
     └── search-index.json   verified in CI against disk, both directions
 
