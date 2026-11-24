@@ -94,12 +94,15 @@ JavaDev Bible — integrity check
   ✓ every page has a self-referencing canonical and Open Graph tags
 
 13. Sitemap
-  ✓ sitemap.xml lists exactly the 95 pages on disk
+  ✓ sitemap.xml lists exactly the 97 pages on disk
 
 14. Field injection
   ✓ no @Autowired field injection outside tests and ❌ examples
 
-✓ 14/14 checks passed.
+15. Interview questions
+  ✓ every page has junior and senior questions as <details class="qa">
+
+✓ 15/15 checks passed.
 ```
 
 [`tools/verify.sh`](tools/verify.sh) walks every `href` in every page and resolves it against the filesystem; diffs the search index, the sitemap and the index-page category cards against what is on disk; catches the UTF-8 BOM that Windows editors reintroduce silently; fails on any `console.log` in production JS; checks that every CSS class used is defined somewhere (a dead class once styled nothing on 78 tables for months); parses every hand-highlighted code block for unbalanced `<span>`s and unescaped tags (an unescaped `<pid>` once vanished from a `jmap` command); rejects inline styles, side-by-side ASCII diagrams that break on phones and `@Autowired` field injection in sample code; checks every meta description and canonical URL; and fails when a hand-typed "N topics" or "N categories" in the site or the docs disagrees with what is on disk.

@@ -115,7 +115,7 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
 
 3. **Best Practices** — formatted as `✅ Do` / `❌ Don't` lists. Never a single flat bullet list. Never titled "Summary."
 
-4. **Interview Questions** — split explicitly into `🎓 Junior level` (`info-box note`) and `🔥 Senior level` (`info-box important`). **Minimum 3 + 3; more is fine and often better.** Do not cut a good question to hit a number. Every page must have this section.
+4. **Interview Questions** — split explicitly into `🎓 Junior level` (`info-box note`) and `🔥 Senior level` (`info-box important`). **Minimum 3 + 3; more is fine and often better.** Do not cut a good question to hit a number. Every page must have this section. Each question is a `<details class="qa">` whose `<summary>` is the question (no "Q:" prefix) and whose single `<p>` is the answer; `navigation.js` adds "Show all answers" and opens every answer for printing. Copy the markup from `topics/databases/relationships.html`.
 
 5. **Related Topics** — links to sibling pages in the same category, plus meaningful cross-category links where genuinely relevant. Use exact filenames. `verify.sh` will catch a wrong one, but catching it yourself is faster.
 

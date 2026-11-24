@@ -26,6 +26,8 @@
 #  13. Sitemap                — sitemap.xml lists exactly the pages on disk, with <lastmod>
 #                               (regenerate with tools/sitemap.sh)
 #  14. Field injection        — @Autowired on a field outside test code / ❌ examples
+#  15. Interview questions    — every page has junior and senior <details class="qa">
+#                               questions, and none left in the old <p><strong>Q: form
 #
 # Usage:
 #   bash tools/verify.sh            run all checks
@@ -642,6 +644,47 @@ else
   fail "$FI_N code block(s) with @Autowired field injection"
   show_capped "$(cat "$TMP/fieldinj.txt")"
   hint 'fix: a final field + a single constructor (no @Autowired needed since Spring 4.3)'
+fi
+
+# ─── Check 15: Interview questions ────────────────────────────────────────────
+#
+# CLAUDE.md: every page ends with Junior and Senior interview questions, each a
+# <details class="qa"> (collapsed answer). The 596 questions were converted
+# from <p><strong>Q: …</strong><br> on 2026-11-24; this keeps the old form
+# from coming back through copy-paste, and a page from losing a level.
+#
+# QA_MIN is the per-level minimum CLAUDE.md asks for (3). It is 1 for now:
+# ten pages had only 2 questions in a level when this check was written, and
+# a check that is red from day one gets ignored. Raise it to 3 once they are
+# filled in.
+
+header "15. Interview questions"
+
+QA_MIN=1
+
+grep -rln '<p><strong>Q:' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
+  | sed "s|^$REPO_ROOT/||; s|$| → old <p><strong>Q: format|" > "$TMP/qa.txt" || true
+
+awk -v min="$QA_MIN" '
+  function report() {
+    if (prev != "" && (j < min || s < min))
+      printf "%s → junior %d, senior %d (minimum %d each)\n", prev, j, s, min
+  }
+  FNR == 1 { report(); prev = FILENAME; j = 0; s = 0; lvl = "" }
+  /info-box-title">(🎓|&#x1F393;)/ { lvl = "j" }
+  /info-box-title">(🔥|&#x1F525;)/ { lvl = "s" }
+  /<details class="qa">/ { if (lvl == "j") j++; else if (lvl == "s") s++ }
+  END { report() }
+' $(find "$TOPICS_DIR" -name '*.html' | sort) 2>/dev/null \
+  | sed "s|^$REPO_ROOT/||" >> "$TMP/qa.txt"
+
+QA_N=$(grep -c . "$TMP/qa.txt" || true)
+if [[ "$QA_N" -eq 0 ]]; then
+  pass "every page has junior and senior questions as <details class=\"qa\">"
+else
+  fail "$QA_N page(s) with missing or old-format interview questions"
+  show_capped "$(cat "$TMP/qa.txt")"
+  hint 'fix: copy the <details class="qa"> markup from topics/databases/relationships.html'
 fi
 
 # ─── Summary ──────────────────────────────────────────────────────────────────

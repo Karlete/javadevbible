@@ -6,6 +6,8 @@
    when the elements it needs are absent.
 
    - Copy button on every <pre><code> block
+   - "Show all answers" for interview questions (<details class="qa">),
+     and every answer opened while printing
    - Ctrl/Cmd + K focuses the search box on the index page
 
    Removed on 2026-11-23 because no page used them: collapsible sections,
@@ -17,7 +19,59 @@
 
     const COPY_RESET_MS = 2000;
 
-    document.addEventListener('DOMContentLoaded', initializeCopyButtons);
+    document.addEventListener('DOMContentLoaded', function () {
+        initializeCopyButtons();
+        initializeInterviewAnswers();
+    });
+
+    // ── Interview answers (<details class="qa">) ────────────────────────────
+
+    function initializeInterviewAnswers() {
+        const all = document.querySelectorAll('details.qa');
+        if (!all.length) return;
+
+        // One "Show all answers" button per section that holds questions, for
+        // reading straight through instead of practising one at a time.
+        document.querySelectorAll('.content-section').forEach(function (section) {
+            const items = section.querySelectorAll('details.qa');
+            const heading = section.querySelector('h2');
+            if (!items.length || !heading) return;
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'qa-toggle-all';
+            heading.after(button);
+
+            function sync() {
+                const allOpen = Array.prototype.every.call(items, function (d) { return d.open; });
+                button.textContent = allOpen ? 'Hide all answers' : 'Show all answers';
+                button.setAttribute('aria-pressed', String(allOpen));
+            }
+
+            button.addEventListener('click', function () {
+                const open = button.getAttribute('aria-pressed') !== 'true';
+                items.forEach(function (d) { d.open = open; });
+                sync();
+            });
+            // 'toggle' does not bubble; listen on each item so the label stays
+            // right when answers are opened one by one.
+            items.forEach(function (d) { d.addEventListener('toggle', sync); });
+            sync();
+        });
+
+        // A printed page has no way to click: open every answer for printing
+        // and restore what the reader had open afterwards.
+        let openBeforePrint = null;
+        window.addEventListener('beforeprint', function () {
+            openBeforePrint = Array.prototype.map.call(all, function (d) { return d.open; });
+            all.forEach(function (d) { d.open = true; });
+        });
+        window.addEventListener('afterprint', function () {
+            if (!openBeforePrint) return;
+            all.forEach(function (d, i) { d.open = openBeforePrint[i]; });
+            openBeforePrint = null;
+        });
+    }
 
     // In-page anchors are left to the browser on purpose. This file used to
     // intercept every a[href^="#"], scroll with JS and update the URL with

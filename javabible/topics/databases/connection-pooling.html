@@ -599,36 +599,43 @@ app.datasource.replica.hikari.pool-name=ReplicaPool</code></pre>
 
                 <div class="info-box note">
                     <div class="info-box-title">🎓 Junior level</div>
-                    <p><strong>Q: What is a connection pool and why is it necessary?</strong><br>
-                    A connection pool maintains a set of already-open database
+                    <details class="qa">
+                        <summary>What is a connection pool and why is it necessary?</summary>
+                        <p>A connection pool maintains a set of already-open database
                     connections that application code borrows and returns. Without one,
                     each database call would open a new physical TCP connection — a
                     50–200ms operation that dominates the total request time for fast
                     queries. The pool also limits the total number of connections to
                     the database, preventing the application from overwhelming the
                     database server's connection capacity under load.</p>
+                    </details>
 
-                    <p><strong>Q: What happens when <code>conn.close()</code> is called on a pooled connection?</strong><br>
-                    Nothing is physically closed. The connection is returned to the pool
+                    <details class="qa">
+                        <summary>What happens when <code>conn.close()</code> is called on a pooled connection?</summary>
+                        <p>Nothing is physically closed. The connection is returned to the pool
                     and marked available for the next caller. The pool's
                     <code>close()</code> implementation resets the connection state
                     (rolls back any open transactions, resets auto-commit) and makes
                     the connection available again. The actual TCP connection is only
                     closed when the pool retires it due to <code>max-lifetime</code>
                     or an error.</p>
+                    </details>
 
-                    <p><strong>Q: What does <code>maximum-pool-size</code> control?</strong><br>
-                    The total number of physical database connections the pool will
+                    <details class="qa">
+                        <summary>What does <code>maximum-pool-size</code> control?</summary>
+                        <p>The total number of physical database connections the pool will
                     maintain at any one time — both active (in use) and idle (waiting).
                     If all connections are active and a new request tries to borrow one,
                     the request waits up to <code>connection-timeout</code> milliseconds
                     for one to become available before throwing an exception.</p>
+                    </details>
                 </div>
 
                 <div class="info-box important">
                     <div class="info-box-title">🔥 Senior level</div>
-                    <p><strong>Q: Your application throws <code>HikariPool-1 - Connection is not available, request timed out after 5000ms</code> under moderate load. Increasing <code>maximum-pool-size</code> from 10 to 50 fixes it. Six weeks later the same error returns. What is likely happening, and what is the correct diagnostic approach?</strong><br>
-                    The likely root cause is a connection leak — code that borrows a
+                    <details class="qa">
+                        <summary>Your application throws <code>HikariPool-1 - Connection is not available, request timed out after 5000ms</code> under moderate load. Increasing <code>maximum-pool-size</code> from 10 to 50 fixes it. Six weeks later the same error returns. What is likely happening, and what is the correct diagnostic approach?</summary>
+                        <p>The likely root cause is a connection leak — code that borrows a
                     connection but never returns it, either because of a bug in
                     exception handling or because a code path that should use
                     try-with-resources doesn't. Increasing the pool size delayed
@@ -640,9 +647,11 @@ app.datasource.replica.hikari.pool-name=ReplicaPool</code></pre>
                     Once the leak is fixed, the pool size can be reduced back to a
                     value calibrated by actual load, not by how fast the leak exhausts
                     it.</p>
+                    </details>
 
-                    <p><strong>Q: You receive "Connection reset by peer" errors on the first query of the day, but all subsequent queries succeed. What is the most likely cause and how do you fix it?</strong><br>
-                    The database server has closed idle connections that have been
+                    <details class="qa">
+                        <summary>You receive "Connection reset by peer" errors on the first query of the day, but all subsequent queries succeed. What is the most likely cause and how do you fix it?</summary>
+                        <p>The database server has closed idle connections that have been
                     inactive overnight. If <code>max-lifetime</code> is longer than
                     the database's idle timeout, HikariCP still considers those
                     connections alive and hands them to the first callers of the day —
@@ -653,9 +662,11 @@ app.datasource.replica.hikari.pool-name=ReplicaPool</code></pre>
                     value shorter than the database's idle timeout (so HikariCP sends
                     a lightweight keepalive query to idle connections at that interval,
                     preventing the database from closing them in the first place).</p>
+                    </details>
 
-                    <p><strong>Q: You enable Virtual Threads with <code>spring.threads.virtual.enabled=true</code>. A colleague argues you can now increase <code>maximum-pool-size</code> to 500 because Virtual Threads make blocking I/O cheap. Is this correct?</strong><br>
-                    No. Virtual Threads address platform thread exhaustion — a virtual
+                    <details class="qa">
+                        <summary>You enable Virtual Threads with <code>spring.threads.virtual.enabled=true</code>. A colleague argues you can now increase <code>maximum-pool-size</code> to 500 because Virtual Threads make blocking I/O cheap. Is this correct?</summary>
+                        <p>No. Virtual Threads address platform thread exhaustion — a virtual
                     thread blocked on JDBC I/O yields its carrier platform thread,
                     allowing the carrier to run other virtual threads. But the JDBC
                     connection itself is still held for the entire duration of the
@@ -668,6 +679,7 @@ app.datasource.replica.hikari.pool-name=ReplicaPool</code></pre>
                     The correct pool size is determined by database capacity
                     (core count × 2 + spindle count, adjusted for workload), not by
                     how many virtual threads the JVM can create.</p>
+                    </details>
                 </div>
             </section>
 

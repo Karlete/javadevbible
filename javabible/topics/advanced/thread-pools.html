@@ -486,30 +486,37 @@ tpe.getTaskCount();          <span class="comment">// total submitted</span>
                 <div class="info-box note">
                     <div class="info-box-title">🎓 Junior level</div>
 
-                    <p><strong>Q: Why use a thread pool instead of creating threads manually?</strong><br>
-                    Thread creation is expensive (OS thread allocation, stack memory). Creating one
+                    <details class="qa">
+                        <summary>Why use a thread pool instead of creating threads manually?</summary>
+                        <p>Thread creation is expensive (OS thread allocation, stack memory). Creating one
                     thread per task at scale means thousands of threads competing for CPU, exhausting
                     memory and causing excessive context switching. A thread pool creates threads
                     once and reuses them, queuing excess tasks instead of spawning new threads.</p>
+                    </details>
 
-                    <p><strong>Q: What is the difference between execute() and submit()?</strong><br>
-                    <code>execute(Runnable)</code> returns void — no way to get a result or catch
+                    <details class="qa">
+                        <summary>What is the difference between execute() and submit()?</summary>
+                        <p><code>execute(Runnable)</code> returns void — no way to get a result or catch
                     exceptions (they're passed to the thread's uncaught exception handler).
                     <code>submit(Callable)</code> returns a <code>Future</code> — you can retrieve
                     the result, and exceptions are held until <code>future.get()</code> is called,
                     where they're wrapped in <code>ExecutionException</code>.</p>
+                    </details>
 
-                    <p><strong>Q: What happens if you don't call shutdown() on an ExecutorService?</strong><br>
-                    The pool's worker threads are non-daemon by default and will keep the JVM alive
+                    <details class="qa">
+                        <summary>What happens if you don't call shutdown() on an ExecutorService?</summary>
+                        <p>The pool's worker threads are non-daemon by default and will keep the JVM alive
                     indefinitely — even after <code>main()</code> returns. This is a resource
                     leak: threads consume memory and OS handles without doing any work.</p>
+                    </details>
                 </div>
 
                 <div class="info-box important">
                     <div class="info-box-title">🔥 Senior level</div>
 
-                    <p><strong>Q: Explain the ThreadPoolExecutor task submission flow.</strong><br>
-                    (1) If running threads &lt; <code>corePoolSize</code>, create a new core thread
+                    <details class="qa">
+                        <summary>Explain the ThreadPoolExecutor task submission flow.</summary>
+                        <p>(1) If running threads &lt; <code>corePoolSize</code>, create a new core thread
                     even if idle threads exist. (2) If at core size, try to enqueue the task. If
                     the queue accepts it, return — existing threads will pick it up. (3) If the
                     queue is full and running threads &lt; <code>maximumPoolSize</code>, create a
@@ -517,18 +524,22 @@ tpe.getTaskCount();          <span class="comment">// total submitted</span>
                     handler fires. This is why with an <em>unbounded</em> queue (as in
                     <code>Executors.newFixedThreadPool</code>), <code>maximumPoolSize</code> is
                     irrelevant — the queue never fills, so extra threads are never created.</p>
+                    </details>
 
-                    <p><strong>Q: What is the danger of Executors.newCachedThreadPool() in production?</strong><br>
-                    <code>newCachedThreadPool()</code> uses a <code>SynchronousQueue</code> (zero
+                    <details class="qa">
+                        <summary>What is the danger of Executors.newCachedThreadPool() in production?</summary>
+                        <p><code>newCachedThreadPool()</code> uses a <code>SynchronousQueue</code> (zero
                     capacity) and <code>maximumPoolSize = Integer.MAX_VALUE</code>. Every submitted
                     task either finds an idle thread or spawns a new one — there is no queue and
                     no upper bound. Under sustained load, this creates thousands of threads, leading
                     to <code>OutOfMemoryError</code>. In production, always use
                     <code>ThreadPoolExecutor</code> directly with a bounded queue and explicit
                     core/max sizes.</p>
+                    </details>
 
-                    <p><strong>Q: What is work stealing and when does ForkJoinPool outperform fixed thread pools?</strong><br>
-                    In a fixed pool, each thread has a shared task queue — all threads compete for
+                    <details class="qa">
+                        <summary>What is work stealing and when does ForkJoinPool outperform fixed thread pools?</summary>
+                        <p>In a fixed pool, each thread has a shared task queue — all threads compete for
                     the same lock. In <code>ForkJoinPool</code>, each thread has its own
                     double-ended deque. Threads push/pop from their own deque (no contention) and
                     steal from the <em>tail</em> of other threads' deques when idle. This reduces
@@ -536,15 +547,18 @@ tpe.getTaskCount();          <span class="comment">// total submitted</span>
                     recursive divide-and-conquer tasks where subtask counts are high and tasks are
                     short. For independent tasks of similar duration, a fixed pool is simpler and
                     equally efficient.</p>
+                    </details>
 
-                    <p><strong>Q: How do you handle uncaught exceptions in scheduled tasks?</strong><br>
-                    An uncaught exception in a <code>scheduleAtFixedRate</code> task silently cancels
+                    <details class="qa">
+                        <summary>How do you handle uncaught exceptions in scheduled tasks?</summary>
+                        <p>An uncaught exception in a <code>scheduleAtFixedRate</code> task silently cancels
                     all future executions — the <code>ScheduledFuture</code> completes exceptionally
                     and no more executions are scheduled. The fix: wrap the task body in a
                     try-catch that logs and does NOT rethrow. To detect silent cancellation, call
                     <code>future.get()</code> periodically — it will throw <code>ExecutionException</code>
                     if the task failed. In Spring, <code>@Scheduled</code> with
                     <code>TaskSchedulerCustomizer</code> can configure a global error handler.</p>
+                    </details>
                 </div>
             </section>
 

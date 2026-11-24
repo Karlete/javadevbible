@@ -509,37 +509,46 @@
 
                 <div class="info-box note">
                     <div class="info-box-title">🎓 Junior level</div>
-                    <p><strong>Q: What is the difference between a topic, a partition and an offset?</strong><br>
-                    A topic is a named log of records. It is split into partitions,
+                    <details class="qa">
+                        <summary>What is the difference between a topic, a partition and an offset?</summary>
+                        <p>A topic is a named log of records. It is split into partitions,
                     each an ordered, append-only sequence stored on a broker;
                     partitions are what Kafka parallelises and replicates. An offset
                     is the position of a record within one partition, and a consumer
                     group tracks, per partition, the offset it has processed up to.</p>
+                    </details>
 
-                    <p><strong>Q: Why do we send the order id as the record key?</strong><br>
-                    Records with the same key always land in the same partition, and
+                    <details class="qa">
+                        <summary>Why do we send the order id as the record key?</summary>
+                        <p>Records with the same key always land in the same partition, and
                     Kafka guarantees order only within a partition. Keying by order
                     id keeps every event of one order — placed, paid, shipped — in the
                     order they were produced, while different orders are spread
                     across partitions and processed in parallel.</p>
+                    </details>
 
-                    <p><strong>Q: What is a consumer group?</strong><br>
-                    A set of consumers sharing a <code>group.id</code>. Kafka assigns
+                    <details class="qa">
+                        <summary>What is a consumer group?</summary>
+                        <p>A set of consumers sharing a <code>group.id</code>. Kafka assigns
                     each partition to exactly one member, so the group shares the
                     work; different groups each receive every record. Notification and
                     invoicing use different groups, so both see every order.</p>
+                    </details>
 
-                    <p><strong>Q: What does "at-least-once delivery" mean for the code you write?</strong><br>
-                    A record may be delivered more than once — after a crash before
+                    <details class="qa">
+                        <summary>What does "at-least-once delivery" mean for the code you write?</summary>
+                        <p>A record may be delivered more than once — after a crash before
                     the offset commit, a rebalance, or a producer or outbox retry. The
                     consumer has to produce the same result when it sees the same
                     event twice, typically by recording processed event ids.</p>
+                    </details>
                 </div>
 
                 <div class="info-box important">
                     <div class="info-box-title">🔥 Senior level</div>
-                    <p><strong>Q: An order is saved and an <code>OrderPlaced</code> event is sent from the same <code>@Transactional</code> method. What can go wrong, and how do you fix it?</strong><br>
-                    The database and Kafka are separate systems; the Spring
+                    <details class="qa">
+                        <summary>An order is saved and an <code>OrderPlaced</code> event is sent from the same <code>@Transactional</code> method. What can go wrong, and how do you fix it?</summary>
+                        <p>The database and Kafka are separate systems; the Spring
                     transaction covers only the database. If the send succeeds and the
                     transaction then rolls back, consumers react to an order that does
                     not exist. Sending after commit fixes that but loses the event if
@@ -548,9 +557,11 @@
                     to an outbox table in the same transaction, then publish it with a
                     relay or CDC (Debezium). That gives at-least-once publication,
                     which in turn requires idempotent consumers.</p>
+                    </details>
 
-                    <p><strong>Q: Consumer lag keeps growing and the logs show frequent rebalances. How do you diagnose it?</strong><br>
-                    Frequent rebalances with growing lag usually mean processing a
+                    <details class="qa">
+                        <summary>Consumer lag keeps growing and the logs show frequent rebalances. How do you diagnose it?</summary>
+                        <p>Frequent rebalances with growing lag usually mean processing a
                     batch exceeds <code>max.poll.interval.ms</code>: the member is
                     evicted, its partitions move, and the batch is reprocessed
                     elsewhere — so work is repeated and little progresses. Check
@@ -561,9 +572,11 @@
                     outages, more partitions and consumers if throughput is the real
                     limit. Kafka 4's KIP-848 protocol reduces the cost of each
                     rebalance but not the cause.</p>
+                    </details>
 
-                    <p><strong>Q: A record that can never be deserialised arrives on a partition. What happens with a default setup, and what should happen?</strong><br>
-                    Without <code>ErrorHandlingDeserializer</code>, deserialisation
+                    <details class="qa">
+                        <summary>A record that can never be deserialised arrives on a partition. What happens with a default setup, and what should happen?</summary>
+                        <p>Without <code>ErrorHandlingDeserializer</code>, deserialisation
                     fails inside the consumer before the listener is called; depending
                     on the version and configuration, the container cannot get past
                     that offset and the partition stalls — a poison pill. Wrapping the
@@ -572,9 +585,11 @@
                     <code>DefaultErrorHandler</code> treats as not retryable and sends
                     straight to the dead-letter topic with the original bytes and the
                     exception in the headers.</p>
+                    </details>
 
-                    <p><strong>Q: Does Kafka's exactly-once semantics mean the customer gets exactly one email?</strong><br>
-                    No. Kafka's exactly-once semantics — idempotent producers plus
+                    <details class="qa">
+                        <summary>Does Kafka's exactly-once semantics mean the customer gets exactly one email?</summary>
+                        <p>No. Kafka's exactly-once semantics — idempotent producers plus
                     transactions — covers read-process-write loops <em>within
                     Kafka</em>: consuming from one topic, producing to another and
                     committing the offsets atomically. An email, an HTTP call or a
@@ -582,6 +597,7 @@
                     cannot roll back. For those, the guarantee is at-least-once
                     delivery plus an idempotent consumer, which gives effectively-once
                     results.</p>
+                    </details>
                 </div>
             </section>
 
