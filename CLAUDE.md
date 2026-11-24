@@ -61,7 +61,7 @@ If you changed `mcp/` **or the search index / search algorithm**, also run `cd m
 ├── index.html                     category navigation + instant search
 ├── topics/{category}/{topic}.html 96 topic pages
 ├── css/                           main.css, syntax-highlighting.css, toc.css
-├── js/                            search.js, navigation.js, toc.js
+├── js/                            search.js, navigation.js, toc.js, demos.js
 ├── data/search-index.json         must always match topics/ on disk — verify.sh checks this
 ├── favicon.svg, img/              icon, og-card.jpg (1200×630 share image for every page),
 │                                  javadevlogo.jpg (stock image, no longer shown on the home)
@@ -140,7 +140,7 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
   - **Canonical**, `og:url` and every JSON-LD URL are absolute under `https://karlete.github.io/javadevbible/javabible/`. `og:image` is always `img/og-card.jpg`.
   - **JSON-LD**: an `@graph` with a `TechArticle` (headline = `<h1>`, name = search title, description, url, image, `inLanguage`, `articleSection` = category, `isPartOf` the WebSite) and a `BreadcrumbList` Home → category (`index.html#anchor`) → this page. Escape `</` as `<\/` inside it. No dates and no author: nothing keeps them true, and a wrong `dateModified` is worse than none — freshness comes from the sitemap's `<lastmod>`.
 - Stylesheets: `main.css`, `syntax-highlighting.css`, `toc.css`.
-- Scripts at the end of `<body>`: `navigation.js`, `toc.js` on topic pages. `index.html` additionally loads `search.js`. The home hero is deliberately static: no animated gradient, particles or typing effect (removed 2026-11-24 because they made the site read as a generic template).
+- Scripts at the end of `<body>`: `navigation.js`, `toc.js` on topic pages. `index.html` additionally loads `search.js`. A page with an interactive demo (`<figure data-demo="…" hidden>`, see `js/demos.js`; first one: the N+1 demo in `topics/databases/relationships.html`) also loads `demos.js` last; without JS the placeholder stays hidden and the page reads as before. The home hero is deliberately static: no animated gradient, particles or typing effect (removed 2026-11-24 because they made the site read as a generic template).
 - TOC sidebar (`<aside class="toc-sidebar" id="toc-sidebar">`) — copy the exact markup from a reference page below. Do not hand-roll it.
 - Tables need **no class**. `main.css` styles `<table>` globally. Use `<tr class="row-highlight">` to emphasise a row.
 - **Code blocks are hand-highlighted HTML.** There is no highlighter library. Inside `<pre><code>`, every literal `<`, `>` and `&` must be written `&lt;`, `&gt;`, `&amp;` — an unescaped `<pid>` or `List<Order>` is parsed as a tag and silently disappears from the page. Token classes are `keyword`, `class-name`, `annotation`, `comment`, `string`, `function`, `number`, `attribute`; every `<span>` must be closed on the line it means to end. `verify.sh` catches tags inside `<pre>` that are not `span`/`mark`/`b`/`strong`/`em`/`code`.
