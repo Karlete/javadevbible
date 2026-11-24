@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker for Spring Boot: Dockerfile, Layers &amp; Compose - JavaDev Bible</title>
+    <meta name="description" content="How to package a Spring Boot app as a container image: a layered Dockerfile, buildpacks, the Java 25 AOT cache, JVM memory limits and Compose.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/docker.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Docker for Spring Boot: Dockerfile, Layers &amp; Compose">
+    <meta property="og:description" content="How to package a Spring Boot app as a container image: a layered Dockerfile, buildpacks, the Java 25 AOT cache, JVM memory limits and Compose.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/docker.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Docker for Spring Boot",
+              "name": "Docker for Spring Boot: Dockerfile, Layers & Compose",
+              "description": "How to package a Spring Boot app as a container image: a layered Dockerfile, buildpacks, the Java 25 AOT cache, JVM memory limits and Compose.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/docker.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Docker for Spring Boot",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/docker.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Docker for Spring Boot
+            </nav>
+            <h1>Docker for Spring Boot</h1>
+            <p class="topic-subtitle">From a fat JAR copied into an image to a layered build that rebuilds in seconds — plus the JVM memory and shutdown settings that containers get wrong, and a Compose file that runs Postgres and Kafka next to the shop on every machine</p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What a Container Image Is — and Why "It Works on My Machine" Stops Being an Excuse</h2>
+                <p>A Spring Boot JAR is not self-contained. It needs a specific Java
+                    runtime, the right operating-system libraries, environment
+                    variables, and — for the shop — a PostgreSQL database and a Kafka
+                    broker. Every machine that runs it has to provide all of that, and
+                    every machine provides it slightly differently.</p>
+
+                <p>A <strong>container image</strong> packages the application
+                    together with the runtime and the filesystem it expects: a
+                    read-only stack of <em>layers</em>, each one the result of an
+                    instruction in a <code>Dockerfile</code>. A
+                    <strong>container</strong> is a running process started from an
+                    image, isolated by the Linux kernel (namespaces for what it can
+                    see, cgroups for how much CPU and memory it can use). The same
+                    image runs on a laptop, in CI and in production, so the
+                    difference between environments shrinks to configuration.</p>
+
+                <p>Writing a Dockerfile that <em>works</em> takes three lines.
+                    Writing one that builds fast, starts fast, shuts down cleanly and
+                    respects memory limits is where the actual skill is:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">Dockerfile — works, and is wrong in five ways</span></figcaption>
+                    <pre><code><span class="comment"># Deprecated image, and "latest" changes under you between two builds</span>
+<span class="keyword">FROM</span> openjdk:latest
+<span class="comment"># The whole 80 MB fat JAR is ONE layer: every commit invalidates it,
+# so every deploy pushes and pulls all the dependencies again</span>
+<span class="keyword">COPY</span> target/shop.jar /app.jar
+<span class="comment"># Runs as root, and the shell form starts /bin/sh as PID 1:
+# docker stop sends SIGTERM to the shell, which does not forward it to Java</span>
+<span class="keyword">ENTRYPOINT</span> java -jar /app.jar</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">Dockerfile — layered, pinned, non-root</span></figcaption>
+                    <pre><code><span class="comment"># Stage 1: split the fat JAR into layers that change at different speeds</span>
+<span class="keyword">FROM</span> eclipse-temurin:25-jre <span class="keyword">AS</span> builder
+<span class="keyword">WORKDIR</span> /builder
+<span class="keyword">COPY</span> target/shop.jar application.jar
+<span class="keyword">RUN</span> java -Djarmode=tools -jar application.jar extract --layers --destination extracted
+
+<span class="comment"># Stage 2: the runtime image. A JRE, not a JDK: no compiler in production</span>
+<span class="keyword">FROM</span> eclipse-temurin:25-jre
+<span class="keyword">RUN</span> useradd --system --uid 1001 shop
+<span class="keyword">USER</span> shop
+<span class="keyword">WORKDIR</span> /application
+<span class="comment"># Least volatile first: a code-only change rebuilds and ships just the last layer</span>
+<span class="keyword">COPY</span> --from=builder /builder/extracted/dependencies/ ./
+<span class="keyword">COPY</span> --from=builder /builder/extracted/spring-boot-loader/ ./
+<span class="keyword">COPY</span> --from=builder /builder/extracted/snapshot-dependencies/ ./
+<span class="keyword">COPY</span> --from=builder /builder/extracted/application/ ./
+<span class="comment"># Exec form: java is PID 1 and receives SIGTERM directly, so graceful shutdown works</span>
+<span class="keyword">ENTRYPOINT</span> [<span class="string">"java"</span>, <span class="string">"-jar"</span>, <span class="string">"application.jar"</span>]</code></pre>
+                </figure>
+
+                <table>
+                    <tr><th>Problem in the naive version</th><th>What it costs</th><th>Fix</th></tr>
+                    <tr><td>One layer for the whole JAR</td><td>Every deploy ships ~80 MB of unchanged dependencies</td><td>Layered extraction, least volatile layer first</td></tr>
+                    <tr><td><code>openjdk:latest</code></td><td>Unreproducible builds; the official <code>openjdk</code> image is deprecated</td><td>A maintained image with a pinned major version</td></tr>
+                    <tr><td>Full JDK at runtime</td><td>Larger image, a compiler available to an attacker</td><td>JRE runtime stage</td></tr>
+                    <tr><td>Running as root</td><td>A container escape starts with root privileges</td><td><code>USER</code> with a fixed UID</td></tr>
+                    <tr><td>Shell-form <code>ENTRYPOINT</code></td><td>SIGTERM never reaches the JVM; in-flight orders are cut off by SIGKILL</td><td>Exec form (JSON array)</td></tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — LAYERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Layers and the Build Cache — Why Order Matters</h2>
+                <p>Every instruction that changes the filesystem
+                    (<code>COPY</code>, <code>RUN</code>, <code>ADD</code>) produces
+                    a layer, identified by a hash of its content. Docker reuses a
+                    cached layer only if that instruction <em>and every instruction
+                    before it</em> are unchanged. The moment one layer changes, every
+                    layer after it is rebuilt — and every registry push and server
+                    pull transfers only the layers the other side does not have.</p>
+
+                <p>That makes the order of <code>COPY</code> instructions a
+                    performance decision. Spring Boot's tools mode
+                    (<code>-Djarmode=tools</code>, the replacement for the older
+                    <code>layertools</code> mode) splits the fat JAR into four
+                    directories so they can become four layers:</p>
+
+                <table>
+                    <tr><th>Layer</th><th>Contents</th><th>Changes when</th></tr>
+                    <tr><td><code>dependencies</code></td><td>Release JARs: Spring, Hibernate, the Kafka client…</td><td>You upgrade a library — a few times a month</td></tr>
+                    <tr><td><code>spring-boot-loader</code></td><td>The launcher that boots the extracted layout</td><td>You upgrade Spring Boot</td></tr>
+                    <tr><td><code>snapshot-dependencies</code></td><td><code>-SNAPSHOT</code> JARs, e.g. an internal library under development</td><td>Often, during development</td></tr>
+                    <tr class="row-highlight"><td><code>application</code></td><td>Your classes and <code>application.yaml</code></td><td>Every commit</td></tr>
+                </table>
+
+                <p>With this order, a commit that touches only
+                    <code>OrderService</code> rebuilds and ships a layer of a few
+                    hundred kilobytes; the dependency layer stays cached on the CI
+                    runner, in the registry and on every node that already pulled
+                    the previous version.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">The extracted layout also starts faster</div>
+                    <p>The runtime stage does not run the fat JAR. It runs an
+                        <code>application.jar</code> that contains only your code and
+                        references the extracted dependency JARs on the filesystem.
+                        Loading classes from plain files is faster than unpacking
+                        nested JARs, and it is the layout the AOT cache and CDS
+                        require — a cache trained against the fat JAR has no
+                        effect.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — AOT CACHE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Faster Startup: the AOT Cache on Java 25</h2>
+                <p>A Spring Boot application spends most of its startup loading,
+                    linking and initialising thousands of classes. The JVM can record
+                    that work during a <em>training run</em> and store it in an
+                    <strong>AOT cache</strong> file; the next start maps the cache
+                    instead of repeating the work. Spring Boot supports the AOT cache
+                    from Java 25 on; on older Java versions the equivalent, with a
+                    smaller gain, is Class Data Sharing (CDS).</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-label">Fix</span> <span class="code-path">Dockerfile — runtime stage with an AOT cache</span></figcaption>
+                    <pre><code><span class="keyword">COPY</span> --from=builder /builder/extracted/application/ ./
+<span class="line-add"><span class="comment"># Training run: start the context, record class loading, exit after refresh</span></span>
+<span class="line-add"><span class="keyword">RUN</span> java -XX:AOTCacheOutput=app.aot -Dspring.context.exit=onRefresh \</span>
+<span class="line-add">        -Dspring.profiles.active=training -jar application.jar</span>
+<span class="line-del"><span class="keyword">ENTRYPOINT</span> [<span class="string">"java"</span>, <span class="string">"-jar"</span>, <span class="string">"application.jar"</span>]</span>
+<span class="line-add"><span class="keyword">ENTRYPOINT</span> [<span class="string">"java"</span>, <span class="string">"-XX:AOTCache=app.aot"</span>, <span class="string">"-jar"</span>, <span class="string">"application.jar"</span>]</span></code></pre>
+                </figure>
+
+                <p>The training run executes <em>during <code>docker build</code></em>,
+                    and it refreshes the whole application context. In the shop
+                    that means Flyway wants to migrate a database and Hibernate wants
+                    to read JDBC metadata — and there is no database inside a build.
+                    A dedicated profile keeps the training run away from external
+                    systems:</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/application-training.yaml</span></figcaption>
+                    <pre><code><span class="comment"># Active only for the training run inside docker build</span>
+<span class="attribute">spring</span>:
+  <span class="attribute">flyway</span>:
+    <span class="attribute">enabled</span>: <span class="keyword">false</span>
+  <span class="attribute">jpa</span>:
+    <span class="attribute">properties</span>:
+      <span class="comment"># Hibernate needs the dialect up front when it may not ask the database</span>
+      <span class="attribute">hibernate.boot.allow_jdbc_metadata_access</span>: <span class="keyword">false</span>
+      <span class="attribute">hibernate.dialect</span>: org.hibernate.dialect.PostgreSQLDialect</code></pre>
+                </figure>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">The cache is tied to one build</div>
+                    <p>An AOT cache is valid only for the exact application and the
+                        exact JVM that produced it. Train it in the same Dockerfile,
+                        on the same base image, as the image that uses it — never copy
+                        an <code>app.aot</code> between builds. And measure: the gain
+                        depends on how much of startup is class loading versus, for
+                        example, waiting for a connection pool.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — BUILDPACKS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>No Dockerfile at All: Cloud Native Buildpacks</h2>
+                <p>The Spring Boot Maven and Gradle plugins can build an OCI image
+                    without a Dockerfile, using Paketo buildpacks. The plugin detects
+                    the Java version from the build, picks a matching JRE, applies the
+                    same layering and produces a non-root image:</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">terminal</span></figcaption>
+                    <pre><code><span class="comment"># Maven — the image is named after artifactId:version by default</span>
+./mvnw spring-boot:build-image -Dspring-boot.build-image.imageName=registry.example.com/shop:1.4.0
+
+<span class="comment"># Gradle</span>
+./gradlew bootBuildImage --imageName=registry.example.com/shop:1.4.0</code></pre>
+                </figure>
+
+                <table>
+                    <tr><th></th><th>Dockerfile</th><th>Buildpacks</th></tr>
+                    <tr><td>Control</td><td>Total: base image, users, extra packages, entrypoint</td><td>Configuration through <code>BP_*</code> environment variables</td></tr>
+                    <tr><td>Maintenance</td><td>You patch the base image and keep the file current</td><td>Rebuild picks up patched JREs and OS packages</td></tr>
+                    <tr><td>Needs</td><td>Docker only</td><td>A Docker daemon for the build; downloads builder images</td></tr>
+                    <tr><td>Fits</td><td>Teams with platform conventions, unusual runtimes</td><td>Teams that want a secure default with no Dockerfile to own</td></tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — THE JVM INSIDE A CONTAINER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The JVM Inside a Container: Memory and Shutdown</h2>
+
+                <h3>Memory: the default heap is a quarter of the limit</h3>
+                <p>The JVM is container-aware: it reads the cgroup memory limit, not
+                    the host's RAM. But its default maximum heap is
+                    <strong>25% of that limit</strong>. A shop container limited to
+                    2 GiB gets a 512 MiB heap and leaves 1.5 GiB unused — or, if
+                    someone "fixes" it with <code>-Xmx2g</code>, the heap plus
+                    metaspace, thread stacks and direct buffers exceed the limit and
+                    the kernel kills the container (exit code 137, OOMKilled) with
+                    no <code>OutOfMemoryError</code> in the logs.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">compose.yaml — shop service (excerpt)</span></figcaption>
+                    <pre><code>  <span class="attribute">shop</span>:
+    <span class="attribute">image</span>: registry.example.com/shop:1.4.0
+    <span class="attribute">deploy</span>:
+      <span class="attribute">resources</span>:
+        <span class="attribute">limits</span>:
+          <span class="attribute">memory</span>: 2g
+    <span class="attribute">environment</span>:
+      <span class="comment"># A percentage follows the limit when ops change it; -Xmx would not.
+      # 75% leaves room for metaspace, thread stacks and direct buffers.</span>
+      <span class="attribute">JAVA_TOOL_OPTIONS</span>: <span class="string">"-XX:MaxRAMPercentage=75"</span></code></pre>
+                </figure>
+
+                <h3>Shutdown: two timeouts that must agree</h3>
+                <p><code>docker stop</code> sends SIGTERM, waits (10 seconds by
+                    default) and then sends SIGKILL. Since Spring Boot 3.4, graceful
+                    shutdown is on by default: on SIGTERM the embedded server stops
+                    accepting requests and lets in-flight ones finish, for up to
+                    <code>spring.lifecycle.timeout-per-shutdown-phase</code>
+                    (30 seconds by default). If Docker's grace period is shorter
+                    than Spring's, Docker wins: a checkout halfway through
+                    <code>OrderService.placeOrder()</code> is killed mid-request.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">compose.yaml + application.yaml</span></figcaption>
+                    <pre><code><span class="comment"># compose.yaml — give the container more time than Spring needs</span>
+  <span class="attribute">shop</span>:
+    <span class="attribute">stop_grace_period</span>: 40s
+
+<span class="comment"># application.yaml — the budget for finishing in-flight requests</span>
+<span class="attribute">spring</span>:
+  <span class="attribute">lifecycle</span>:
+    <span class="attribute">timeout-per-shutdown-phase</span>: 30s</code></pre>
+                </figure>
+                <p>None of this works with a shell-form <code>ENTRYPOINT</code>:
+                    the signal goes to <code>/bin/sh</code>, Java never sees it, and
+                    the container always dies by SIGKILL after the grace period.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — COMPOSE FOR LOCAL DEVELOPMENT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Docker Compose: Postgres and Kafka on Every Developer's Machine</h2>
+                <p>The shop needs PostgreSQL for orders and Kafka for the
+                    <code>OrderPlaced</code> events the notification module consumes.
+                    Installing both on every laptop, at the right versions, is the
+                    classic onboarding day lost. A <code>compose.yaml</code> in the
+                    repository describes them once:</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">compose.yaml</span></figcaption>
+                    <pre><code><span class="attribute">services</span>:
+  <span class="attribute">postgres</span>:
+    <span class="attribute">image</span>: postgres:17
+    <span class="attribute">environment</span>:
+      <span class="attribute">POSTGRES_DB</span>: shop
+      <span class="attribute">POSTGRES_USER</span>: shop
+      <span class="attribute">POSTGRES_PASSWORD</span>: shop      <span class="comment"># local only — never a real secret in compose.yaml</span>
+    <span class="attribute">ports</span>:
+      - <span class="string">"5432"</span>                    <span class="comment"># random host port: no clash with a local Postgres</span>
+    <span class="attribute">healthcheck</span>:
+      <span class="comment"># "Port open" is not "ready to accept queries"; pg_isready is</span>
+      <span class="attribute">test</span>: [<span class="string">"CMD-SHELL"</span>, <span class="string">"pg_isready -U shop -d shop"</span>]
+      <span class="attribute">interval</span>: 2s
+      <span class="attribute">retries</span>: 15
+
+  <span class="attribute">kafka</span>:
+    <span class="attribute">image</span>: apache/kafka:4.1.2          <span class="comment"># default config: one KRaft broker (Kafka 4 has no ZooKeeper)</span>
+    <span class="attribute">ports</span>:
+      - <span class="string">"9092:9092"</span>
+    <span class="attribute">labels</span>:
+      <span class="comment"># Tells Spring Boot which connection details to derive from this container</span>
+      <span class="attribute">org.springframework.boot.service-connection</span>: kafka</code></pre>
+                </figure>
+
+                <p>Add the <code>spring-boot-docker-compose</code> module and Spring
+                    Boot does the rest at startup: it runs <code>docker compose
+                    up</code>, waits for the containers to be ready, and creates
+                    <em>service connections</em> from them — the JDBC URL with the
+                    randomly mapped port, the username and password, the Kafka
+                    bootstrap servers. There is no <code>spring.datasource.url</code>
+                    to keep in sync with the compose file.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml (excerpt)</span></figcaption>
+                    <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-docker-compose&lt;/<span class="keyword">artifactId</span>&gt;
+    <span class="comment">&lt;!-- optional: never packaged into the production JAR --&gt;</span>
+    &lt;<span class="keyword">optional</span>&gt;true&lt;/<span class="keyword">optional</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Compose support is for development, not for tests or production</div>
+                    <p>It is skipped in tests by default, and it does nothing in the
+                        packaged JAR because the module is optional. For integration
+                        tests, Testcontainers starts disposable containers per test
+                        run with the same service-connection mechanism; in production,
+                        the platform (Kubernetes, a managed database, a managed Kafka)
+                        provides the services and configuration comes from the
+                        environment.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Extract the JAR with <code>-Djarmode=tools … extract --layers</code> and copy the layers from least to most volatile</li>
+                        <li>Pin the base image to a major version (<code>eclipse-temurin:25-jre</code>), and rebuild regularly to pick up its security patches</li>
+                        <li>Use a JRE in the runtime stage and run as a non-root user with a fixed UID</li>
+                        <li>Use the exec form of <code>ENTRYPOINT</code> so the JVM receives SIGTERM</li>
+                        <li>Size the heap with <code>-XX:MaxRAMPercentage</code> so it follows the container limit</li>
+                        <li>Make the orchestrator's grace period longer than <code>spring.lifecycle.timeout-per-shutdown-phase</code></li>
+                        <li>Keep a <code>.dockerignore</code> (<code>target/</code> except the JAR, <code>.git</code>, IDE folders) so the build context stays small</li>
+                        <li>Inject configuration and secrets through environment variables or the platform's secret store at run time</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't copy the fat JAR as a single layer — every deploy re-ships all dependencies</li>
+                        <li>Don't use <code>latest</code> or the deprecated <code>openjdk</code> image</li>
+                        <li>Don't hard-code <code>-Xmx</code> equal to the container limit — non-heap memory pushes the container over and it gets OOMKilled without a Java error</li>
+                        <li>Don't bake passwords, API keys or <code>application-prod.yaml</code> secrets into the image: every layer is readable by anyone who can pull it</li>
+                        <li>Don't build the JAR inside the runtime image with Maven — build it in CI (or a builder stage) and ship only the result</li>
+                        <li>Don't reuse an AOT cache or CDS archive across builds or JVM versions</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <p><strong>Q: What is the difference between an image and a container?</strong><br>
+                    An image is a read-only, layered filesystem plus metadata (the
+                    entrypoint, environment, exposed ports). A container is a running
+                    process started from an image, with a thin writable layer on top
+                    and its own isolated view of processes, network and filesystem.
+                    One image can run as many containers at once — three replicas of
+                    the shop are three containers from the same image.</p>
+
+                    <p><strong>Q: Why copy dependencies and application code in separate layers?</strong><br>
+                    Docker caches layers and reuses a layer only if it and every
+                    layer before it are unchanged. Dependencies change rarely and are
+                    large; application code changes on every commit and is small.
+                    Copying dependencies first means a code change rebuilds and
+                    transfers only the small application layer instead of the whole
+                    fat JAR.</p>
+
+                    <p><strong>Q: What does a multi-stage build give you?</strong><br>
+                    A builder stage can contain tools needed only to produce the
+                    artifact — here, extracting the JAR; in other setups, Maven and a
+                    JDK — and the final stage copies only the result. The runtime
+                    image stays small and contains nothing an attacker could use to
+                    compile or download code.</p>
+
+                    <p><strong>Q: How does the shop application find the database started by Docker Compose?</strong><br>
+                    With <code>spring-boot-docker-compose</code> on the classpath,
+                    Spring Boot starts the services in <code>compose.yaml</code>,
+                    recognises them by image name or by the
+                    <code>org.springframework.boot.service-connection</code> label,
+                    and creates connection details from the running containers,
+                    including the host port Docker mapped. No
+                    <code>spring.datasource.url</code> is needed for local
+                    development.</p>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <p><strong>Q: A Spring Boot container in production restarts with exit code 137 and there is no <code>OutOfMemoryError</code> in the logs. What happened and how do you fix it?</strong><br>
+                    137 is 128 + 9: the process received SIGKILL, and with no stop
+                    request in progress that is the kernel's OOM killer enforcing the
+                    cgroup memory limit. The JVM never threw because the heap was not
+                    full — the <em>process</em> exceeded the limit: heap plus
+                    metaspace, thread stacks (hundreds of request threads), direct
+                    buffers (Netty, the Kafka client), code cache and GC overhead.
+                    The usual cause is <code>-Xmx</code> set close to the limit.
+                    Fix: size the heap as a percentage
+                    (<code>-XX:MaxRAMPercentage=70–75</code>), measure non-heap usage
+                    with Native Memory Tracking, cap what grows unbounded (thread
+                    pools, direct memory), and only then raise the limit if the
+                    measurements justify it.</p>
+
+                    <p><strong>Q: Deployments drop a few checkout requests every time a pod or container is replaced, even with graceful shutdown enabled. Where do you look?</strong><br>
+                    First the entrypoint: in shell form, <code>/bin/sh</code> is PID 1
+                    and swallows SIGTERM, so the JVM is always SIGKILLed after the
+                    grace period. Second, the two timeouts: if the orchestrator's
+                    grace period (10s in Docker, 30s in Kubernetes) is not longer than
+                    <code>spring.lifecycle.timeout-per-shutdown-phase</code>, long
+                    requests are killed. Third, traffic routing: the load balancer may
+                    keep sending requests for a moment after SIGTERM; readiness must
+                    flip to "not ready" first — Spring Boot does this on shutdown,
+                    and in Kubernetes a short <code>preStop</code> sleep covers the
+                    window before endpoints are updated.</p>
+
+                    <p><strong>Q: Buildpacks or a hand-written Dockerfile — how do you decide?</strong><br>
+                    Buildpacks give a secure, layered, non-root image with no file to
+                    maintain, and a rebuild picks up patched JREs and OS packages —
+                    the right default for teams without platform conventions. A
+                    Dockerfile wins when you need control: a mandated base image, an
+                    extra OS package, a custom entrypoint, an AOT training run with a
+                    specific profile, or builds without access to the builder images.
+                    Either way the important properties are the same: layering, a
+                    JRE, non-root, exec-form entrypoint, pinned versions.</p>
+
+                    <p><strong>Q: The AOT cache made startup faster locally but makes no difference in the deployed image. What could be wrong?</strong><br>
+                    The cache is valid only for the same application and the same JVM
+                    that recorded it, and only when the application runs from the
+                    extracted layout. Common causes: the cache was trained against the
+                    fat JAR or on a different base image; it was copied from another
+                    build; the runtime entrypoint does not pass
+                    <code>-XX:AOTCache</code>; or the runtime image uses a different
+                    JDK build than the training stage. Train inside the same
+                    Dockerfile, on the same base image, against the extracted
+                    <code>application.jar</code>.</p>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../servers/war-jar.html" class="related-link"><span class="related-icon">📦</span>WAR vs JAR Files</a>
+                    <a href="../spring/boot.html" class="related-link"><span class="related-icon">🍃</span>Spring Boot Basics</a>
+                    <a href="../spring/profiles.html" class="related-link"><span class="related-icon">🔀</span>Profiles &amp; Environments</a>
+                    <a href="../tools/cicd.html" class="related-link"><span class="related-icon">🔁</span>CI/CD Basics</a>
+                    <a href="../advanced/garbage-collection.html" class="related-link"><span class="related-icon">♻️</span>Garbage Collection</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible</p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>

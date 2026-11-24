@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>{@code search_topics} — ranked multi-word search over the search index</li>
  *   <li>{@code get_topic_content} — read and clean a specific topic page</li>
- *   <li>{@code list_categories} — list all 13 categories with their topics</li>
+ *   <li>{@code list_categories} — list all 14 categories with their topics</li>
  * </ul>
  */
 @Component
@@ -297,7 +297,7 @@ public class JavaBibleTools {
     // ── Tool 3: list_categories ──────────────────────────────────────────
 
     @McpTool(description = """
-            List all 13 categories in JavaDevBible with their topic pages.
+            List all 14 categories in JavaDevBible with their topic pages.
             Use this to explore what content is available before searching,
             or when asked "what topics does JavaDevBible cover?"
             """)

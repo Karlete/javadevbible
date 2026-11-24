@@ -1,6 +1,6 @@
 # JavaDev Bible
 
-A static reference covering the Java ecosystem — 94 topics across 13 categories, written for junior and senior developers on the same page.
+A static reference covering the Java ecosystem — 95 topics across 14 categories, written for junior and senior developers on the same page.
 
 **[Read it here →](https://karlete.github.io/javadevbible/javabible/index.html)**
 
@@ -60,7 +60,7 @@ JavaDev Bible — integrity check
   ✓ 1392 links checked, all resolve
 
 2. Search index
-  ✓ index and disk agree (94 pages)
+  ✓ index and disk agree (95 pages)
 
 3. UTF-8 BOM
   ✓ no BOM in any HTML file
@@ -76,7 +76,7 @@ JavaDev Bible — integrity check
   ✓ every meta description is 70–160 characters
 
 7. Hand-written counts
-  ✓ every stated count matches disk (94 topics, 13 categories)
+  ✓ every stated count matches disk (95 topics, 14 categories)
 
 8. Code blocks
   ✓ every <pre> block is balanced and escaped
@@ -112,7 +112,7 @@ It knows what it does not cover: referential integrity, not behaviour. That gap 
 
 ## MCP server — use this Bible from Claude Desktop or Claude Code
 
-The `mcp/` directory contains a Spring Boot MCP server that exposes the Bible's content to any MCP-compatible AI assistant. Add it to Claude Desktop and ask Java questions backed by 94 topic pages — no API key, no cloud service, no port.
+The `mcp/` directory contains a Spring Boot MCP server that exposes the Bible's content to any MCP-compatible AI assistant. Add it to Claude Desktop and ask Java questions backed by 95 topic pages — no API key, no cloud service, no port.
 
 **Three tools are exposed:**
 
@@ -120,7 +120,7 @@ The `mcp/` directory contains a Spring Boot MCP server that exposes the Bible's 
 |---|---|
 | `search_topics` | Ranked multi-word search across every page (same algorithm as the site's search box) |
 | `get_topic_content` | Read the full content of a specific topic page |
-| `list_categories` | List all 13 categories and their topics |
+| `list_categories` | List all 14 categories and their topics |
 
 **Setup:**
 
@@ -208,7 +208,7 @@ bash tools/verify.sh --full   # do not truncate long failure lists
 ```
 javabible/
 ├── index.html              category navigation and search
-├── topics/{category}/      94 topic pages across 13 categories
+├── topics/{category}/      95 topic pages across 14 categories
 ├── css/                    main, syntax-highlighting, toc
 ├── js/                     search, navigation, toc
 └── data/
