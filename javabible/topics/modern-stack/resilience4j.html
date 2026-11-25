@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resilience4j in Spring Boot: Circuit Breaker &amp; Retry - JavaDev Bible</title>
+    <meta name="description" content="Fault tolerance for Spring Boot service calls: timeouts, Spring Framework 7 @Retryable, Resilience4j circuit breakers, bulkheads, fallbacks and monitoring.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/resilience4j.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Resilience4j in Spring Boot: Circuit Breaker &amp; Retry">
+    <meta property="og:description" content="Fault tolerance for Spring Boot service calls: timeouts, Spring Framework 7 @Retryable, Resilience4j circuit breakers, bulkheads, fallbacks and monitoring.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/resilience4j.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Resilience4j: Fault Tolerance for Spring Boot",
+              "name": "Resilience4j in Spring Boot: Circuit Breaker & Retry",
+              "description": "Fault tolerance for Spring Boot service calls: timeouts, Spring Framework 7 @Retryable, Resilience4j circuit breakers, bulkheads, fallbacks and monitoring.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/resilience4j.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Resilience4j: Fault Tolerance for Spring Boot",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/resilience4j.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Resilience4j
+            </nav>
+            <h1>Resilience4j: Fault Tolerance for Spring Boot</h1>
+            <p class="topic-subtitle">What checkout does when the inventory service is slow or down — timeouts, retries that are safe to repeat, a circuit breaker that stops hammering a failing service, and a limit on how much one dependency can take down with it</p>
+            <p class="reviewed-stamp">Checked against Spring Boot 4.2 · Spring Framework 7.1 · Resilience4j 2.4 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Fault Tolerance Is — and How One Slow Service Takes Down Another</h2>
+                <p><strong>Fault tolerance</strong> is a set of patterns that decide what a
+                    service does when something it calls misbehaves: give up after a deadline
+                    (timeout), try again (retry), stop calling something that is clearly broken
+                    (circuit breaker), and cap how much of the caller one dependency may occupy
+                    (bulkhead). <strong>Resilience4j</strong> is the library that implements them
+                    for Java, with annotations and configuration for Spring Boot.</p>
+
+                <p>The problem is rarely a dependency that is <em>down</em> — a refused
+                    connection fails fast. It is one that is <em>slow</em>. On the
+                    <a href="microservices.html">microservices page</a> checkout reserves stock by
+                    calling the inventory service. When inventory takes 30 seconds to answer,
+                    every checkout request waits 30 seconds, requests pile up, and the order
+                    service runs out of threads or connections. Inventory's problem has become
+                    the whole shop's outage.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/StockReservation.java — waits as long as inventory takes</span></figcaption>
+                    <pre><code><span class="comment">// No timeout, no limit, no plan for failure. A slow inventory service
+// holds every caller until the requests pile up and checkout stops for
+// everyone — including customers whose items are in stock.</span>
+<span class="keyword">public</span> <span class="class-name">ReservationResponse</span> <span class="function">reserve</span>(<span class="class-name">Cart</span> cart) {
+    <span class="keyword">return</span> inventory.reserve(<span class="keyword">new</span> <span class="class-name">ReservationRequest</span>(cart.lines()));
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/StockReservation.java — bounded and failing fast</span></figcaption>
+                    <pre><code><span class="comment">// The client times out after 2 s (configuration, below). After repeated
+// failures the circuit opens and calls fail immediately for 30 s, without
+// touching inventory; the fallback turns that into a clear 503 for the
+// customer instead of a page that spins for half a minute.</span>
+<span class="annotation">@CircuitBreaker</span>(name = <span class="string">"inventory"</span>, fallbackMethod = <span class="string">"inventoryUnavailable"</span>)
+<span class="keyword">public</span> <span class="class-name">ReservationResponse</span> <span class="function">reserve</span>(<span class="class-name">Cart</span> cart) {
+    <span class="keyword">return</span> inventory.reserve(<span class="keyword">new</span> <span class="class-name">ReservationRequest</span>(cart.lines()));
+}
+
+<span class="keyword">private</span> <span class="class-name">ReservationResponse</span> <span class="function">inventoryUnavailable</span>(<span class="class-name">Cart</span> cart, <span class="class-name">Throwable</span> cause) {
+    <span class="keyword">throw new</span> <span class="class-name">InventoryUnavailableException</span>(cause);   <span class="comment">// mapped to a 503 ProblemDetail</span>
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — WHICH TOOL
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Spring Framework 7 or Resilience4j?</h2>
+                <p>Spring Framework 7 added basic resilience to its core: a
+                    <code>@Retryable</code> annotation and a <code>@ConcurrencyLimit</code>,
+                    enabled with <code>@EnableResilientMethods</code>. For many services that is
+                    enough. Resilience4j is still the tool when you need a circuit breaker, rate
+                    limiting, or the metrics and health indicators that come with it.</p>
+
+                <table>
+                    <tr><th>Pattern</th><th>Spring Framework 7 core</th><th>Resilience4j</th></tr>
+                    <tr><td>Timeout</td><td colspan="2">Configure it on the HTTP client (<code>spring.http.serviceclient.&lt;group&gt;.read-timeout</code>) — the first and most important one</td></tr>
+                    <tr><td>Retry with back-off</td><td><code>@Retryable</code>, <code>RetryTemplate</code></td><td><code>@Retry</code></td></tr>
+                    <tr><td>Concurrency limit / bulkhead</td><td><code>@ConcurrencyLimit</code></td><td><code>@Bulkhead</code> (semaphore or thread pool)</td></tr>
+                    <tr class="row-highlight"><td>Circuit breaker</td><td>—</td><td><code>@CircuitBreaker</code></td></tr>
+                    <tr><td>Rate limiter</td><td>—</td><td><code>@RateLimiter</code></td></tr>
+                    <tr><td>Metrics, health, events</td><td>—</td><td>Micrometer metrics, Actuator health indicators and event endpoints</td></tr>
+                </table>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml — Resilience4j on Spring Boot 4</span></figcaption>
+                    <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;io.github.resilience4j&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;resilience4j-spring-boot4&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;2.4.0&lt;/<span class="keyword">version</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+<span class="comment">&lt;!-- The annotations are applied by AOP. Spring Boot 4 renamed the starter:
+     spring-boot-starter-aop is now spring-boot-starter-aspectj --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-aspectj&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-actuator&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — RETRY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Retry — Only What Is Safe to Repeat</h2>
+                <p>A retry turns a brief glitch — a dropped connection, a Pod being replaced —
+                    into a success the caller never notices. It is only safe when doing the
+                    operation twice has the same effect as doing it once. Reading the status of
+                    a payment is; capturing a payment is not, unless the provider deduplicates
+                    by an idempotency key.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">payment/PaymentStatusClient.java — Spring Framework 7</span></figcaption>
+                    <pre><code><span class="comment">// A GET is idempotent: retrying it cannot charge anyone twice. Only network
+// errors are retried — a 4xx means the request itself is wrong, and asking
+// again gives the same answer. Back-off spreads the retries out so a service
+// that is recovering is not flattened by every client retrying at once.</span>
+<span class="annotation">@Retryable</span>(includes = <span class="class-name">ResourceAccessException</span>.<span class="keyword">class</span>, maxRetries = <span class="number">3</span>, delay = <span class="number">200</span>, multiplier = <span class="number">2</span>)
+<span class="keyword">public</span> <span class="class-name">PaymentStatus</span> <span class="function">statusOf</span>(<span class="class-name">String</span> paymentId) {
+    <span class="keyword">return</span> payments.status(paymentId);
+}
+
+<span class="comment">// Once, in a @Configuration class</span>
+<span class="annotation">@EnableResilientMethods</span></code></pre>
+                </figure>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Retries multiply load exactly when a service is struggling</div>
+                    <p>Three layers that each retry three times turn one failing request into 64
+                        calls to the bottom service. Retry in one place — usually the caller
+                        closest to the user — with a small number of attempts and exponential
+                        back-off with jitter, and never retry a call that already timed out
+                        because the other side is overloaded.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — CIRCUIT BREAKER
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Circuit Breaker — Stop Calling What Is Broken</h2>
+                <p>A circuit breaker watches the outcome of recent calls. While most succeed it
+                    stays <strong>closed</strong> and lets everything through. When the failure
+                    rate passes a threshold it <strong>opens</strong>: calls fail immediately
+                    without reaching the dependency, so the caller stays fast and the failing
+                    service gets room to recover. After a wait it lets a few trial calls through
+                    (<strong>half-open</strong>) and closes again if they succeed.</p>
+
+                <table>
+                    <tr><th>State</th><th>Calls</th><th>Moves to</th></tr>
+                    <tr><td><strong>Closed</strong></td><td>All go through; outcomes are recorded</td><td>Open, when the failure rate in the sliding window reaches the threshold</td></tr>
+                    <tr class="row-highlight"><td><strong>Open</strong></td><td>None go through; each fails immediately with <code>CallNotPermittedException</code></td><td>Half-open, after <code>waitDurationInOpenState</code></td></tr>
+                    <tr><td><strong>Half-open</strong></td><td>A few trial calls</td><td>Closed if they succeed, open again if they fail</td></tr>
+                </table>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">resources/application.yaml</span></figcaption>
+                    <pre><code><span class="attribute">resilience4j</span>:
+  <span class="attribute">circuitbreaker</span>:
+    <span class="attribute">instances</span>:
+      <span class="attribute">inventory</span>:
+        <span class="attribute">slidingWindowSize</span>: 20                 <span class="comment"># judge the last 20 calls</span>
+        <span class="attribute">minimumNumberOfCalls</span>: 10              <span class="comment"># …but never on fewer than 10</span>
+        <span class="attribute">failureRateThreshold</span>: 50              <span class="comment"># open at 50% failures</span>
+        <span class="attribute">slowCallDurationThreshold</span>: 1s         <span class="comment"># a call over 1 s counts as slow…</span>
+        <span class="attribute">slowCallRateThreshold</span>: 50             <span class="comment"># …and 50% slow calls also open it</span>
+        <span class="attribute">waitDurationInOpenState</span>: 30s
+        <span class="attribute">permittedNumberOfCallsInHalfOpenState</span>: 3
+        <span class="attribute">registerHealthIndicator</span>: <span class="keyword">true</span>
+        <span class="attribute">ignoreExceptions</span>:                      <span class="comment"># a "sold out" answer is not a failure of inventory</span>
+          - com.javadevbible.shop.order.OutOfStockException</code></pre>
+                </figure>
+
+                <aside class="review-note" aria-label="Code review comment">
+                    <p class="review-note-label">Code review comment</p>
+                    <pre><code><span class="line-del">return new ReservationResponse(true);   // fallback: assume it's in stock</span>
+<span class="line-add">throw new InventoryUnavailableException(cause);</span></code></pre>
+                    <p>A fallback that pretends the reservation worked sells stock we may not have,
+                        and nobody notices until the warehouse can't ship. When there is no safe
+                        default, the fallback should fail clearly — a 503 the customer can retry is
+                        better than an order we can't fulfil.</p>
+                </aside>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — BULKHEADS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Bulkheads — How Much One Dependency May Take</h2>
+                <p>A bulkhead caps how many calls to one dependency can be in flight at once. If
+                    the recommendation service hangs, at most 20 requests wait on it; the rest
+                    fail fast, and checkout — which doesn't need recommendations — keeps its
+                    capacity.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">catalog/RecommendationClient.java</span></figcaption>
+                    <pre><code><span class="comment">// Spring Framework 7: at most 20 concurrent calls; with virtual threads the
+// app no longer runs out of threads, so this limit is what protects the
+// downstream service and the connection pool instead.</span>
+<span class="annotation">@ConcurrencyLimit</span>(<span class="number">20</span>)
+<span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">ProductSummary</span>&gt; <span class="function">recommendationsFor</span>(<span class="class-name">Long</span> customerId) {
+    <span class="keyword">return</span> recommendations.forCustomer(customerId);
+}</code></pre>
+                </figure>
+
+                <p>Resilience4j's <code>@Bulkhead</code> does the same with a semaphore, or runs
+                    the call on its own small thread pool so a hung call cannot even occupy the
+                    caller's thread. When several patterns are combined, Resilience4j applies
+                    them in a fixed order by default — retry outermost, then circuit breaker,
+                    rate limiter, time limiter and bulkhead closest to the call — so every retry
+                    attempt is counted by the circuit breaker.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — OBSERVING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Seeing It Work: Health, Metrics and Events</h2>
+                <p>A circuit breaker that opens silently is half a feature. Resilience4j registers
+                    Micrometer metrics for every instance —
+                    <code>resilience4j.circuitbreaker.state</code>,
+                    <code>resilience4j.circuitbreaker.calls</code> by outcome — and, with
+                    <code>registerHealthIndicator: true</code> and
+                    <code>management.health.circuitbreakers.enabled: true</code>, adds the state
+                    to <code>/actuator/health</code>. Alert on a breaker that stays open, not on
+                    each failed call.</p>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Keep circuit breakers out of the liveness probe</div>
+                    <p>An open circuit means a <em>dependency</em> is failing. If its health
+                        indicator is part of liveness, Kubernetes restarts the healthy caller —
+                        see the <a href="kubernetes.html">Kubernetes page</a>. Leave it in the
+                        general health output for dashboards, or in readiness only if a Pod
+                        really cannot serve anything without that dependency.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Put a connect and read timeout on every outgoing call before adding anything else</li>
+                        <li>Retry only idempotent operations, only on transient errors, a few times, with exponential back-off and jitter</li>
+                        <li>Use a circuit breaker on calls to other services so a failing dependency fails fast</li>
+                        <li>Count slow calls as failures in the circuit breaker — slowness is the common failure</li>
+                        <li>Ignore business exceptions (out of stock, validation) in the breaker configuration</li>
+                        <li>Make fallbacks honest: a cached or default value only when it is genuinely acceptable, otherwise a clear error</li>
+                        <li>Export the metrics and alert on circuits that stay open</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't retry a payment capture or any non-idempotent call without an idempotency key</li>
+                        <li>Don't retry at every layer of a call chain</li>
+                        <li>Don't write fallbacks that fake success</li>
+                        <li>Don't put the annotations on a method called from the same class — like <code>@Transactional</code>, the proxy is bypassed and nothing happens</li>
+                        <li>Don't let a dependency's circuit breaker decide the caller's liveness</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What are the three states of a circuit breaker?</summary>
+                        <p>Closed: calls go through and failures are counted. Open: calls fail
+                    immediately without reaching the dependency. Half-open: after a wait, a few
+                    trial calls go through; success closes the circuit, failure opens it
+                    again.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why is a timeout the first thing to configure on an outgoing call?</summary>
+                        <p>Because without it a slow dependency holds the caller's thread or
+                    connection for as long as it likes, and requests pile up until the caller
+                    fails too. Every other pattern — retry, circuit breaker — relies on calls
+                    ending in bounded time.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Which calls are safe to retry?</summary>
+                        <p>Idempotent ones, whose repetition has the same effect as a single call —
+                    reads, and writes keyed by an idempotency key — and only on transient errors
+                    such as connection failures or a 503, not on a 400 or a validation
+                    error.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>Explain how a slow downstream service can cause a cascading failure, and which patterns stop it.</summary>
+                        <p>Each request to the caller waits on the slow dependency, holding a thread,
+                    a connection or memory; incoming requests keep arriving, so resources run
+                    out and the caller stops answering even requests that don't need the
+                    dependency. Its own callers then slow down the same way. Timeouts bound each
+                    wait, a bulkhead bounds how many waits there can be, and a circuit breaker
+                    stops making the calls at all once the failure rate shows the dependency is
+                    unhealthy.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why can retries make an outage worse, and how do you retry responsibly?</summary>
+                        <p>Retries add load exactly when the dependency is overloaded, and retries at
+                    several layers multiply: three layers of three retries make 64 calls from one
+                    request. Retry in one place, few times, with exponential back-off and jitter
+                    so clients don't retry in sync, only on transient errors, and combine it
+                    with a circuit breaker so retries stop once the dependency is clearly
+                    down.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>When should a fallback return a default value, and when should it fail?</summary>
+                        <p>Return a default when a degraded answer is genuinely acceptable — no
+                    recommendations, or a cached product list. Fail when the operation's result
+                    matters for correctness — a stock reservation or a payment — because a fake
+                    success creates inconsistent data that surfaces much later. Then the fallback
+                    should raise a clear error the client can act on, such as a 503 with
+                    problem details.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Spring Framework 7 has @Retryable and @ConcurrencyLimit. Why would you still add Resilience4j?</summary>
+                        <p>For the patterns Spring core does not provide: circuit breakers, rate
+                    limiters and time limiters, plus the per-instance configuration, Micrometer
+                    metrics, health indicators and event endpoints that make them observable in
+                    production. A service that only needs simple retries and a concurrency cap
+                    can stay with Spring alone.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="microservices.html" class="related-link"><span class="related-icon">🧩</span>Microservices with Spring Boot</a>
+                    <a href="kubernetes.html" class="related-link"><span class="related-icon">☸️</span>Kubernetes for Spring Boot</a>
+                    <a href="../spring/rest.html" class="related-link"><span class="related-icon">🌐</span>Spring REST</a>
+                    <a href="../advanced/thread-pools.html" class="related-link"><span class="related-icon">🧵</span>Thread Pools</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
