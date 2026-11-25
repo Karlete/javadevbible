@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angular Client for Spring Boot: Signals &amp; HttpClient - JavaDev Bible</title>
+    <meta name="description" content="An Angular client for a Spring Boot API: standalone components, signals, httpResource, a ProblemDetail interceptor, the dev proxy and built-in XSRF support.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/angular.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Angular Client for Spring Boot: Signals &amp; HttpClient">
+    <meta property="og:description" content="An Angular client for a Spring Boot API: standalone components, signals, httpResource, a ProblemDetail interceptor, the dev proxy and built-in XSRF support.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/angular.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Angular Frontend for a Spring Boot API",
+              "name": "Angular Client for Spring Boot: Signals & HttpClient",
+              "description": "An Angular client for a Spring Boot API: standalone components, signals, httpResource, a ProblemDetail interceptor, the dev proxy and built-in XSRF support.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/angular.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Angular Frontend for a Spring Boot API",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/angular.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Angular Frontend
+            </nav>
+            <h1>Angular Frontend for a Spring Boot API</h1>
+            <p class="topic-subtitle">The second client of the shop's <code>/api/orders</code>: a framework with dependency injection, typed HTTP and CSRF handling built in — what changed with signals, and the parts that already match what Spring Boot sends</p>
+            <p class="reviewed-stamp">Checked against Angular 22 · Spring Boot 4.2 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Angular Is — and Why It Feels Familiar to a Spring Developer</h2>
+                <p><strong>Angular</strong> is a complete frontend framework, written in and for
+                    TypeScript. Where <a href="react.html">React</a> is a view library and you
+                    choose the rest, Angular ships the rest: a dependency-injection container, an
+                    HTTP client, a router, forms and a test setup, all with one opinion about
+                    how to use them. For a team coming from Spring, that is the point — services
+                    are injected, configuration is central, and every project looks alike.</p>
+
+                <p>The problem it solves is the same as React's: keeping the screen in step with
+                    the data. What changed in recent versions is <em>how</em>. Older Angular code
+                    is written around RxJS subscriptions and manual flags; Angular 22 reads
+                    server data through <strong>signals</strong>, and most of that code
+                    disappears.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">orders/order-list.component.ts — subscription style</span></figcaption>
+                    <pre><code><span class="comment">// The pattern in most Angular codebases written before signals. A loading
+// flag and an error field to keep in sync by hand, a subscription that leaks
+// if the component is destroyed before the request completes, and nothing
+// refreshes the list after an order is placed elsewhere.</span>
+<span class="annotation">@Component</span>({ selector: <span class="string">'app-order-list'</span>, templateUrl: <span class="string">'./order-list.component.html'</span> })
+<span class="keyword">export class</span> <span class="class-name">OrderListComponent</span> <span class="keyword">implements</span> <span class="class-name">OnInit</span> {
+  orders: <span class="class-name">OrderResponse</span>[] = [];
+  loading = <span class="keyword">true</span>;
+  error?: <span class="class-name">string</span>;
+
+  <span class="keyword">constructor</span>(<span class="keyword">private</span> http: <span class="class-name">HttpClient</span>) {}
+
+  <span class="function">ngOnInit</span>() {
+    <span class="keyword">this</span>.http.<span class="function">get</span>&lt;<span class="class-name">OrderResponse</span>[]&gt;(<span class="string">'/api/orders'</span>).<span class="function">subscribe</span>({
+      next: orders =&gt; { <span class="keyword">this</span>.orders = orders; <span class="keyword">this</span>.loading = <span class="keyword">false</span>; },
+      error: e =&gt; { <span class="keyword">this</span>.error = e.message; <span class="keyword">this</span>.loading = <span class="keyword">false</span>; },
+    });
+  }
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">orders/order-list.ts — signals and httpResource</span></figcaption>
+                    <pre><code><span class="comment">// httpResource (stable since Angular 22) is a signal holding the request's
+// value, loading state and error. The template reads it; Angular cancels the
+// request if the component goes away, and reload() fetches it again.</span>
+<span class="annotation">@Component</span>({
+  selector: <span class="string">'app-order-list'</span>,
+  template: <span class="string">`
+    @if (orders.isLoading()) {
+      &lt;p&gt;Loading orders…&lt;/p&gt;
+    } @else if (orders.error()) {
+      &lt;app-problem [error]="orders.error()" /&gt;
+    } @else {
+      &lt;ul&gt;
+        @for (order of orders.value(); track order.id) {
+          &lt;li&gt;#{{ order.id }} — {{ order.status }}&lt;/li&gt;
+        }
+      &lt;/ul&gt;
+    }`</span>,
+})
+<span class="keyword">export class</span> <span class="class-name">OrderList</span> {
+  <span class="keyword">readonly</span> orders = <span class="function">httpResource</span>&lt;<span class="class-name">OrderResponse</span>[]&gt;(() =&gt; <span class="string">'/api/orders'</span>, { defaultValue: [] });
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — ANGULAR VS REACT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Angular or React — What Actually Differs</h2>
+                <p>Both talk to the same Spring Boot API the same way: JSON over HTTP, a session
+                    cookie, problem details for errors. The difference is how much is decided
+                    for you.</p>
+
+                <table>
+                    <tr><th></th><th>Angular</th><th>React</th></tr>
+                    <tr><td>What it is</td><td>A framework: DI, router, HTTP client, forms, testing</td><td>A view library; routing, data fetching and forms are separate choices</td></tr>
+                    <tr><td>Language</td><td>TypeScript only</td><td>JavaScript or TypeScript</td></tr>
+                    <tr><td>Templates</td><td>HTML with Angular syntax (<code>@if</code>, <code>@for</code>, <code>{{ }}</code>)</td><td>JSX inside TypeScript</td></tr>
+                    <tr><td>Reactivity</td><td>Signals; RxJS for streams of events</td><td>Re-render on state change; hooks</td></tr>
+                    <tr><td>CSRF with Spring Security</td><td>Built into <code>HttpClient</code></td><td>Read the cookie and set the header yourself</td></tr>
+                    <tr class="row-highlight"><td>Typical fit</td><td>Large internal applications, teams that want one way to do things</td><td>Teams that want to pick their stack; public-facing apps</td></tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SERVICES, DI AND THE API
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Services and Dependency Injection — the Spring Part of Angular</h2>
+                <p>An Angular service is a class the framework creates once and injects where it
+                    is needed — the frontend equivalent of a Spring <code>@Service</code>.
+                    Keeping all HTTP calls in one service per resource gives components nothing
+                    to do but display, and gives tests one thing to replace.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">frontend/src/app/orders/order-api.ts</span></figcaption>
+                    <pre><code><span class="comment">// providedIn: 'root' — one instance for the whole app, like a singleton bean.
+// inject() is Angular's injection point; constructor parameters still work.</span>
+<span class="annotation">@Injectable</span>({ providedIn: <span class="string">'root'</span> })
+<span class="keyword">export class</span> <span class="class-name">OrderApi</span> {
+  <span class="keyword">private readonly</span> http = <span class="function">inject</span>(<span class="class-name">HttpClient</span>);
+
+  <span class="function">place</span>(request: <span class="class-name">PlaceOrderRequest</span>): <span class="class-name">Observable</span>&lt;<span class="class-name">OrderResponse</span>&gt; {
+    <span class="keyword">return this</span>.http.<span class="function">post</span>&lt;<span class="class-name">OrderResponse</span>&gt;(<span class="string">'/api/orders'</span>, request);
+  }
+}
+
+<span class="comment">// In the checkout component: place the order, then refresh the list
+// that every order view reads from</span>
+<span class="keyword">this</span>.orderApi.<span class="function">place</span>(request).<span class="function">subscribe</span>(() =&gt; <span class="keyword">this</span>.orders.<span class="function">reload</span>());</code></pre>
+                </figure>
+
+                <p>The response types are the same TypeScript types as on the
+                    <a href="react.html">React page</a> — mirrors of the Java records, ideally
+                    generated from the API's OpenAPI description — including the rule that a
+                    <code>BigDecimal</code> total travels as a string.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — PROBLEMDETAIL ERRORS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Turning ProblemDetail Errors Into Something the UI Can Show</h2>
+                <p>Unlike <code>fetch</code>, Angular's <code>HttpClient</code> fails on 4xx and
+                    5xx by itself, with an <code>HttpErrorResponse</code> whose
+                    <code>error</code> property is the parsed body — the shop's
+                    <code>ProblemDetail</code>. An <strong>interceptor</strong>, Angular's
+                    equivalent of a servlet filter, can normalise that for every request in one
+                    place.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">frontend/src/app/api/problem.interceptor.ts</span></figcaption>
+                    <pre><code><span class="keyword">export type</span> <span class="class-name">Problem</span> = { type: <span class="class-name">string</span>; title: <span class="class-name">string</span>; status: <span class="class-name">number</span>; detail?: <span class="class-name">string</span> };
+
+<span class="comment">// Every failed call reaches the component as a Problem — the server's
+// "Product KB-104 is out of stock", not "Http failure response for /api/orders"</span>
+<span class="keyword">export const</span> problemInterceptor: <span class="class-name">HttpInterceptorFn</span> = (req, next) =&gt;
+  <span class="function">next</span>(req).<span class="function">pipe</span>(
+    <span class="function">catchError</span>((e: <span class="class-name">HttpErrorResponse</span>) =&gt; <span class="function">throwError</span>(() =&gt;
+      e.error?.title
+        ? (e.error <span class="keyword">as</span> <span class="class-name">Problem</span>)
+        : { type: <span class="string">'about:blank'</span>, title: e.statusText, status: e.status } <span class="keyword">satisfies</span> <span class="class-name">Problem</span>)),
+  );
+
+<span class="comment">// app.config.ts — registered once for the whole application</span>
+<span class="keyword">export const</span> appConfig: <span class="class-name">ApplicationConfig</span> = {
+  providers: [<span class="function">provideHttpClient</span>(<span class="function">withInterceptors</span>([problemInterceptor]))],
+};</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — DEV PROXY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Local Development: the Angular Dev Server Proxy</h2>
+                <p><code>ng serve</code> runs on port 4200 and Spring Boot on 8080. As with
+                    Vite on the React page, the clean fix for the cross-origin problem is not
+                    CORS but a proxy: the browser only talks to 4200, and the dev server
+                    forwards <code>/api</code>.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">frontend/proxy.conf.json + angular.json</span></figcaption>
+                    <pre><code><span class="comment">// proxy.conf.json</span>
+{
+  <span class="string">"/api"</span>: { <span class="string">"target"</span>: <span class="string">"http://localhost:8080"</span>, <span class="string">"secure"</span>: <span class="keyword">false</span> }
+}
+
+<span class="comment">// angular.json — projects.shop-frontend.architect.serve.options</span>
+<span class="string">"proxyConfig"</span>: <span class="string">"proxy.conf.json"</span></code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — CSRF
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>CSRF: Already Wired to What Spring Security Sends</h2>
+                <p>With a session cookie, state-changing requests need a CSRF token. Spring
+                    Security 7's <code>csrf.spa()</code> sends the token in an
+                    <code>XSRF-TOKEN</code> cookie and expects it back in an
+                    <code>X-XSRF-TOKEN</code> header — and those are exactly the names Angular's
+                    <code>HttpClient</code> uses by default. It reads the cookie and adds the
+                    header to every <code>POST</code>, <code>PUT</code>, <code>PATCH</code> and
+                    <code>DELETE</code> sent to a relative URL, so the shop's frontend needs no
+                    code for it.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">security/SecurityConfig.java — the backend half</span></figcaption>
+                    <pre><code><span class="annotation">@Bean</span>
+<span class="class-name">SecurityFilterChain</span> <span class="function">api</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
+    <span class="keyword">return</span> http
+            .<span class="function">authorizeHttpRequests</span>(auth -&gt; auth.<span class="function">requestMatchers</span>(<span class="string">"/api/**"</span>).<span class="function">authenticated</span>()
+                                               .<span class="function">anyRequest</span>().<span class="function">permitAll</span>())
+            .<span class="function">formLogin</span>(<span class="class-name">Customizer</span>.withDefaults())
+            .<span class="function">csrf</span>(csrf -&gt; csrf.<span class="function">spa</span>())   <span class="comment">// XSRF-TOKEN cookie, X-XSRF-TOKEN header: Angular's defaults</span>
+            .<span class="function">build</span>();
+}</code></pre>
+                </figure>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">The automatic header only goes to relative URLs</div>
+                    <p>Angular deliberately does not attach the token to absolute URLs such as
+                        <code>https://api.shop.example.com/api/orders</code>, so it cannot leak to
+                        another host. If the frontend calls the API on a different origin, the
+                        header silently stops being sent and every <code>POST</code> fails with
+                        403. Serving both from one origin — as with React — keeps the default
+                        working.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BUILD AND DEPLOY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Building and Shipping</h2>
+                <p><code>ng build</code> writes static files to
+                    <code>dist/shop-frontend/browser/</code>. They are deployed exactly like
+                    the React build: copied into <code>src/main/resources/static</code> and
+                    served by Spring Boot, with client-side routes such as
+                    <code>/orders/42</code> forwarded to <code>index.html</code> (see the
+                    <code>SpaForwardingController</code> on the <a href="react.html">React
+                    page</a>), or published separately behind the same domain.</p>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Angular's major version every six months</div>
+                    <p>Angular releases a major version roughly every six months and supports each
+                        for 18 months. <code>ng update</code> runs migrations that rewrite code —
+                        it moved projects to standalone components and the new
+                        <code>@if</code>/<code>@for</code> control flow — so staying current is
+                        cheaper than jumping several versions at once.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Read server data with <code>httpResource</code> and signals in new code; keep RxJS for genuine event streams</li>
+                        <li>Put HTTP calls in injectable services, one per API resource, and keep components to display logic</li>
+                        <li>Normalise <code>ProblemDetail</code> errors once, in an interceptor</li>
+                        <li>Use relative URLs and one origin so <code>HttpClient</code>'s XSRF support matches Spring's <code>csrf.spa()</code> without configuration</li>
+                        <li>Use the dev-server proxy instead of CORS for local development</li>
+                        <li>Run <code>ng update</code> with every major release instead of skipping versions</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't <code>subscribe()</code> in a component just to copy data into a field — use a resource or the <code>async</code> pipe</li>
+                        <li>Don't disable CSRF on the backend because "Angular handles it" — Angular only sends the token the backend issues</li>
+                        <li>Don't call the API with absolute URLs to another origin and expect the XSRF header to follow</li>
+                        <li>Don't bypass sanitisation with <code>bypassSecurityTrustHtml</code> on API data</li>
+                        <li>Don't keep business rules such as prices or stock checks only in the frontend</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What is an Angular service, and how does it compare to a Spring bean?</summary>
+                        <p>A class decorated with <code>@Injectable</code> that Angular instantiates
+                    and injects where it is requested. With <code>providedIn: 'root'</code> there
+                    is one instance for the application, like a singleton Spring bean, and it is
+                    the usual place for HTTP calls and shared state.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What is a signal in Angular?</summary>
+                        <p>A value that notifies its readers when it changes. Templates and computed
+                    values that read a signal are updated automatically when it is set, which
+                    lets Angular update only what depends on the changed value.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why does the Angular dev server need a proxy configuration to call Spring Boot?</summary>
+                        <p>Because the dev server (port 4200) and Spring Boot (8080) are different
+                    origins. The proxy forwards <code>/api</code> requests server-side, so the
+                    browser sees only one origin and no CORS configuration is needed.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>Why does an Angular app often work with Spring Security's CSRF protection without any frontend code?</summary>
+                        <p>Angular's <code>HttpClient</code> reads a cookie named
+                    <code>XSRF-TOKEN</code> and sends its value in an <code>X-XSRF-TOKEN</code>
+                    header on mutating requests to relative URLs. Spring Security's SPA CSRF
+                    configuration issues the token in that cookie and checks that header, so
+                    the defaults line up. It stops working when the frontend calls an absolute
+                    URL on another origin, because Angular does not send the token there.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What problems does httpResource solve compared to subscribing to HttpClient in ngOnInit?</summary>
+                        <p>It keeps value, loading state and error together in signals, so there
+                    are no hand-maintained flags to get out of sync; it cancels the request when
+                    its owner is destroyed, so nothing leaks; and it re-runs automatically when
+                    signals used to build the URL change, or on <code>reload()</code>. The
+                    manual version needs all of that written and tested by hand in every
+                    component.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>How would you handle API errors consistently across an Angular application talking to a Spring Boot backend?</summary>
+                        <p>Make the backend return RFC 9457 problem details for every error
+                    (<code>ProblemDetail</code> in Spring), and add an
+                    <code>HttpInterceptorFn</code> that maps every
+                    <code>HttpErrorResponse</code> to one typed <code>Problem</code>. Components
+                    then show <code>detail</code> from the server and handle specific
+                    <code>status</code> codes, such as a 409 for out-of-stock, without parsing
+                    responses themselves.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>A team runs Angular on a CDN domain and the API on another. Which assumptions from a same-origin setup break?</summary>
+                        <p>Requests become cross-origin, so the API needs a CORS policy that allows
+                    the frontend's origin with credentials; the session cookie needs
+                    <code>SameSite=None; Secure</code> to be sent; and Angular stops attaching
+                    the XSRF header to absolute URLs, so CSRF needs explicit handling. Routing
+                    the API under the frontend's domain avoids all three.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="react.html" class="related-link"><span class="related-icon">⚛️</span>React Frontend for a Spring Boot API</a>
+                    <a href="../spring/rest.html" class="related-link"><span class="related-icon">🌐</span>Spring REST</a>
+                    <a href="../web-concepts/cors.html" class="related-link"><span class="related-icon">🔐</span>CORS</a>
+                    <a href="../spring/security.html" class="related-link"><span class="related-icon">🛡️</span>Spring Security</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
