@@ -10,7 +10,10 @@
    - Copy button on every <pre><code> block
    - "Show all answers" for interview questions (<details class="qa">),
      and every answer opened while printing
-   - Ctrl/Cmd + K focuses the search box on the index page
+   - Search from any page: Ctrl/Cmd + K or "/" focuses the search box on the
+     index; on a topic page they go to the index with the box focused (and
+     pre-filled with the selected text, if any). Topic pages also get a
+     visible "Search" link next to "Back to Index".
 
    Removed on 2026-11-23 because no page used them: collapsible sections,
    the back-to-top button, and a global sharePage() that fell back to alert().
@@ -217,13 +220,66 @@
     // display:none from this file once overrode that state and left search dead
     // until the next page load.
 
+    // On topic pages the index is reached through the breadcrumb's first link,
+    // so no page has to hard-code its depth.
+    function searchPageUrl(query) {
+        const home = document.querySelector('.topic-header .breadcrumb a');
+        if (!home) return null;
+        const url = new URL(home.href);
+        url.hash = '';
+        url.search = '?q=' + encodeURIComponent(query || '');
+        return url.href;
+    }
+
+    // Selected text becomes the query: select "HikariCP", press Ctrl+K, and
+    // the index opens with it already searched. Long selections are ignored:
+    // they are a paragraph being copied, not a term being looked up.
+    function selectedTerm() {
+        const text = String(window.getSelection ? window.getSelection() : '').trim();
+        return text.length > 0 && text.length <= 60 && !/[\r\n]/.test(text) ? text : '';
+    }
+
+    function initializeSearchLink() {
+        const back = document.querySelector('.topic-header .back-btn');
+        const href = searchPageUrl('');
+        if (!back || !href) return;
+
+        const link = document.createElement('a');
+        link.className = 'header-search-link';
+        link.href = href;
+        link.appendChild(document.createTextNode('Search'));
+        const hint = document.createElement('kbd');
+        hint.textContent = '/';
+        hint.setAttribute('aria-hidden', 'true');
+        link.appendChild(hint);
+        link.setAttribute('aria-label', 'Search all topics (shortcut: slash or Control K)');
+        back.insertAdjacentElement('afterend', link);
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeSearchLink);
+
+    function isTyping(target) {
+        return target instanceof HTMLElement &&
+            (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+    }
+
     document.addEventListener('keydown', function (e) {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-            const searchInput = document.getElementById('searchInput');
-            if (!searchInput) return;   // topic pages have no search box: leave the browser shortcut alone
+        const ctrlK = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k';
+        const slash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !isTyping(e.target);
+        if (!ctrlK && !slash) return;
+
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            if (slash && e.target === searchInput) return;
             e.preventDefault();
             searchInput.focus();
             searchInput.select();
+            return;
         }
+
+        const url = searchPageUrl(selectedTerm());
+        if (!url) return;   // a page with neither box nor breadcrumb: leave the browser shortcut alone
+        e.preventDefault();
+        window.location.href = url;
     });
 }());

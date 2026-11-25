@@ -67,9 +67,24 @@
         if (!input || !panel) return;
 
         applyAriaContract();
-        loadIndex();
         bindEvents();
+        loadIndex().then(runQueryFromUrl);
     });
+
+    /**
+     * Topic pages send Ctrl+K, "/" and their "Search" link here as
+     * index.html?q=<term>. An empty q only focuses the box; a term is also
+     * searched, once the index has arrived.
+     */
+    function runQueryFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.has('q')) return;
+
+        const query = (params.get('q') || '').trim();
+        input.value = query;
+        input.focus();
+        if (query.length >= MIN_QUERY) search(query);
+    }
 
     /**
      * Wires up the ARIA combobox pattern. The markup declares the structure;

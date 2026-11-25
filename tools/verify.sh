@@ -653,14 +653,13 @@ fi
 # from <p><strong>Q: …</strong><br> on 2026-11-24; this keeps the old form
 # from coming back through copy-paste, and a page from losing a level.
 #
-# QA_MIN is the per-level minimum CLAUDE.md asks for (3). It is 1 for now:
-# ten pages had only 2 questions in a level when this check was written, and
-# a check that is red from day one gets ignored. Raise it to 3 once they are
-# filled in.
+# QA_MIN is the per-level minimum CLAUDE.md asks for (3 junior + 3 senior).
+# It was 1 while ten pages had only 2 in a level; raised on 2026-11-25 once
+# they were filled in.
 
 header "15. Interview questions"
 
-QA_MIN=1
+QA_MIN=3
 
 grep -rln '<p><strong>Q:' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
   | sed "s|^$REPO_ROOT/||; s|$| → old <p><strong>Q: format|" > "$TMP/qa.txt" || true
