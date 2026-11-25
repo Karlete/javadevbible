@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observability in Spring Boot: Metrics, Tracing &amp; Logs - JavaDev Bible</title>
+    <meta name="description" content="Metrics, distributed tracing and correlated logs for Spring Boot 4: Micrometer, OpenTelemetry over OTLP, Prometheus, trace IDs in logs and @Observed.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/observability.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Observability in Spring Boot: Metrics, Tracing &amp; Logs">
+    <meta property="og:description" content="Metrics, distributed tracing and correlated logs for Spring Boot 4: Micrometer, OpenTelemetry over OTLP, Prometheus, trace IDs in logs and @Observed.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/observability.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Observability for Spring Boot",
+              "name": "Observability in Spring Boot: Metrics, Tracing & Logs",
+              "description": "Metrics, distributed tracing and correlated logs for Spring Boot 4: Micrometer, OpenTelemetry over OTLP, Prometheus, trace IDs in logs and @Observed.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/observability.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Observability for Spring Boot",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/observability.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Observability
+            </nav>
+            <h1>Observability for Spring Boot</h1>
+            <p class="topic-subtitle">A customer says checkout took twenty seconds. Metrics tell you it is happening, a trace shows which of the four services spent the time, and the logs of that one request tell you why — if the three are wired together</p>
+            <p class="reviewed-stamp">Checked against Spring Boot 4.2 · Micrometer 1.18 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Observability Is — and Why Logs Alone Stop Being Enough</h2>
+                <p><strong>Observability</strong> is being able to answer questions about a running
+                    system from the data it emits, without shipping new code to ask them. That data
+                    comes in three kinds: <strong>metrics</strong> (numbers over time: requests per
+                    second, error rate, latency percentiles), <strong>traces</strong> (the path of
+                    one request through every service it touched, with timings) and
+                    <strong>logs</strong> (what the code said while handling it).</p>
+
+                <p>With one application and one server, logs were enough: you could read them.
+                    With the shop split into services, each running several Pods, the log lines of
+                    one slow checkout are scattered over a dozen processes with nothing to join
+                    them. Spring Boot's answer is <strong>Micrometer</strong>: one instrumentation
+                    API that produces all three signals from the same observation, and stamps
+                    every log line with the trace it belongs to.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/CheckoutService.java — measuring by hand</span></figcaption>
+                    <pre><code><span class="comment">// A timing nobody can graph, a log line that can't be tied to the inventory
+// call it waited on, and no way to see which of the services was slow.</span>
+<span class="keyword">long</span> start = <span class="class-name">System</span>.currentTimeMillis();
+<span class="class-name">Order</span> order = place(cart);
+log.info(<span class="string">"Checkout took {} ms"</span>, <span class="class-name">System</span>.currentTimeMillis() - start);</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/CheckoutService.java — one observation, three signals</span></figcaption>
+                    <pre><code><span class="comment">// One annotation produces a timer metric (shop.checkout), a span in the
+// request's trace, and log lines carrying that trace's id. The HTTP call to
+// inventory and the Kafka message to notification join the same trace
+// automatically.</span>
+<span class="annotation">@Observed</span>(name = <span class="string">"shop.checkout"</span>, contextualName = <span class="string">"place-order"</span>)
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">place</span>(<span class="class-name">Cart</span> cart) {
+    ...
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THREE SIGNALS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Three Signals and the Question Each One Answers</h2>
+                <table>
+                    <tr><th>Signal</th><th>Answers</th><th>Typical backend</th><th>Cost</th></tr>
+                    <tr><td><strong>Metrics</strong></td><td><em>Is</em> something wrong, and since when? Alerting, dashboards, SLOs</td><td>Prometheus + Grafana</td><td>Cheap: aggregated numbers, independent of traffic volume</td></tr>
+                    <tr class="row-highlight"><td><strong>Traces</strong></td><td><em>Where</em> is the time going in this request, across services?</td><td>Tempo, Jaeger, or any OTLP backend</td><td>Grows with traffic, so usually sampled</td></tr>
+                    <tr><td><strong>Logs</strong></td><td><em>Why</em> did this request fail — the details the code recorded</td><td>Loki, Elasticsearch</td><td>The most expensive per request; keep them structured and purposeful</td></tr>
+                </table>
+                <p>The workflow follows the table: an alert on a metric tells you checkout latency
+                    is up, a slow trace from that window shows the time is in the inventory call,
+                    and the logs filtered by that trace's id show the reservation retrying against
+                    a locked row.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SETUP
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Setting It Up in Spring Boot 4</h2>
+                <p>Spring Boot 4 bundles the OpenTelemetry integration in one starter. Traces —
+                    and optionally metrics and logs — are exported over <strong>OTLP</strong>, the
+                    OpenTelemetry protocol that every major backend accepts, usually through an
+                    OpenTelemetry Collector running next to the application.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml</span></figcaption>
+                    <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-actuator&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-opentelemetry&lt;/<span class="keyword">artifactId</span>&gt;   <span class="comment">&lt;!-- tracing over OTLP --&gt;</span>
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;io.micrometer&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;micrometer-registry-prometheus&lt;/<span class="keyword">artifactId</span>&gt;   <span class="comment">&lt;!-- /actuator/prometheus --&gt;</span>
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">resources/application.yaml</span></figcaption>
+                    <pre><code><span class="attribute">spring</span>:
+  <span class="attribute">application</span>:
+    <span class="attribute">name</span>: order-service          <span class="comment"># becomes the service name on every metric, span and log</span>
+<span class="attribute">management</span>:
+  <span class="attribute">endpoints.web.exposure.include</span>: health,prometheus
+  <span class="attribute">tracing</span>:
+    <span class="attribute">sampling</span>:
+      <span class="attribute">probability</span>: 0.1           <span class="comment"># the default: 10% of requests are traced</span>
+  <span class="attribute">opentelemetry</span>:
+    <span class="attribute">tracing</span>:
+      <span class="attribute">export</span>:
+        <span class="attribute">otlp</span>:
+          <span class="attribute">endpoint</span>: http://otel-collector:4318/v1/traces</code></pre>
+                </figure>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Ten percent is the default, and it is a decision</div>
+                    <p>Spring Boot samples 10% of requests unless told otherwise. That keeps tracing
+                        cheap at high traffic, but the one slow checkout a customer complains about
+                        has a nine-in-ten chance of not being there. Low-traffic services can trace
+                        everything (<code>1.0</code>); high-traffic ones often keep head sampling low
+                        and let the Collector keep every slow or failed trace (tail sampling).</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — METRICS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Metrics: What You Get, and the Ones Only You Can Add</h2>
+                <p>Without writing any code, the shop already exports
+                    <code>http.server.requests</code> (rate, errors and latency per endpoint and
+                    status), JVM memory, GC and thread metrics, the HikariCP connection pool, and
+                    Kafka producer and consumer metrics. What no framework can know are the
+                    business numbers.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderMetrics.java</span></figcaption>
+                    <pre><code><span class="annotation">@Component</span>
+<span class="keyword">class</span> <span class="class-name">OrderMetrics</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">MeterRegistry</span> registry;
+
+    <span class="class-name">OrderMetrics</span>(<span class="class-name">MeterRegistry</span> registry) {
+        <span class="keyword">this</span>.registry = registry;
+    }
+
+    <span class="keyword">void</span> <span class="function">orderPlaced</span>(<span class="class-name">Order</span> order) {
+        <span class="comment">// Tags with a handful of values (payment method, country) are fine;
+        // a tag per orderId or customerId creates one time series per order
+        // and takes the metrics backend down.</span>
+        registry.counter(<span class="string">"shop.orders.placed"</span>, <span class="string">"payment"</span>, order.getPaymentMethod().name())
+                .increment();
+    }
+}</code></pre>
+                </figure>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">High-cardinality tags are the most common metrics mistake</div>
+                    <p>Every distinct combination of tag values is a separate time series. A tag
+                        holding an id, an e-mail or a full URL with path variables multiplies them
+                        by the number of users or orders. Put per-request detail in traces and logs;
+                        keep metric tags to small, fixed sets.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — DISTRIBUTED TRACING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Distributed Tracing: One Request Across Four Services</h2>
+                <p>A <strong>trace</strong> is a tree of <strong>spans</strong>: one for the
+                    incoming request, children for each database query, HTTP call and message.
+                    The trace id travels with the request in the W3C <code>traceparent</code>
+                    header, so the inventory service's spans attach to the order service's trace.
+                    Spring Boot propagates it automatically through instrumented clients —
+                    <code>RestClient</code>, HTTP service clients, <code>WebClient</code> — as long
+                    as they are built from the auto-configured builders, not with
+                    <code>new</code>.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">trace of one slow checkout</span></figcaption>
+                    <pre><code>POST /api/orders                     order-service          20.4 s
+├── SELECT … FROM carts              order-service           3 ms
+├── POST /api/reservations           order-service → inventory   19.9 s   <span class="comment">← here</span>
+│   └── UPDATE stock_levels …        inventory-service      19.8 s   <span class="comment">← waiting on a row lock</span>
+├── INSERT INTO orders               order-service           4 ms
+└── send orders.placed               order-service           2 ms
+    └── receive orders.placed        notification-service    1.2 s  <span class="comment">(after the response)</span></code></pre>
+                </figure>
+
+                <p>Kafka joins the trace when observation is enabled on both sides:
+                    <code>spring.kafka.template.observation-enabled=true</code> on the producer and
+                    <code>spring.kafka.listener.observation-enabled=true</code> on the consumer put
+                    the trace context in the message headers and continue it in the listener.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — LOGS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Logs That Belong to a Trace</h2>
+                <p>With tracing on the classpath, Spring Boot puts the current trace and span ids
+                    in the logging MDC and adds them to every log line — no code change. A log
+                    search for one trace id returns exactly the lines of that one checkout, from
+                    every service.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">resources/application.yaml + console output</span></figcaption>
+                    <pre><code><span class="comment"># One JSON object per line, in a format the log backend already understands</span>
+<span class="attribute">logging</span>:
+  <span class="attribute">structured</span>:
+    <span class="attribute">format</span>:
+      <span class="attribute">console</span>: ecs                 <span class="comment"># or logstash, gelf</span>
+
+<span class="comment"># a line written by order-service while handling the slow checkout</span>
+{<span class="string">"@timestamp"</span>:<span class="string">"2026-11-25T09:30:20.4Z"</span>,<span class="string">"log.level"</span>:<span class="string">"WARN"</span>,
+ <span class="string">"service.name"</span>:<span class="string">"order-service"</span>,<span class="string">"traceId"</span>:<span class="string">"803b448a0489f840…"</span>,
+ <span class="string">"message"</span>:<span class="string">"Stock reservation for order 9001 took 19.9 s"</span>}</code></pre>
+                </figure>
+
+                <p>On Kubernetes, write logs to standard output and let the platform collect them,
+                    as described on the <a href="../tools/logging.html">logging page</a>; with the
+                    OpenTelemetry starter they can also be exported over OTLP to the same Collector
+                    as traces.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — CUSTOM OBSERVATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Instrumenting Your Own Code with @Observed</h2>
+                <p>Framework calls are instrumented already; a business operation that spans
+                    several of them — "place an order" — is not. <code>@Observed</code> wraps a
+                    method in an observation that produces a timer and a span; the
+                    <code>Observation</code> API does the same for a block of code.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">resources/application.yaml</span></figcaption>
+                    <pre><code><span class="comment"># @Observed is applied by an aspect: it also needs spring-boot-starter-aspectj</span>
+<span class="attribute">management</span>:
+  <span class="attribute">observations</span>:
+    <span class="attribute">annotations</span>:
+      <span class="attribute">enabled</span>: <span class="keyword">true</span></code></pre>
+                </figure>
+
+                <p>Observe operations that mean something to the business, not every method:
+                    annotating a controller or a repository that Spring MVC and Spring Data already
+                    instrument produces duplicate spans and metrics.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Set <code>spring.application.name</code> in every service — it is how all three signals are grouped</li>
+                        <li>Export through an OpenTelemetry Collector rather than straight to a vendor, so backends can change without redeploying services</li>
+                        <li>Alert on metrics (error rate, latency percentiles, saturation), then use traces and logs to investigate</li>
+                        <li>Build HTTP clients from Spring's auto-configured builders so trace context propagates</li>
+                        <li>Enable observation on Kafka templates and listeners so asynchronous work stays in the trace</li>
+                        <li>Use structured logging and include business identifiers such as the order id in the message or as fields</li>
+                        <li>Choose the sampling rate deliberately and keep slow and failed traces</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't tag metrics with ids, e-mails or raw URLs</li>
+                        <li>Don't create <code>RestClient</code> or <code>WebClient</code> instances with <code>new</code> — they are not instrumented</li>
+                        <li>Don't log personal data or secrets just because the log line now has good context</li>
+                        <li>Don't expose every Actuator endpoint publicly; <code>health</code> and <code>prometheus</code> are usually enough, on a protected port</li>
+                        <li>Don't add <code>@Observed</code> on code the framework already observes</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What are the three signals of observability, and what is each good for?</summary>
+                        <p>Metrics are numbers over time — request rate, error rate, latency — good
+                    for dashboards and alerts. Traces follow one request through every service with
+                    timings, good for finding where time or errors come from. Logs are the detailed
+                    records the code writes, good for understanding why a specific request
+                    failed.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What is a trace id, and why does it appear in Spring Boot log lines?</summary>
+                        <p>An identifier shared by every span of one request across all services,
+                    propagated in the <code>traceparent</code> header. Spring Boot puts it in the
+                    logging MDC so every log line written while handling that request carries it,
+                    which lets you find all the logs of one request in every service.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What does Micrometer do?</summary>
+                        <p>It is the instrumentation API Spring Boot uses: application and framework
+                    code record observations through it once, and it turns them into metrics for a
+                    backend such as Prometheus and into spans for a tracer such as OpenTelemetry,
+                    without the code depending on either.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>Why is a high-cardinality metric tag a problem, and where should that detail go instead?</summary>
+                        <p>Each unique combination of tag values is a separate time series stored and
+                    queried by the metrics backend. A tag such as an order id creates a series per
+                    order, which grows without bound, slows queries and can exhaust the backend's
+                    memory. Per-request detail belongs in span attributes and log fields; metric tags
+                    should have a small, fixed set of values.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>A trace stops at the order service even though it calls inventory over HTTP. What would you check?</summary>
+                        <p>Whether the client is instrumented: a <code>RestClient</code> or
+                    <code>WebClient</code> created with <code>new</code> instead of from the
+                    auto-configured builder does not add the <code>traceparent</code> header.
+                    Then whether inventory has tracing enabled, whether something in between
+                    (a gateway, a proxy) strips the header, and whether the request was simply not
+                    sampled.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What are the trade-offs between head sampling and tail sampling?</summary>
+                        <p>Head sampling decides at the start of a request, so it is cheap and every
+                    service agrees, but it drops interesting traces as readily as boring ones. Tail
+                    sampling decides after the trace is complete — usually in an OpenTelemetry
+                    Collector — so it can keep every error and every slow request, at the cost of
+                    buffering all spans until the decision is made.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>How does trace context survive an asynchronous hop through Kafka?</summary>
+                        <p>With observation enabled on the <code>KafkaTemplate</code>, the producer
+                    writes the trace context into the record headers. With observation enabled on
+                    the listener container, the consumer reads those headers and starts its span as
+                    a child of the producer's. The consumer may run much later, so the trace shows
+                    both the response time and the time until the event was processed.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../tools/logging.html" class="related-link"><span class="related-icon">📝</span>Logging Frameworks</a>
+                    <a href="microservices.html" class="related-link"><span class="related-icon">🧩</span>Microservices with Spring Boot</a>
+                    <a href="resilience4j.html" class="related-link"><span class="related-icon">🛟</span>Resilience4j: Fault Tolerance for Spring Boot</a>
+                    <a href="kafka.html" class="related-link"><span class="related-icon">📨</span>Apache Kafka with Spring Boot</a>
+                    <a href="kubernetes.html" class="related-link"><span class="related-icon">☸️</span>Kubernetes for Spring Boot</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>

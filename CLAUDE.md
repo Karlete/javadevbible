@@ -13,7 +13,7 @@ A machine-readable architecture map lives in `docs/architecture.json` (human ver
 - **Repo:** https://github.com/karlete/javadevbible
 - **What it is:** A static HTML reference covering Java from fundamentals through the wider ecosystem, written for junior and senior developers on the same page.
 - **Deploy:** GitHub Pages serves the **repository root** of branch `main`. The site itself lives in `/javabible/`; the root `index.html` only redirects there, and the root `404.html` is what Pages shows for any missing URL. Because the whole repo root is public, anything committed anywhere (including `docs/`) is published.
-- **Scale:** 101 topic pages across 14 categories.
+- **Scale:** 102 topic pages across 14 categories.
 
 ## Stack — non-negotiable
 
@@ -59,7 +59,7 @@ If you changed `mcp/` **or the search index / search algorithm**, also run `cd m
                                    edit it — the property silently loses verification. verify.sh guards it.
 /javabible/
 ├── index.html                     category navigation + instant search
-├── topics/{category}/{topic}.html 101 topic pages
+├── topics/{category}/{topic}.html 102 topic pages
 ├── css/                           main.css, syntax-highlighting.css, toc.css
 ├── js/                            search.js, navigation.js, toc.js, demos.js
 ├── data/search-index.json         must always match topics/ on disk — verify.sh checks this
