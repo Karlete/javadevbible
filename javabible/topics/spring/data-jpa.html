@@ -190,7 +190,9 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
             <section class="content-section">
                 <h2>Entity Mapping</h2>
 
-                <pre><code><span class="keyword">import</span> jakarta.persistence.*;
+                <figure class="code-file">
+                    <figcaption><span class="code-path">customer/Customer.java</span></figcaption>
+                    <pre><code><span class="keyword">import</span> jakarta.persistence.*;
 
 <span class="annotation">@Entity</span>
 <span class="annotation">@Table</span>(name = <span class="string">"customers"</span>)
@@ -200,8 +202,8 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
     <span class="annotation">@GeneratedValue</span>(strategy = <span class="class-name">GenerationType</span>.IDENTITY)
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
-    <span class="annotation">@Column</span>(nullable = <span class="keyword">false</span>, length = <span class="number">100</span>)
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="annotation">@Column</span>(nullable = <span class="keyword">false</span>, length = <span class="number">200</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> fullName;
 
     <span class="annotation">@Column</span>(unique = <span class="keyword">true</span>, nullable = <span class="keyword">false</span>)
     <span class="keyword">private</span> <span class="class-name">String</span> email;
@@ -209,18 +211,22 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
     <span class="annotation">@Enumerated</span>(<span class="class-name">EnumType</span>.STRING)  <span class="comment">// ALWAYS STRING — ORDINAL breaks silently if the enum is ever reordered</span>
     <span class="keyword">private</span> <span class="class-name">Status</span> status = <span class="class-name">Status</span>.ACTIVE;
 
-    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"customer"</span>, cascade = <span class="class-name">CascadeType</span>.ALL)
+    <span class="comment">// No REMOVE: deleting a customer must not delete their orders (financial records)</span>
+    <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"customer"</span>, cascade = {<span class="class-name">CascadeType</span>.PERSIST, <span class="class-name">CascadeType</span>.MERGE})
     <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();  <span class="comment">// LAZY by default</span>
 
     <span class="annotation">@ManyToOne</span>
     <span class="annotation">@JoinColumn</span>(name = <span class="string">"loyalty_tier_id"</span>)
     <span class="keyword">private</span> <span class="class-name">LoyaltyTier</span> loyaltyTier;  <span class="comment">// EAGER by default — see note below</span>
 
+    <span class="keyword">private</span> <span class="class-name">Instant</span> createdAt;
+
     <span class="annotation">@PrePersist</span>
-    <span class="keyword">protected void</span> <span class="function">onCreate</span>() { createdAt = <span class="class-name">LocalDateTime</span>.now(); }
+    <span class="keyword">protected void</span> <span class="function">onCreate</span>() { createdAt = <span class="class-name">Instant</span>.now(); }  <span class="comment">// an instant, not a wall-clock time: no time zone to get wrong</span>
 
     <span class="comment">// constructors, getters, setters</span>
 }</code></pre>
+                </figure>
 
                 <div class="info-box important">
                     <div class="info-box-title">FetchType defaults by relationship — the #1 misremembered fact in JPA</div>
@@ -288,11 +294,11 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                 <table>
                     <tr><th>Keyword</th><th>Method example</th><th>Generated intent</th></tr>
                     <tr><td><code>findBy</code></td><td><code>findByEmail(String)</code></td><td><code>WHERE email = ?</code></td></tr>
-                    <tr><td><code>Containing</code></td><td><code>findByNameContaining(String)</code></td><td><code>WHERE name LIKE %?%</code></td></tr>
-                    <tr><td><code>And</code> / <code>Or</code></td><td><code>findByStatusAndName(...)</code></td><td><code>WHERE status = ? AND name = ?</code></td></tr>
+                    <tr><td><code>Containing</code></td><td><code>findByFullNameContaining(String)</code></td><td><code>WHERE full_name LIKE %?%</code></td></tr>
+                    <tr><td><code>And</code> / <code>Or</code></td><td><code>findByStatusAndEmail(...)</code></td><td><code>WHERE status = ? AND email = ?</code></td></tr>
                     <tr><td><code>Between</code></td><td><code>findByCreatedAtBetween(a, b)</code></td><td><code>WHERE created_at BETWEEN ? AND ?</code></td></tr>
                     <tr><td><code>In</code></td><td><code>findByStatusIn(Collection)</code></td><td><code>WHERE status IN (...)</code></td></tr>
-                    <tr><td><code>OrderBy...Asc/Desc</code></td><td><code>findByStatusOrderByNameAsc</code></td><td><code>WHERE status = ? ORDER BY name</code></td></tr>
+                    <tr><td><code>OrderBy...Asc/Desc</code></td><td><code>findByStatusOrderByFullNameAsc</code></td><td><code>WHERE status = ? ORDER BY full_name</code></td></tr>
                     <tr><td><code>First</code> / <code>Top&lt;N&gt;</code></td><td><code>findFirstByStatus</code></td><td><code>LIMIT 1</code></td></tr>
                     <tr><td><code>countBy</code></td><td><code>countByStatus(Status)</code></td><td><code>SELECT COUNT(*) ...</code></td></tr>
                     <tr><td><code>existsBy</code></td><td><code>existsByEmail(String)</code></td><td><code>SELECT EXISTS(...)</code></td></tr>
@@ -328,7 +334,7 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
 
     <span class="comment">// Bulk update/delete — @Modifying is mandatory, or Spring throws at runtime</span>
     <span class="annotation">@Modifying</span>(clearAutomatically = <span class="keyword">true</span>)  <span class="comment">// clears the persistence context — see note below</span>
-    <span class="annotation">@Query</span>(<span class="string">"UPDATE Customer u SET u.status = :status WHERE u.id = :id"</span>)
+    <span class="annotation">@Query</span>(<span class="string">"UPDATE Customer c SET c.status = :status WHERE c.id = :id"</span>)
     <span class="keyword">int</span> <span class="function">updateStatus</span>(<span class="annotation">@Param</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id, <span class="annotation">@Param</span>(<span class="string">"status"</span>) <span class="class-name">Status</span> status);
 }</code></pre>
 
@@ -357,17 +363,17 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                 <h3>Projections — Interface-Based and Record-Based DTOs</h3>
                 <pre><code><span class="comment">// Interface projection — Spring Data generates a proxy matching these getters</span>
 <span class="keyword">public interface</span> <span class="class-name">CustomerSummary</span> {
-    <span class="class-name">String</span> <span class="function">getName</span>();
+    <span class="class-name">String</span> <span class="function">getFullName</span>();
     <span class="class-name">String</span> <span class="function">getEmail</span>();
 }
 
 <span class="comment">// Record (DTO) projection — Java 17+ idiom, matches constructor params to entity
 // property names. No @Query needed even for a derived query method.</span>
-<span class="keyword">public record</span> <span class="class-name">CustomerView</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {}
+<span class="keyword">public record</span> <span class="class-name">CustomerView</span>(<span class="class-name">String</span> fullName, <span class="class-name">String</span> email) {}
 
 <span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
     <span class="class-name">List</span>&lt;<span class="class-name">CustomerSummary</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">Status</span> status);  <span class="comment">// interface projection</span>
-    <span class="class-name">List</span>&lt;<span class="class-name">CustomerView</span>&gt;    <span class="function">findByStatusOrderByName</span>(<span class="class-name">Status</span> status);  <span class="comment">// record projection</span>
+    <span class="class-name">List</span>&lt;<span class="class-name">CustomerView</span>&gt;    <span class="function">findByStatusOrderByFullName</span>(<span class="class-name">Status</span> status);  <span class="comment">// record projection</span>
 }</code></pre>
 
                 <div class="info-box tip">
@@ -406,7 +412,7 @@ spring.jpa.show-sql=<span class="keyword">true</span></code></pre>
                     users.</p>
 
                 <h3>Fix 1: JOIN FETCH — one query instead of N+1</h3>
-                <pre><code><span class="annotation">@Query</span>(<span class="string">"SELECT u FROM Customer u LEFT JOIN FETCH u.orders WHERE u.status = :status"</span>)
+                <pre><code><span class="annotation">@Query</span>(<span class="string">"SELECT c FROM Customer c LEFT JOIN FETCH c.orders WHERE c.status = :status"</span>)
 <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findWithOrdersByStatus</span>(<span class="annotation">@Param</span>(<span class="string">"status"</span>) <span class="class-name">Status</span> status);
 <span class="comment">// Single query: customers LEFT JOIN orders — the association is populated immediately, no follow-up queries</span></code></pre>
 
@@ -527,10 +533,10 @@ customer.getOrders().size();  <span class="comment">// throws LazyInitialization
 
                 <pre><code><span class="keyword">public interface</span> <span class="class-name">CustomerRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Customer</span>, <span class="class-name">Long</span>&gt; {
     <span class="class-name">Page</span>&lt;<span class="class-name">Customer</span>&gt;  <span class="function">findByStatus</span>(<span class="class-name">Status</span> status, <span class="class-name">Pageable</span> pageable);   <span class="comment">// includes a COUNT(*) query for total pages</span>
-    <span class="class-name">Slice</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByNameContaining</span>(<span class="class-name">String</span> name, <span class="class-name">Pageable</span> pageable);  <span class="comment">// no COUNT query — cheaper</span>
+    <span class="class-name">Slice</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByFullNameContaining</span>(<span class="class-name">String</span> fullName, <span class="class-name">Pageable</span> pageable);  <span class="comment">// no COUNT query — cheaper</span>
 }
 
-<span class="class-name">Pageable</span> pageable = <span class="class-name">PageRequest</span>.of(<span class="number">0</span>, <span class="number">20</span>, <span class="class-name">Sort</span>.by(<span class="string">"name"</span>).ascending());
+<span class="class-name">Pageable</span> pageable = <span class="class-name">PageRequest</span>.of(<span class="number">0</span>, <span class="number">20</span>, <span class="class-name">Sort</span>.by(<span class="string">"fullName"</span>).ascending());
 <span class="class-name">Page</span>&lt;<span class="class-name">Customer</span>&gt; result = customerRepository.findByStatus(<span class="class-name">Status</span>.ACTIVE, pageable);</code></pre>
 
                 <div class="info-box tip">
@@ -558,15 +564,15 @@ customer.getOrders().size();  <span class="comment">// throws LazyInitialization
     <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">hasStatus</span>(<span class="class-name">Status</span> status) {
         <span class="keyword">return</span> (root, query, cb) -> cb.equal(root.get(<span class="string">"status"</span>), status);
     }
-    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">nameLike</span>(<span class="class-name">String</span> name) {
-        <span class="keyword">return</span> (root, query, cb) -> cb.like(cb.lower(root.get(<span class="string">"name"</span>)), <span class="string">"%"</span> + name.toLowerCase() + <span class="string">"%"</span>);
+    <span class="keyword">public static</span> <span class="class-name">Specification</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">fullNameLike</span>(<span class="class-name">String</span> fullName) {
+        <span class="keyword">return</span> (root, query, cb) -> cb.like(cb.lower(root.get(<span class="string">"fullName"</span>)), <span class="string">"%"</span> + fullName.toLowerCase() + <span class="string">"%"</span>);
     }
 }
 
 <span class="comment">// Compose conditionally — only the filters actually provided end up in the query</span>
 <span class="class-name">Specification</span>&lt;<span class="class-name">Customer</span>&gt; spec = <span class="class-name">Specification</span>.where(<span class="keyword">null</span>);
-<span class="keyword">if</span> (criteria.status() != <span class="keyword">null</span>) spec = spec.and(<span class="class-name">CustomerSpecifications</span>.hasStatus(criteria.status()));
-<span class="keyword">if</span> (criteria.name()   != <span class="keyword">null</span>) spec = spec.and(<span class="class-name">CustomerSpecifications</span>.nameLike(criteria.name()));
+<span class="keyword">if</span> (criteria.status()   != <span class="keyword">null</span>) spec = spec.and(<span class="class-name">CustomerSpecifications</span>.hasStatus(criteria.status()));
+<span class="keyword">if</span> (criteria.fullName() != <span class="keyword">null</span>) spec = spec.and(<span class="class-name">CustomerSpecifications</span>.fullNameLike(criteria.fullName()));
 <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; results = customerRepository.findAll(spec);</code></pre>
 
                 <div class="info-box note">
@@ -594,10 +600,10 @@ customer.getOrders().size();  <span class="comment">// throws LazyInitialization
 <span class="annotation">@EntityListeners</span>(<span class="class-name">AuditingEntityListener</span>.<span class="keyword">class</span>)
 <span class="keyword">public abstract class</span> <span class="class-name">Auditable</span> {
     <span class="annotation">@CreatedDate</span>  <span class="annotation">@Column</span>(updatable = <span class="keyword">false</span>)
-    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> createdAt;
+    <span class="keyword">private</span> <span class="class-name">Instant</span> createdAt;
 
     <span class="annotation">@LastModifiedDate</span>
-    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> updatedAt;
+    <span class="keyword">private</span> <span class="class-name">Instant</span> updatedAt;
 
     <span class="annotation">@CreatedBy</span>  <span class="annotation">@Column</span>(updatable = <span class="keyword">false</span>)
     <span class="keyword">private</span> <span class="class-name">String</span> createdBy;
@@ -635,7 +641,7 @@ customer.getOrders().size();  <span class="comment">// throws LazyInitialization
 
     <span class="annotation">@Test</span>
     <span class="keyword">void</span> <span class="function">findByEmail_returnsMatchingCustomer</span>() {
-        entityManager.persist(<span class="keyword">new</span> <span class="class-name">Customer</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>));
+        entityManager.persist(<span class="keyword">new</span> <span class="class-name">Customer</span>(<span class="string">"ana@example.com"</span>, <span class="string">"Ana Martín"</span>));
         entityManager.flush();
 
         <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; found = customerRepository.findByEmail(<span class="string">"ana@example.com"</span>);
@@ -764,6 +770,7 @@ customer.getOrders().size();  <span class="comment">// throws LazyInitialization
                     <a href="../tools/testing.html" class="related-link">
                         <span class="related-icon">🧪</span>Testing (JUnit, Mockito)
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

@@ -196,10 +196,10 @@
 <span class="annotation">@Entity</span> <span class="annotation">@Table</span>(name = <span class="string">"customers"</span>)
 <span class="keyword">public class</span> <span class="class-name">Customer</span> {
     <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = <span class="class-name">GenerationType</span>.IDENTITY) <span class="keyword">private</span> <span class="class-name">Long</span> id;
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
     <span class="keyword">private</span> <span class="class-name">String</span> email;
+    <span class="keyword">private</span> <span class="class-name">String</span> fullName;
     <span class="keyword">private</span> <span class="class-name">String</span> passwordHash;     <span class="comment">// NEVER expose this</span>
-    <span class="keyword">private</span> <span class="class-name">LocalDateTime</span> createdAt;
+    <span class="keyword">private</span> <span class="class-name">Instant</span> createdAt;
     <span class="annotation">@OneToMany</span>(mappedBy = <span class="string">"customer"</span>, fetch = <span class="class-name">FetchType</span>.LAZY)
     <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; orders;        <span class="comment">// serialising this triggers N+1 queries</span>
 }
@@ -207,26 +207,26 @@
 <span class="comment">// Response DTO — record: immutable, concise, zero boilerplate (Java 16+)</span>
 <span class="keyword">public record</span> <span class="class-name">CustomerResponse</span>(
     <span class="class-name">Long</span> id,
-    <span class="class-name">String</span> name,
     <span class="class-name">String</span> email,
-    <span class="class-name">LocalDateTime</span> createdAt
+    <span class="class-name">String</span> fullName,
+    <span class="class-name">Instant</span> createdAt
 ) {
     <span class="comment">// Factory method keeps mapping logic in the DTO, not scattered across controllers</span>
     <span class="keyword">public static</span> <span class="class-name">CustomerResponse</span> <span class="function">from</span>(<span class="class-name">Customer</span> customer) {
-        <span class="keyword">return new</span> <span class="class-name">CustomerResponse</span>(customer.getId(), customer.getName(), customer.getEmail(), customer.getCreatedAt());
+        <span class="keyword">return new</span> <span class="class-name">CustomerResponse</span>(customer.getId(), customer.getEmail(), customer.getFullName(), customer.getCreatedAt());
     }
 }
 
 <span class="comment">// Separate request DTOs — create and update have different validation rules</span>
 <span class="keyword">public record</span> <span class="class-name">CreateCustomerRequest</span>(
-    <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">100</span>) <span class="class-name">String</span> name,
     <span class="annotation">@NotBlank</span> <span class="annotation">@Email</span> <span class="class-name">String</span> email,
+    <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">200</span>) <span class="class-name">String</span> fullName,
     <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">8</span>, max = <span class="number">72</span>) <span class="class-name">String</span> password  <span class="comment">// 72 = bcrypt max useful input length</span>
 ) {}
 
 <span class="keyword">public record</span> <span class="class-name">UpdateCustomerRequest</span>(
-    <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">100</span>) <span class="class-name">String</span> name,
-    <span class="annotation">@NotBlank</span> <span class="annotation">@Email</span> <span class="class-name">String</span> email
+    <span class="annotation">@NotBlank</span> <span class="annotation">@Email</span> <span class="class-name">String</span> email,
+    <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">200</span>) <span class="class-name">String</span> fullName
     <span class="comment">// no password — changes go through a dedicated /change-password endpoint</span>
 ) {}</code></pre>
 
@@ -255,7 +255,9 @@
             <section class="content-section">
                 <h2>A Complete REST Controller</h2>
 
-                <pre><code><span class="annotation">@RestController</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">customer/CustomerController.java</span></figcaption>
+                    <pre><code><span class="annotation">@RestController</span>
 <span class="annotation">@RequestMapping</span>(<span class="string">"/api/v1/customers"</span>)
 <span class="keyword">public class</span> <span class="class-name">CustomerController</span> {
 
@@ -263,7 +265,7 @@
 
     <span class="keyword">public</span> <span class="function">CustomerController</span>(<span class="class-name">CustomerService</span> customerService) { <span class="keyword">this</span>.customerService = customerService; }
 
-    <span class="comment">// GET /api/v1/customers?page=0&size=20&sort=name</span>
+    <span class="comment">// GET /api/v1/customers?page=0&size=20&sort=fullName</span>
     <span class="annotation">@GetMapping</span>
     <span class="keyword">public</span> <span class="class-name">Page</span>&lt;<span class="class-name">CustomerResponse</span>&gt; <span class="function">listCustomers</span>(
             <span class="annotation">@RequestParam</span>(defaultValue = <span class="string">"0"</span>) <span class="keyword">int</span> page,
@@ -314,6 +316,7 @@
         <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.noContent().build();
     }
 }</code></pre>
+                </figure>
 
                 <div class="info-box warning">
                     <div class="info-box-title">PUT vs PATCH — using PUT for a partial update silently destroys data</div>
@@ -356,8 +359,8 @@
 
                 <pre><code><span class="comment">// Constraint annotations compose directly on record components</span>
 <span class="keyword">public record</span> <span class="class-name">CreateCustomerRequest</span>(
-    <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">100</span>) <span class="class-name">String</span> name,
     <span class="annotation">@NotBlank</span> <span class="annotation">@Email</span> <span class="class-name">String</span> email,
+    <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">2</span>, max = <span class="number">200</span>) <span class="class-name">String</span> fullName,
     <span class="annotation">@NotNull</span> <span class="annotation">@Min</span>(<span class="number">18</span>) <span class="annotation">@Max</span>(<span class="number">120</span>) <span class="class-name">Integer</span> age,
     <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(min = <span class="number">8</span>, max = <span class="number">72</span>) <span class="class-name">String</span> password,
     <span class="annotation">@Valid</span> <span class="annotation">@NotNull</span> <span class="class-name">AddressRequest</span> address  <span class="comment">// @Valid cascades into the nested record</span>
@@ -597,13 +600,13 @@ spring.mvc.problemdetails.enabled=true</code></pre>
 
     <span class="annotation">@Test</span>
     <span class="keyword">void</span> <span class="function">getCustomer_whenExists_returns200</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="keyword">var</span> customer = <span class="keyword">new</span> <span class="class-name">CustomerResponse</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="class-name">LocalDateTime</span>.now());
+        <span class="keyword">var</span> customer = <span class="keyword">new</span> <span class="class-name">CustomerResponse</span>(<span class="number">1L</span>, <span class="string">"ana@example.com"</span>, <span class="string">"Ana Martín"</span>, <span class="class-name">Instant</span>.now());
         when(customerService.findById(<span class="number">1L</span>)).thenReturn(<span class="class-name">Optional</span>.of(customer));
 
         mockMvc.perform(get(<span class="string">"/api/v1/customers/1"</span>).accept(<span class="class-name">MediaType</span>.APPLICATION_JSON))
             .andExpect(status().isOk())
             .andExpect(jsonPath(<span class="string">"$.id"</span>).value(<span class="number">1</span>))
-            .andExpect(jsonPath(<span class="string">"$.name"</span>).value(<span class="string">"Ana"</span>))
+            .andExpect(jsonPath(<span class="string">"$.fullName"</span>).value(<span class="string">"Ana Martín"</span>))
             .andExpect(jsonPath(<span class="string">"$.passwordHash"</span>).doesNotExist());  <span class="comment">// assert no data leaks</span>
     }
 
@@ -616,8 +619,9 @@ spring.mvc.problemdetails.enabled=true</code></pre>
 
     <span class="annotation">@Test</span>
     <span class="keyword">void</span> <span class="function">createCustomer_whenValid_returns201WithLocation</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="keyword">var</span> req = <span class="keyword">new</span> <span class="class-name">CreateCustomerRequest</span>(<span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="string">"securepass"</span>, <span class="keyword">null</span>);
-        <span class="keyword">var</span> res = <span class="keyword">new</span> <span class="class-name">CustomerResponse</span>(<span class="number">1L</span>, <span class="string">"Ana"</span>, <span class="string">"ana@example.com"</span>, <span class="class-name">LocalDateTime</span>.now());
+        <span class="keyword">var</span> req = <span class="keyword">new</span> <span class="class-name">CreateCustomerRequest</span>(<span class="string">"ana@example.com"</span>, <span class="string">"Ana Martín"</span>, <span class="number">34</span>, <span class="string">"securepass"</span>,
+                <span class="keyword">new</span> <span class="class-name">AddressRequest</span>(<span class="string">"Gran Vía 1"</span>, <span class="string">"28013"</span>));
+        <span class="keyword">var</span> res = <span class="keyword">new</span> <span class="class-name">CustomerResponse</span>(<span class="number">1L</span>, <span class="string">"ana@example.com"</span>, <span class="string">"Ana Martín"</span>, <span class="class-name">Instant</span>.now());
         when(customerService.create(any())).thenReturn(res);
 
         mockMvc.perform(post(<span class="string">"/api/v1/customers"</span>)
@@ -630,7 +634,8 @@ spring.mvc.problemdetails.enabled=true</code></pre>
 
     <span class="annotation">@Test</span>
     <span class="keyword">void</span> <span class="function">createCustomer_whenInvalidEmail_returns400</span>() <span class="keyword">throws</span> <span class="class-name">Exception</span> {
-        <span class="keyword">var</span> req = <span class="keyword">new</span> <span class="class-name">CreateCustomerRequest</span>(<span class="string">"Ana"</span>, <span class="string">"not-an-email"</span>, <span class="string">"securepass"</span>, <span class="keyword">null</span>);
+        <span class="keyword">var</span> req = <span class="keyword">new</span> <span class="class-name">CreateCustomerRequest</span>(<span class="string">"not-an-email"</span>, <span class="string">"Ana Martín"</span>, <span class="number">34</span>, <span class="string">"securepass"</span>,
+                <span class="keyword">new</span> <span class="class-name">AddressRequest</span>(<span class="string">"Gran Vía 1"</span>, <span class="string">"28013"</span>));
 
         mockMvc.perform(post(<span class="string">"/api/v1/customers"</span>)
                 .contentType(<span class="class-name">MediaType</span>.APPLICATION_JSON)
@@ -742,6 +747,7 @@ spring.mvc.problemdetails.enabled=true</code></pre>
                     <a href="../web-concepts/http.html" class="related-link"><span class="related-icon">&#x1F4E1;</span>HTTP Protocol &amp; Methods</a>
                     <a href="../tools/testing.html" class="related-link"><span class="related-icon">&#x1F9EA;</span>Testing (JUnit, Mockito)</a>
                     <a href="../security/jwt.html" class="related-link"><span class="related-icon">&#x1F3AB;</span>JWT (JSON Web Tokens)</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

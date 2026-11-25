@@ -152,15 +152,17 @@
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>The Entry Point: @SpringBootApplication</h2>
-                <pre><code><span class="keyword">package</span> com.company.myapp;
+                <figure class="code-file">
+                    <figcaption><span class="code-path">ShopApplication.java</span></figcaption>
+                    <pre><code><span class="keyword">package</span> com.javadevbible.shop;
 
 <span class="keyword">import</span> org.springframework.boot.SpringApplication;
 <span class="keyword">import</span> org.springframework.boot.autoconfigure.SpringBootApplication;
 
 <span class="annotation">@SpringBootApplication</span>
-<span class="keyword">public class</span> <span class="class-name">MyAppApplication</span> {
+<span class="keyword">public class</span> <span class="class-name">ShopApplication</span> {
     <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
-        <span class="class-name">SpringApplication</span>.run(<span class="class-name">MyAppApplication</span>.<span class="keyword">class</span>, args);
+        <span class="class-name">SpringApplication</span>.run(<span class="class-name">ShopApplication</span>.<span class="keyword">class</span>, args);
     }
 }
 
@@ -168,6 +170,7 @@
 <span class="annotation">@Configuration</span>            <span class="comment">// this class itself can declare @Bean methods</span>
 <span class="annotation">@EnableAutoConfiguration</span>  <span class="comment">// triggers the auto-configuration mechanism (see below)</span>
 <span class="annotation">@ComponentScan</span>            <span class="comment">// scans this package and sub-packages for @Component/@Service/etc.</span></code></pre>
+                </figure>
 
                 <pre><code><span class="comment"># Running it</span>
 mvn spring-boot:run                                   <span class="comment"># dev mode, via the Maven plugin</span>
@@ -227,7 +230,7 @@ java -Dserver.port=9090 -jar my-app.jar                 <span class="comment"># 
     <span class="class-name">DataSourceAutoConfiguration</span>.<span class="keyword">class</span>,
     <span class="class-name">SecurityAutoConfiguration</span>.<span class="keyword">class</span>
 })
-<span class="keyword">public class</span> <span class="class-name">MyApp</span> { }
+<span class="keyword">public class</span> <span class="class-name">ShopApplication</span> { }
 
 <span class="comment"># See EXACTLY what was applied and what was skipped, and why —
 # the single most useful debugging command for "why isn't my bean here"</span>
@@ -252,9 +255,11 @@ java -jar my-app.jar --debug
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>A Minimal REST API</h2>
-                <pre><code><span class="comment">// Model — a record, not a class with manual getters/setters/constructors.
+                <figure class="code-file">
+                    <figcaption><span class="code-path">customer/Customer.java · CustomerService.java · CustomerController.java</span></figcaption>
+                    <pre><code><span class="comment">// Model — a record, not a class with manual getters/setters/constructors.
 // Immutable, equals/hashCode/toString generated, accessors without "get" prefix.</span>
-<span class="keyword">public record</span> <span class="class-name">Customer</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> name, <span class="class-name">String</span> email) {}
+<span class="keyword">public record</span> <span class="class-name">Customer</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> email, <span class="class-name">String</span> fullName) {}
 
 <span class="comment">// Service — stateless singleton bean, constructor injection</span>
 <span class="annotation">@Service</span>
@@ -266,8 +271,8 @@ java -jar my-app.jar --debug
 
     <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findById</span>(<span class="class-name">Long</span> id) { <span class="keyword">return</span> <span class="class-name">Optional</span>.ofNullable(customers.get(id)); }
 
-    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">create</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {
-        <span class="class-name">Customer</span> customer = <span class="keyword">new</span> <span class="class-name">Customer</span>(nextId.getAndIncrement(), name, email);
+    <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">create</span>(<span class="class-name">String</span> email, <span class="class-name">String</span> fullName) {
+        <span class="class-name">Customer</span> customer = <span class="keyword">new</span> <span class="class-name">Customer</span>(nextId.getAndIncrement(), email, fullName);
         customers.put(customer.id(), customer);
         <span class="keyword">return</span> customer;
     }
@@ -293,13 +298,14 @@ java -jar my-app.jar --debug
     <span class="annotation">@PostMapping</span>
     <span class="annotation">@ResponseStatus</span>(HttpStatus.CREATED)
     <span class="keyword">public</span> <span class="class-name">Customer</span> <span class="function">create</span>(<span class="annotation">@RequestBody</span> <span class="class-name">CreateCustomerRequest</span> request) {
-        <span class="keyword">return</span> customerService.create(request.name(), request.email());
+        <span class="keyword">return</span> customerService.create(request.email(), request.fullName());
     }
 }
 
 <span class="comment">// Separate request DTO from the domain record — never bind @RequestBody
 // directly to your entity/domain type in real applications (see Spring REST page)</span>
-<span class="keyword">public record</span> <span class="class-name">CreateCustomerRequest</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {}</code></pre>
+<span class="keyword">public record</span> <span class="class-name">CreateCustomerRequest</span>(<span class="class-name">String</span> email, <span class="class-name">String</span> fullName) {}</code></pre>
+                </figure>
 
                 <p>Full HTTP verb coverage, validation, error handling, and DTO patterns are
                     covered in depth in <a href="rest.html">Spring REST</a> — this is the minimal
@@ -389,16 +395,16 @@ management.endpoint.health.show-details=when-authorized</code></pre>
 
                 <div class="info-box warning">
                     <div class="info-box-title">Component scan misses classes outside the base package</div>
-                    <pre><code><span class="comment">// ❌ MyAppApplication is in com.company.myapp — @ComponentScan only
+                    <pre><code><span class="comment">// ❌ ShopApplication is in com.javadevbible.shop — @ComponentScan only
 // scans THIS package and below. A @Service in com.othercompany.lib is invisible.</span>
-<span class="keyword">package</span> com.company.myapp;
+<span class="keyword">package</span> com.javadevbible.shop;
 <span class="annotation">@SpringBootApplication</span>
-<span class="keyword">public class</span> <span class="class-name">MyAppApplication</span> { }
+<span class="keyword">public class</span> <span class="class-name">ShopApplication</span> { }
 
 <span class="comment">// ✅ Explicitly widen the scan, or restructure packages so everything
 // genuinely sits under the application's root package</span>
-<span class="annotation">@SpringBootApplication</span>(scanBasePackages = {<span class="string">"com.company.myapp"</span>, <span class="string">"com.othercompany.lib"</span>})
-<span class="keyword">public class</span> <span class="class-name">MyAppApplication</span> { }</code></pre>
+<span class="annotation">@SpringBootApplication</span>(scanBasePackages = {<span class="string">"com.javadevbible.shop"</span>, <span class="string">"com.othercompany.lib"</span>})
+<span class="keyword">public class</span> <span class="class-name">ShopApplication</span> { }</code></pre>
                 </div>
 
                 <div class="info-box warning">
@@ -515,6 +521,7 @@ management.endpoint.health.show-details=when-authorized</code></pre>
                     <a href="../fundamentals/exceptions.html" class="related-link">
                         <span class="related-icon">⚠️</span>Exception Handling
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

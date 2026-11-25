@@ -435,40 +435,43 @@
             <section class="content-section">
                 <h2>Method-Level Security</h2>
 
-                <pre><code><span class="annotation">@Configuration</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderService.java</span></figcaption>
+                    <pre><code><span class="annotation">@Configuration</span>
 <span class="annotation">@EnableMethodSecurity</span>
 <span class="keyword">public class</span> <span class="class-name">MethodSecurityConfig</span> {}
 
 <span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">CustomerService</span> {
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
 
-    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)                              <span class="comment">// checked BEFORE the method body runs</span>
-    <span class="keyword">public void</span> <span class="function">deleteUser</span>(<span class="class-name">Long</span> id) { }
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('ADMIN')"</span>)                                 <span class="comment">// checked BEFORE the method body runs</span>
+    <span class="keyword">public void</span> <span class="function">cancelOrder</span>(<span class="class-name">Long</span> id) { }
 
-    <span class="annotation">@PreAuthorize</span>(<span class="string">"#userId == authentication.principal.id"</span>)          <span class="comment">// can reference method parameters directly</span>
-    <span class="keyword">public</span> <span class="class-name">User</span> <span class="function">getProfile</span>(<span class="class-name">Long</span> userId) { ... }
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"#customerId == authentication.principal.id"</span>)          <span class="comment">// can reference method parameters directly</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderSummary</span>&gt; <span class="function">findByCustomer</span>(<span class="class-name">Long</span> customerId) { ... }
 
-    <span class="annotation">@PostAuthorize</span>(<span class="string">"returnObject.owner == authentication.name"</span>)        <span class="comment">// checked AFTER — needs the return value to decide</span>
-    <span class="keyword">public</span> <span class="class-name">Document</span> <span class="function">getDocument</span>(<span class="class-name">Long</span> id) { ... }
+    <span class="annotation">@PostAuthorize</span>(<span class="string">"returnObject.customerEmail == authentication.name"</span>) <span class="comment">// checked AFTER — needs the return value to decide</span>
+    <span class="keyword">public</span> <span class="class-name">OrderSummary</span> <span class="function">getOrder</span>(<span class="class-name">Long</span> id) { ... }
 
-    <span class="annotation">@PostFilter</span>(<span class="string">"filterObject.owner == authentication.name"</span>)         <span class="comment">// filters the returned collection element-by-element</span>
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Document</span>&gt; <span class="function">getAllDocuments</span>() {
-        <span class="keyword">return</span> documentRepository.findAll();
+    <span class="annotation">@PostFilter</span>(<span class="string">"filterObject.customerEmail == authentication.name"</span>)    <span class="comment">// filters the returned collection element-by-element</span>
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderSummary</span>&gt; <span class="function">getAllOrders</span>() {
+        <span class="keyword">return</span> orderRepository.findAllSummaries();  <span class="comment">// a mutable list: @PostFilter removes from it in place</span>
     }
 }</code></pre>
+                </figure>
 
                 <div class="info-box warning">
                     <div class="info-box-title">@PostFilter is an in-memory filter, not a WHERE clause — the same lesson as N+1</div>
-                    <p><code>getAllDocuments()</code> above calls
-                        <code>documentRepository.findAll()</code> — <strong>every</strong> document
+                    <p><code>getAllOrders()</code> above calls
+                        <code>orderRepository.findAllSummaries()</code> — <strong>every</strong> order
                         row is fetched from the database first. <code>@PostFilter</code> then
                         discards the ones that don't match the SpEL expression, entirely in Java,
-                        after the fact. On a table with a million documents belonging to
-                        thousands of users, this fetches all of them to return maybe a dozen. As
+                        after the fact. On a table with a million orders belonging to
+                        thousands of customers, this fetches all of them to return maybe a dozen. As
                         with the N+1 problem covered in
                         <a href="data-jpa.html">Spring Data JPA</a>, the fix is pushing the
                         condition down into the query itself — a
-                        <code>findByOwner(owner)</code> derived method or a
+                        <code>findByCustomerEmail(email)</code> derived method or a
                         <code>Specification</code> — and reserving <code>@PostFilter</code> for
                         collections that are already small by the time they reach this layer.</p>
                 </div>
@@ -690,6 +693,7 @@
                     <a href="../tools/testing.html" class="related-link">
                         <span class="related-icon">🧪</span>Testing (JUnit, Mockito)
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
