@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Testcontainers with Spring Boot: Real Postgres &amp; Kafka - JavaDev Bible</title>
+    <meta name="description" content="Integration tests against real PostgreSQL and Kafka with Testcontainers 2 and Spring Boot: @ServiceConnection, shared containers, Kafka tests and dev mode.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/testcontainers.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Testcontainers with Spring Boot: Real Postgres &amp; Kafka">
+    <meta property="og:description" content="Integration tests against real PostgreSQL and Kafka with Testcontainers 2 and Spring Boot: @ServiceConnection, shared containers, Kafka tests and dev mode.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/testcontainers.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Testcontainers with Spring Boot",
+              "name": "Testcontainers with Spring Boot: Real Postgres & Kafka",
+              "description": "Integration tests against real PostgreSQL and Kafka with Testcontainers 2 and Spring Boot: @ServiceConnection, shared containers, Kafka tests and dev mode.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/testcontainers.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Testcontainers with Spring Boot",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/testcontainers.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Testcontainers
+            </nav>
+            <h1>Testcontainers with Spring Boot</h1>
+            <p class="topic-subtitle">Testing the shop against the PostgreSQL and Kafka it runs on in production, started in Docker by the test itself — why H2 gives false confidence, how Spring Boot wires a container in one annotation, and how to keep the suite fast</p>
+            <p class="reviewed-stamp">Checked against Spring Boot 4.2 · Testcontainers 2.0 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Testcontainers Is — and Why H2 Is the Wrong Database to Test Against</h2>
+                <p><strong>Testcontainers</strong> is a Java library that starts real services —
+                    PostgreSQL, Kafka, Redis — in Docker containers for the duration of a test, and
+                    removes them afterwards. The test talks to the same database engine, the same
+                    version, that production uses.</p>
+
+                <p>The usual alternative is an in-memory database such as H2. It is fast and needs
+                    nothing installed, but it is a different database: its SQL dialect, its locking,
+                    its types and its error codes are not PostgreSQL's. Tests pass against H2 and the
+                    code fails in production — or tests fail on H2 for code that is correct on
+                    PostgreSQL, and someone "fixes" the code to please the test database.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">test/…/StockLevelRepositoryTest.java — against H2</span></figcaption>
+                    <pre><code><span class="comment">// The repository uses PostgreSQL's INSERT … ON CONFLICT to upsert a stock
+// level. H2 does not support it: this test either fails with a syntax error,
+// or someone rewrites the query into something that runs on both — and loses
+// the atomic upsert the production code depended on.</span>
+<span class="annotation">@DataJpaTest</span>   <span class="comment">// replaces the DataSource with an embedded H2</span>
+<span class="keyword">class</span> <span class="class-name">StockLevelRepositoryTest</span> {
+
+    <span class="annotation">@Autowired</span> <span class="class-name">StockLevelRepository</span> stock;
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">restockAddsToExistingQuantity</span>() {
+        stock.restock(<span class="number">42L</span>, <span class="number">10</span>);
+        stock.restock(<span class="number">42L</span>, <span class="number">5</span>);
+        assertThat(stock.findById(<span class="number">42L</span>)).get().extracting(<span class="class-name">StockLevel</span>::getQuantity).isEqualTo(<span class="number">15</span>);
+    }
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">test/…/StockLevelRepositoryTest.java — against PostgreSQL 19</span></figcaption>
+                    <pre><code><span class="comment">// The same test, against the real engine. @ServiceConnection tells Spring
+// Boot to point the DataSource at the container: no URL, user or password
+// to configure, and the Flyway migrations run exactly as in production.</span>
+<span class="annotation">@DataJpaTest</span>
+<span class="annotation">@AutoConfigureTestDatabase</span>(replace = <span class="class-name">Replace</span>.NONE)
+<span class="annotation">@Testcontainers</span>
+<span class="keyword">class</span> <span class="class-name">StockLevelRepositoryTest</span> {
+
+    <span class="annotation">@Container</span>
+    <span class="annotation">@ServiceConnection</span>
+    <span class="keyword">static</span> <span class="class-name">PostgreSQLContainer</span> postgres = <span class="keyword">new</span> <span class="class-name">PostgreSQLContainer</span>(<span class="string">"postgres:19-alpine"</span>);
+
+    <span class="annotation">@Autowired</span> <span class="class-name">StockLevelRepository</span> stock;
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">restockAddsToExistingQuantity</span>() { ... }   <span class="comment">// unchanged</span>
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — HOW IT WORKS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>How It Works, and What It Costs</h2>
+                <p>Testcontainers talks to the local Docker daemon (or any compatible runtime:
+                    Podman, Colima, a remote Docker host). It pulls the image once, starts the
+                    container on a random free port, waits until the service inside is actually
+                    ready — not just started — and exposes the mapped host and port to the test.
+                    A small companion container removes everything when the test JVM exits, even
+                    if it crashes.</p>
+
+                <table>
+                    <tr><th>Approach</th><th>Startup</th><th>Fidelity</th><th>Needs</th></tr>
+                    <tr><td>Mocked repository</td><td>Instant</td><td>Tests your logic, not your SQL</td><td>Nothing</td></tr>
+                    <tr><td>H2 in PostgreSQL mode</td><td>~1 s</td><td>Partial: different engine</td><td>Nothing</td></tr>
+                    <tr class="row-highlight"><td>Testcontainers</td><td>A few seconds, once per test run if shared</td><td>Same engine and version as production</td><td>Docker on the machine and the CI runner</td></tr>
+                </table>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml — test dependencies</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- Testcontainers 2 renamed its modules with a testcontainers- prefix;
+     versions are managed by Spring Boot --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-testcontainers&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">groupId</span>&gt;org.testcontainers&lt;/<span class="keyword">groupId</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;testcontainers-junit-jupiter&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">groupId</span>&gt;org.testcontainers&lt;/<span class="keyword">groupId</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;testcontainers-postgresql&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">groupId</span>&gt;org.testcontainers&lt;/<span class="keyword">groupId</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;testcontainers-kafka&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SHARED CONTAINERS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>One Set of Containers for the Whole Suite</h2>
+                <p>A <code>static @Container</code> field starts a container per test class. With
+                    fifty integration test classes, that is fifty PostgreSQL startups. The faster
+                    pattern declares the containers once as beans in a test configuration: every
+                    test that imports it shares the same Spring context — which Spring's test
+                    framework caches — and therefore the same containers.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">test/…/TestcontainersConfiguration.java</span></figcaption>
+                    <pre><code><span class="comment">// Each @Bean is a container; @ServiceConnection derives the Spring Boot
+// connection properties from it (spring.datasource.*, spring.kafka.*).
+// The containers start once and stop when the cached context is closed.</span>
+<span class="annotation">@TestConfiguration</span>(proxyBeanMethods = <span class="keyword">false</span>)
+<span class="keyword">public class</span> <span class="class-name">TestcontainersConfiguration</span> {
+
+    <span class="annotation">@Bean</span>
+    <span class="annotation">@ServiceConnection</span>
+    <span class="class-name">PostgreSQLContainer</span> <span class="function">postgres</span>() {
+        <span class="keyword">return new</span> <span class="class-name">PostgreSQLContainer</span>(<span class="string">"postgres:19-alpine"</span>);
+    }
+
+    <span class="annotation">@Bean</span>
+    <span class="annotation">@ServiceConnection</span>
+    <span class="class-name">KafkaContainer</span> <span class="function">kafka</span>() {
+        <span class="keyword">return new</span> <span class="class-name">KafkaContainer</span>(<span class="string">"apache/kafka:4.4.0"</span>);
+    }
+}
+
+<span class="comment">// Any integration test</span>
+<span class="annotation">@SpringBootTest</span>
+<span class="annotation">@Import</span>(<span class="class-name">TestcontainersConfiguration</span>.<span class="keyword">class</span>)
+<span class="keyword">class</span> <span class="class-name">CheckoutIntegrationTest</span> { ... }</code></pre>
+                </figure>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">@DirtiesContext and differing configurations defeat the sharing</div>
+                    <p>The containers live as long as the cached context. A test class that adds
+                        <code>@DirtiesContext</code>, a different <code>@MockitoBean</code> set or
+                        different properties gets a new context — and a new set of containers. Keep
+                        integration tests on a small number of identical configurations, and clean
+                        up data between tests (a transaction rolled back, or tables truncated)
+                        instead of throwing the context away.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — TESTING KAFKA
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Testing the Order Flow Through Kafka</h2>
+                <p>The checkout publishes <code>OrderPlacedEvent</code> and the notification module
+                    consumes it — the flow from the <a href="kafka.html">Kafka page</a>. With real
+                    Kafka the test exercises serialisation, topic configuration and the listener
+                    together. Because consumption is asynchronous, the assertion waits until the
+                    effect is visible instead of sleeping.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">test/…/OrderPlacedFlowTest.java</span></figcaption>
+                    <pre><code><span class="annotation">@SpringBootTest</span>
+<span class="annotation">@Import</span>(<span class="class-name">TestcontainersConfiguration</span>.<span class="keyword">class</span>)
+<span class="keyword">class</span> <span class="class-name">OrderPlacedFlowTest</span> {
+
+    <span class="annotation">@Autowired</span> <span class="class-name">CheckoutService</span> checkout;
+    <span class="annotation">@MockitoBean</span> <span class="class-name">ConfirmationMailer</span> mailer;   <span class="comment">// the one external effect we replace</span>
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">placingAnOrderSendsAConfirmation</span>() {
+        <span class="class-name">Order</span> order = checkout.place(<span class="class-name">TestCarts</span>.oneKeyboardFor(<span class="string">"ana@example.com"</span>));
+
+        <span class="comment">// Polls until the consumer has run, up to 10 s; fails with the last
+        // assertion error if it never does. No Thread.sleep guessing.</span>
+        await().atMost(<span class="class-name">Duration</span>.ofSeconds(<span class="number">10</span>)).untilAsserted(() -&gt;
+                verify(mailer).sendConfirmation(<span class="string">"ana@example.com"</span>, order.getId()));
+    }
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — DEV MODE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Running the Application Locally on the Same Containers</h2>
+                <p>The test configuration can also start the whole application for local
+                    development: a small <code>main</code> class in the test sources runs
+                    <code>ShopApplication</code> with the containers attached. It replaces the
+                    <a href="docker.html">Compose file</a> for developers who only need the
+                    application's own dependencies.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">test/…/TestShopApplication.java</span></figcaption>
+                    <pre><code><span class="comment">// Run this instead of ShopApplication: PostgreSQL and Kafka start in Docker,
+// Spring Boot connects to them, and they stop when the application stops.</span>
+<span class="keyword">public class</span> <span class="class-name">TestShopApplication</span> {
+
+    <span class="keyword">public static void</span> <span class="function">main</span>(<span class="class-name">String</span>[] args) {
+        <span class="class-name">SpringApplication</span>.from(<span class="class-name">ShopApplication</span>::main)
+                .with(<span class="class-name">TestcontainersConfiguration</span>.<span class="keyword">class</span>)
+                .run(args);
+    }
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Use the same image and major version in tests as in production (<code>postgres:19</code>, <code>apache/kafka:4.4.0</code>), pinned, never <code>latest</code></li>
+                        <li>Let <code>@ServiceConnection</code> wire the connection instead of copying URLs into <code>@DynamicPropertySource</code></li>
+                        <li>Share containers across the suite through one test configuration and Spring's context cache</li>
+                        <li>Run the real schema migrations against the container</li>
+                        <li>Wait for asynchronous effects with Awaitility, with a timeout</li>
+                        <li>Keep unit tests without containers; use Testcontainers where the database, broker or wire format is part of what is being tested</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't use H2 to stand in for PostgreSQL in tests of SQL, migrations or locking</li>
+                        <li>Don't <code>Thread.sleep()</code> to wait for a Kafka consumer</li>
+                        <li>Don't add <code>@DirtiesContext</code> to clean data — it restarts the containers</li>
+                        <li>Don't rely on test execution order or on data left behind by another test</li>
+                        <li>Don't hard-code ports; containers get a random free port</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What does Testcontainers do?</summary>
+                        <p>It starts real services such as PostgreSQL or Kafka in Docker containers
+                    for a test, waits until they are ready, gives the test their host and port, and
+                    removes them afterwards, so integration tests run against the same software as
+                    production.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why is H2 a poor substitute for PostgreSQL in tests?</summary>
+                        <p>It is a different database: SQL features such as
+                    <code>ON CONFLICT</code>, types such as <code>jsonb</code>, locking behaviour
+                    and error codes differ. Tests can pass on H2 while the code fails on
+                    PostgreSQL, or force changes to correct code just to satisfy H2.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What does @ServiceConnection do?</summary>
+                        <p>It tells Spring Boot to create the connection details for a service from
+                    a container — the JDBC URL, user and password for PostgreSQL, the bootstrap
+                    servers for Kafka — so the application connects to the container without any
+                    properties being set by hand.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>An integration test suite with Testcontainers takes fifteen minutes. Where would you look first?</summary>
+                        <p>At how many times the containers and the Spring context start. Containers
+                    declared per test class, <code>@DirtiesContext</code>, and many slightly
+                    different test configurations each force new contexts and new containers.
+                    Declaring the containers once in a shared test configuration and keeping test
+                    classes on identical configurations usually cuts the time to a single
+                    startup; after that, check whether some tests could be plain unit tests.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>How do you test asynchronous processing, such as a Kafka consumer, without flaky tests?</summary>
+                        <p>Trigger the action, then poll for the expected effect with a bounded
+                    timeout — Awaitility's <code>await().atMost(…).untilAsserted(…)</code> —
+                    instead of sleeping for a fixed time. The test finishes as soon as the effect is
+                    visible, and fails with a meaningful assertion if it never appears. Assert on an
+                    observable outcome (a database row, a mock interaction), not on internal
+                    timing.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Which tests should use Testcontainers, and which should not?</summary>
+                        <p>Use it where the external system is part of what is being verified:
+                    repository queries, migrations, transaction and locking behaviour, message
+                    serialisation and listener configuration, end-to-end flows. Keep business
+                    logic in fast unit tests with plain objects or mocks; running every test
+                    against a database makes the suite slow without making it more
+                    meaningful.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../tools/testing.html" class="related-link"><span class="related-icon">🧪</span>Testing — JUnit 6 and Mockito</a>
+                    <a href="docker.html" class="related-link"><span class="related-icon">🐳</span>Docker for Spring Boot</a>
+                    <a href="kafka.html" class="related-link"><span class="related-icon">📨</span>Apache Kafka with Spring Boot</a>
+                    <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">💾</span>Spring Data JPA</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # JavaDev Bible
 
-A static reference covering the Java ecosystem — 102 topics across 14 categories, written for junior and senior developers on the same page.
+A static reference covering the Java ecosystem — 103 topics across 14 categories, written for junior and senior developers on the same page.
 
 **[Read it here →](https://karlete.github.io/javadevbible/javabible/index.html)**
 
@@ -60,7 +60,7 @@ JavaDev Bible — integrity check
   ✓ 1392 links checked, all resolve
 
 2. Search index
-  ✓ index and disk agree (102 pages)
+  ✓ index and disk agree (103 pages)
 
 3. UTF-8 BOM
   ✓ no BOM in any HTML file
@@ -76,7 +76,7 @@ JavaDev Bible — integrity check
   ✓ every meta description is 70–160 characters
 
 7. Hand-written counts
-  ✓ every stated count matches disk (102 topics, 14 categories)
+  ✓ every stated count matches disk (103 topics, 14 categories)
 
 8. Code blocks
   ✓ every <pre> block is balanced and escaped
@@ -94,7 +94,7 @@ JavaDev Bible — integrity check
   ✓ every page has a self-referencing canonical and Open Graph tags
 
 13. Sitemap
-  ✓ sitemap.xml lists exactly the 105 pages on disk
+  ✓ sitemap.xml lists exactly the 106 pages on disk
 
 14. Field injection
   ✓ no @Autowired field injection outside tests and ❌ examples
@@ -115,7 +115,7 @@ It knows what it does not cover: referential integrity, not behaviour. That gap 
 
 ## MCP server — use this Bible from Claude Desktop or Claude Code
 
-The `mcp/` directory contains a Spring Boot MCP server that exposes the Bible's content to any MCP-compatible AI assistant. Add it to Claude Desktop and ask Java questions backed by 102 topic pages — no API key, no cloud service, no port.
+The `mcp/` directory contains a Spring Boot MCP server that exposes the Bible's content to any MCP-compatible AI assistant. Add it to Claude Desktop and ask Java questions backed by 103 topic pages — no API key, no cloud service, no port.
 
 **Three tools are exposed:**
 
@@ -211,7 +211,7 @@ bash tools/verify.sh --full   # do not truncate long failure lists
 ```
 javabible/
 ├── index.html              category navigation and search
-├── topics/{category}/      102 topic pages across 14 categories
+├── topics/{category}/      103 topic pages across 14 categories
 ├── css/                    main, syntax-highlighting, toc
 ├── js/                     search, navigation, toc
 └── data/
