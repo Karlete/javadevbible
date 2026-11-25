@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenAPI in Spring Boot: springdoc &amp; Generated Clients - JavaDev Bible</title>
+    <meta name="description" content="Describing a Spring Boot REST API with OpenAPI: springdoc, an accurate spec from records, generated TypeScript clients and breaking-change checks in CI.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/openapi.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="OpenAPI in Spring Boot: springdoc &amp; Generated Clients">
+    <meta property="og:description" content="Describing a Spring Boot REST API with OpenAPI: springdoc, an accurate spec from records, generated TypeScript clients and breaking-change checks in CI.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/openapi.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "OpenAPI for Spring Boot APIs",
+              "name": "OpenAPI in Spring Boot: springdoc & Generated Clients",
+              "description": "Describing a Spring Boot REST API with OpenAPI: springdoc, an accurate spec from records, generated TypeScript clients and breaking-change checks in CI.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/openapi.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "OpenAPI for Spring Boot APIs",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/openapi.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                OpenAPI
+            </nav>
+            <h1>OpenAPI for Spring Boot APIs</h1>
+            <p class="topic-subtitle">One machine-readable description of the shop's API, generated from the controllers and records themselves — the source for its documentation, for the React and Angular clients' types, and for a CI check that fails before a breaking change ships</p>
+            <p class="reviewed-stamp">Checked against Spring Boot 4.2 · springdoc-openapi 3.2 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What OpenAPI Is — and Why Hand-Written API Docs Drift</h2>
+                <p><strong>OpenAPI</strong> is a standard format, in JSON or YAML, for describing an
+                    HTTP API: every path and method, its parameters, request and response bodies
+                    with their exact fields and types, the status codes it returns and how it is
+                    secured. Because it is machine-readable, tools can render it as interactive
+                    documentation, generate client code from it, and compare two versions of
+                    it.</p>
+
+                <p>The problem it solves is the gap between an API and what its clients believe
+                    about it. A README or a wiki page describing the endpoints is out of date the
+                    first time someone adds a field and forgets to update it; a TypeScript type
+                    written by hand on the frontend drifts the same way, and nothing fails until a
+                    customer sees <code>undefined</code> on the screen.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">frontend/src/orders/types.ts — copied by hand</span></figcaption>
+                    <pre><code><span class="comment">// Written from the README months ago. The backend has since renamed total to
+// totalAmount and added placedAt; this still compiles, and the order list now
+// shows an empty total in production.</span>
+<span class="keyword">export type</span> <span class="class-name">OrderResponse</span> = {
+  id: <span class="class-name">number</span>;
+  status: <span class="class-name">string</span>;
+  total: <span class="class-name">string</span>;
+};</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">frontend build — types generated from the running API's description</span></figcaption>
+                    <pre><code><span class="comment"># springdoc publishes the description from the controllers and records;
+# the frontend build turns it into types. A renamed field now breaks the
+# TypeScript compile instead of the order page.</span>
+npx openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — SPRINGDOC
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>springdoc: the Description From the Code</h2>
+                <p><strong>springdoc-openapi</strong> inspects the application at runtime — request
+                    mappings, parameter and return types, Jackson's view of the records, Bean
+                    Validation annotations — and serves the resulting OpenAPI document. Its 3.x line
+                    targets Spring Boot 4; Boot does not manage its version.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml + resources/application.yaml</span></figcaption>
+                    <pre><code>&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springdoc&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;springdoc-openapi-starter-webmvc-ui&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;3.2.1&lt;/<span class="keyword">version</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+<span class="comment"># GET /v3/api-docs        → the OpenAPI document (JSON; /v3/api-docs.yaml for YAML)
+# GET /swagger-ui.html    → interactive documentation rendered from it</span>
+<span class="attribute">springdoc</span>:
+  <span class="attribute">swagger-ui</span>:
+    <span class="attribute">enabled</span>: <span class="keyword">false</span>     <span class="comment"># in the production profile: publish the spec, not a console to call the API</span></code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — AN ACCURATE SPEC
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Making the Description Accurate</h2>
+                <p>Out of the box the description is only as precise as the code. Three things
+                    usually need help: which fields are required, the error responses, and types
+                    whose JSON shape differs from their Java type.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/PlaceOrderRequest.java + order/OrderResponse.java</span></figcaption>
+                    <pre><code><span class="comment">// Bean Validation annotations become part of the schema: required fields,
+// minimum values and sizes are documented without writing them twice.</span>
+<span class="keyword">public record</span> <span class="class-name">PlaceOrderRequest</span>(
+        <span class="annotation">@NotEmpty</span> <span class="class-name">List</span>&lt;<span class="annotation">@Valid</span> <span class="class-name">OrderItemRequest</span>&gt; items) {
+}
+
+<span class="keyword">public record</span> <span class="class-name">OrderResponse</span>(
+        <span class="annotation">@NotNull</span> <span class="class-name">Long</span> id,
+        <span class="annotation">@NotNull</span> <span class="class-name">OrderStatus</span> status,       <span class="comment">// enums become a list of allowed values</span>
+        <span class="comment">// Jackson writes this BigDecimal as a string; tell the schema the same,
+        // or generated clients will treat the total as a float</span>
+        <span class="annotation">@Schema</span>(type = <span class="string">"string"</span>, example = <span class="string">"129.90"</span>)
+        <span class="annotation">@JsonFormat</span>(shape = <span class="class-name">JsonFormat</span>.<span class="class-name">Shape</span>.STRING) <span class="class-name">BigDecimal</span> total,
+        <span class="annotation">@NotNull</span> <span class="class-name">Instant</span> placedAt) {
+}</code></pre>
+                </figure>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderController.java</span></figcaption>
+                    <pre><code><span class="comment">// The success response is inferred; the errors clients must handle are not.
+// Documenting them with ProblemDetail tells every client what an
+// out-of-stock rejection looks like.</span>
+<span class="annotation">@Operation</span>(summary = <span class="string">"Place an order for the authenticated customer"</span>)
+<span class="annotation">@ApiResponse</span>(responseCode = <span class="string">"201"</span>, description = <span class="string">"Order placed, awaiting payment"</span>)
+<span class="annotation">@ApiResponse</span>(responseCode = <span class="string">"409"</span>, description = <span class="string">"A product is out of stock"</span>,
+        content = <span class="annotation">@Content</span>(mediaType = <span class="string">"application/problem+json"</span>,
+                           schema = <span class="annotation">@Schema</span>(implementation = <span class="class-name">ProblemDetail</span>.<span class="keyword">class</span>)))
+<span class="annotation">@PostMapping</span>
+<span class="annotation">@ResponseStatus</span>(<span class="class-name">HttpStatus</span>.CREATED)
+<span class="class-name">OrderResponse</span> <span class="function">place</span>(<span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> <span class="class-name">PlaceOrderRequest</span> request) {
+    <span class="keyword">return</span> orders.place(request);
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — CODE-FIRST OR CONTRACT-FIRST
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Code-First or Contract-First</h2>
+                <p>springdoc works <strong>code-first</strong>: the Java code is the source and the
+                    description is derived from it. The alternative writes the OpenAPI document
+                    first and generates server interfaces from it (for example with the
+                    openapi-generator Maven plugin), which the controllers then implement.</p>
+
+                <table>
+                    <tr><th></th><th>Code-first (springdoc)</th><th>Contract-first (generator)</th></tr>
+                    <tr><td>Source of truth</td><td>Controllers and records</td><td>The OpenAPI YAML file</td></tr>
+                    <tr><td>Strength</td><td>No duplication; the description cannot disagree with the code</td><td>Frontend and backend agree on the contract before implementation; reviewable as one file</td></tr>
+                    <tr><td>Weakness</td><td>The API's design emerges from implementation details unless reviewed</td><td>Generated code to live with; generator quirks; two artefacts to keep in step</td></tr>
+                    <tr class="row-highlight"><td>Fits</td><td>One team owning API and main client — the shop</td><td>Public APIs, several teams or companies consuming one contract</td></tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — GENERATED CLIENTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Generated Clients for the React and Angular Frontends</h2>
+                <p>The <a href="react.html">React</a> and <a href="angular.html">Angular</a> pages
+                    wrote the TypeScript types by hand and noted that they should be generated.
+                    <code>openapi-typescript</code> turns the description into types for every path;
+                    <code>openapi-fetch</code> is a small fetch wrapper that uses them, so the path,
+                    its parameters and the response type are all checked by the compiler.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">frontend/src/api/client.ts</span></figcaption>
+                    <pre><code><span class="keyword">import</span> createClient <span class="keyword">from</span> <span class="string">'openapi-fetch'</span>;
+<span class="keyword">import type</span> { paths } <span class="keyword">from</span> <span class="string">'./schema'</span>;   <span class="comment">// generated, never edited</span>
+
+<span class="keyword">export const</span> api = <span class="function">createClient</span>&lt;<span class="class-name">paths</span>&gt;({ baseUrl: <span class="string">'/'</span> });
+
+<span class="comment">// A typo in the path, a missing parameter or a field that no longer exists
+// in the response is now a compile error</span>
+<span class="keyword">const</span> { data: order, error } = <span class="keyword">await</span> api.<span class="function">GET</span>(<span class="string">'/api/orders/{id}'</span>, {
+  params: { path: { id: <span class="number">9001</span> } },
+});</code></pre>
+                </figure>
+
+                <p>Java callers have the same choice: openapi-generator can produce a Java client,
+                    but for service-to-service calls inside one organisation the declarative
+                    <code>@HttpExchange</code> interfaces from the
+                    <a href="microservices.html">microservices page</a> are usually lighter.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — CI
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Catching Breaking Changes in CI</h2>
+                <p>Once the description is a file, two versions of it can be compared. A CI step
+                    exports the document from the new build — from a test that calls
+                    <code>/v3/api-docs</code> and writes it to disk, for instance — and compares it
+                    with the one from the main branch using a diff tool such as
+                    <code>oasdiff</code>. Removing a field, renaming a path or making an optional
+                    parameter required fails the build; adding an optional field passes.</p>
+
+                <table>
+                    <tr><th>Change</th><th>Breaking for existing clients?</th></tr>
+                    <tr><td>Add an optional request field or a response field</td><td>No</td></tr>
+                    <tr><td>Add an endpoint</td><td>No</td></tr>
+                    <tr class="row-highlight"><td>Remove or rename a response field</td><td>Yes — clients reading it get nothing</td></tr>
+                    <tr><td>Make a request field required</td><td>Yes — existing requests are rejected</td></tr>
+                    <tr><td>Add a value to a response enum (<code>OrderStatus</code>)</td><td>Often — clients with an exhaustive <code>switch</code> fail on the new value</td></tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Generate client types from the description instead of writing them by hand</li>
+                        <li>Document error responses as <code>application/problem+json</code> with the <code>ProblemDetail</code> schema</li>
+                        <li>Use Bean Validation annotations on request records so constraints appear in the description</li>
+                        <li>Make the schema match Jackson's output for types with a custom shape, such as money as strings</li>
+                        <li>Compare the description against the previous release in CI and fail on breaking changes</li>
+                        <li>Review API changes in the description diff, not only in the Java diff</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't expose Swagger UI publicly in production</li>
+                        <li>Don't return JPA entities from controllers — the description then publishes your database model</li>
+                        <li>Don't edit generated code; change the source and regenerate</li>
+                        <li>Don't treat the generated description as API design: review names, paths and status codes deliberately</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What is an OpenAPI document?</summary>
+                        <p>A machine-readable description of an HTTP API in JSON or YAML: its paths,
+                    methods, parameters, request and response schemas, status codes and security
+                    schemes. Tools use it to render documentation, generate clients and compare
+                    versions.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What does springdoc do in a Spring Boot application?</summary>
+                        <p>It inspects the controllers, their parameter and return types and the
+                    validation annotations at runtime and serves the resulting OpenAPI document at
+                    <code>/v3/api-docs</code>, plus an optional Swagger UI that renders it.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why generate frontend types from the API description?</summary>
+                        <p>So they cannot drift from the backend: when a field is renamed or removed,
+                    the regenerated types change and the frontend fails to compile, instead of
+                    silently showing missing data to users.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>Code-first or contract-first — how do you choose?</summary>
+                        <p>Code-first suits one team owning the API and its main client: the
+                    description is derived and cannot disagree with the code. Contract-first suits
+                    public APIs and several consuming teams, where the contract is agreed and
+                    reviewed before implementation and generated server interfaces enforce it. The
+                    cost is generated code and keeping the contract and implementation in
+                    step.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Which API changes are breaking, and how do you catch them before release?</summary>
+                        <p>Removing or renaming response fields, removing endpoints, adding required
+                    request fields, changing types, and often adding enum values that clients handle
+                    exhaustively. Export the OpenAPI document in CI and diff it against the released
+                    version with a tool such as <code>oasdiff</code>, failing the build on breaking
+                    changes unless a new API version is introduced.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>The shop's total is a BigDecimal written as a JSON string. What can go wrong in the OpenAPI description, and how do you fix it?</summary>
+                        <p>The generator sees a <code>BigDecimal</code> and documents a number, while
+                    Jackson actually sends a string, so generated clients get the wrong type and may
+                    parse it as a float. Annotate the component with
+                    <code>@Schema(type = "string")</code> so the description matches the wire
+                    format, and verify with a test that compares an actual response to the
+                    schema.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../spring/rest.html" class="related-link"><span class="related-icon">🌐</span>Spring REST</a>
+                    <a href="../web-concepts/rest-principles.html" class="related-link"><span class="related-icon">📐</span>RESTful API Principles</a>
+                    <a href="react.html" class="related-link"><span class="related-icon">⚛️</span>React Frontend for a Spring Boot API</a>
+                    <a href="angular.html" class="related-link"><span class="related-icon">🅰️</span>Angular Frontend for a Spring Boot API</a>
+                    <a href="../tools/cicd.html" class="related-link"><span class="related-icon">🔁</span>CI/CD Basics</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
