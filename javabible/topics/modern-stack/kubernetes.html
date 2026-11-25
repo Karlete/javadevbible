@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes for Spring Boot: Probes, Rollouts &amp; Config - JavaDev Bible</title>
+    <meta name="description" content="How to run a Spring Boot service on Kubernetes: Deployments, Services, Actuator health probes, JVM resource limits, zero-downtime rollouts and config.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/kubernetes.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Kubernetes for Spring Boot: Probes, Rollouts &amp; Config">
+    <meta property="og:description" content="How to run a Spring Boot service on Kubernetes: Deployments, Services, Actuator health probes, JVM resource limits, zero-downtime rollouts and config.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/kubernetes.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Kubernetes for Spring Boot",
+              "name": "Kubernetes for Spring Boot: Probes, Rollouts & Config",
+              "description": "How to run a Spring Boot service on Kubernetes: Deployments, Services, Actuator health probes, JVM resource limits, zero-downtime rollouts and config.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/kubernetes.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Kubernetes for Spring Boot",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/kubernetes.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Kubernetes for Spring Boot
+            </nav>
+            <h1>Kubernetes for Spring Boot</h1>
+            <p class="topic-subtitle">The shop's image from the Docker page, running as three replicas that restart themselves, receive traffic only when ready, and roll out a new version without dropping a single checkout</p>
+            <p class="reviewed-stamp">Checked against Java 25 · Spring Boot 4.2 · Kubernetes 1.37 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Kubernetes Is — and the Job It Takes Off Your Hands</h2>
+                <p><strong>Kubernetes</strong> is a container orchestrator: you describe the
+                    state you want — "three copies of <code>shop:1.4.0</code>, each with 1 GiB
+                    of memory, reachable on port 80" — and a control loop keeps the cluster in
+                    that state. If a container crashes, it is restarted; if a node dies, its
+                    containers are started on another node; if you change the image tag, the
+                    old copies are replaced by new ones a few at a time.</p>
+
+                <p>The problem it solves starts where the <a href="docker.html">Docker
+                    page</a> ends. An image runs the same everywhere, but someone still has to
+                    decide <em>where</em> it runs, restart it when it fails, spread traffic over
+                    several copies, and replace it without downtime. Without an orchestrator,
+                    that someone is a script:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">deploy.sh — one VM, by hand</span></figcaption>
+                    <pre><code><span class="comment"># Stops the old container, then starts the new one: every deploy is an outage.
+# If the JVM crashes at 3 a.m., nothing restarts it. If the VM dies, the shop
+# is down until someone provisions a new one and runs this again.</span>
+ssh deploy@vm-01 <span class="string">"docker stop shop &amp;&amp; docker rm shop"</span>
+ssh deploy@vm-01 <span class="string">"docker run -d --name shop -p 80:8080 registry.example.com/shop:1.4.0"</span></code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">k8s/deployment.yaml — desired state</span></figcaption>
+                    <pre><code><span class="comment"># You declare the result; Kubernetes works out the steps and keeps
+# repeating them: three replicas, on whatever nodes have room, replaced
+# one at a time when the image tag changes.</span>
+<span class="attribute">apiVersion</span>: apps/v1
+<span class="attribute">kind</span>: Deployment
+<span class="attribute">metadata</span>:
+  <span class="attribute">name</span>: shop
+<span class="attribute">spec</span>:
+  <span class="attribute">replicas</span>: 3
+  <span class="attribute">selector</span>:
+    <span class="attribute">matchLabels</span>: { <span class="attribute">app</span>: shop }
+  <span class="attribute">template</span>:
+    <span class="attribute">metadata</span>:
+      <span class="attribute">labels</span>: { <span class="attribute">app</span>: shop }
+    <span class="attribute">spec</span>:
+      <span class="attribute">containers</span>:
+        - <span class="attribute">name</span>: shop
+          <span class="attribute">image</span>: registry.example.com/shop:1.4.0
+          <span class="attribute">ports</span>:
+            - <span class="attribute">containerPort</span>: 8080</code></pre>
+                </figure>
+
+                <p>The whole of Kubernetes is that idea applied to more things: networking,
+                    configuration, storage, scaling. This page covers the part an application
+                    developer has to get right — the parts where a Spring Boot service and the
+                    cluster have to cooperate.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — THE OBJECTS YOU WRITE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Five Objects a Spring Boot Service Needs</h2>
+                <p>A cluster has dozens of resource types. A typical stateless service uses
+                    five of them; the database and Kafka usually run as managed services
+                    outside the cluster, or are operated by a platform team.</p>
+
+                <table>
+                    <tr><th>Object</th><th>What it is</th><th>For the shop</th></tr>
+                    <tr><td><strong>Pod</strong></td><td>One or more containers scheduled together, with one IP address. Disposable: it is never repaired, only replaced</td><td>One running copy of <code>shop:1.4.0</code></td></tr>
+                    <tr class="row-highlight"><td><strong>Deployment</strong></td><td>Keeps N identical Pods running and replaces them on every change to the Pod template</td><td>Three replicas, rolled out one at a time</td></tr>
+                    <tr><td><strong>Service</strong></td><td>A stable name and virtual IP in front of the Pods whose labels match, load-balancing across the <em>ready</em> ones</td><td><code>http://shop</code> inside the cluster</td></tr>
+                    <tr><td><strong>ConfigMap</strong> / <strong>Secret</strong></td><td>Configuration and credentials, injected as environment variables or files</td><td>Datasource URL, Kafka bootstrap servers, database password</td></tr>
+                    <tr><td><strong>Ingress</strong> (or Gateway API)</td><td>HTTP routing from outside the cluster to Services</td><td><code>https://shop.example.com/api/**</code> → <code>shop</code></td></tr>
+                </table>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">k8s/service.yaml</span></figcaption>
+                    <pre><code><span class="comment"># Other workloads call http://shop — never a Pod IP, which changes on every
+# restart. Only Pods whose readiness probe passes receive traffic.</span>
+<span class="attribute">apiVersion</span>: v1
+<span class="attribute">kind</span>: Service
+<span class="attribute">metadata</span>:
+  <span class="attribute">name</span>: shop
+<span class="attribute">spec</span>:
+  <span class="attribute">selector</span>: { <span class="attribute">app</span>: shop }
+  <span class="attribute">ports</span>:
+    - <span class="attribute">port</span>: 80
+      <span class="attribute">targetPort</span>: 8080</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — HEALTH PROBES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Health Probes — Liveness, Readiness and Startup</h2>
+                <p>Kubernetes asks each container three different questions, and confusing
+                    them is the most common cause of a service that restarts itself into an
+                    outage:</p>
+
+                <table>
+                    <tr><th>Probe</th><th>Question</th><th>When it fails</th></tr>
+                    <tr><td><strong>Startup</strong></td><td>Has the application finished starting?</td><td>The other probes wait; after <code>failureThreshold × periodSeconds</code> the container is restarted</td></tr>
+                    <tr class="row-highlight"><td><strong>Liveness</strong></td><td>Is this process broken beyond repair?</td><td>The container is <strong>killed and restarted</strong></td></tr>
+                    <tr><td><strong>Readiness</strong></td><td>Should this Pod receive requests right now?</td><td>The Pod is <strong>removed from the Service</strong>; nothing is restarted</td></tr>
+                </table>
+
+                <p>Spring Boot answers liveness and readiness out of the box. When it detects
+                    Kubernetes — from the <code>*_SERVICE_HOST</code> and
+                    <code>*_SERVICE_PORT</code> environment variables every Pod receives —
+                    Actuator enables two health groups, <code>/actuator/health/liveness</code>
+                    and <code>/actuator/health/readiness</code>, backed by the application's
+                    own availability state: live once the context has refreshed, ready once
+                    the startup runners have finished.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">k8s/deployment.yaml — container probes</span></figcaption>
+                    <pre><code>          <span class="attribute">startupProbe</span>:
+            <span class="attribute">httpGet</span>: { <span class="attribute">path</span>: /actuator/health/liveness, <span class="attribute">port</span>: 8080 }
+            <span class="attribute">periodSeconds</span>: 5
+            <span class="attribute">failureThreshold</span>: 24        <span class="comment"># up to 2 minutes to start, then liveness takes over</span>
+          <span class="attribute">livenessProbe</span>:
+            <span class="attribute">httpGet</span>: { <span class="attribute">path</span>: /actuator/health/liveness, <span class="attribute">port</span>: 8080 }
+            <span class="attribute">periodSeconds</span>: 10
+            <span class="attribute">failureThreshold</span>: 3
+          <span class="attribute">readinessProbe</span>:
+            <span class="attribute">httpGet</span>: { <span class="attribute">path</span>: /actuator/health/readiness, <span class="attribute">port</span>: 8080 }
+            <span class="attribute">periodSeconds</span>: 5
+            <span class="attribute">failureThreshold</span>: 2</code></pre>
+                </figure>
+
+                <aside class="review-note" aria-label="Code review comment">
+                    <p class="review-note-label">Code review comment</p>
+                    <pre><code><span class="line-del">management.endpoint.health.group.liveness.include: livenessState,db</span>
+<span class="line-add">management.endpoint.health.group.readiness.include: readinessState,db</span></code></pre>
+                    <p>Please don't put the database in liveness. If Postgres has a two-minute
+                        failover, every replica fails liveness, Kubernetes restarts all of them,
+                        and they come back into a cold start while the database is recovering.
+                        Readiness takes them out of the load balancer instead and lets them
+                        return on their own.</p>
+                </aside>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Liveness must only check the process itself</div>
+                    <p>A failing liveness probe restarts the container — so it should fail only
+                        when a restart would help: a deadlock, a broken internal state. A
+                        dependency that is down is not fixed by restarting the caller. The
+                        Spring Boot documentation is explicit that liveness should not depend
+                        on external checks. Whether readiness includes the database is a
+                        choice: with it, a Pod that has lost its connection pool stops
+                        receiving checkouts; without it, a database outage keeps every Pod
+                        "ready" and requests fail with 500s instead of being refused.</p>
+                </div>
+
+                <p>The probes run on the application port by default. If Actuator lives on a
+                    separate management port that a broken web server would not affect,
+                    <code>management.endpoint.health.probes.add-additional-paths=true</code>
+                    also exposes them as <code>/livez</code> and <code>/readyz</code> on the
+                    main port, so the probe tests the same server that serves customers.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — RESOURCES AND THE JVM
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Requests, Limits and the JVM</h2>
+                <p>Each container declares what it needs. The scheduler uses
+                    <strong>requests</strong> to choose a node; the kernel enforces
+                    <strong>limits</strong>. For memory the limit is hard: a container that
+                    exceeds it is killed (<code>OOMKilled</code>, exit code 137) with no Java
+                    error and no heap dump. For CPU, the limit throttles: the JVM keeps running,
+                    just slower, which shows up as latency spikes during garbage collection and
+                    JIT compilation.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">k8s/deployment.yaml — resources and JVM flags</span></figcaption>
+                    <pre><code>          <span class="attribute">resources</span>:
+            <span class="attribute">requests</span>: { <span class="attribute">cpu</span>: <span class="string">"1"</span>, <span class="attribute">memory</span>: 1Gi }
+            <span class="attribute">limits</span>:   { <span class="attribute">memory</span>: 1Gi }      <span class="comment"># memory limit = request: no overcommit, no surprise kills</span>
+          <span class="attribute">env</span>:
+            - <span class="attribute">name</span>: JAVA_TOOL_OPTIONS
+              <span class="comment"># Heap follows the container limit, leaving room for metaspace, threads,
+              # direct buffers and the code cache, which also count against it</span>
+              <span class="attribute">value</span>: <span class="string">"-XX:MaxRAMPercentage=70"</span></code></pre>
+                </figure>
+
+                <div class="info-box note">
+                    <div class="info-box-title">A small container can silently get the wrong garbage collector</div>
+                    <p>On Java 25 the JVM only picks G1 on a "server-class" machine; a container
+                        with fewer than two CPUs or less than about 1.8 GB of memory gets the
+                        Serial collector, with its single-threaded pauses. Either give the
+                        container at least two CPUs or set <code>-XX:+UseG1GC</code>
+                        explicitly. Java 27 made G1 the default everywhere, which removes the
+                        trap for the next LTS.</p>
+                </div>
+
+                <p>Leaving out the CPU limit, as above, is a deliberate and common choice: the
+                    request still guarantees the Pod its share, and the JVM can use idle CPU on
+                    the node during startup and GC instead of being throttled. Teams that need
+                    strict isolation between workloads set a limit and size it generously.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — ZERO-DOWNTIME ROLLOUTS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Rolling Updates Without Dropping a Checkout</h2>
+                <p>Changing the image tag starts a rolling update: new Pods are started, and
+                    old ones are terminated once the new ones are ready. Two things decide
+                    whether customers notice — how the Deployment replaces Pods, and how a
+                    terminating Pod leaves.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">k8s/deployment.yaml — rollout strategy</span></figcaption>
+                    <pre><code><span class="attribute">spec</span>:
+  <span class="attribute">strategy</span>:
+    <span class="attribute">type</span>: RollingUpdate
+    <span class="attribute">rollingUpdate</span>:
+      <span class="attribute">maxUnavailable</span>: 0   <span class="comment"># never fewer than 3 ready Pods during the rollout</span>
+      <span class="attribute">maxSurge</span>: 1         <span class="comment"># one extra Pod at a time: needs room for a 4th replica</span></code></pre>
+                </figure>
+
+                <p>Termination is where requests get lost. When a Pod is deleted, two things
+                    happen <em>at the same time</em>: the container receives SIGTERM, and the
+                    Pod is removed from the Service's endpoints. The second one propagates to
+                    every node and Ingress controller asynchronously, so for a few seconds
+                    traffic still arrives at a Pod that is already shutting down. The sequence
+                    that avoids it:</p>
+
+                <table>
+                    <tr><th>Step</th><th>What happens</th><th>Budget</th></tr>
+                    <tr><td>1. <code>preStop</code> hook</td><td>The container waits before receiving SIGTERM, while endpoint removal reaches every load balancer</td><td>10 s</td></tr>
+                    <tr><td>2. SIGTERM → graceful shutdown</td><td>Spring Boot (graceful by default) stops accepting new requests and lets in-flight ones finish</td><td>up to 30 s (<code>spring.lifecycle.timeout-per-shutdown-phase</code>)</td></tr>
+                    <tr class="row-highlight"><td>3. <code>terminationGracePeriodSeconds</code></td><td>After this, Kubernetes sends SIGKILL — it must cover steps 1 and 2</td><td>45 s &gt; 10 + 30</td></tr>
+                </table>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">k8s/deployment.yaml — graceful termination</span></figcaption>
+                    <pre><code>    <span class="attribute">spec</span>:
+      <span class="attribute">terminationGracePeriodSeconds</span>: 45
+      <span class="attribute">containers</span>:
+        - <span class="attribute">name</span>: shop
+          <span class="attribute">lifecycle</span>:
+            <span class="attribute">preStop</span>:
+              <span class="attribute">sleep</span>:
+                <span class="attribute">seconds</span>: 10   <span class="comment"># built-in sleep action (Kubernetes 1.32+): no shell needed in the image</span></code></pre>
+                </figure>
+
+                <p>On clusters older than 1.32 the same delay is an <code>exec</code> hook
+                    running <code>sh -c "sleep 10"</code>, which only works if the image has a
+                    shell. And none of it helps if the JVM never sees SIGTERM — the image needs
+                    the exec form of <code>ENTRYPOINT</code> described on the
+                    <a href="docker.html">Docker page</a>.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — CONFIGURATION AND SECRETS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Configuration and Secrets</h2>
+                <p>The same image runs in every environment; what changes is configuration,
+                    and Spring Boot already reads it from the two places Kubernetes can put
+                    it. Environment variables map to properties through relaxed binding
+                    (<code>SPRING_DATASOURCE_URL</code> → <code>spring.datasource.url</code>);
+                    files mounted from a Secret become properties through
+                    <code>configtree:</code>.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">k8s/deployment.yaml + resources/application.yaml</span></figcaption>
+                    <pre><code><span class="comment"># deployment.yaml — non-secret settings as environment variables,
+# credentials as files from a Secret</span>
+          <span class="attribute">envFrom</span>:
+            - <span class="attribute">configMapRef</span>: { <span class="attribute">name</span>: shop-config }   <span class="comment"># SPRING_DATASOURCE_URL, SPRING_KAFKA_BOOTSTRAP_SERVERS</span>
+          <span class="attribute">volumeMounts</span>:
+            - { <span class="attribute">name</span>: db-credentials, <span class="attribute">mountPath</span>: /run/secrets/shop, <span class="attribute">readOnly</span>: <span class="keyword">true</span> }
+      <span class="attribute">volumes</span>:
+        - <span class="attribute">name</span>: db-credentials
+          <span class="attribute">secret</span>: { <span class="attribute">secretName</span>: shop-db }      <span class="comment"># keys: spring.datasource.username, spring.datasource.password</span>
+
+<span class="comment"># application.yaml — every file in the directory becomes a property named after it</span>
+<span class="attribute">spring</span>:
+  <span class="attribute">config</span>:
+    <span class="attribute">import</span>: configtree:/run/secrets/shop/</code></pre>
+                </figure>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">A Secret is base64, not encryption</div>
+                    <p>Anyone who can read the Secret object can decode it, and by default it is
+                        stored unencrypted in the cluster's database. Restrict who can read
+                        Secrets, enable encryption at rest, and for production credentials
+                        prefer an external secret store synchronised into the cluster. Mounting
+                        secrets as files rather than environment variables also keeps them out
+                        of <code>/actuator/env</code>, crash reports and child processes.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — SCALING
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Scaling the Shop Horizontally</h2>
+                <p>A HorizontalPodAutoscaler changes <code>replicas</code> from a metric. CPU
+                    is the usual one; for a JVM it needs two adjustments to behave.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">k8s/hpa.yaml</span></figcaption>
+                    <pre><code><span class="attribute">apiVersion</span>: autoscaling/v2
+<span class="attribute">kind</span>: HorizontalPodAutoscaler
+<span class="attribute">metadata</span>:
+  <span class="attribute">name</span>: shop
+<span class="attribute">spec</span>:
+  <span class="attribute">scaleTargetRef</span>: { <span class="attribute">apiVersion</span>: apps/v1, <span class="attribute">kind</span>: Deployment, <span class="attribute">name</span>: shop }
+  <span class="attribute">minReplicas</span>: 3
+  <span class="attribute">maxReplicas</span>: 10
+  <span class="attribute">metrics</span>:
+    - <span class="attribute">type</span>: Resource
+      <span class="attribute">resource</span>: { <span class="attribute">name</span>: cpu, <span class="attribute">target</span>: { <span class="attribute">type</span>: Utilization, <span class="attribute">averageUtilization</span>: 70 } }
+  <span class="attribute">behavior</span>:
+    <span class="attribute">scaleDown</span>:
+      <span class="attribute">stabilizationWindowSeconds</span>: 300   <span class="comment"># don't remove Pods on a short dip</span></code></pre>
+                </figure>
+
+                <ul>
+                    <li><strong>Startup looks like load.</strong> A new JVM burns CPU on class
+                        loading and JIT compilation, which can push the average up and trigger
+                        another scale-up. The startup probe keeps new Pods out of the metric
+                        until they are ready; the AOT cache from the Docker page shortens the
+                        window.</li>
+                    <li><strong>Kafka consumers don't scale past the partitions.</strong> The
+                        <code>notification</code> consumer group from the
+                        <a href="kafka.html">Kafka page</a> can only have as many active
+                        consumers as <code>orders.placed</code> has partitions; replicas beyond
+                        that sit idle.</li>
+                </ul>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Use Actuator's <code>/actuator/health/liveness</code> and <code>/readiness</code> groups for the probes, and add a startup probe for slow starts</li>
+                        <li>Keep liveness limited to the process itself; put dependencies, if anywhere, in readiness</li>
+                        <li>Set the memory request equal to the limit and size the heap with <code>-XX:MaxRAMPercentage</code></li>
+                        <li>Add a <code>preStop</code> sleep and make <code>terminationGracePeriodSeconds</code> longer than the sleep plus Spring's shutdown timeout</li>
+                        <li>Use <code>maxUnavailable: 0</code> for services that must not lose capacity during a rollout</li>
+                        <li>Deploy by immutable image tag or digest, and keep the manifests in Git next to the code or in a GitOps repository</li>
+                        <li>Mount credentials as files from Secrets and read them with <code>configtree:</code></li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't check the database, Kafka or another service in the liveness probe — an outage elsewhere turns into a restart storm</li>
+                        <li>Don't use <code>latest</code> as the image tag: a restarted Pod may pull a different image than its siblings</li>
+                        <li>Don't set <code>-Xmx</code> equal to the memory limit; non-heap memory gets the container OOMKilled</li>
+                        <li>Don't run a single replica of a service that customers depend on — every node drain or rollout is then an outage</li>
+                        <li>Don't treat Secrets as encrypted, and don't commit them to Git, even base64-encoded</li>
+                        <li>Don't run more consumer replicas than the topic has partitions and expect more throughput</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What is the difference between a Pod, a Deployment and a Service?</summary>
+                        <p>A Pod is one running instance: one or more containers with a shared IP,
+                    created and destroyed freely. A Deployment keeps a given number of
+                    identical Pods running and replaces them when their template changes. A
+                    Service gives those Pods one stable name and address and load-balances
+                    across the ones that are ready, so callers never deal with Pod IPs.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What happens when a liveness probe fails, and when a readiness probe fails?</summary>
+                        <p>A failing liveness probe gets the container killed and restarted. A
+                    failing readiness probe only removes the Pod from the Service's endpoints,
+                    so it stops receiving traffic until the probe passes again; nothing is
+                    restarted.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>How does a Spring Boot application read configuration on Kubernetes?</summary>
+                        <p>The same way as anywhere else: from environment variables, which relaxed
+                    binding maps to properties (<code>SPRING_DATASOURCE_URL</code> →
+                    <code>spring.datasource.url</code>), and from files, which
+                    <code>spring.config.import=configtree:/path/</code> turns into properties
+                    named after each file. ConfigMaps and Secrets provide both.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why should a Spring Boot service run more than one replica?</summary>
+                        <p>Because Pods are replaced routinely — on every rollout, node upgrade
+                    or eviction. With one replica, each of those events is an outage; with
+                    several, the Service sends traffic to the others while one is being
+                    replaced.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>Why do some requests still fail during a rolling update even with graceful shutdown enabled?</summary>
+                        <p>Because SIGTERM and the removal of the Pod from the Service's endpoints
+                    happen in parallel, and endpoint removal reaches kube-proxy and the
+                    Ingress controllers asynchronously. For a few seconds new requests keep
+                    arriving at a Pod whose server has already stopped accepting them. A
+                    <code>preStop</code> sleep delays SIGTERM until the endpoint change has
+                    propagated, and <code>terminationGracePeriodSeconds</code> must cover the
+                    sleep plus Spring's shutdown timeout, or SIGKILL cuts the in-flight
+                    requests short.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Should the database be part of a health probe?</summary>
+                        <p>Never of liveness: when the database is down, every replica fails,
+                    Kubernetes restarts all of them, and the service comes back cold into an
+                    ongoing incident. In readiness it is a trade-off: it removes Pods that
+                    cannot serve requests, but during a full database outage it removes all of
+                    them, so the Service answers with connection errors instead of the
+                    application's own error responses. Many teams keep readiness to the
+                    application's own state and handle dependency failures with timeouts,
+                    circuit breakers and <code>ProblemDetail</code> errors.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>A Spring Boot Pod is OOMKilled but the logs show no OutOfMemoryError. What is going on?</summary>
+                        <p>The container exceeded its memory limit and the kernel killed the
+                    process; the JVM never got to throw anything. The heap is only part of the
+                    process's memory — metaspace, thread stacks, the code cache, direct
+                    buffers and GC structures come on top. With <code>-Xmx</code> close to the
+                    limit, non-heap growth pushes the total over. Size the heap as a
+                    percentage of the limit (<code>MaxRAMPercentage</code> around 70–75), and
+                    use Native Memory Tracking to see what the rest is.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why might a JVM service behave differently in a 1-CPU container than on a developer laptop?</summary>
+                        <p>Ergonomics. The JVM sizes thread pools, the heap and even its choice of
+                    garbage collector from the CPU and memory it sees, and it sees the
+                    container limits. On Java 25, under two CPUs or about 1.8 GB the JVM
+                    falls back to the Serial collector; common pools such as
+                    <code>ForkJoinPool.commonPool()</code> shrink to one thread; and a CPU
+                    limit throttles GC and JIT threads. Setting the collector explicitly and
+                    giving latency-sensitive services at least two CPUs avoids most of it —
+                    Java 27 makes G1 the default regardless of size.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why doesn't adding replicas speed up a Kafka consumer beyond a certain point?</summary>
+                        <p>Within a consumer group, each partition is consumed by at most one
+                    member. With six partitions, the seventh replica gets no partition and
+                    sits idle. Throughput beyond that needs more partitions — planned up front,
+                    because adding partitions later changes which partition a key maps to and
+                    breaks per-key ordering for existing keys.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="docker.html" class="related-link"><span class="related-icon">🐳</span>Docker for Spring Boot</a>
+                    <a href="kafka.html" class="related-link"><span class="related-icon">📨</span>Apache Kafka with Spring Boot</a>
+                    <a href="../spring/properties.html" class="related-link"><span class="related-icon">⚙️</span>application.properties &amp; YAML</a>
+                    <a href="../spring/profiles.html" class="related-link"><span class="related-icon">🔀</span>Profiles &amp; Environments</a>
+                    <a href="../tools/cicd.html" class="related-link"><span class="related-icon">🔁</span>CI/CD Basics</a>
+                    <a href="../advanced/garbage-collection.html" class="related-link"><span class="related-icon">♻️</span>Garbage Collection</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
