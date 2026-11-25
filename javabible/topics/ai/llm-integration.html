@@ -119,8 +119,10 @@
                     codes, and different streaming formats. Switching providers meant rewriting the
                     integration from scratch.</p>
 
-                <pre><code><span class="comment">/*
- * BEFORE — raw HttpClient against the OpenAI API.
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">recommendation/ProductRecommendationService.java — raw HttpClient</span></figcaption>
+                    <pre><code><span class="comment">/*
+ * Raw HttpClient against the OpenAI API.
  * Works, but: provider-specific JSON, manual parsing, no type safety on the
  * response, no streaming, no structured output, no retry, and switching to
  * Anthropic means rewriting everything below.
@@ -129,7 +131,7 @@
 
 <span class="class-name">String</span> requestBody = <span class="string">"""
     {
-      "model": "gpt-4o",
+      "model": "&lt;dated-model-snapshot&gt;",
       "messages": [
         {"role": "system", "content": "You are a product recommender for an e-commerce store."},
         {"role": "user",   "content": "Suggest 3 products related to order #4821"}
@@ -148,9 +150,12 @@
 <span class="class-name">HttpResponse</span>&lt;<span class="class-name">String</span>&gt; response = http.send(request, <span class="class-name">HttpResponse</span>.<span class="class-name">BodyHandlers</span>.ofString());
 <span class="comment">// Now parse the JSON, extract choices[0].message.content, handle errors,
 // handle rate limits, handle token overflow... all manually.</span></code></pre>
+                </figure>
 
-                <pre><code><span class="comment">/*
- * AFTER — Spring AI ChatClient.
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">recommendation/ProductRecommendationService.java — Spring AI ChatClient</span></figcaption>
+                    <pre><code><span class="comment">/*
+ * Spring AI ChatClient.
  * Provider-agnostic, typed, streamable. Switching from OpenAI to Anthropic is
  * a dependency swap + one property change — zero code changes.
  */</span>
@@ -172,6 +177,7 @@
             .content();                <span class="comment">// returns the model's text response as a String</span>
     }
 }</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">Spring AI vs LangChain4j — which one?</div>
@@ -196,13 +202,13 @@
             <section class="content-section">
                 <h2>Project Setup</h2>
 
-                <pre><code><span class="comment">&lt;!-- pom.xml — Spring AI 2.0 with the OpenAI starter --&gt;</span>
+                <pre><code><span class="comment">&lt;!-- pom.xml — Spring AI 2.1 with the OpenAI starter --&gt;</span>
 &lt;<span class="keyword">dependencyManagement</span>&gt;
     &lt;<span class="keyword">dependencies</span>&gt;
         &lt;<span class="keyword">dependency</span>&gt;
             &lt;<span class="keyword">groupId</span>&gt;org.springframework.ai&lt;/<span class="keyword">groupId</span>&gt;
             &lt;<span class="keyword">artifactId</span>&gt;spring-ai-bom&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;2.0.0&lt;/<span class="keyword">version</span>&gt;
+            &lt;<span class="keyword">version</span>&gt;2.1.0&lt;/<span class="keyword">version</span>&gt;
             &lt;<span class="keyword">type</span>&gt;pom&lt;/<span class="keyword">type</span>&gt;
             &lt;<span class="keyword">scope</span>&gt;import&lt;/<span class="keyword">scope</span>&gt;
         &lt;/<span class="keyword">dependency</span>&gt;
@@ -219,7 +225,7 @@
 
                 <pre><code><span class="comment"># application.properties</span>
 spring.ai.openai.api-key=${OPENAI_API_KEY}           <span class="comment"># NEVER hardcode — use env var or secret manager</span>
-spring.ai.openai.chat.options.model=gpt-4o
+spring.ai.openai.chat.options.model=${OPENAI_CHAT_MODEL}   <span class="comment"># a dated snapshot from the provider's model list — see "Pin the model" below</span>
 spring.ai.openai.chat.options.temperature=0.3         <span class="comment"># lower = more deterministic</span></code></pre>
 
                 <div class="info-box warning">
@@ -362,7 +368,7 @@ spring.ai.openai.chat.options.temperature=0.3         <span class="comment"># lo
                         compiler. Fields can be null, enums can contain unexpected values, and
                         numeric fields can arrive as strings. Always validate the returned record
                         before passing it to business logic — the same way you validate any
-                        external input. Spring AI 2.0 supports self-correcting schema validation
+                        external input. Spring AI 2.x supports self-correcting schema validation
                         via <code>.entity(Type.class, spec -> spec.validateSchema())</code>,
                         which retries on schema violations automatically.</p>
                 </div>
@@ -438,12 +444,12 @@ spring.ai.openai.chat.options.temperature=0.3         <span class="comment"># lo
                         <td><code>model</code></td>
                         <td>Which model version to use</td>
                         <td>Pin to a specific version in production
-                            (<code>gpt-4o-2024-11-20</code>, not <code>gpt-4o</code>) — the
+                            (a dated snapshot such as <code>&lt;model&gt;-YYYY-MM-DD</code>, not the bare model alias) — the
                             generic alias can silently change behaviour on a provider update</td>
                     </tr>
                 </table>
 
-                <pre><code><span class="comment"># Override per-call via runtime options (Spring AI 2.0)</span>
+                <pre><code><span class="comment"># Override per-call via runtime options (Spring AI 2.x)</span>
 <span class="class-name">String</span> result = chatClient.prompt()
     .user(<span class="string">"Classify this return request"</span>)
     .options(<span class="class-name">ChatOptions</span>.builder()
@@ -512,8 +518,10 @@ spring.ai.openai.chat.options.temperature=0.3         <span class="comment"># lo
                     behaviour.</p>
 
                 <p>✅ <strong>Do</strong> pin the model version in production configuration.
-                    <code>gpt-4o</code> is an alias that can change without notice;
-                    <code>gpt-4o-2024-11-20</code> is a contract.</p>
+                    The bare model name is an alias the provider re-points without notice;
+                    a dated snapshot (<code>&lt;model&gt;-YYYY-MM-DD</code>) is a contract. Model
+                    names also go stale within months, so keep the ID in configuration, not
+                    in code.</p>
 
                 <p>✅ <strong>Do</strong> set <code>max-tokens</code> on every call. An unbounded
                     response can generate thousands of tokens, burning budget and exceeding
@@ -563,8 +571,8 @@ spring.ai.openai.chat.options.temperature=0.3         <span class="comment"># lo
                     Spring ecosystem — auto-configuration, starters, property-driven setup.
                     You add a starter dependency (e.g.
                     <code>spring-ai-starter-model-openai</code>), set the API key in
-                    properties, and inject a <code>ChatClient.Builder</code>. Spring AI 2.0
-                    is designed for Spring Boot 4.x.</p>
+                    properties, and inject a <code>ChatClient.Builder</code>. Spring AI 2.x
+                    targets Spring Boot 4; Spring AI 2.1 is built on Spring Boot 4.2.</p>
                     </details>
 
                     <details class="qa">
@@ -664,6 +672,7 @@ spring.ai.openai.chat.options.temperature=0.3         <span class="comment"># lo
                     <a href="../tools/jackson.html" class="related-link">
                         <span class="related-icon">📋</span>Jackson (JSON)
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
