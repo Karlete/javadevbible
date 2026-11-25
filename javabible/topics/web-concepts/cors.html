@@ -140,6 +140,36 @@ fetch(<span class="string">'https://mybank.com/api/transfer'</span>, {
                         JavaScript that initiated it.</p>
                 </div>
 
+                <p>The most damaging CORS bug is not a missing header but a policy that
+                    allows everything while also allowing credentials:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">security/CorsFilter.java</span></figcaption>
+                    <pre><code><span class="comment">// "Fixes" every CORS error by echoing back whatever Origin asked, with
+// credentials allowed. Any site a logged-in customer visits can now read
+// /api/orders and /api/customers/me with the customer's session cookie
+// (stopped only if that cookie happens to be SameSite=Lax or Strict).</span>
+res.setHeader(<span class="string">"Access-Control-Allow-Origin"</span>, req.getHeader(<span class="string">"Origin"</span>));
+res.setHeader(<span class="string">"Access-Control-Allow-Credentials"</span>, <span class="string">"true"</span>);</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">security/SecurityConfig.java</span></figcaption>
+                    <pre><code><span class="comment">// An explicit list of the shop's own front ends. Spring answers the
+// preflight and only names an origin that is on the list.</span>
+<span class="annotation">@Bean</span>
+<span class="class-name">CorsConfigurationSource</span> <span class="function">corsConfigurationSource</span>() {
+    <span class="class-name">CorsConfiguration</span> config = <span class="keyword">new</span> <span class="class-name">CorsConfiguration</span>();
+    config.setAllowedOrigins(<span class="class-name">List</span>.of(<span class="string">"https://shop.example.com"</span>));
+    config.setAllowedMethods(<span class="class-name">List</span>.of(<span class="string">"GET"</span>, <span class="string">"POST"</span>, <span class="string">"PUT"</span>, <span class="string">"DELETE"</span>));
+    config.setAllowCredentials(<span class="keyword">true</span>);
+
+    <span class="class-name">UrlBasedCorsConfigurationSource</span> source = <span class="keyword">new</span> <span class="class-name">UrlBasedCorsConfigurationSource</span>();
+    source.registerCorsConfiguration(<span class="string">"/api/**"</span>, config);
+    <span class="keyword">return</span> source;
+}</code></pre>
+                </figure>
+
                 <h3>What "Origin" Means Precisely</h3>
                 <pre><code><span class="comment">// Origin = Protocol + Host + Port — all three must match</span>
 
@@ -706,6 +736,7 @@ curl -v -X OPTIONS \
                     <a href="rest-principles.html" class="related-link"><span class="related-icon">🔗</span>RESTful API Principles</a>
                     <a href="sessions-cookies.html" class="related-link"><span class="related-icon">🍪</span>Sessions &amp; Cookies</a>
                     <a href="../spring/security.html" class="related-link"><span class="related-icon">🍃</span>Spring Security</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

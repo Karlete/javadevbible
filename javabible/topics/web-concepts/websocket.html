@@ -147,6 +147,38 @@ ws.send(JSON.stringify({ type: <span class="string">'ORDER_UPDATE'</span>, order
                     <tr><td>Server-Sent Events</td><td>Server → Client only</td><td>Persistent HTTP stream</td><td>Built into browser</td><td>Live feeds, notifications, one-way push</td></tr>
                     <tr><td>WebSocket</td><td>Full-duplex</td><td>Persistent (upgraded)</td><td>Manual implementation</td><td>Chat, games, collaborative tools, high-frequency bidirectional</td></tr>
                 </table>
+
+                <p>The most common mistake is the third option used for a job the second one
+                    does better — the shop's order-status page only ever <em>receives</em>
+                    updates:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">frontend/order-status.js — WebSocket</span></figcaption>
+                    <pre><code><span class="comment">// A full-duplex connection for one-way data: the server needs a WebSocket
+// handler and the load balancer an upgrade rule, and reconnecting after a
+// dropped connection is the client's job.</span>
+<span class="keyword">function</span> connect() {
+    <span class="keyword">const</span> ws = <span class="keyword">new</span> WebSocket(<span class="string">'wss://shop.example.com/ws/orders'</span>);
+    ws.onopen = () => ws.send(JSON.stringify({ subscribe: <span class="number">9001</span> }));
+    ws.onmessage = e => showStatus(JSON.parse(e.data));
+    ws.onclose = () => setTimeout(connect, <span class="number">1000</span>);   <span class="comment">// reconnect by hand</span>
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderEventsController.java + frontend/order-status.js — SSE</span></figcaption>
+                    <pre><code><span class="comment">// Server-Sent Events: a plain HTTP response that stays open. Same
+// controllers, same security, and the browser reconnects on its own.</span>
+<span class="annotation">@GetMapping</span>(path = <span class="string">"/api/orders/{id}/events"</span>, produces = <span class="class-name">MediaType</span>.TEXT_EVENT_STREAM_VALUE)
+<span class="class-name">SseEmitter</span> <span class="function">orderEvents</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) {
+    <span class="class-name">SseEmitter</span> emitter = <span class="keyword">new</span> <span class="class-name">SseEmitter</span>(<span class="class-name">Duration</span>.ofMinutes(<span class="number">30</span>).toMillis());
+    orderStatusUpdates.subscribe(id, emitter);   <span class="comment">// sends each OrderStatus change</span>
+    <span class="keyword">return</span> emitter;
+}
+
+<span class="comment">// Client</span>
+<span class="keyword">new</span> EventSource(<span class="string">'/api/orders/9001/events'</span>).onmessage = e => showStatus(JSON.parse(e.data));</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -705,6 +737,7 @@ Instance B pushes to Bob ✓</code></pre>
                     <a href="sessions-cookies.html" class="related-link"><span class="related-icon">🍪</span>Sessions &amp; Cookies</a>
                     <a href="../jakarta-ee/cdi.html" class="related-link"><span class="related-icon">💉</span>CDI (Dependency Injection)</a>
                     <a href="../spring/security.html" class="related-link"><span class="related-icon">🍃</span>Spring Security</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
