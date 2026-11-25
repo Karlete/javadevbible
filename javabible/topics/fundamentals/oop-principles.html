@@ -104,9 +104,9 @@
                     around <strong>objects</strong> — entities that combine related data (fields)
                     and behaviour (methods) in a single unit. Instead of writing a program as a
                     long sequence of instructions that manipulate separate variables, OOP lets you
-                    model the real world: a <code>BankAccount</code> knows its own balance and
-                    knows how to deposit or withdraw. A <code>User</code> knows its own credentials
-                    and knows how to authenticate.</p>
+                    model the real world: an <code>Order</code> knows its own items and total and
+                    knows how to add an item or be cancelled. A <code>Customer</code> knows its own
+                    email and knows how to change it safely.</p>
             
                 <p>The problem OOP solves: as programs grow, procedural code — variables here,
                     functions there, no clear ownership of data — becomes impossible to reason
@@ -114,29 +114,35 @@
                     this logic? OOP answers both questions by keeping data and the code that
                     operates on it together, in one place, with controlled access.</p>
             
-                <pre><code><span class="comment">// Procedural style: data and logic are separate, no ownership</span>
-            <span class="keyword">String</span>  accountId = <span class="string">"ACC-001"</span>;
-            <span class="keyword">double</span> balance    = <span class="number">500.0</span>;
-            
-            <span class="comment">// Anyone can corrupt state — no rules, no guarantees</span>
-            balance = -<span class="number">9999</span>;
-            
-            <span class="keyword">double</span> <span class="function">calculateInterest</span>(<span class="keyword">double</span> bal, <span class="keyword">double</span> rate) { <span class="keyword">return</span> bal * rate; }
-            <span class="keyword">void</span>   <span class="function">printBalance</span>(<span class="keyword">double</span> bal)              { <span class="class-name">System</span>.out.println(bal); }
-            
-            <span class="comment">// OOP style: data + behaviour bundled, access controlled</span>
-            <span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
-                <span class="keyword">private final</span> <span class="class-name">String</span> id;
-                <span class="keyword">private</span>       <span class="keyword">double</span> balance;
-            
-                <span class="keyword">public void</span> <span class="function">deposit</span>(<span class="keyword">double</span> amount) {
-                    <span class="keyword">if</span> (amount &lt;= <span class="number">0</span>) <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Must be positive"</span>);
-                    balance += amount;  <span class="comment">// only THIS class can modify balance</span>
-                }
-            
-                <span class="keyword">public double</span> <span class="function">calculateInterest</span>(<span class="keyword">double</span> rate) { <span class="keyword">return</span> balance * rate; }
-                <span class="keyword">public void</span>   <span class="function">printBalance</span>() { <span class="class-name">System</span>.out.println(balance); }
-            }</code></pre>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">procedural — data and logic apart, no owner</span></figcaption>
+                    <pre><code><span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="class-name">BigDecimal</span> total = <span class="class-name">BigDecimal</span>.ZERO;
+
+<span class="comment">// Anyone can change either one, and nothing keeps them in step</span>
+items.add(lamp);                          <span class="comment">// total is now wrong</span>
+total = <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"-9999"</span>);              <span class="comment">// and nothing stops this</span>
+
+<span class="class-name">BigDecimal</span> <span class="function">recalculate</span>(<span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items) { ... }  <span class="comment">// remembered by some callers</span></code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/Order.java — data and the rules that change it, together</span></figcaption>
+                    <pre><code><span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="keyword">private final</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    <span class="keyword">private</span> <span class="class-name">BigDecimal</span>  total  = <span class="class-name">BigDecimal</span>.ZERO;
+    <span class="keyword">private</span> <span class="class-name">OrderStatus</span> status = <span class="class-name">OrderStatus</span>.PENDING;
+
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">OrderItem</span> item) {
+        <span class="keyword">if</span> (status != <span class="class-name">OrderStatus</span>.PENDING)
+            <span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(<span class="string">"Only a pending order can change"</span>);
+        items.add(item);
+        total = total.add(item.lineTotal());  <span class="comment">// only THIS class writes total, so it never drifts from items</span>
+    }
+
+    <span class="keyword">public</span> <span class="class-name">BigDecimal</span> <span class="function">getTotal</span>() { <span class="keyword">return</span> total; }
+}</code></pre>
+                </figure>
             
                 <p>Java is OOP-first: every piece of code lives inside a class. There are no
                     standalone functions, no global variables. The four fundamental principles
@@ -202,43 +208,42 @@
                     object into an invalid state because it has no direct access to the fields — only to
                     the methods that enforce the rules.</p>
 
-                <pre><code><span class="comment">// ❌ No encapsulation — anyone can corrupt the state</span>
-<span class="keyword">public class</span> <span class="class-name">BankAccountBad</span> {
-    <span class="keyword">public double</span> balance;
-    <span class="keyword">public</span> <span class="class-name">String</span> accountNumber;
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">no encapsulation — anyone can corrupt the state</span></figcaption>
+                    <pre><code><span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="keyword">public</span> <span class="class-name">BigDecimal</span>  total;
+    <span class="keyword">public</span> <span class="class-name">OrderStatus</span> status;
 }
-account.balance = -<span class="number">1_000_000</span>;  <span class="comment">// perfectly legal, completely wrong</span>
-account.accountNumber = <span class="keyword">null</span>;  <span class="comment">// now the account has no identity</span>
+order.total  = <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"-1000000"</span>);  <span class="comment">// perfectly legal, completely wrong</span>
+order.status = <span class="keyword">null</span>;                         <span class="comment">// now the order has no lifecycle</span></code></pre>
+                </figure>
 
-<span class="comment">// ✅ Encapsulated — object enforces its own invariants</span>
-<span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
-    <span class="keyword">private final</span> <span class="class-name">String</span> accountNumber;
-    <span class="keyword">private</span>       <span class="keyword">double</span> balance;
-    <span class="keyword">private final</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; history = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/Order.java — the object enforces its own invariants</span></figcaption>
+                    <pre><code><span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="keyword">private final</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; items = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+    <span class="keyword">private</span> <span class="class-name">BigDecimal</span>  total  = <span class="class-name">BigDecimal</span>.ZERO;
+    <span class="keyword">private</span> <span class="class-name">OrderStatus</span> status = <span class="class-name">OrderStatus</span>.PENDING;
 
-    <span class="keyword">public</span> <span class="function">BankAccount</span>(<span class="class-name">String</span> number) {
-        <span class="keyword">if</span> (number == <span class="keyword">null</span> || number.length() != <span class="number">10</span>)
-            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Invalid account number"</span>);
-        <span class="keyword">this</span>.accountNumber = number;
+    <span class="keyword">public</span> <span class="class-name">BigDecimal</span> <span class="function">getTotal</span>() { <span class="keyword">return</span> total; }
+
+    <span class="keyword">public void</span> <span class="function">addItem</span>(<span class="class-name">OrderItem</span> item) {
+        <span class="keyword">if</span> (status != <span class="class-name">OrderStatus</span>.PENDING)
+            <span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(<span class="string">"Only a pending order can change"</span>);
+        items.add(item);
+        total = total.add(item.lineTotal());
     }
 
-    <span class="keyword">public double</span> <span class="function">getBalance</span>() { <span class="keyword">return</span> balance; }
-
-    <span class="keyword">public void</span> <span class="function">deposit</span>(<span class="keyword">double</span> amount) {
-        <span class="keyword">if</span> (amount &lt;= <span class="number">0</span>) <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Must be positive"</span>);
-        balance += amount;
-        history.add(<span class="string">"DEPOSIT $"</span> + amount);
-    }
-
-    <span class="keyword">public void</span> <span class="function">withdraw</span>(<span class="keyword">double</span> amount) {
-        <span class="keyword">if</span> (amount > balance) <span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(<span class="string">"Insufficient funds"</span>);
-        balance -= amount;
-        history.add(<span class="string">"WITHDRAW $"</span> + amount);
+    <span class="keyword">public void</span> <span class="function">cancel</span>() {
+        <span class="keyword">if</span> (status == <span class="class-name">OrderStatus</span>.SHIPPED || status == <span class="class-name">OrderStatus</span>.DELIVERED)
+            <span class="keyword">throw new</span> <span class="class-name">IllegalStateException</span>(<span class="string">"Already shipped"</span>);
+        status = <span class="class-name">OrderStatus</span>.CANCELLED;
     }
 
     <span class="comment">// Defensive copy — caller cannot mutate our internal list</span>
-    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; <span class="function">getHistory</span>() { <span class="keyword">return</span> <span class="class-name">List</span>.copyOf(history); }
+    <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">OrderItem</span>&gt; <span class="function">getItems</span>() { <span class="keyword">return</span> <span class="class-name">List</span>.copyOf(items); }
 }</code></pre>
+                </figure>
 
                 <div class="info-box tip">
                     <div class="info-box-title">Encapsulation in modern Java: prefer records and immutability</div>
@@ -697,6 +702,7 @@ dog.eat();  <span class="comment">// calls Animal.eat() — our method is never 
                     <a href="../best-practices/solid-principles.html" class="related-link">
                         <span class="related-icon">📏</span>SOLID Principles
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

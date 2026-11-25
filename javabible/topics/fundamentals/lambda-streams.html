@@ -129,23 +129,28 @@ names.sort((s1, s2) -&gt; s1.compareTo(s2));
 <span class="comment">// EVEN BETTER: method reference — reads like English</span>
 names.sort(<span class="class-name">String</span>::compareTo);</code></pre>
 
-                <pre><code><span class="comment">// BEFORE: imperative loop — mutable state, hard to parallelise</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; result = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
-<span class="keyword">for</span> (<span class="class-name">Customer</span> customer : customers) {
-    <span class="keyword">if</span> (customer.isActive() && customer.getAge() &gt;= <span class="number">18</span>) {
-        result.add(customer.getName().toUpperCase());
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">imperative loop — mutable state, hard to parallelise</span></figcaption>
+                    <pre><code><span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; result = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
+<span class="keyword">for</span> (<span class="class-name">Product</span> product : products) {
+    <span class="keyword">if</span> (<span class="string">"Lighting"</span>.equals(product.getCategory())
+            &amp;&amp; product.getPrice().compareTo(budget) &lt;= <span class="number">0</span>) {
+        result.add(product.getName().toUpperCase());
     }
 }
-<span class="class-name">Collections</span>.sort(result);
+<span class="class-name">Collections</span>.sort(result);</code></pre>
+                </figure>
 
-<span class="comment">// AFTER: stream pipeline — declarative, composable, parallelisable</span>
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; result = customers.stream()
-    .filter(<span class="class-name">Customer</span>::isActive)
-    .filter(u -&gt; u.getAge() &gt;= <span class="number">18</span>)
-    .map(<span class="class-name">Customer</span>::getName)
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">stream pipeline — declarative, composable, parallelisable</span></figcaption>
+                    <pre><code><span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; result = products.stream()
+    .filter(p -&gt; <span class="string">"Lighting"</span>.equals(p.getCategory()))
+    .filter(p -&gt; p.getPrice().compareTo(budget) &lt;= <span class="number">0</span>)
+    .map(<span class="class-name">Product</span>::getName)
     .map(<span class="class-name">String</span>::toUpperCase)
     .sorted()
-    .collect(<span class="class-name">Collectors</span>.toList());</code></pre>
+    .toList();   <span class="comment">// Java 16+: an unmodifiable list, no Collectors needed</span></code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">Streams don't store data</div>
@@ -217,7 +222,7 @@ isLong.negate().test(<span class="string">"hi"</span>);                  <span c
 
 <span class="comment">// Consumer&lt;T&gt;: T → void — use for side effects (logging, saving)</span>
 <span class="class-name">Consumer</span>&lt;<span class="class-name">Customer</span>&gt; saveCustomer = customerRepo::save;
-<span class="class-name">Consumer</span>&lt;<span class="class-name">Customer</span>&gt; logCustomer  = u -&gt; log.info(<span class="string">"Saved: {}"</span>, u.getName());
+<span class="class-name">Consumer</span>&lt;<span class="class-name">Customer</span>&gt; logCustomer  = c -&gt; log.info(<span class="string">"Saved: {}"</span>, c.getEmail());
 saveCustomer.andThen(logCustomer).accept(newCustomer);  <span class="comment">// save then log</span>
 
 <span class="comment">// Supplier&lt;T&gt;: () → T — use for lazy/deferred creation</span>
@@ -317,45 +322,49 @@ nums.stream().mapToInt(<span class="class-name">Integer</span>::intValue).averag
             <section class="content-section">
                 <h2>Collectors — Grouping and Aggregating</h2>
 
-                <pre><code><span class="keyword">record</span> <span class="class-name">Person</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> age, <span class="class-name">String</span> dept) {}
+                <pre><code><span class="keyword">record</span> <span class="class-name">Product</span>(<span class="class-name">String</span> sku, <span class="class-name">String</span> name, <span class="class-name">BigDecimal</span> price, <span class="class-name">String</span> category) {}
 
-<span class="class-name">List</span>&lt;<span class="class-name">Person</span>&gt; people = <span class="class-name">List</span>.of(
-    <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Alice"</span>, <span class="number">25</span>, <span class="string">"Eng"</span>), <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Bob"</span>, <span class="number">30</span>, <span class="string">"Eng"</span>),
-    <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Carol"</span>, <span class="number">35</span>, <span class="string">"Mkt"</span>), <span class="keyword">new</span> <span class="class-name">Person</span>(<span class="string">"Dan"</span>, <span class="number">28</span>, <span class="string">"Mkt"</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; catalog = <span class="class-name">List</span>.of(
+    <span class="keyword">new</span> <span class="class-name">Product</span>(<span class="string">"LAMP-01"</span>,  <span class="string">"Desk Lamp"</span>,     <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"39.90"</span>),  <span class="string">"Lighting"</span>),
+    <span class="keyword">new</span> <span class="class-name">Product</span>(<span class="string">"LAMP-02"</span>,  <span class="string">"Floor Lamp"</span>,    <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"89.00"</span>),  <span class="string">"Lighting"</span>),
+    <span class="keyword">new</span> <span class="class-name">Product</span>(<span class="string">"DESK-07"</span>,  <span class="string">"Standing Desk"</span>, <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"449.00"</span>), <span class="string">"Furniture"</span>),
+    <span class="keyword">new</span> <span class="class-name">Product</span>(<span class="string">"CHAIR-03"</span>, <span class="string">"Task Chair"</span>,    <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"219.00"</span>), <span class="string">"Furniture"</span>)
 );
 
 <span class="comment">// Joining strings</span>
-people.stream().map(<span class="class-name">Person</span>::name)
-    .collect(<span class="class-name">Collectors</span>.joining(<span class="string">", "</span>, <span class="string">"["</span>, <span class="string">"]"</span>));   <span class="comment">// [Alice, Bob, Carol, Dan]</span>
+catalog.stream().map(<span class="class-name">Product</span>::name)
+    .collect(<span class="class-name">Collectors</span>.joining(<span class="string">", "</span>, <span class="string">"["</span>, <span class="string">"]"</span>));   <span class="comment">// [Desk Lamp, Floor Lamp, Standing Desk, Task Chair]</span>
 
 <span class="comment">// groupingBy → Map&lt;K, List&lt;V&gt;&gt;</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">List</span>&lt;<span class="class-name">Person</span>&gt;&gt; byDept = people.stream()
-    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Person</span>::dept));
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt;&gt; byCategory = catalog.stream()
+    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Product</span>::category));
 
 <span class="comment">// groupingBy with downstream collector</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Long</span>&gt;   countByDept = people.stream()
-    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Person</span>::dept, <span class="class-name">Collectors</span>.counting()));
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Long</span>&gt; countByCategory = catalog.stream()
+    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Product</span>::category, <span class="class-name">Collectors</span>.counting()));
 
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Double</span>&gt; avgAge = people.stream()
-    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Person</span>::dept,
-                                    <span class="class-name">Collectors</span>.averagingInt(<span class="class-name">Person</span>::age)));
+<span class="comment">// Money is BigDecimal, and there is no summingBigDecimal: reduce with add</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">BigDecimal</span>&gt; valueByCategory = catalog.stream()
+    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Product</span>::category,
+             <span class="class-name">Collectors</span>.reducing(<span class="class-name">BigDecimal</span>.ZERO, <span class="class-name">Product</span>::price, <span class="class-name">BigDecimal</span>::add)));
+<span class="comment">// {Lighting=128.90, Furniture=668.00}</span>
 
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Optional</span>&lt;<span class="class-name">Person</span>&gt;&gt; oldest = people.stream()
-    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Person</span>::dept,
-                                    <span class="class-name">Collectors</span>.maxBy(<span class="class-name">Comparator</span>.comparingInt(<span class="class-name">Person</span>::age))));
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Optional</span>&lt;<span class="class-name">Product</span>&gt;&gt; mostExpensive = catalog.stream()
+    .collect(<span class="class-name">Collectors</span>.groupingBy(<span class="class-name">Product</span>::category,
+             <span class="class-name">Collectors</span>.maxBy(<span class="class-name">Comparator</span>.comparing(<span class="class-name">Product</span>::price))));
 
 <span class="comment">// partitioningBy → Map&lt;Boolean, List&gt; (binary split)</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">Boolean</span>, <span class="class-name">List</span>&lt;<span class="class-name">Person</span>&gt;&gt; senior = people.stream()
-    .collect(<span class="class-name">Collectors</span>.partitioningBy(p -&gt; p.age() &gt;= <span class="number">30</span>));
-<span class="comment">// {false=[Alice, Dan], true=[Bob, Carol]}</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">Boolean</span>, <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt;&gt; freeShipping = catalog.stream()
+    .collect(<span class="class-name">Collectors</span>.partitioningBy(p -&gt; p.price().compareTo(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"100"</span>)) &gt;= <span class="number">0</span>));
+<span class="comment">// {false=[Desk Lamp, Floor Lamp], true=[Standing Desk, Task Chair]}</span>
 
-<span class="comment">// toMap — watch out for duplicate keys (throws by default)</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Integer</span>&gt; nameToAge = people.stream()
-    .collect(<span class="class-name">Collectors</span>.toMap(<span class="class-name">Person</span>::name, <span class="class-name">Person</span>::age));
+<span class="comment">// toMap — throws IllegalStateException on a duplicate key; the SKU is unique, so it is safe here</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">BigDecimal</span>&gt; priceBySku = catalog.stream()
+    .collect(<span class="class-name">Collectors</span>.toMap(<span class="class-name">Product</span>::sku, <span class="class-name">Product</span>::price));
 
-<span class="comment">// toMap with merge function for duplicates</span>
-<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">Integer</span>&gt; maxAgeByDept = people.stream()
-    .collect(<span class="class-name">Collectors</span>.toMap(<span class="class-name">Person</span>::dept, <span class="class-name">Person</span>::age, <span class="class-name">Integer</span>::max));</code></pre>
+<span class="comment">// toMap with a merge function when keys repeat (many products per category)</span>
+<span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">BigDecimal</span>&gt; maxPriceByCategory = catalog.stream()
+    .collect(<span class="class-name">Collectors</span>.toMap(<span class="class-name">Product</span>::category, <span class="class-name">Product</span>::price, <span class="class-name">BigDecimal</span>::max));</code></pre>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -510,7 +519,7 @@ names.stream()
 // filter early → fewer elements for expensive map/sorted</span>
 customers.stream()
     .filter(<span class="class-name">Customer</span>::isActive)        <span class="comment">// cheap: boolean check, eliminates many</span>
-    .filter(u -&gt; u.age() &gt;= <span class="number">18</span>)   <span class="comment">// cheap: int comparison</span>
+    .filter(c -&gt; c.orderCount() &gt;= <span class="number">3</span>) <span class="comment">// cheap: int comparison</span>
     .map(<span class="class-name">Customer</span>::loadFullProfile)    <span class="comment">// expensive: DB call — only on survivors</span>
     .sorted(<span class="class-name">Comparator</span>.comparing(<span class="class-name">Customer</span>::score))
     .limit(<span class="number">10</span>)
@@ -639,6 +648,7 @@ customers.stream()
                     <a href="../best-practices/solid-principles.html" class="related-link">
                         <span class="related-icon">📏</span>SOLID Principles
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

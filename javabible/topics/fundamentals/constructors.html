@@ -104,52 +104,59 @@
             <section class="content-section">
                 <h2>The Problem Constructors Solve</h2>
                 <p>Every object needs to start in a <strong>valid state</strong>. A
-                    <code>BankAccount</code> without an ID is meaningless. A <code>User</code>
-                    with a null email will crash the first time someone tries to send a
-                    confirmation. A <code>Connection</code> with no host cannot connect to
+                    <code>OrderItem</code> without a product is meaningless. A <code>Customer</code>
+                    with a null email will crash the first time someone tries to send an
+                    order confirmation. A <code>Connection</code> with no host cannot connect to
                     anything. If you leave object initialisation to the caller — setting
                     fields manually after creation — nothing guarantees they'll do it correctly,
                     or at all.
                 </p>
 
-                <pre><code><span class="comment">// Without a constructor: caller is responsible for initialisation
-            // Nothing stops them from forgetting, or setting invalid values</span>
-            <span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
-                <span class="keyword">public</span> <span class="class-name">String</span> id;
-                <span class="keyword">public double</span> balance;
-            }
-            
-            <span class="class-name">BankAccount</span> acc = <span class="keyword">new</span> <span class="class-name">BankAccount</span>();
-            <span class="comment">// id is null, balance is 0.0 — object exists but is completely unusable</span>
-            <span class="comment">// caller might forget to set id, or set balance = -500, and nothing stops them</span>
-            acc.balance = -<span class="number">500</span>;  <span class="comment">// perfectly legal, completely wrong</span>
-            
-            <span class="comment">// With a constructor: the class controls its own initialisation</span>
-            <span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
-                <span class="keyword">private final</span> <span class="class-name">String</span> id;
-                <span class="keyword">private</span>       <span class="keyword">double</span> balance;
-            
-                <span class="keyword">public</span> <span class="function">BankAccount</span>(<span class="class-name">String</span> id, <span class="keyword">double</span> initialBalance) {
-                    <span class="keyword">if</span> (id == <span class="keyword">null</span> || id.isBlank())
-                        <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"ID required"</span>);
-                    <span class="keyword">if</span> (initialBalance &lt; <span class="number">0</span>)
-                        <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Balance cannot be negative"</span>);
-                    <span class="keyword">this</span>.id      = id;
-                    <span class="keyword">this</span>.balance = initialBalance;
-                }
-            }
-            
-            <span class="comment">// Now there is no way to create an invalid BankAccount:
-            // new BankAccount(null, 0);   → IllegalArgumentException
-            // new BankAccount("", -500);  → IllegalArgumentException
-            // new BankAccount("ACC-001", 500); → valid, guaranteed</span></code></pre>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderItem.java — the caller initialises the fields</span></figcaption>
+                    <pre><code><span class="keyword">public class</span> <span class="class-name">OrderItem</span> {
+    <span class="keyword">public</span> <span class="class-name">Product</span>    product;
+    <span class="keyword">public int</span>        quantity;
+    <span class="keyword">public</span> <span class="class-name">BigDecimal</span> unitPrice;
+}
+
+<span class="class-name">OrderItem</span> item = <span class="keyword">new</span> <span class="class-name">OrderItem</span>();
+<span class="comment">// product is null, quantity is 0 — the object exists but is unusable</span>
+item.quantity = -<span class="number">3</span>;  <span class="comment">// perfectly legal, completely wrong</span></code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderItem.java — the constructor enforces the invariant</span></figcaption>
+                    <pre><code><span class="keyword">public class</span> <span class="class-name">OrderItem</span> {
+    <span class="keyword">private final</span> <span class="class-name">Product</span>    product;
+    <span class="keyword">private final</span> <span class="class-name">BigDecimal</span> unitPrice;
+    <span class="keyword">private</span>       <span class="keyword">int</span>        quantity;
+
+    <span class="keyword">public</span> <span class="function">OrderItem</span>(<span class="class-name">Product</span> product, <span class="keyword">int</span> quantity, <span class="class-name">BigDecimal</span> unitPrice) {
+        <span class="keyword">if</span> (product == <span class="keyword">null</span>)
+            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Product required"</span>);
+        <span class="keyword">if</span> (quantity &lt;= <span class="number">0</span>)
+            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Quantity must be positive"</span>);
+        <span class="keyword">if</span> (unitPrice == <span class="keyword">null</span> || unitPrice.signum() &lt; <span class="number">0</span>)
+            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Price cannot be negative"</span>);
+        <span class="keyword">this</span>.product   = product;
+        <span class="keyword">this</span>.quantity  = quantity;
+        <span class="keyword">this</span>.unitPrice = unitPrice;
+    }
+}
+
+<span class="comment">// Now there is no way to create an invalid OrderItem:
+// new OrderItem(null, 1, price);   → IllegalArgumentException
+// new OrderItem(lamp, 0, price);   → IllegalArgumentException
+// new OrderItem(lamp, 2, price);   → valid, guaranteed</span></code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">The invariant guarantee</div>
                     <p>An <strong>invariant</strong> is a condition that must always be true
-                        about an object — "the ID is never null", "the balance is never
-                        negative". Constructors are where you establish invariants. Methods
-                        like <code>withdraw()</code> then maintain them. If the constructor
+                        about an object — "the product is never null", "the quantity is always
+                        positive". Constructors are where you establish invariants. Methods
+                        like <code>changeQuantity()</code> then maintain them. If the constructor
                         enforces the invariant correctly, the object can never be in an
                         invalid state — because it never escapes the constructor in one.</p>
                 </div>
@@ -170,27 +177,29 @@
                     <code>new</code> — you never invoke them directly.
                 </p>
 
-                <pre><code><span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
-    <span class="keyword">private final</span> <span class="class-name">String</span> id;
-    <span class="keyword">private</span>       <span class="keyword">double</span> balance;
+                <pre><code><span class="keyword">public class</span> <span class="class-name">OrderItem</span> {
+    <span class="keyword">private final</span> <span class="class-name">Product</span>    product;
+    <span class="keyword">private final</span> <span class="class-name">BigDecimal</span> unitPrice;
+    <span class="keyword">private</span>       <span class="keyword">int</span>        quantity;
 
     <span class="comment">// Constructor: same name as class, no return type</span>
-    <span class="keyword">public</span> <span class="function">BankAccount</span>(<span class="class-name">String</span> id, <span class="keyword">double</span> initialBalance) {
-        <span class="keyword">if</span> (id == <span class="keyword">null</span> || id.isBlank())
-            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"ID required"</span>);
-        <span class="keyword">if</span> (initialBalance &lt; <span class="number">0</span>)
-            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Balance cannot be negative"</span>);
+    <span class="keyword">public</span> <span class="function">OrderItem</span>(<span class="class-name">Product</span> product, <span class="keyword">int</span> quantity, <span class="class-name">BigDecimal</span> unitPrice) {
+        <span class="keyword">if</span> (product == <span class="keyword">null</span>)
+            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Product required"</span>);
+        <span class="keyword">if</span> (quantity &lt;= <span class="number">0</span>)
+            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Quantity must be positive"</span>);
 
-        <span class="keyword">this</span>.id      = id;
-        <span class="keyword">this</span>.balance = initialBalance;
+        <span class="keyword">this</span>.product   = product;
+        <span class="keyword">this</span>.quantity  = quantity;
+        <span class="keyword">this</span>.unitPrice = unitPrice;
     }
 
-    <span class="keyword">public double</span> <span class="function">getBalance</span>() { <span class="keyword">return</span> balance; }
+    <span class="keyword">public</span> <span class="class-name">BigDecimal</span> <span class="function">lineTotal</span>() { <span class="keyword">return</span> unitPrice.multiply(<span class="class-name">BigDecimal</span>.valueOf(quantity)); }
 }
 
 <span class="comment">// new triggers: memory allocation → field defaults → constructor body</span>
-<span class="class-name">BankAccount</span> acc = <span class="keyword">new</span> <span class="class-name">BankAccount</span>(<span class="string">"ACC-001"</span>, <span class="number">500.0</span>);
-<span class="comment">// new BankAccount(null, -1);  // throws immediately — object never escapes invalid</span></code></pre>
+<span class="class-name">OrderItem</span> item = <span class="keyword">new</span> <span class="class-name">OrderItem</span>(lamp, <span class="number">2</span>, <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"39.90"</span>));
+<span class="comment">// new OrderItem(lamp, 0, price);  // throws immediately — object never escapes invalid</span></code></pre>
 
                 <div class="info-box note">
                     <div class="info-box-title">Constructor rules</div>
@@ -284,47 +293,48 @@
 <span class="comment">// Fix: explicitly add public Config() { this("localhost"); }</span></code></pre>
 
                 <h3>Parameterized constructor — validate on entry</h3>
-                <pre><code><span class="keyword">public class</span> <span class="class-name">Person</span> {
-    <span class="keyword">private final</span> <span class="class-name">String</span> name;
-    <span class="keyword">private final</span> <span class="keyword">int</span>    birthYear;
-    <span class="keyword">private</span>       <span class="class-name">String</span> email;
+                <pre><code><span class="keyword">public class</span> <span class="class-name">Customer</span> {
+    <span class="keyword">private final</span> <span class="class-name">String</span>  email;
+    <span class="keyword">private final</span> <span class="class-name">String</span>  fullName;
+    <span class="keyword">private final</span> <span class="class-name">Instant</span> createdAt;
+    <span class="keyword">private</span>       <span class="class-name">ShippingAddress</span> shippingAddress;   <span class="comment">// optional at sign-up</span>
 
-    <span class="comment">// Primary constructor — ALL validation lives here</span>
-    <span class="keyword">public</span> <span class="function">Person</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> birthYear) {
-        <span class="keyword">if</span> (name == <span class="keyword">null</span> || name.isBlank())
+    <span class="keyword">public</span> <span class="function">Customer</span>(<span class="class-name">String</span> email, <span class="class-name">String</span> fullName) {
+        <span class="keyword">if</span> (email == <span class="keyword">null</span> || !email.contains(<span class="string">"@"</span>))
+            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Valid email required"</span>);
+        <span class="keyword">if</span> (fullName == <span class="keyword">null</span> || fullName.isBlank())
             <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Name required"</span>);
-        <span class="keyword">if</span> (birthYear &lt; <span class="number">1900</span> || birthYear &gt; <span class="number">2026</span>)
-            <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Invalid birth year"</span>);
-        <span class="keyword">this</span>.name      = name;
-        <span class="keyword">this</span>.birthYear = birthYear;
+        <span class="keyword">this</span>.email     = email;
+        <span class="keyword">this</span>.fullName  = fullName;
+        <span class="keyword">this</span>.createdAt = <span class="class-name">Instant</span>.now();
     }
 
-    <span class="comment">// Secondary constructor delegates — no duplicated validation</span>
-    <span class="keyword">public</span> <span class="function">Person</span>(<span class="class-name">String</span> name, <span class="keyword">int</span> birthYear, <span class="class-name">String</span> email) {
-        <span class="keyword">this</span>(name, birthYear);  <span class="comment">// this() must be the first line</span>
-        <span class="keyword">this</span>.email = email;
+    <span class="comment">// Overload for the checkout that already has an address</span>
+    <span class="keyword">public</span> <span class="function">Customer</span>(<span class="class-name">String</span> email, <span class="class-name">String</span> fullName, <span class="class-name">ShippingAddress</span> address) {
+        <span class="keyword">this</span>(email, fullName);  <span class="comment">// this() must be the first line: validation lives in one place</span>
+        <span class="keyword">this</span>.shippingAddress = address;
     }
 }</code></pre>
 
                 <h3>Copy constructor</h3>
-                <pre><code><span class="keyword">public class</span> <span class="class-name">Team</span> {
-    <span class="keyword">private</span> <span class="class-name">String</span>       name;
-    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; members;
+                <pre><code><span class="keyword">public class</span> <span class="class-name">ShoppingCart</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span>       customerEmail;
+    <span class="keyword">private</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; skus;
 
-    <span class="keyword">public</span> <span class="function">Team</span>(<span class="class-name">String</span> name, <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; members) {
-        <span class="keyword">this</span>.name    = name;
-        <span class="keyword">this</span>.members = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;(members); <span class="comment">// defensive copy</span>
+    <span class="keyword">public</span> <span class="function">ShoppingCart</span>(<span class="class-name">String</span> customerEmail, <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; skus) {
+        <span class="keyword">this</span>.customerEmail = customerEmail;
+        <span class="keyword">this</span>.skus          = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;(skus); <span class="comment">// defensive copy</span>
     }
 
-    <span class="comment">// Copy constructor — deep copy so changes to one don't affect the other</span>
-    <span class="keyword">public</span> <span class="function">Team</span>(<span class="class-name">Team</span> other) {
-        <span class="keyword">this</span>.name    = other.name;                      <span class="comment">// String: immutable, safe to share</span>
-        <span class="keyword">this</span>.members = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;(other.members); <span class="comment">// List: must copy</span>
+    <span class="comment">// Copy constructor — "save this cart for later" must not share the list</span>
+    <span class="keyword">public</span> <span class="function">ShoppingCart</span>(<span class="class-name">ShoppingCart</span> other) {
+        <span class="keyword">this</span>.customerEmail = other.customerEmail;               <span class="comment">// String: immutable, safe to share</span>
+        <span class="keyword">this</span>.skus          = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;(other.skus); <span class="comment">// List: must copy</span>
     }
 }
 
-<span class="class-name">Team</span> original = <span class="keyword">new</span> <span class="class-name">Team</span>(<span class="string">"Alpha"</span>, <span class="class-name">List</span>.of(<span class="string">"Alice"</span>, <span class="string">"Bob"</span>));
-<span class="class-name">Team</span> copy     = <span class="keyword">new</span> <span class="class-name">Team</span>(original);  <span class="comment">// independent object</span></code></pre>
+<span class="class-name">ShoppingCart</span> current = <span class="keyword">new</span> <span class="class-name">ShoppingCart</span>(<span class="string">"ana@example.com"</span>, <span class="class-name">List</span>.of(<span class="string">"LAMP-01"</span>, <span class="string">"DESK-07"</span>));
+<span class="class-name">ShoppingCart</span> saved   = <span class="keyword">new</span> <span class="class-name">ShoppingCart</span>(current);  <span class="comment">// independent object</span></code></pre>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -739,6 +749,7 @@ m.currency();  <span class="comment">// accessor</span></code></pre>
                     <a href="../advanced/design-patterns.html" class="related-link">
                         <span class="related-icon">🧱</span>Design Patterns
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

@@ -378,41 +378,46 @@
                     where callers should be forced to handle.</p>
 
                 <pre><code><span class="comment">// Custom unchecked exception — callers don't have to catch it</span>
-<span class="keyword">public class</span> <span class="class-name">InsufficientFundsException</span> <span class="keyword">extends</span> <span class="class-name">RuntimeException</span> {
-    <span class="keyword">private final double</span> available;
-    <span class="keyword">private final double</span> requested;
+<span class="keyword">public class</span> <span class="class-name">InsufficientStockException</span> <span class="keyword">extends</span> <span class="class-name">RuntimeException</span> {
+    <span class="keyword">private final</span> <span class="class-name">String</span> sku;
+    <span class="keyword">private final int</span>    available;
+    <span class="keyword">private final int</span>    requested;
 
-    <span class="keyword">public</span> <span class="function">InsufficientFundsException</span>(<span class="keyword">double</span> available, <span class="keyword">double</span> requested) {
-        <span class="keyword">super</span>(<span class="class-name">String</span>.format(<span class="string">"Insufficient funds: available=%.2f, requested=%.2f"</span>,
-                            available, requested));
+    <span class="keyword">public</span> <span class="function">InsufficientStockException</span>(<span class="class-name">String</span> sku, <span class="keyword">int</span> available, <span class="keyword">int</span> requested) {
+        <span class="keyword">super</span>(<span class="class-name">String</span>.format(<span class="string">"Insufficient stock for %s: available=%d, requested=%d"</span>,
+                            sku, available, requested));
+        <span class="keyword">this</span>.sku       = sku;
         <span class="keyword">this</span>.available = available;
         <span class="keyword">this</span>.requested = requested;
     }
 
     <span class="comment">// Always provide a cause-accepting constructor for exception chaining</span>
-    <span class="keyword">public</span> <span class="function">InsufficientFundsException</span>(<span class="keyword">double</span> available, <span class="keyword">double</span> requested,
-                                       <span class="class-name">Throwable</span> cause) {
-        <span class="keyword">super</span>(<span class="class-name">String</span>.format(<span class="string">"Insufficient funds: available=%.2f, requested=%.2f"</span>,
-                            available, requested), cause);
+    <span class="keyword">public</span> <span class="function">InsufficientStockException</span>(<span class="class-name">String</span> sku, <span class="keyword">int</span> available, <span class="keyword">int</span> requested,
+                                      <span class="class-name">Throwable</span> cause) {
+        <span class="keyword">super</span>(<span class="class-name">String</span>.format(<span class="string">"Insufficient stock for %s: available=%d, requested=%d"</span>,
+                            sku, available, requested), cause);
+        <span class="keyword">this</span>.sku       = sku;
         <span class="keyword">this</span>.available = available;
         <span class="keyword">this</span>.requested = requested;
     }
 
-    <span class="keyword">public double</span> <span class="function">getAvailable</span>() { <span class="keyword">return</span> available; }
-    <span class="keyword">public double</span> <span class="function">getRequested</span>() { <span class="keyword">return</span> requested; }
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getSku</span>()       { <span class="keyword">return</span> sku; }
+    <span class="keyword">public int</span>    <span class="function">getAvailable</span>() { <span class="keyword">return</span> available; }
+    <span class="keyword">public int</span>    <span class="function">getRequested</span>() { <span class="keyword">return</span> requested; }
 }
 
 <span class="comment">// Usage — caller gets rich context, not just a message string</span>
-<span class="keyword">public void</span> <span class="function">withdraw</span>(<span class="keyword">double</span> amount) {
-    <span class="keyword">if</span> (amount &gt; balance)
-        <span class="keyword">throw new</span> <span class="class-name">InsufficientFundsException</span>(balance, amount);
-    balance -= amount;
+<span class="keyword">public void</span> <span class="function">reserve</span>(<span class="class-name">String</span> sku, <span class="keyword">int</span> quantity) {
+    <span class="keyword">int</span> available = stockLevels.quantityOf(sku);
+    <span class="keyword">if</span> (quantity &gt; available)
+        <span class="keyword">throw new</span> <span class="class-name">InsufficientStockException</span>(sku, available, quantity);
+    stockLevels.decrement(sku, quantity);
 }
 
 <span class="keyword">try</span> {
-    account.withdraw(<span class="number">500</span>);
-} <span class="keyword">catch</span> (<span class="class-name">InsufficientFundsException</span> e) {
-    <span class="class-name">System</span>.out.printf(<span class="string">"Need %.2f more%n"</span>, e.getRequested() - e.getAvailable());
+    inventory.reserve(<span class="string">"LAMP-01"</span>, <span class="number">5</span>);
+} <span class="keyword">catch</span> (<span class="class-name">InsufficientStockException</span> e) {
+    <span class="class-name">System</span>.out.printf(<span class="string">"Only %d left of %s%n"</span>, e.getAvailable(), e.getSku());
 }</code></pre>
             </section>
 
@@ -641,28 +646,30 @@ e.getCause();           <span class="comment">// direct cause</span>
 }</code></pre>
 
                 <h3>Global exception handling in Spring</h3>
-                <pre><code><span class="comment">// Instead of try-catch in every controller, centralise with @ControllerAdvice</span>
-<span class="annotation">@ControllerAdvice</span>
+                <pre><code><span class="comment">// Instead of try-catch in every controller, centralise with @RestControllerAdvice.
+// ProblemDetail (RFC 9457) is the standard error body: no hand-rolled ErrorResponse.</span>
+<span class="annotation">@RestControllerAdvice</span>
 <span class="keyword">public class</span> <span class="class-name">GlobalExceptionHandler</span> {
 
-    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">InsufficientFundsException</span>.<span class="keyword">class</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handle</span>(<span class="class-name">InsufficientFundsException</span> e) {
-        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>
-            .status(<span class="class-name">HttpStatus</span>.UNPROCESSABLE_ENTITY)
-            .body(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"INSUFFICIENT_FUNDS"</span>, e.getMessage()));
+    <span class="annotation">@ExceptionHandler</span>(<span class="class-name">InsufficientStockException</span>.<span class="keyword">class</span>)
+    <span class="keyword">public</span> <span class="class-name">ProblemDetail</span> <span class="function">handle</span>(<span class="class-name">InsufficientStockException</span> e) {
+        <span class="class-name">ProblemDetail</span> problem = <span class="class-name">ProblemDetail</span>.forStatusAndDetail(<span class="class-name">HttpStatus</span>.CONFLICT, e.getMessage());
+        problem.setTitle(<span class="string">"Insufficient stock"</span>);
+        problem.setProperty(<span class="string">"sku"</span>, e.getSku());               <span class="comment">// machine-readable context for the client</span>
+        problem.setProperty(<span class="string">"available"</span>, e.getAvailable());
+        <span class="keyword">return</span> problem;
     }
 
     <span class="annotation">@ExceptionHandler</span>(<span class="class-name">IllegalArgumentException</span>.<span class="keyword">class</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handle</span>(<span class="class-name">IllegalArgumentException</span> e) {
-        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.badRequest()
-            .body(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"INVALID_INPUT"</span>, e.getMessage()));
+    <span class="keyword">public</span> <span class="class-name">ProblemDetail</span> <span class="function">handle</span>(<span class="class-name">IllegalArgumentException</span> e) {
+        <span class="keyword">return</span> <span class="class-name">ProblemDetail</span>.forStatusAndDetail(<span class="class-name">HttpStatus</span>.BAD_REQUEST, e.getMessage());
     }
 
     <span class="annotation">@ExceptionHandler</span>(<span class="class-name">Exception</span>.<span class="keyword">class</span>)
-    <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">ErrorResponse</span>&gt; <span class="function">handleUnexpected</span>(<span class="class-name">Exception</span> e) {
+    <span class="keyword">public</span> <span class="class-name">ProblemDetail</span> <span class="function">handleUnexpected</span>(<span class="class-name">Exception</span> e) {
         log.error(<span class="string">"Unhandled exception"</span>, e);
-        <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.internalServerError()
-            .body(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"INTERNAL_ERROR"</span>, <span class="string">"Please try later"</span>));
+        <span class="comment">// Never echo e.getMessage() here: it can leak internals to the client</span>
+        <span class="keyword">return</span> <span class="class-name">ProblemDetail</span>.forStatusAndDetail(<span class="class-name">HttpStatus</span>.INTERNAL_SERVER_ERROR, <span class="string">"Please try later"</span>);
     }
 }</code></pre>
             </section>
@@ -774,6 +781,7 @@ e.getCause();           <span class="comment">// direct cause</span>
                     <a href="../advanced/design-patterns.html" class="related-link">
                         <span class="related-icon">🧱</span>Design Patterns
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

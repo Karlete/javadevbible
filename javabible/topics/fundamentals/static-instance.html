@@ -111,37 +111,36 @@
                 </p>
 
                 <p>The problem it solves: some data is shared across all objects of a type
-                    — the total number of users created, a configuration constant, a utility
+                    — the next order number to hand out, a configuration constant, a utility
                     function that needs no object state. Other data is unique per object —
-                    each user's name, each bank account's balance. Conflating the two leads
+                    each order's total, each customer's email. Conflating the two leads
                     to subtle bugs: shared mutable state modified by one object and unexpectedly
                     visible to all others.</p>
 
-                <pre><code><span class="keyword">public class</span> <span class="class-name">Player</span> {
-                <span class="comment">// STATIC — one copy, shared by ALL Player objects</span>
-                <span class="comment">// "How many players exist in total?"</span>
-                <span class="keyword">private static int</span> totalPlayers = <span class="number">0</span>;
-            
-                <span class="comment">// INSTANCE — each Player object has its own copy</span>
-                <span class="comment">// "What is THIS player's name and score?"</span>
-                <span class="keyword">private final</span> <span class="class-name">String</span> name;
-                <span class="keyword">private</span>       <span class="keyword">int</span>    score;
-            
-                <span class="keyword">public</span> <span class="function">Player</span>(<span class="class-name">String</span> name) {
-                    <span class="keyword">this</span>.name = name;
-                    totalPlayers++;  <span class="comment">// increments the ONE shared counter</span>
-                }
-            }
-            
-            <span class="class-name">Player</span> alice = <span class="keyword">new</span> <span class="class-name">Player</span>(<span class="string">"Alice"</span>);
-            <span class="class-name">Player</span> bob   = <span class="keyword">new</span> <span class="class-name">Player</span>(<span class="string">"Bob"</span>);
-            
-            <span class="comment">// Each object has its own name — instance data</span>
-            alice.getName();  <span class="comment">// "Alice"</span>
-            bob.getName();    <span class="comment">// "Bob"</span>
-            
-            <span class="comment">// There is only ONE counter shared by everyone — static data</span>
-            <span class="class-name">Player</span>.getTotalPlayers();  <span class="comment">// 2</span></code></pre>
+                <pre><code><span class="keyword">public class</span> <span class="class-name">Order</span> {
+    <span class="comment">// STATIC — one copy, shared by ALL Order objects
+    // "Which number does the next order get?"</span>
+    <span class="keyword">private static long</span> nextNumber = <span class="number">1001</span>;
+
+    <span class="comment">// INSTANCE — each Order object has its own copy
+    // "What is THIS order's number and total?"</span>
+    <span class="keyword">private final long</span>       number;
+    <span class="keyword">private</span>       <span class="class-name">BigDecimal</span> total = <span class="class-name">BigDecimal</span>.ZERO;
+
+    <span class="keyword">public</span> <span class="function">Order</span>() {
+        <span class="keyword">this</span>.number = nextNumber++;  <span class="comment">// reads and advances the ONE shared counter</span>
+    }
+}
+
+<span class="class-name">Order</span> first  = <span class="keyword">new</span> <span class="class-name">Order</span>();
+<span class="class-name">Order</span> second = <span class="keyword">new</span> <span class="class-name">Order</span>();
+
+<span class="comment">// Each object has its own number — instance data</span>
+first.getNumber();   <span class="comment">// 1001</span>
+second.getNumber();  <span class="comment">// 1002</span>
+
+<span class="comment">// There is only ONE counter shared by everyone — static data</span>
+<span class="class-name">Order</span>.peekNextNumber();  <span class="comment">// 1003</span></code></pre>
 
                 <p><strong>Static members</strong> are loaded when the class is first referenced
                     by the JVM — before any object exists. <strong>Instance members</strong> are
@@ -154,8 +153,8 @@
                     <p>Before adding <code>static</code> to any member, ask: <em>"Does this
                             make sense without a specific object?"</em> If yes — a utility method,
                         a constant, a factory — <code>static</code> is correct. If the answer
-                        depends on which object you're talking about — a person's age, an
-                        account's balance — it must be an instance member.</p>
+                        depends on which object you're talking about — an order's total, a
+                        customer's email — it must be an instance member.</p>
                 </div>
             </section>
 
@@ -212,43 +211,44 @@
                     </tr>
                 </table>
 
-                <pre><code><span class="keyword">public class</span> <span class="class-name">Student</span> {
-    <span class="comment">// STATIC — shared by ALL Student objects (one copy in class data)</span>
-    <span class="keyword">private static int</span>    totalEnrolled = <span class="number">0</span>;
-    <span class="keyword">public  static final int</span> MAX_CAPACITY = <span class="number">500</span>;
+                <pre><code><span class="keyword">public class</span> <span class="class-name">Invoice</span> {
+    <span class="comment">// STATIC — shared by ALL Invoice objects (one copy in class data)</span>
+    <span class="keyword">private static int</span>          issued = <span class="number">0</span>;
+    <span class="keyword">public  static final</span> <span class="class-name">String</span> PREFIX = <span class="string">"INV-"</span>;
 
-    <span class="comment">// INSTANCE — each Student has its own copy (on the heap)</span>
-    <span class="keyword">private final</span> <span class="class-name">String</span> name;
-    <span class="keyword">private</span>       <span class="keyword">double</span> gpa;
+    <span class="comment">// INSTANCE — each Invoice has its own copy (on the heap)</span>
+    <span class="keyword">private final</span> <span class="class-name">String</span>     number;
+    <span class="keyword">private final</span> <span class="class-name">BigDecimal</span> total;
 
-    <span class="keyword">public</span> <span class="function">Student</span>(<span class="class-name">String</span> name) {
-        <span class="keyword">this</span>.name = name;
-        totalEnrolled++;  <span class="comment">// increments the ONE shared counter</span>
+    <span class="keyword">public</span> <span class="function">Invoice</span>(<span class="class-name">BigDecimal</span> total) {
+        issued++;                        <span class="comment">// increments the ONE shared counter</span>
+        <span class="keyword">this</span>.number = PREFIX + issued;
+        <span class="keyword">this</span>.total  = total;
     }
 
-    <span class="keyword">public static int</span> <span class="function">getTotalEnrolled</span>() { <span class="keyword">return</span> totalEnrolled; }
-    <span class="keyword">public</span> <span class="class-name">String</span>  <span class="function">getName</span>()           { <span class="keyword">return</span> name; }
+    <span class="keyword">public static int</span> <span class="function">getIssued</span>() { <span class="keyword">return</span> issued; }
+    <span class="keyword">public</span> <span class="class-name">String</span>  <span class="function">getNumber</span>() { <span class="keyword">return</span> number; }
 }
 
-<span class="class-name">Student</span> alice = <span class="keyword">new</span> <span class="class-name">Student</span>(<span class="string">"Alice"</span>);
-<span class="class-name">Student</span> bob   = <span class="keyword">new</span> <span class="class-name">Student</span>(<span class="string">"Bob"</span>);
+<span class="class-name">Invoice</span> a = <span class="keyword">new</span> <span class="class-name">Invoice</span>(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"129.90"</span>));
+<span class="class-name">Invoice</span> b = <span class="keyword">new</span> <span class="class-name">Invoice</span>(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"39.90"</span>));
 
-alice.getName();               <span class="comment">// "Alice"  — instance, unique per object</span>
-bob.getName();                 <span class="comment">// "Bob"</span>
-<span class="class-name">Student</span>.getTotalEnrolled();   <span class="comment">// 2       — static, same for everyone</span></code></pre>
+a.getNumber();          <span class="comment">// "INV-1" — instance, unique per object</span>
+b.getNumber();          <span class="comment">// "INV-2"</span>
+<span class="class-name">Invoice</span>.getIssued();    <span class="comment">// 2       — static, same for everyone</span></code></pre>
 
                 <pre><code><span class="comment">/*
  *  Memory layout:
  *
  *  Metaspace (class data)           Heap (objects)
  *  ──────────────────────           ──────────────
- *  Student.class                    alice (Student)
- *    totalEnrolled: 2               │  name: "Alice"
- *    MAX_CAPACITY: 500              │  gpa: 0.0
+ *  Invoice.class                    a (Invoice)
+ *    issued: 2                      │  number: "INV-1"
+ *    PREFIX: "INV-"                 │  total: 129.90
  *    static methods                 └──────────────
- *    instance method templates      bob (Student)
- *                                   │  name: "Bob"
- *                                   │  gpa: 0.0
+ *    instance method templates      b (Invoice)
+ *                                   │  number: "INV-2"
+ *                                   │  total: 39.90
  *                                   └──────────────
  *
  *  ONE copy of static data. TWO separate objects on the heap.
@@ -361,27 +361,22 @@ bob.getName();                 <span class="comment">// "Bob"</span>
                 <h2>Instance Members in Depth</h2>
 
                 <h3>The <code>this</code> keyword</h3>
-                <pre><code><span class="keyword">public class</span> <span class="class-name">BankAccount</span> {
-    <span class="keyword">private final</span> <span class="class-name">String</span> id;
-    <span class="keyword">private</span>       <span class="keyword">double</span> balance;
+                <pre><code><span class="keyword">public class</span> <span class="class-name">ShoppingCart</span> {
+    <span class="keyword">private final</span> <span class="class-name">String</span>       customerEmail;
+    <span class="keyword">private final</span> <span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; skus = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 
-    <span class="comment">// 'this.field' disambiguates when parameter shadows the field name</span>
-    <span class="keyword">public</span> <span class="function">BankAccount</span>(<span class="class-name">String</span> id) {
-        <span class="keyword">this</span>.id      = id;
-        <span class="keyword">this</span>.balance = <span class="number">0.0</span>;
-    }
-
-    <span class="keyword">public void</span> <span class="function">deposit</span>(<span class="keyword">double</span> amount) {
-        <span class="keyword">this</span>.balance += amount;
+    <span class="comment">// 'this.field' disambiguates when the parameter shadows the field name</span>
+    <span class="keyword">public</span> <span class="function">ShoppingCart</span>(<span class="class-name">String</span> customerEmail) {
+        <span class="keyword">this</span>.customerEmail = customerEmail;
     }
 
     <span class="comment">// 'return this' enables fluent/builder-style chaining</span>
-    <span class="keyword">public</span> <span class="class-name">BankAccount</span> <span class="function">credit</span>(<span class="keyword">double</span> amount) { balance += amount; <span class="keyword">return this</span>; }
-    <span class="keyword">public</span> <span class="class-name">BankAccount</span> <span class="function">debit</span>(<span class="keyword">double</span> amount)  { balance -= amount; <span class="keyword">return this</span>; }
+    <span class="keyword">public</span> <span class="class-name">ShoppingCart</span> <span class="function">add</span>(<span class="class-name">String</span> sku)    { skus.add(sku);    <span class="keyword">return this</span>; }
+    <span class="keyword">public</span> <span class="class-name">ShoppingCart</span> <span class="function">remove</span>(<span class="class-name">String</span> sku) { skus.remove(sku); <span class="keyword">return this</span>; }
 }
 
-<span class="class-name">BankAccount</span> acc = <span class="keyword">new</span> <span class="class-name">BankAccount</span>(<span class="string">"ACC-001"</span>);
-acc.credit(<span class="number">1000</span>).debit(<span class="number">200</span>).credit(<span class="number">50</span>);  <span class="comment">// fluent chaining via 'return this'</span></code></pre>
+<span class="class-name">ShoppingCart</span> cart = <span class="keyword">new</span> <span class="class-name">ShoppingCart</span>(<span class="string">"ana@example.com"</span>);
+cart.add(<span class="string">"LAMP-01"</span>).add(<span class="string">"DESK-07"</span>).remove(<span class="string">"LAMP-01"</span>);  <span class="comment">// fluent chaining via 'return this'</span></code></pre>
 
                 <h3>Instance initializer blocks</h3>
                 <pre><code><span class="keyword">public class</span> <span class="class-name">Connection</span> {
@@ -651,6 +646,7 @@ p.describe(); <span class="comment">// "Child"  — instance, resolved by object
                     <a href="../advanced/design-patterns.html" class="related-link">
                         <span class="related-icon">🧱</span>Design Patterns
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

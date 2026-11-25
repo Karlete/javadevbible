@@ -114,19 +114,26 @@
                     (parameters), what it does (body), and what it gives back (return type). The compiler
                     enforces that contract at every call site.</p>
 
-                <pre><code><span class="comment">// Without methods: repeated logic, no structure</span>
-            <span class="keyword">double</span> total1 = <span class="number">99.99</span> * <span class="number">1.21</span>;  <span class="comment">// apply 21% VAT</span>
-            <span class="keyword">double</span> total2 = <span class="number">49.50</span> * <span class="number">1.21</span>;  <span class="comment">// same logic repeated</span>
-            <span class="keyword">double</span> total3 = <span class="number">15.00</span> * <span class="number">1.21</span>;  <span class="comment">// change the rate? update 3 places. miss one? bug.</span>
-            
-            <span class="comment">// With a method: defined once, called everywhere, change in one place</span>
-            <span class="keyword">public double</span> <span class="function">applyVat</span>(<span class="keyword">double</span> price) {
-                <span class="keyword">return</span> price * <span class="number">1.21</span>;
-            }
-            
-            <span class="keyword">double</span> total1 = applyVat(<span class="number">99.99</span>);
-            <span class="keyword">double</span> total2 = applyVat(<span class="number">49.50</span>);
-            <span class="keyword">double</span> total3 = applyVat(<span class="number">15.00</span>);</code></pre>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">the same rule copied three times</span></figcaption>
+                    <pre><code><span class="class-name">BigDecimal</span> total1 = <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"99.99"</span>).multiply(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"1.21"</span>));  <span class="comment">// apply 21% VAT</span>
+<span class="class-name">BigDecimal</span> total2 = <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"49.50"</span>).multiply(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"1.21"</span>));  <span class="comment">// same logic repeated</span>
+<span class="class-name">BigDecimal</span> total3 = <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"15.00"</span>).multiply(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"1.21"</span>));  <span class="comment">// change the rate? update 3 places. miss one? bug.</span></code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/PriceCalculator.java — defined once, called everywhere</span></figcaption>
+                    <pre><code><span class="keyword">private static final</span> <span class="class-name">BigDecimal</span> VAT = <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"1.21"</span>);
+
+<span class="keyword">public</span> <span class="class-name">BigDecimal</span> <span class="function">applyVat</span>(<span class="class-name">BigDecimal</span> price) {
+    <span class="comment">// Round once, at the end, to the currency's two decimals</span>
+    <span class="keyword">return</span> price.multiply(VAT).setScale(<span class="number">2</span>, <span class="class-name">RoundingMode</span>.HALF_UP);
+}
+
+<span class="class-name">BigDecimal</span> total1 = applyVat(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"99.99"</span>));
+<span class="class-name">BigDecimal</span> total2 = applyVat(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"49.50"</span>));
+<span class="class-name">BigDecimal</span> total3 = applyVat(<span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"15.00"</span>));</code></pre>
+                </figure>
 
                 <p>Methods are also the unit of <strong>testing</strong>. You can write a test that
                     calls <code>applyVat(100.0)</code> and verifies the result is <code>121.0</code>
@@ -158,9 +165,9 @@
  *    │           │         │         │                │                   │
  *    ▼           ▼         ▼         ▼                ▼                   ▼
  */</span>
-<span class="keyword">public static</span> <span class="class-name">String</span> <span class="function">formatCurrency</span>(<span class="keyword">double</span> amount, <span class="class-name">String</span> symbol)
+<span class="keyword">public static</span> <span class="class-name">String</span> <span class="function">formatCurrency</span>(<span class="class-name">BigDecimal</span> amount, <span class="class-name">String</span> symbol)
         <span class="keyword">throws</span> <span class="class-name">IllegalArgumentException</span> {
-    <span class="keyword">if</span> (amount &lt; <span class="number">0</span>) <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Negative amount"</span>);
+    <span class="keyword">if</span> (amount.signum() &lt; <span class="number">0</span>) <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Negative amount"</span>);
     <span class="keyword">return</span> <span class="class-name">String</span>.format(<span class="string">"%s%.2f"</span>, symbol, amount);
 }</code></pre>
 
@@ -426,12 +433,12 @@ c2.getCount();             <span class="comment">// 0  — different object</spa
 <span class="keyword">private void</span>    <span class="function">notifyCustomer</span>(<span class="class-name">Customer</span> customer)          { ... }</code></pre>
 
                 <pre><code><span class="comment">// ❌ BAD: too many parameters (hard to read, hard to test)</span>
-<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">createOrder</span>(<span class="class-name">String</span> product, <span class="keyword">int</span> qty, <span class="keyword">double</span> price,
-        <span class="class-name">String</span> customer, <span class="class-name">String</span> address, <span class="keyword">boolean</span> express) { ... }
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">createOrder</span>(<span class="class-name">String</span> sku, <span class="keyword">int</span> quantity, <span class="class-name">BigDecimal</span> unitPrice,
+        <span class="class-name">String</span> customerEmail, <span class="class-name">String</span> address, <span class="keyword">boolean</span> express) { ... }
 
 <span class="comment">// ✅ GOOD: group into an object (record in Java 16+)</span>
-<span class="keyword">record</span> <span class="class-name">OrderRequest</span>(<span class="class-name">String</span> product, <span class="keyword">int</span> qty, <span class="keyword">double</span> price,
-                    <span class="class-name">String</span> customer, <span class="class-name">String</span> address, <span class="keyword">boolean</span> express) {}
+<span class="keyword">record</span> <span class="class-name">OrderRequest</span>(<span class="class-name">String</span> sku, <span class="keyword">int</span> quantity, <span class="class-name">BigDecimal</span> unitPrice,
+                    <span class="class-name">String</span> customerEmail, <span class="class-name">String</span> address, <span class="keyword">boolean</span> express) {}
 
 <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">createOrder</span>(<span class="class-name">OrderRequest</span> req) { ... }
 
@@ -506,8 +513,8 @@ names.stream().map(<span class="class-name">Customer</span>::new).toList();</cod
 
 <span class="comment">// Common real-world use: Comparator.comparing()</span>
 <span class="class-name">List</span>&lt;<span class="class-name">Customer</span>&gt; sorted = customers.stream()
-    .sorted(<span class="class-name">Comparator</span>.comparing(<span class="class-name">Customer</span>::lastName)
-                       .thenComparing(<span class="class-name">Customer</span>::firstName))
+    .sorted(<span class="class-name">Comparator</span>.comparing(<span class="class-name">Customer</span>::fullName)
+                       .thenComparing(<span class="class-name">Customer</span>::email))   <span class="comment">// tie-breaker: names repeat, emails do not</span>
     .toList();</code></pre>
 
                 <h3>Covariant return types</h3>
@@ -634,6 +641,7 @@ names.stream().map(<span class="class-name">Customer</span>::new).toList();</cod
                     <a href="exceptions.html" class="related-link">
                         <span class="related-icon">⚠️</span>Exception Handling
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
