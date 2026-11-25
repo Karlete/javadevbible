@@ -28,6 +28,8 @@
 #  14. Field injection        — @Autowired on a field outside test code / ❌ examples
 #  15. Interview questions    — every page has junior and senior <details class="qa">
 #                               questions, and none left in the old <p><strong>Q: form
+#  16. Review stamp           — optional "Checked against …" stamp: well formed, one per
+#                               page, not future-dated, month text matches datetime
 #
 # Usage:
 #   bash tools/verify.sh            run all checks
@@ -684,6 +686,48 @@ else
   fail "$QA_N page(s) with missing or old-format interview questions"
   show_capped "$(cat "$TMP/qa.txt")"
   hint 'fix: copy the <details class="qa"> markup from topics/databases/relationships.html'
+fi
+
+# ─── 16. Review stamp ─────────────────────────────────────────────────────────
+# The stamp is optional: a page gets one only when its content was really
+# checked against the versions it names. git dates cannot stand in for it (a
+# footer edit touches every page). What this check guarantees is that a stamp,
+# when present, is well formed, single, not dated in the future, and that its
+# visible month matches its machine-readable date.
+
+header "16. Review stamp"
+
+TODAY=$(printf '%(%Y-%m-%d)T' -1)
+
+awk -v today="$TODAY" '
+  BEGIN {
+    split("January February March April May June July August September October November December", M, " ")
+  }
+  FNR == 1 { n = 0 }
+  /class="reviewed-stamp"/ {
+    n++
+    if (n > 1) { printf "%s:%d → more than one stamp\n", FILENAME, FNR; next }
+    line = $0
+    sub(/^[ \t]+/, "", line); sub(/[ \t\r]+$/, "", line)
+    if (line !~ /^<p class="reviewed-stamp">Checked against [^<]+ — <time datetime="[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]">[A-Z][a-z]+ [0-9][0-9][0-9][0-9]<\/time><\/p>$/) {
+      printf "%s:%d → malformed stamp (copy it from topics/modern-stack/docker.html)\n", FILENAME, FNR; next
+    }
+    match(line, /datetime="[0-9-]+"/); d = substr(line, RSTART + 10, 10)
+    match(line, /">[A-Z][a-z]+ [0-9]+<\/time>/); shown = substr(line, RSTART + 2, RLENGTH - 9)
+    if (d > today) printf "%s:%d → dated %s, in the future\n", FILENAME, FNR, d
+    want = M[substr(d, 6, 2) + 0] " " substr(d, 1, 4)
+    if (shown != want) printf "%s:%d → shows \"%s\" but datetime says %s\n", FILENAME, FNR, shown, want
+  }
+' $(find "$TOPICS_DIR" -name '*.html' | sort) 2>/dev/null \
+  | sed "s|^$REPO_ROOT/||" > "$TMP/stamp.txt"
+
+STAMP_N=$(grep -c . "$TMP/stamp.txt" || true)
+STAMPED=$(grep -l 'class="reviewed-stamp"' $(find "$TOPICS_DIR" -name '*.html') 2>/dev/null | grep -c . || true)
+if [[ "$STAMP_N" -eq 0 ]]; then
+  pass "$STAMPED page(s) stamped as reviewed; every stamp well formed"
+else
+  fail "$STAMP_N problem(s) with review stamps"
+  show_capped "$(cat "$TMP/stamp.txt")"
 fi
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
