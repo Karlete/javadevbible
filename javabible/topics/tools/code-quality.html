@@ -108,22 +108,28 @@
                     exactly what a machine is good at catching before a single
                     reviewer even opens the pull request.</p>
 
-                <pre><code><span class="comment">// BEFORE — ships, passes code review, passes unit tests that never
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">invoice/InvoiceExporter.java — a leaked file handle</span></figcaption>
+                    <pre><code><span class="comment">// Ships, passes code review, passes unit tests that never
 // exercise the failure path</span>
 <span class="keyword">public void</span> <span class="function">exportInvoice</span>(<span class="class-name">Order</span> order) <span class="keyword">throws</span> <span class="class-name">IOException</span> {
     <span class="class-name">FileOutputStream</span> fos = <span class="keyword">new</span> <span class="class-name">FileOutputStream</span>(<span class="string">"invoice.pdf"</span>);
     fos.write(order.toPdfBytes());
     <span class="comment">// Never closed. Leaks a file handle on every single call. A reviewer
     // skimming a 40-line diff misses this constantly — it looks fine.</span>
-}
+}</code></pre>
+                </figure>
 
-<span class="comment">// AFTER — SpotBugs flags OBL_UNSATISFIED_OBLIGATION at build time,
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">invoice/InvoiceExporter.java — after SpotBugs</span></figcaption>
+                    <pre><code><span class="comment">// SpotBugs flags OBL_UNSATISFIED_OBLIGATION at build time,
 // before a human reviewer is even involved</span>
 <span class="keyword">public void</span> <span class="function">exportInvoice</span>(<span class="class-name">Order</span> order) <span class="keyword">throws</span> <span class="class-name">IOException</span> {
     <span class="keyword">try</span> (<span class="class-name">FileOutputStream</span> fos = <span class="keyword">new</span> <span class="class-name">FileOutputStream</span>(<span class="string">"invoice.pdf"</span>)) {
         fos.write(order.toPdfBytes());
     }
 }</code></pre>
+                </figure>
 
                 <div class="info-box important">
                     <div class="info-box-title">What none of these tools will ever catch: a correct-looking, wrong business rule</div>
@@ -195,10 +201,10 @@ jobs:
   sonar:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with: { fetch-depth: 0 }
-    - uses: actions/setup-java@v4
-      with: { java-version: '21', distribution: 'temurin', cache: maven }
+    - uses: actions/setup-java@v6
+      with: { java-version: '25', distribution: 'temurin', cache: maven }
     - name: Build and analyze
       env:
         SONAR_TOKEN: <span class="string">${{ secrets.SONAR_TOKEN }}</span>
@@ -232,7 +238,7 @@ New Security Hotspots:      100% reviewed</code></pre>
                 <pre><code>&lt;plugin&gt;
     &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
     &lt;artifactId&gt;maven-checkstyle-plugin&lt;/artifactId&gt;
-    &lt;version&gt;3.5.0&lt;/version&gt;
+    &lt;version&gt;3.6.0&lt;/version&gt;
     &lt;configuration&gt;
         &lt;configLocation&gt;google_checks.xml&lt;/configLocation&gt;
         &lt;failsOnError&gt;true&lt;/failsOnError&gt;
@@ -272,7 +278,7 @@ New Security Hotspots:      100% reviewed</code></pre>
                 <pre><code>&lt;plugin&gt;
     &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
     &lt;artifactId&gt;maven-pmd-plugin&lt;/artifactId&gt;
-    &lt;version&gt;3.26.0&lt;/version&gt;
+    &lt;version&gt;3.28.0&lt;/version&gt;
     &lt;configuration&gt;
         &lt;rulesets&gt;
             &lt;ruleset&gt;/category/java/bestpractices.xml&lt;/ruleset&gt;
@@ -310,7 +316,7 @@ New Security Hotspots:      100% reviewed</code></pre>
                 <pre><code>&lt;plugin&gt;
     &lt;groupId&gt;com.github.spotbugs&lt;/groupId&gt;
     &lt;artifactId&gt;spotbugs-maven-plugin&lt;/artifactId&gt;
-    &lt;version&gt;4.8.6.6&lt;/version&gt;
+    &lt;version&gt;4.10.5.0&lt;/version&gt;
     &lt;configuration&gt;
         &lt;effort&gt;Max&lt;/effort&gt;
         &lt;threshold&gt;Low&lt;/threshold&gt;
@@ -319,7 +325,7 @@ New Security Hotspots:      100% reviewed</code></pre>
             &lt;plugin&gt;
                 &lt;groupId&gt;com.h3xstream.findsecbugs&lt;/groupId&gt;
                 &lt;artifactId&gt;findsecbugs-plugin&lt;/artifactId&gt;
-                &lt;version&gt;1.13.0&lt;/version&gt;
+                &lt;version&gt;1.14.0&lt;/version&gt;
             &lt;/plugin&gt;
         &lt;/plugins&gt;
     &lt;/configuration&gt;
@@ -352,17 +358,22 @@ New Security Hotspots:      100% reviewed</code></pre>
                 <pre><code>&lt;plugin&gt;
     &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
     &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
-    &lt;version&gt;3.13.0&lt;/version&gt;
+    &lt;version&gt;3.16.0&lt;/version&gt;
     &lt;configuration&gt;
-        &lt;release&gt;21&lt;/release&gt;
+        &lt;release&gt;25&lt;/release&gt;
         &lt;compilerArgs&gt;
+            <span class="comment">&lt;!-- Error Prone's documented setup: both flags are required, and on
+                 JDK 16+ .mvn/jvm.config must also export the javac internals
+                 it uses (see the Error Prone installation guide) --&gt;</span>
+            &lt;arg&gt;-XDcompilePolicy=simple&lt;/arg&gt;
+            &lt;arg&gt;--should-stop=ifError=FLOW&lt;/arg&gt;
             &lt;arg&gt;-Xplugin:ErrorProne&lt;/arg&gt;
         &lt;/compilerArgs&gt;
         &lt;annotationProcessorPaths&gt;
             &lt;path&gt;
                 &lt;groupId&gt;com.google.errorprone&lt;/groupId&gt;
                 &lt;artifactId&gt;error_prone_core&lt;/artifactId&gt;
-                &lt;version&gt;2.31.0&lt;/version&gt;
+                &lt;version&gt;2.53.0&lt;/version&gt;
             &lt;/path&gt;
         &lt;/annotationProcessorPaths&gt;
     &lt;/configuration&gt;
@@ -457,10 +468,10 @@ mvn spotless:check checkstyle:check pmd:check spotbugs:check verify</code></pre>
                 <pre><code>&lt;plugin&gt;
     &lt;groupId&gt;com.diffplug.spotless&lt;/groupId&gt;
     &lt;artifactId&gt;spotless-maven-plugin&lt;/artifactId&gt;
-    &lt;version&gt;2.44.0&lt;/version&gt;
+    &lt;version&gt;3.12.0&lt;/version&gt;
     &lt;configuration&gt;
         &lt;java&gt;
-            &lt;googleJavaFormat&gt;&lt;version&gt;1.23.0&lt;/version&gt;&lt;/googleJavaFormat&gt;
+            &lt;googleJavaFormat&gt;&lt;version&gt;2.0.0&lt;/version&gt;&lt;/googleJavaFormat&gt;
             &lt;removeUnusedImports/&gt;
         &lt;/java&gt;
     &lt;/configuration&gt;
@@ -635,6 +646,7 @@ mvn spotless:check checkstyle:check pmd:check spotbugs:check verify</code></pre>
                     <a href="cicd.html" class="related-link"><span class="related-icon">🔁</span>CI/CD Basics</a>
                     <a href="../best-practices/clean-code.html" class="related-link"><span class="related-icon">🧹</span>Clean Code</a>
                     <a href="ides.html" class="related-link"><span class="related-icon">🖥️</span>IDEs</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

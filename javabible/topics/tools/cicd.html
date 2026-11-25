@@ -109,16 +109,22 @@
                     directory. "It works on my machine" wasn't a joke; it was the
                     actual deployment process.</p>
 
-                <pre><code><span class="comment">// BEFORE — manual build and deploy, different every time</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">deploying by hand</span></figcaption>
+                    <pre><code><span class="comment">// Manual build and deploy, different every time</span>
 <span class="comment">$ mvn package                      # on YOUR laptop, with YOUR local Maven cache
 $ scp target/order-service.jar deploy@prod:/opt/app/
 $ ssh deploy@prod "systemctl restart order-service"
 # Did staging get tested with this exact jar? Unknown.
-# Did anyone else's uncommitted change sneak into this build? Unknown.</span>
+# Did anyone else's uncommitted change sneak into this build? Unknown.</span></code></pre>
+                </figure>
 
-<span class="comment">// AFTER — one pipeline builds it once, the same artifact moves through every stage</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">.github/workflows/build.yml</span></figcaption>
+                    <pre><code><span class="comment">// One pipeline builds it once, the same artifact moves through every stage</span>
 <span class="comment">// git push triggers: compile → test → package → the SAME jar is
 // promoted through staging → production. No laptop involved, ever.</span></code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">Three terms people use interchangeably — they're not the same thing</div>
@@ -226,10 +232,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-java@v4
+    - uses: actions/checkout@v7
+    - uses: actions/setup-java@v6
       with:
-        java-version: <span class="string">'21'</span>
+        java-version: <span class="string">'25'</span>
         distribution: <span class="string">'temurin'</span>
         cache: maven
 
@@ -242,10 +248,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: [17, 21]
+        java: [17, 21, 25]   # every LTS the shop claims to support
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-java@v4
+    - uses: actions/checkout@v7
+    - uses: actions/setup-java@v6
       with:
         java-version: <span class="string">${{ matrix.java }}</span>
         distribution: <span class="string">'temurin'</span>
@@ -293,10 +299,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-java@v4
+    - uses: actions/checkout@v7
+    - uses: actions/setup-java@v6
       with:
-        java-version: <span class="string">'21'</span>
+        java-version: <span class="string">'25'</span>
         distribution: <span class="string">'temurin'</span>
         cache: maven
 
@@ -304,13 +310,13 @@ jobs:
       run: mvn -B package -DskipTests
 
     - name: Log in to registry
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         username: <span class="string">${{ github.actor }}</span>
         password: <span class="string">${{ secrets.GITHUB_TOKEN }}</span>
 
     - name: Build and push
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7
       with:
         context: .
         push: true
@@ -452,7 +458,7 @@ deploy-production:
         &lt;plugin&gt;
             &lt;groupId&gt;org.codehaus.mojo&lt;/groupId&gt;
             &lt;artifactId&gt;flatten-maven-plugin&lt;/artifactId&gt;
-            &lt;version&gt;1.5.0&lt;/version&gt;
+            &lt;version&gt;1.10.0&lt;/version&gt;
             &lt;executions&gt;
                 &lt;execution&gt;&lt;goals&gt;&lt;goal&gt;flatten&lt;/goal&gt;&lt;/goals&gt;&lt;/execution&gt;
             &lt;/executions&gt;
@@ -644,7 +650,7 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
 
     - name: OWASP Dependency Check
       uses: dependency-check/Dependency-Check_Action@<span class="string">&lt;pinned-commit-sha&gt;</span> <span class="comment"># pin to a specific release commit, not @main</span>
@@ -653,7 +659,7 @@ jobs:
         path: <span class="string">'.'</span>
         format: <span class="string">'HTML'</span>
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: dependency-check-report
         path: reports/</code></pre>
@@ -798,6 +804,7 @@ jobs:
                     <a href="testing.html" class="related-link"><span class="related-icon">🧪</span>Testing (JUnit, Mockito)</a>
                     <a href="code-quality.html" class="related-link"><span class="related-icon">✅</span>Code Quality Tools</a>
                     <a href="../databases/relationships.html" class="related-link"><span class="related-icon">💾</span>Entity Relationships</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
