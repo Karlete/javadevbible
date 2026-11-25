@@ -111,9 +111,10 @@
                     <strong>object-relational impedance mismatch</strong>, and every ORM
                     exists solely to bridge it.</p>
 
-                <pre><code><span class="comment">// WITHOUT an ORM — every query hand-maps ResultSet columns to fields</span>
-<span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">findById</span>(<span class="keyword">long</span> id) {
-    <span class="class-name">String</span> sql = <span class="string">"SELECT id, name, price, category_id FROM products WHERE id = ?"</span>;
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">catalog/ProductDao.java — JDBC, every column mapped by hand</span></figcaption>
+                    <pre><code><span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">findById</span>(<span class="keyword">long</span> id) {
+    <span class="class-name">String</span> sql = <span class="string">"SELECT id, sku, name, price, category FROM products WHERE id = ?"</span>;
 
     <span class="keyword">try</span> (<span class="class-name">Connection</span> conn = dataSource.getConnection();
          <span class="class-name">PreparedStatement</span> stmt = conn.prepareStatement(sql)) {
@@ -123,10 +124,12 @@
             <span class="keyword">if</span> (rs.next()) {
                 <span class="class-name">Product</span> product = <span class="keyword">new</span> <span class="class-name">Product</span>();
                 product.setId(rs.getLong(<span class="string">"id"</span>));
+                product.setSku(rs.getString(<span class="string">"sku"</span>));
                 product.setName(rs.getString(<span class="string">"name"</span>));
                 product.setPrice(rs.getBigDecimal(<span class="string">"price"</span>));
-                <span class="comment">// Need the category too? That's a second query, written by hand,
-                // and a decision about whether to run it now or defer it.</span>
+                product.setCategory(rs.getString(<span class="string">"category"</span>));
+                <span class="comment">// A new column means editing this method, and every other method
+                // that maps a Product, by hand. Miss one and it silently stays null.</span>
                 <span class="keyword">return</span> product;
             }
         }
@@ -134,13 +137,17 @@
         <span class="keyword">throw new</span> <span class="class-name">DataAccessException</span>(<span class="string">"Failed to load product "</span> + id, e);
     }
     <span class="keyword">return null</span>;
-}
+}</code></pre>
+                </figure>
 
-<span class="comment">// WITH an ORM (JPA / Hibernate) — the mapping is declared once on the
-// entity; every query after that reuses it automatically.</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">catalog/ProductDao.java — JPA</span></figcaption>
+                    <pre><code><span class="comment">// The mapping is declared once on the entity;
+// every query after that reuses it automatically.</span>
 <span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">findById</span>(<span class="keyword">long</span> id) {
     <span class="keyword">return</span> entityManager.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, id);
 }</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">An ORM removes boilerplate — it does not remove the need to understand SQL</div>
@@ -244,10 +251,11 @@
 <span class="comment">// 1. FULL ORM (JPA / Hibernate) — declare the mapping once, query with objects</span>
 <span class="annotation">@Entity</span>
 <span class="keyword">public class</span> <span class="class-name">Product</span> {
-    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span> <span class="keyword">private</span> <span class="class-name">Long</span> id;
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = <span class="class-name">GenerationType</span>.IDENTITY) <span class="keyword">private</span> <span class="class-name">Long</span> id;
+    <span class="keyword">private</span> <span class="class-name">String</span> sku;
     <span class="keyword">private</span> <span class="class-name">String</span> name;
     <span class="keyword">private</span> <span class="class-name">BigDecimal</span> price;
-    <span class="annotation">@ManyToOne</span> <span class="keyword">private</span> <span class="class-name">Category</span> category;
+    <span class="keyword">private</span> <span class="class-name">String</span> category;
 }
 <span class="class-name">Product</span> product = em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, <span class="number">1L</span>);   <span class="comment">// no SQL written</span>
 
@@ -259,9 +267,8 @@
 
 <span class="comment">// 3. SQL BUILDER (jOOQ) — type-safe SQL, validated against the schema at compile time</span>
 <span class="class-name">Result</span>&lt;<span class="class-name">Record</span>&gt; result = create
-    .select(PRODUCTS.NAME, CATEGORIES.NAME)
+    .select(PRODUCTS.SKU, PRODUCTS.NAME, PRODUCTS.CATEGORY)
     .from(PRODUCTS)
-    .join(CATEGORIES).on(PRODUCTS.CATEGORY_ID.eq(CATEGORIES.ID))
     .where(PRODUCTS.ID.eq(<span class="number">1L</span>))
     .fetch();</code></pre>
             </section>
@@ -335,8 +342,9 @@ order.getItems().size();               <span class="comment">// NOW the SELECT f
                     reporting queries, stored-procedure-driven systems, or a legacy
                     schema an ORM's conventions don't fit cleanly.</p>
 
-                <pre><code><span class="comment">&lt;!-- OrderMapper.xml --&gt;</span>
-<span class="keyword">&lt;mapper</span> namespace="com.shop.mapper.OrderMapper"<span class="keyword">&gt;</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/com/javadevbible/shop/order/OrderMapper.xml</span></figcaption>
+                    <pre><code><span class="keyword">&lt;mapper</span> namespace="com.javadevbible.shop.order.OrderMapper"<span class="keyword">&gt;</span>
 
     <span class="keyword">&lt;resultMap</span> id="orderResultMap" type="Order"<span class="keyword">&gt;</span>
         <span class="keyword">&lt;id</span> property="id" column="order_id"<span class="keyword">/&gt;</span>
@@ -358,8 +366,11 @@ order.getItems().size();               <span class="comment">// NOW the SELECT f
     <span class="keyword">&lt;/select&gt;</span>
 
 <span class="keyword">&lt;/mapper&gt;</span></code></pre>
+                </figure>
 
-                <pre><code><span class="keyword">public interface</span> <span class="class-name">OrderMapper</span> {
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderMapper.java</span></figcaption>
+                    <pre><code><span class="keyword">public interface</span> <span class="class-name">OrderMapper</span> {
     <span class="class-name">Order</span> <span class="function">findById</span>(<span class="keyword">long</span> id);
     <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">search</span>(<span class="class-name">OrderSearchCriteria</span> criteria);
 
@@ -367,6 +378,7 @@ order.getItems().size();               <span class="comment">// NOW the SELECT f
     <span class="annotation">@Select</span>(<span class="string">"SELECT * FROM orders WHERE id = #{id}"</span>)
     <span class="class-name">Order</span> <span class="function">findByIdSimple</span>(<span class="keyword">long</span> id);
 }</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">MyBatis caching is per-namespace and does not know about writes from elsewhere</div>
@@ -400,10 +412,12 @@ em.createQuery(<span class="string">"SELECT p FROM Prodcut p"</span>);   <span c
 // as a generated constant</span>
 create.selectFrom(PRODCUT);   <span class="comment">// compile error</span></code></pre>
 
-                <pre><code><span class="keyword">import static</span> org.jooq.impl.DSL.*;
-<span class="keyword">import static</span> com.shop.generated.Tables.*;   <span class="comment">// generated from the schema</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">catalog/ProductQueries.java</span></figcaption>
+                    <pre><code><span class="keyword">import static</span> org.jooq.impl.DSL.*;
+<span class="keyword">import static</span> com.javadevbible.shop.jooq.Tables.*;   <span class="comment">// generated from the schema</span>
 
-<span class="keyword">public class</span> <span class="class-name">ProductRepository</span> {
+<span class="keyword">public class</span> <span class="class-name">ProductQueries</span> {
 
     <span class="keyword">private final</span> <span class="class-name">DSLContext</span> create;
 
@@ -418,11 +432,10 @@ create.selectFrom(PRODCUT);   <span class="comment">// compile error</span></cod
     <span class="comment">// Aggregate reporting query — exactly the kind of query that fights an ORM</span>
     <span class="keyword">public</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">BigDecimal</span>&gt; <span class="function">avgPriceByCategory</span>() {
         <span class="keyword">return</span> create
-            .select(CATEGORIES.NAME, avg(PRODUCTS.PRICE))
+            .select(PRODUCTS.CATEGORY, avg(PRODUCTS.PRICE))
             .from(PRODUCTS)
-            .join(CATEGORIES).on(PRODUCTS.CATEGORY_ID.eq(CATEGORIES.ID))
-            .groupBy(CATEGORIES.NAME)
-            .fetchMap(CATEGORIES.NAME, avg(PRODUCTS.PRICE));
+            .groupBy(PRODUCTS.CATEGORY)
+            .fetchMap(PRODUCTS.CATEGORY, avg(PRODUCTS.PRICE));
     }
 
     <span class="comment">// Dynamic query — conditions composed at runtime, still fully type-checked</span>
@@ -432,12 +445,13 @@ create.selectFrom(PRODCUT);   <span class="comment">// compile error</span></cod
         <span class="keyword">if</span> (criteria.getName() != <span class="keyword">null</span>) {
             query = query.and(PRODUCTS.NAME.containsIgnoreCase(criteria.getName()));
         }
-        <span class="keyword">if</span> (criteria.getCategoryId() != <span class="keyword">null</span>) {
-            query = query.and(PRODUCTS.CATEGORY_ID.eq(criteria.getCategoryId()));
+        <span class="keyword">if</span> (criteria.getCategory() != <span class="keyword">null</span>) {
+            query = query.and(PRODUCTS.CATEGORY.eq(criteria.getCategory()));
         }
         <span class="keyword">return</span> query.fetchInto(<span class="class-name">Product</span>.<span class="keyword">class</span>);
     }
 }</code></pre>
+                </figure>
 
                 <div class="info-box important">
                     <div class="info-box-title">jOOQ's license is a real adoption factor, not a footnote</div>
@@ -475,9 +489,11 @@ create.selectFrom(PRODCUT);   <span class="comment">// compile error</span></cod
                     the reporting queries that would otherwise become an unmaintainable
                     native <code>@Query</code> string.</p>
 
-                <pre><code><span class="comment">// Spring Data JPA handles ordinary CRUD</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">catalog/ProductRepository.java · catalog/CatalogReportService.java</span></figcaption>
+                    <pre><code><span class="comment">// Spring Data JPA handles ordinary CRUD</span>
 <span class="keyword">public interface</span> <span class="class-name">ProductRepository</span> <span class="keyword">extends</span> <span class="class-name">JpaRepository</span>&lt;<span class="class-name">Product</span>, <span class="class-name">Long</span>&gt; {
-    <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">findByCategoryId</span>(<span class="class-name">Long</span> categoryId);
+    <span class="class-name">List</span>&lt;<span class="class-name">Product</span>&gt; <span class="function">findByCategory</span>(<span class="class-name">String</span> category);
 }
 
 <span class="comment">// jOOQ handles the reporting query that JPQL would make unreadable</span>
@@ -489,18 +505,18 @@ create.selectFrom(PRODCUT);   <span class="comment">// compile error</span></cod
     <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">CategoryPricingReport</span>&gt; <span class="function">generatePricingReport</span>() {
         <span class="keyword">return</span> dsl
             .select(
-                CATEGORIES.NAME,
+                PRODUCTS.CATEGORY,
                 count(PRODUCTS.ID).as(<span class="string">"product_count"</span>),
                 avg(PRODUCTS.PRICE).as(<span class="string">"avg_price"</span>)
             )
             .from(PRODUCTS)
-            .join(CATEGORIES).on(PRODUCTS.CATEGORY_ID.eq(CATEGORIES.ID))
-            .groupBy(CATEGORIES.NAME)
+            .groupBy(PRODUCTS.CATEGORY)
             .having(count(PRODUCTS.ID).gt(<span class="number">5</span>))
             .orderBy(avg(PRODUCTS.PRICE).desc())
             .fetchInto(<span class="class-name">CategoryPricingReport</span>.<span class="keyword">class</span>);
     }
 }</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -637,6 +653,7 @@ create.selectFrom(PRODCUT);   <span class="comment">// compile error</span></cod
                     <a href="relationships.html" class="related-link"><span class="related-icon">🔗</span>Entity Relationships</a>
                     <a href="transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions (ACID)</a>
                     <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">🍃</span>Spring Data JPA</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

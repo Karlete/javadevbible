@@ -116,17 +116,20 @@
                     <code>conn.close()</code>, the connection is not destroyed — it
                     is returned to the pool for the next caller.</p>
 
-                <pre><code><span class="comment">// Without a pool — creates a new physical TCP connection every call</span>
-<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) {
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderRepository.java — a new physical connection on every call</span></figcaption>
+                    <pre><code><span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) {
     <span class="keyword">try</span> (<span class="class-name">Connection</span> conn = <span class="class-name">DriverManager</span>.getConnection(url, user, pass)) {
         <span class="comment">// TCP + TLS + auth: 50-200ms BEFORE the query even starts</span>
         <span class="comment">// Query execution: 1-5ms</span>
         <span class="comment">// Total: 51-205ms, dominated by connection setup</span>
     }
-}
+}</code></pre>
+                </figure>
 
-<span class="comment">// With a pool — borrows an already-open connection</span>
-<span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) {
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderRepository.java — borrows an already-open connection</span></figcaption>
+                    <pre><code><span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) {
     <span class="keyword">try</span> (<span class="class-name">Connection</span> conn = dataSource.getConnection()) {
         <span class="comment">// Pool borrow: &lt;1ms</span>
         <span class="comment">// Query execution: 1-5ms</span>
@@ -134,6 +137,7 @@
     }
     <span class="comment">// conn.close() returns it to the pool; no TCP teardown</span>
 }</code></pre>
+                </figure>
 
                 <p>The pool lifecycle — what actually happens at startup and per request:</p>
                 <table>
@@ -186,7 +190,9 @@
                 </table>
 
                 <h3>Dependency</h3>
-                <pre><code><span class="comment">&lt;!-- HikariCP is included transitively with any Spring Boot data starter --&gt;</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml (excerpt)</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- HikariCP is included transitively with any Spring Boot data starter --&gt;</span>
 &lt;dependency&gt;
     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
     &lt;artifactId&gt;spring-boot-starter-data-jpa&lt;/artifactId&gt;
@@ -198,6 +204,7 @@
     &lt;artifactId&gt;spring-boot-starter-jdbc&lt;/artifactId&gt;
 &lt;/dependency&gt;
 <span class="comment">&lt;!-- Both bring in HikariCP automatically; no separate dependency needed --&gt;</span></code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -207,7 +214,9 @@
                 <h2>Configuration: Every Parameter That Matters</h2>
 
                 <h3>Spring Boot application.properties</h3>
-                <pre><code><span class="comment"># Essential — the three you must always set</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/application.properties</span></figcaption>
+                    <pre><code><span class="comment"># Essential — the three you must always set</span>
 spring.datasource.url=jdbc:postgresql://localhost:5432/shop
 spring.datasource.username=app
 spring.datasource.password=${DB_PASSWORD}   <span class="comment"># never hardcode; use env var or secrets manager</span>
@@ -223,6 +232,7 @@ spring.datasource.hikari.idle-timeout=300000        <span class="comment"># 5 mi
 
 <span class="comment"># Leak detection — enable in dev/staging, optional in prod</span>
 spring.datasource.hikari.leak-detection-threshold=10000   <span class="comment"># warn if a connection is held >10s without being returned</span></code></pre>
+                </figure>
 
                 <h3>What each parameter actually does</h3>
                 <table>
@@ -367,9 +377,12 @@ spring.datasource.hikari.connection-timeout=60000   <span class="comment"># long
                     often masks rather than fixes the real issue).</p>
 
                 <h3>Spring Boot Actuator metrics</h3>
-                <pre><code><span class="comment"># application.properties — expose the metrics endpoints</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/application.properties</span></figcaption>
+                    <pre><code><span class="comment"># Expose the metrics endpoints</span>
 management.endpoints.web.exposure.include=health,metrics
 management.endpoint.health.show-details=always</code></pre>
+                </figure>
 
                 <pre><code><span class="comment"># The three HikariCP metrics that matter:</span>
 
@@ -477,7 +490,9 @@ spring.datasource.hikari.keepalive-time=60000      <span class="comment">// 1 mi
                     separate pools. Spring Boot's auto-configuration only handles one
                     DataSource; for multiple you configure them manually.</p>
 
-                <pre><code><span class="comment"># application.properties — two datasources</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/application.properties</span></figcaption>
+                    <pre><code><span class="comment"># Two datasources: writes go to the primary, reports to a read replica</span>
 <span class="comment"># Primary (read-write)</span>
 app.datasource.primary.url=jdbc:postgresql://primary-db:5432/shop
 app.datasource.primary.username=app_rw
@@ -491,6 +506,7 @@ app.datasource.replica.username=app_ro
 app.datasource.replica.password=${DB_REPLICA_PASSWORD}
 app.datasource.replica.hikari.maximum-pool-size=30   <span class="comment"># replicas handle more read load</span>
 app.datasource.replica.hikari.pool-name=ReplicaPool</code></pre>
+                </figure>
 
                 <pre><code><span class="annotation">@Configuration</span>
 <span class="keyword">public class</span> <span class="class-name">DataSourceConfig</span> {
@@ -525,7 +541,9 @@ app.datasource.replica.hikari.pool-name=ReplicaPool</code></pre>
     }
 }</code></pre>
 
-                <pre><code><span class="comment">// Using the replica explicitly in a read-only repository</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">catalog/ProductReportRepository.java</span></figcaption>
+                    <pre><code><span class="comment">// Using the replica explicitly in a read-only repository</span>
 <span class="annotation">@Repository</span>
 <span class="keyword">public class</span> <span class="class-name">ProductReportRepository</span> {
 
@@ -547,6 +565,7 @@ app.datasource.replica.hikari.pool-name=ReplicaPool</code></pre>
             """</span>, <span class="keyword">this</span>::mapRow, limit);
     }
 }</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">Replication lag is a real concern when routing reads to a replica</div>
@@ -692,6 +711,7 @@ app.datasource.replica.hikari.pool-name=ReplicaPool</code></pre>
                     <a href="../jakarta-ee/jpa.html" class="related-link"><span class="related-icon">🗃️</span>JPA (Java Persistence API)</a>
                     <a href="transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions (ACID)</a>
                     <a href="../advanced/multithreading.html" class="related-link"><span class="related-icon">🧵</span>Multithreading &amp; Concurrency</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

@@ -151,7 +151,9 @@
                 <h2>Setup: Driver and DataSource</h2>
 
                 <h3>Driver dependency</h3>
-                <pre><code><span class="comment">&lt;!-- PostgreSQL (preferred for new projects) --&gt;</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml (excerpt)</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- PostgreSQL (preferred for new projects) --&gt;</span>
 &lt;dependency&gt;
     &lt;groupId&gt;org.postgresql&lt;/groupId&gt;
     &lt;artifactId&gt;postgresql&lt;/artifactId&gt;
@@ -170,6 +172,7 @@
     &lt;artifactId&gt;h2&lt;/artifactId&gt;
     &lt;scope&gt;test&lt;/scope&gt;
 &lt;/dependency&gt;</code></pre>
+                </figure>
 
                 <h3>DataSource vs DriverManager</h3>
                 <div class="info-box important">
@@ -204,7 +207,9 @@ config.setMaximumPoolSize(<span class="number">20</span>);
 <span class="class-name">DataSource</span> dataSource = <span class="keyword">new</span> <span class="class-name">HikariDataSource</span>(config);
 <span class="comment">// Pool sizing and tuning covered in Connection Pooling</span></code></pre>
 
-                <pre><code><span class="comment"># Spring Boot: configure the DataSource from properties — nothing else needed</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/application.properties</span></figcaption>
+                    <pre><code><span class="comment"># Spring Boot: configure the DataSource from properties — nothing else needed</span>
 spring.datasource.url=jdbc:postgresql://localhost:5432/shop
 spring.datasource.username=app
 spring.datasource.password=${DB_PASSWORD}
@@ -213,9 +218,12 @@ spring.datasource.password=${DB_PASSWORD}
 spring.datasource.hikari.maximum-pool-size=20
 spring.datasource.hikari.minimum-idle=5
 spring.datasource.hikari.connection-timeout=30000</code></pre>
+                </figure>
 
                 <h3>JDBC URL formats</h3>
-                <pre><code><span class="comment">// Format: jdbc:subprotocol://host:port/database[?options]</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderRepository.java — plain JDBC</span></figcaption>
+                    <pre><code><span class="comment">// Format: jdbc:subprotocol://host:port/database[?options]</span>
 <span class="string">"jdbc:postgresql://localhost:5432/shop"</span>
 <span class="string">"jdbc:postgresql://prod-db.internal:5432/shop?ssl=true&sslmode=require"</span>
 
@@ -224,6 +232,7 @@ spring.datasource.hikari.connection-timeout=30000</code></pre>
 
 <span class="string">"jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1"</span>   <span class="comment">// in-memory, kept alive for test duration</span>
 <span class="string">"jdbc:h2:file:./data/shop"</span>               <span class="comment">// file-based H2</span></code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -248,7 +257,7 @@ spring.datasource.hikari.connection-timeout=30000</code></pre>
 
     <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) {
         <span class="class-name">String</span> sql = <span class="string">"""
-            SELECT o.id, o.status, o.created_at, c.email AS customer_email
+            SELECT o.id, o.status, o.placed_at, c.email AS customer_email
             FROM orders o
             JOIN customers c ON c.id = o.customer_id
             WHERE o.id = ?
@@ -273,11 +282,11 @@ spring.datasource.hikari.connection-timeout=30000</code></pre>
 
     <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">String</span> status, <span class="keyword">int</span> limit) {
         <span class="class-name">String</span> sql = <span class="string">"""
-            SELECT o.id, o.status, o.created_at, c.email AS customer_email
+            SELECT o.id, o.status, o.placed_at, c.email AS customer_email
             FROM orders o
             JOIN customers c ON c.id = o.customer_id
             WHERE o.status = ?
-            ORDER BY o.created_at DESC
+            ORDER BY o.placed_at DESC
             LIMIT ?
             """</span>;
 
@@ -305,7 +314,7 @@ spring.datasource.hikari.connection-timeout=30000</code></pre>
             rs.getLong(<span class="string">"id"</span>),
             rs.getString(<span class="string">"status"</span>),
             rs.getString(<span class="string">"customer_email"</span>),
-            rs.getObject(<span class="string">"created_at"</span>, <span class="class-name">OffsetDateTime</span>.<span class="keyword">class</span>)  <span class="comment">// see Section 4</span>
+            rs.getObject(<span class="string">"placed_at"</span>, <span class="class-name">OffsetDateTime</span>.<span class="keyword">class</span>)  <span class="comment">// see Section 4</span>
         );
     }
 }</code></pre>
@@ -421,7 +430,9 @@ spring.datasource.hikari.connection-timeout=30000</code></pre>
                     disable auto-commit, execute the statements, then commit or
                     roll back.</p>
 
-                <pre><code><span class="keyword">public class</span> <span class="class-name">OrderFulfillmentService</span> {
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderFulfillmentService.java</span></figcaption>
+                    <pre><code><span class="keyword">public class</span> <span class="class-name">OrderFulfillmentService</span> {
 
     <span class="keyword">private final</span> <span class="class-name">DataSource</span> dataSource;
 
@@ -437,9 +448,9 @@ spring.datasource.hikari.connection-timeout=30000</code></pre>
             <span class="keyword">try</span> {
                 <span class="comment">// Step 1: check and debit stock atomically</span>
                 <span class="class-name">String</span> debitSql = <span class="string">"""
-                    UPDATE products
-                    SET stock = stock - ?
-                    WHERE id = ? AND stock >= ?
+                    UPDATE stock_levels
+                    SET quantity = quantity - ?
+                    WHERE product_id = ? AND quantity >= ?
                     """</span>;
                 <span class="keyword">try</span> (<span class="class-name">PreparedStatement</span> ps = conn.prepareStatement(debitSql)) {
                     ps.setInt(<span class="number">1</span>, quantity);
@@ -476,6 +487,7 @@ spring.datasource.hikari.connection-timeout=30000</code></pre>
         <span class="comment">// try-with-resources on Connection resets autoCommit and returns it to pool</span>
     }
 }</code></pre>
+                </figure>
 
                 <div class="info-box important">
                     <div class="info-box-title">Connection state must be clean before returning to the pool</div>
@@ -503,28 +515,32 @@ spring.datasource.hikari.connection-timeout=30000</code></pre>
                     correct approach is to use <code>java.time</code> types directly
                     via <code>setObject()</code> and <code>getObject(Class)</code>.</p>
 
-                <pre><code><span class="comment">// WRONG — legacy types with silent timezone conversion</span>
-ps.setTimestamp(<span class="number">1</span>, <span class="class-name">Timestamp</span>.from(instant));
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">java.sql.Timestamp — converted through the JVM time zone</span></figcaption>
+                    <pre><code>ps.setTimestamp(<span class="number">1</span>, <span class="class-name">Timestamp</span>.from(instant));
 <span class="comment">// Timestamp.from() uses the JVM default timezone.</span>
 <span class="comment">// If the JVM and the database have different default timezones,</span>
 <span class="comment">// the stored value will be wrong by the offset difference.</span>
 
-<span class="class-name">Timestamp</span> ts = rs.getTimestamp(<span class="string">"created_at"</span>);
+<span class="class-name">Timestamp</span> ts = rs.getTimestamp(<span class="string">"placed_at"</span>);
 <span class="comment">// Also uses the JVM timezone. If the server moved or the JVM default changed,</span>
-<span class="comment">// every historical timestamp reads as a different moment.</span>
+<span class="comment">// every historical timestamp reads as a different moment.</span></code></pre>
+                </figure>
 
-<span class="comment">// CORRECT — java.time types directly via JDBC 4.2</span>
-<span class="comment">// WRITING:</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">java.time types, read and written directly (JDBC 4.2)</span></figcaption>
+                    <pre><code><span class="comment">// WRITING:</span>
 ps.setObject(<span class="number">1</span>, <span class="class-name">OffsetDateTime</span>.now(<span class="class-name">ZoneOffset</span>.UTC));   <span class="comment">// always UTC at the boundary</span>
 ps.setObject(<span class="number">2</span>, <span class="class-name">LocalDate</span>.of(<span class="number">2026</span>, <span class="number">7</span>, <span class="number">1</span>));                <span class="comment">// date-only, no timezone</span>
 
 <span class="comment">// READING:</span>
-<span class="class-name">OffsetDateTime</span> createdAt = rs.getObject(<span class="string">"created_at"</span>, <span class="class-name">OffsetDateTime</span>.<span class="keyword">class</span>);
+<span class="class-name">OffsetDateTime</span> placedAt  = rs.getObject(<span class="string">"placed_at"</span>, <span class="class-name">OffsetDateTime</span>.<span class="keyword">class</span>);
 <span class="class-name">LocalDate</span> deliveryDate  = rs.getObject(<span class="string">"delivery_date"</span>, <span class="class-name">LocalDate</span>.<span class="keyword">class</span>);
 
 <span class="comment">// Handle nullable timestamps correctly:</span>
 <span class="class-name">OffsetDateTime</span> deletedAt = rs.getObject(<span class="string">"deleted_at"</span>, <span class="class-name">OffsetDateTime</span>.<span class="keyword">class</span>);
 <span class="comment">// getObject() returns null when the column is NULL — no wasNull() check needed</span></code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">Which <code>java.time</code> type to use and when</div>
@@ -552,11 +568,17 @@ ps.setObject(<span class="number">2</span>, <span class="class-name">LocalDate</
                     full control over the SQL — a significant step up from raw JDBC
                     without the full ORM abstraction of JPA.</p>
 
-                <pre><code><span class="comment">&lt;!-- Spring Boot auto-configures JdbcTemplate when this is on the classpath --&gt;</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml (excerpt)</span></figcaption>
+                    <figure class="code-file">
+                        <figcaption><span class="code-path">order/OrderRepository.java — with JdbcTemplate</span></figcaption>
+                        <pre><code><span class="comment">&lt;!-- Spring Boot auto-configures JdbcTemplate when this is on the classpath --&gt;</span>
 &lt;dependency&gt;
     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
     &lt;artifactId&gt;spring-boot-starter-jdbc&lt;/artifactId&gt;
 &lt;/dependency&gt;</code></pre>
+                    </figure>
+                </figure>
 
                 <pre><code><span class="annotation">@Repository</span>
 <span class="keyword">public class</span> <span class="class-name">OrderRepository</span> {
@@ -570,11 +592,11 @@ ps.setObject(<span class="number">2</span>, <span class="class-name">LocalDate</
     <span class="comment">// Query for a list — JdbcTemplate handles connection, PreparedStatement, ResultSet</span>
     <span class="keyword">public</span> <span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findByStatus</span>(<span class="class-name">String</span> status) {
         <span class="class-name">String</span> sql = <span class="string">"""
-            SELECT o.id, o.status, o.created_at, c.email AS customer_email
+            SELECT o.id, o.status, o.placed_at, c.email AS customer_email
             FROM orders o
             JOIN customers c ON c.id = o.customer_id
             WHERE o.status = ?
-            ORDER BY o.created_at DESC
+            ORDER BY o.placed_at DESC
             """</span>;
         <span class="keyword">return</span> jdbc.query(sql, <span class="keyword">this</span>::mapRow, status);
     }
@@ -583,7 +605,7 @@ ps.setObject(<span class="number">2</span>, <span class="class-name">LocalDate</
     <span class="keyword">public</span> <span class="class-name">Optional</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findById</span>(<span class="keyword">long</span> id) {
         <span class="keyword">try</span> {
             <span class="class-name">Order</span> order = jdbc.queryForObject(
-                <span class="string">"SELECT o.id, o.status, o.created_at, c.email AS customer_email FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id = ?"</span>,
+                <span class="string">"SELECT o.id, o.status, o.placed_at, c.email AS customer_email FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id = ?"</span>,
                 <span class="keyword">this</span>::mapRow,
                 id
             );
@@ -630,7 +652,7 @@ ps.setObject(<span class="number">2</span>, <span class="class-name">LocalDate</
             rs.getLong(<span class="string">"id"</span>),
             rs.getString(<span class="string">"status"</span>),
             rs.getString(<span class="string">"customer_email"</span>),
-            rs.getObject(<span class="string">"created_at"</span>, <span class="class-name">OffsetDateTime</span>.<span class="keyword">class</span>)
+            rs.getObject(<span class="string">"placed_at"</span>, <span class="class-name">OffsetDateTime</span>.<span class="keyword">class</span>)
         );
     }
 }</code></pre>
@@ -799,7 +821,7 @@ ps.setObject(<span class="number">2</span>, <span class="class-name">LocalDate</
                     </details>
 
                     <details class="qa">
-                        <summary>You switch from <code>rs.getTimestamp("created_at")</code> to <code>rs.getObject("created_at", OffsetDateTime.class)</code>. What was wrong with the first approach?</summary>
+                        <summary>You switch from <code>rs.getTimestamp("placed_at")</code> to <code>rs.getObject("placed_at", OffsetDateTime.class)</code>. What was wrong with the first approach?</summary>
                         <p><code>getTimestamp()</code> internally applies the JVM's default
                     timezone when constructing the <code>java.sql.Timestamp</code>.
                     If the JVM's <code>user.timezone</code> property differs from the
@@ -844,6 +866,7 @@ ps.setObject(<span class="number">2</span>, <span class="class-name">LocalDate</
                     <a href="connection-pooling.html" class="related-link"><span class="related-icon">🏊</span>Connection Pooling</a>
                     <a href="orms.html" class="related-link"><span class="related-icon">🗃️</span>ORMs</a>
                     <a href="transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions (ACID)</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

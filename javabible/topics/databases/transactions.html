@@ -117,7 +117,7 @@
 -- each statement commits independently the instant it runs.</span>
 INSERT INTO orders (customer_id, status, total) VALUES (501, <span class="string">'PENDING'</span>, 129.90);
 <span class="comment">-- ↑ committed immediately, order row now permanent</span>
-UPDATE products SET stock = stock - 2 WHERE id = 42;
+UPDATE stock_levels SET quantity = quantity - 2 WHERE product_id = 42;
 <span class="comment">-- ↑ if the connection drops or this statement fails, the order above
 --   already exists in the database with no stock ever decremented.
 --   Two customers can now buy the last 2 units of the same product.</span>
@@ -127,8 +127,8 @@ BEGIN;
 INSERT INTO orders (customer_id, status, total)
     VALUES (501, <span class="string">'PENDING'</span>, 129.90)
     RETURNING id;                                 <span class="comment">-- id = 8842</span>
-UPDATE products SET stock = stock - 2
-    WHERE id = 42 AND stock >= 2;                 <span class="comment">-- guards against overselling</span>
+UPDATE stock_levels SET quantity = quantity - 2
+    WHERE product_id = 42 AND quantity >= 2;      <span class="comment">-- guards against overselling</span>
 <span class="comment">-- application checks affected-row count here:
 -- 0 rows updated → insufficient stock → ROLLBACK, reject the order
 -- 1 row updated  → proceed → COMMIT</span>
@@ -307,9 +307,9 @@ COMMIT;</code></pre>
 
                 <pre><code><span class="comment">-- Prevent a lost update on inventory by locking the row before reading it</span>
 BEGIN;
-SELECT stock FROM products WHERE id = 42 FOR UPDATE;
-<span class="comment">-- any other transaction's SELECT ... FOR UPDATE on id=42 now blocks here</span>
-UPDATE products SET stock = stock - 2 WHERE id = 42;
+SELECT quantity FROM stock_levels WHERE product_id = 42 FOR UPDATE;
+<span class="comment">-- any other transaction's SELECT ... FOR UPDATE on product 42 now blocks here</span>
+UPDATE stock_levels SET quantity = quantity - 2 WHERE product_id = 42;
 COMMIT;   <span class="comment">-- lock released</span></code></pre>
 
                 <h3>The production pattern: <code>FOR UPDATE SKIP LOCKED</code></h3>
@@ -354,15 +354,15 @@ COMMIT;
 -- Transaction 2: transferring stock from product 77 to product 42
 -- Running concurrently, in opposite lock order:
 
--- T1                                   T2
--- ─────────────────────────────────────────────────────────────
--- BEGIN;                               BEGIN;
--- UPDATE products SET stock=stock-5    UPDATE products SET stock=stock-3
---   WHERE id = 42;   -- locks 42         WHERE id = 77;   -- locks 77
---                                        (both locks acquired so far)
--- UPDATE products SET stock=stock+5    UPDATE products SET stock=stock+3
---   WHERE id = 77;   -- BLOCKS,          WHERE id = 42;   -- BLOCKS,
---   waiting for T2 to release 77         waiting for T1 to release 42
+-- T1                                            T2
+-- ──────────────────────────────────────────────────────────────────────────────────────────
+-- BEGIN;                                        BEGIN;
+-- UPDATE stock_levels SET quantity=quantity-5   UPDATE stock_levels SET quantity=quantity-3
+--   WHERE product_id = 42;  -- locks 42           WHERE product_id = 77;  -- locks 77
+--                                               (both locks acquired so far)
+-- UPDATE stock_levels SET quantity=quantity+5   UPDATE stock_levels SET quantity=quantity+3
+--   WHERE product_id = 77;  -- BLOCKS,            WHERE product_id = 42;  -- BLOCKS,
+--   waiting for T2 to release 77                  waiting for T1 to release 42
 --
 -- Neither can proceed → circular wait → DEADLOCK</span></code></pre>
 
@@ -393,8 +393,8 @@ COMMIT;
     <span class="class-name">Long</span> second = <span class="class-name">Math</span>.max(fromProductId, toProductId);
 
     <span class="comment">// Lock in ascending ID order regardless of transfer direction</span>
-    em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, first,  <span class="class-name">LockModeType</span>.PESSIMISTIC_WRITE);
-    em.find(<span class="class-name">Product</span>.<span class="keyword">class</span>, second, <span class="class-name">LockModeType</span>.PESSIMISTIC_WRITE);
+    em.find(<span class="class-name">StockLevel</span>.<span class="keyword">class</span>, first,  <span class="class-name">LockModeType</span>.PESSIMISTIC_WRITE);
+    em.find(<span class="class-name">StockLevel</span>.<span class="keyword">class</span>, second, <span class="class-name">LockModeType</span>.PESSIMISTIC_WRITE);
 
     <span class="comment">// ... apply the actual stock movement using fromProductId / toProductId</span>
 }</code></pre>
@@ -437,7 +437,7 @@ COMMIT;
             <span class="class-name">Savepoint</span> beforeStockUpdate = conn.setSavepoint(<span class="string">"beforeStockUpdate"</span>);
 
             <span class="keyword">try</span> (<span class="class-name">PreparedStatement</span> decrementStock = conn.prepareStatement(
-                    <span class="string">"UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?"</span>)) {
+                    <span class="string">"UPDATE stock_levels SET quantity = quantity - ? WHERE product_id = ? AND quantity >= ?"</span>)) {
                 decrementStock.setInt(1, quantity);
                 decrementStock.setLong(2, productId);
                 decrementStock.setInt(3, quantity);
@@ -493,16 +493,16 @@ COMMIT;
 
                 <pre><code><span class="comment">-- PESSIMISTIC: acquire the lock up front (see Section 4) — nobody else
 -- can even read-for-update this row until this transaction ends.</span>
-SELECT stock FROM products WHERE id = 42 FOR UPDATE;
-UPDATE products SET stock = stock - 2 WHERE id = 42;
+SELECT quantity FROM stock_levels WHERE product_id = 42 FOR UPDATE;
+UPDATE stock_levels SET quantity = quantity - 2 WHERE product_id = 42;
 
 <span class="comment">-- OPTIMISTIC: no lock at all — read the current version, write only if
 -- the version hasn't changed since. If another transaction committed
 -- first, this UPDATE affects 0 rows and the application must detect it.</span>
-SELECT stock, version FROM products WHERE id = 42;   <span class="comment">-- version = 7</span>
-UPDATE products
-    SET stock = stock - 2, version = version + 1
-    WHERE id = 42 AND version = 7;
+SELECT quantity, version FROM stock_levels WHERE product_id = 42;   <span class="comment">-- version = 7</span>
+UPDATE stock_levels
+    SET quantity = quantity - 2, version = version + 1
+    WHERE product_id = 42 AND version = 7;
 <span class="comment">-- affected rows == 0 → someone else updated first → application retries
 --   or surfaces a conflict to the caller (JPA does exactly this via @Version,
 --   throwing OptimisticLockException — see JPA & Hibernate)</span></code></pre>
@@ -655,6 +655,7 @@ UPDATE products
                     <a href="relationships.html" class="related-link"><span class="related-icon">🔗</span>Entity Relationships</a>
                     <a href="orms.html" class="related-link"><span class="related-icon">🗺️</span>ORMs</a>
                     <a href="../jakarta-ee/transactions.html" class="related-link"><span class="related-icon">🏢</span>Jakarta Transactions (JTA)</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

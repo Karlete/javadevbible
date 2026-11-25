@@ -128,7 +128,7 @@
 <span class="keyword">JOIN</span> customers c  <span class="keyword">ON</span> o.customer_id = c.id
 <span class="keyword">JOIN</span> order_items oi <span class="keyword">ON</span> oi.order_id = o.id
 <span class="keyword">WHERE</span> o.status = <span class="string">'PENDING'</span>
-  <span class="keyword">AND</span> o.created_at >= <span class="function">NOW</span>() - <span class="keyword">INTERVAL</span> <span class="string">'24 HOURS'</span>
+  <span class="keyword">AND</span> o.placed_at >= <span class="function">NOW</span>() - <span class="keyword">INTERVAL</span> <span class="string">'24 HOURS'</span>
 <span class="keyword">GROUP BY</span> o.id, c.email
 <span class="keyword">HAVING</span> <span class="function">SUM</span>(oi.quantity * oi.unit_price) > 100
 <span class="keyword">ORDER BY</span> total <span class="keyword">DESC</span>;
@@ -164,7 +164,9 @@ logging.level.org.hibernate.type.descriptor.sql=trace  <span class="comment"># s
                     understanding what JPA's <code>ddl-auto=create</code> generates
                     (which you should never use in production).</p>
 
-                <pre><code><span class="comment">-- An e-commerce schema: three tables, two foreign keys, essential constraints</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">src/main/resources/db/migration/V1__create_schema.sql</span></figcaption>
+                    <pre><code><span class="comment">-- The shop's core schema: five tables, four foreign keys, constraints in the database</span>
 
 <span class="keyword">CREATE TABLE</span> customers (
     id          <span class="class-name">BIGINT</span>       <span class="keyword">PRIMARY KEY GENERATED ALWAYS AS IDENTITY</span>,  <span class="comment">-- standard SQL:2003, preferred over AUTO_INCREMENT</span>
@@ -178,29 +180,41 @@ logging.level.org.hibernate.type.descriptor.sql=trace  <span class="comment"># s
     sku         <span class="class-name">VARCHAR</span>(50)     <span class="keyword">NOT NULL UNIQUE</span>,
     name        <span class="class-name">VARCHAR</span>(255)    <span class="keyword">NOT NULL</span>,
     price       <span class="class-name">NUMERIC</span>(12, 2)  <span class="keyword">NOT NULL CHECK</span> (price >= 0),   <span class="comment">-- NUMERIC not FLOAT for money</span>
-    stock       <span class="class-name">INTEGER</span>         <span class="keyword">NOT NULL DEFAULT</span> 0 <span class="keyword">CHECK</span> (stock >= 0)
+    category    <span class="class-name">VARCHAR</span>(100)    <span class="keyword">NOT NULL</span>
+);
+
+<span class="comment">-- Stock belongs to inventory, not to the catalogue: a price change and a</span>
+<span class="comment">-- stock movement are different writes and should not lock the same row.</span>
+<span class="keyword">CREATE TABLE</span> stock_levels (
+    product_id  <span class="class-name">BIGINT</span>   <span class="keyword">PRIMARY KEY REFERENCES</span> products(id),
+    quantity    <span class="class-name">INTEGER</span>  <span class="keyword">NOT NULL CHECK</span> (quantity >= 0),
+    version     <span class="class-name">BIGINT</span>   <span class="keyword">NOT NULL DEFAULT</span> 0   <span class="comment">-- optimistic locking: see Transactions</span>
 );
 
 <span class="keyword">CREATE TABLE</span> orders (
     id          <span class="class-name">BIGINT</span>       <span class="keyword">PRIMARY KEY GENERATED ALWAYS AS IDENTITY</span>,
     customer_id <span class="class-name">BIGINT</span>       <span class="keyword">NOT NULL REFERENCES</span> customers(id),
     status      <span class="class-name">VARCHAR</span>(20)  <span class="keyword">NOT NULL DEFAULT</span> <span class="string">'PENDING'</span>
-                    <span class="keyword">CHECK</span> (status <span class="keyword">IN</span> (<span class="string">'PENDING'</span>, <span class="string">'PAID'</span>, <span class="string">'SHIPPED'</span>, <span class="string">'CANCELLED'</span>)),
-    created_at  <span class="class-name">TIMESTAMPTZ</span>  <span class="keyword">NOT NULL DEFAULT</span> <span class="function">NOW</span>()
+                    <span class="keyword">CHECK</span> (status <span class="keyword">IN</span> (<span class="string">'PENDING'</span>, <span class="string">'PAID'</span>, <span class="string">'SHIPPED'</span>,
+                                      <span class="string">'DELIVERED'</span>, <span class="string">'CANCELLED'</span>)),
+    total       <span class="class-name">NUMERIC</span>(12, 2) <span class="keyword">NOT NULL CHECK</span> (total >= 0),  <span class="comment">-- stored: what was charged, not recomputed</span>
+    placed_at   <span class="class-name">TIMESTAMPTZ</span>  <span class="keyword">NOT NULL DEFAULT</span> <span class="function">NOW</span>()
 );
 
 <span class="keyword">CREATE TABLE</span> order_items (
+    id          <span class="class-name">BIGINT</span>         <span class="keyword">PRIMARY KEY GENERATED ALWAYS AS IDENTITY</span>,
     order_id    <span class="class-name">BIGINT</span>         <span class="keyword">NOT NULL REFERENCES</span> orders(id) <span class="keyword">ON DELETE CASCADE</span>,
     product_id  <span class="class-name">BIGINT</span>         <span class="keyword">NOT NULL REFERENCES</span> products(id),
     quantity    <span class="class-name">INTEGER</span>        <span class="keyword">NOT NULL CHECK</span> (quantity > 0),
     unit_price  <span class="class-name">NUMERIC</span>(12, 2) <span class="keyword">NOT NULL CHECK</span> (unit_price >= 0),  <span class="comment">-- snapshot at purchase time</span>
-    <span class="keyword">PRIMARY KEY</span> (order_id, product_id)
+    <span class="keyword">UNIQUE</span> (order_id, product_id)   <span class="comment">-- one line per product; raise quantity instead</span>
 );
 
 <span class="comment">-- Indexes for the columns you'll filter and join on</span>
 <span class="keyword">CREATE INDEX</span> idx_orders_customer   <span class="keyword">ON</span> orders(customer_id);
 <span class="keyword">CREATE INDEX</span> idx_orders_status      <span class="keyword">ON</span> orders(status);
 <span class="keyword">CREATE INDEX</span> idx_order_items_product <span class="keyword">ON</span> order_items(product_id);</code></pre>
+                </figure>
 
                 <div class="info-box important">
                     <div class="info-box-title">Three DDL decisions that matter in production</div>
@@ -323,9 +337,9 @@ logging.level.org.hibernate.type.descriptor.sql=trace  <span class="comment"># s
 <span class="comment">-- 2. Wrap in a transaction</span>
 <span class="comment">-- 3. COMMIT only after verifying the result</span>
 <span class="keyword">BEGIN</span>;
-<span class="keyword">SELECT</span> <span class="function">COUNT</span>(*) <span class="keyword">FROM</span> orders <span class="keyword">WHERE</span> status = <span class="string">'CANCELLED'</span> <span class="keyword">AND</span> created_at < <span class="string">'2025-01-01'</span>;
+<span class="keyword">SELECT</span> <span class="function">COUNT</span>(*) <span class="keyword">FROM</span> orders <span class="keyword">WHERE</span> status = <span class="string">'CANCELLED'</span> <span class="keyword">AND</span> placed_at < <span class="string">'2025-01-01'</span>;
 <span class="comment">-- verify the number before proceeding</span>
-<span class="keyword">DELETE FROM</span> orders <span class="keyword">WHERE</span> status = <span class="string">'CANCELLED'</span> <span class="keyword">AND</span> created_at < <span class="string">'2025-01-01'</span>;
+<span class="keyword">DELETE FROM</span> orders <span class="keyword">WHERE</span> status = <span class="string">'CANCELLED'</span> <span class="keyword">AND</span> placed_at < <span class="string">'2025-01-01'</span>;
 <span class="keyword">ROLLBACK</span>;  <span class="comment">-- or COMMIT once you're sure</span>
 
 <span class="comment">-- Soft delete: preserve history, filter instead of delete</span>
@@ -421,7 +435,7 @@ logging.level.org.hibernate.type.descriptor.sql=trace  <span class="comment"># s
     c.email,
     <span class="function">COUNT</span>(o.id)                                      <span class="keyword">AS</span> order_count,
     <span class="function">SUM</span>(oi.quantity * oi.unit_price)                  <span class="keyword">AS</span> lifetime_value,
-    <span class="function">MAX</span>(o.created_at)                                 <span class="keyword">AS</span> last_order_date
+    <span class="function">MAX</span>(o.placed_at)                                 <span class="keyword">AS</span> last_order_date
 <span class="keyword">FROM</span> customers c
 <span class="keyword">JOIN</span> orders o      <span class="keyword">ON</span> o.customer_id = c.id
 <span class="keyword">JOIN</span> order_items oi <span class="keyword">ON</span> oi.order_id = o.id
@@ -523,12 +537,12 @@ ranked <span class="keyword">AS</span> (
 
 <span class="comment">-- Composite: useful when you always filter on both columns together.</span>
 <span class="comment">-- Column order matters: put the most selective column first.</span>
-<span class="keyword">CREATE INDEX</span> idx_orders_status_created <span class="keyword">ON</span> orders(status, created_at);
-<span class="comment">-- This serves: WHERE status = 'PAID' AND created_at > '...'</span>
-<span class="comment">-- But NOT: WHERE created_at > '...' alone (leading column must appear)</span>
+<span class="keyword">CREATE INDEX</span> idx_orders_status_placed <span class="keyword">ON</span> orders(status, placed_at);
+<span class="comment">-- This serves: WHERE status = 'PAID' AND placed_at > '...'</span>
+<span class="comment">-- But NOT: WHERE placed_at > '...' alone (leading column must appear)</span>
 
 <span class="comment">-- Partial index: only index the rows you actually query</span>
-<span class="keyword">CREATE INDEX</span> idx_orders_pending <span class="keyword">ON</span> orders(created_at)
+<span class="keyword">CREATE INDEX</span> idx_orders_pending <span class="keyword">ON</span> orders(placed_at)
     <span class="keyword">WHERE</span> status = <span class="string">'PENDING'</span>;
 <span class="comment">-- Smaller, faster than a full index if PENDING is a tiny fraction of all orders</span></code></pre>
 
@@ -574,8 +588,9 @@ ranked <span class="keyword">AS</span> (
                     happens when user-supplied input is concatenated directly into a
                     SQL string, allowing the input to change the structure of the query.</p>
 
-                <pre><code><span class="comment">// VULNERABLE — string concatenation with user input</span>
-<span class="class-name">String</span> email = request.getParameter(<span class="string">"email"</span>);
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">string concatenation with user input</span></figcaption>
+                    <pre><code><span class="class-name">String</span> email = request.getParameter(<span class="string">"email"</span>);
 <span class="class-name">String</span> sql = <span class="string">"SELECT * FROM customers WHERE email = '"</span> + email + <span class="string">"'"</span>;
 
 <span class="comment">// If email = "' OR '1'='1", the query becomes:</span>
@@ -583,10 +598,16 @@ ranked <span class="keyword">AS</span> (
 <span class="comment">// This returns every row in the table.</span>
 
 <span class="comment">// If email = "'; DROP TABLE customers; --", the query becomes two statements.</span>
-<span class="comment">// The database executes both. Your table is gone.</span></code></pre>
+<span class="comment">// The database executes both. Your table is gone.</span>
 
-                <pre><code><span class="comment">// CORRECT — parameterized query (PreparedStatement)</span>
-<span class="comment">// The ? is a placeholder. The value is sent separately from the SQL structure.</span>
+<span class="comment">// JPA does not save you from it: concatenated JPQL is injectable too.</span>
+<span class="class-name">String</span> jpql = <span class="string">"FROM Customer WHERE email = '"</span> + email + <span class="string">"'"</span>;
+em.createQuery(jpql);</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">bound parameters</span></figcaption>
+                    <pre><code><span class="comment">// The ? is a placeholder. The value is sent separately from the SQL structure.</span>
 <span class="comment">// No matter what the user types, it can never change the structure of the query.</span>
 <span class="class-name">String</span> sql = <span class="string">"SELECT id, email FROM customers WHERE email = ?"</span>;
 <span class="keyword">try</span> (<span class="class-name">PreparedStatement</span> ps = conn.prepareStatement(sql)) {
@@ -594,14 +615,10 @@ ranked <span class="keyword">AS</span> (
     <span class="class-name">ResultSet</span> rs = ps.executeQuery();
 }
 
-<span class="comment">// JPA / Spring Data protects you automatically when you use parameters:</span>
-<span class="comment">// SAFE — parameter binding</span>
+<span class="comment">// JPA / Spring Data binds named parameters the same way:</span>
 <span class="annotation">@Query</span>(<span class="string">"SELECT c FROM Customer c WHERE c.email = :email"</span>)
-<span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmail</span>(<span class="annotation">@Param</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email);
-
-<span class="comment">// DANGEROUS even with JPA — never concatenate into JPQL</span>
-<span class="class-name">String</span> jpql = <span class="string">"FROM Customer WHERE email = '"</span> + email + <span class="string">"'"</span>;  <span class="comment">// ✗</span>
-em.createQuery(jpql);</code></pre>
+<span class="class-name">Optional</span>&lt;<span class="class-name">Customer</span>&gt; <span class="function">findByEmail</span>(<span class="annotation">@Param</span>(<span class="string">"email"</span>) <span class="class-name">String</span> email);</code></pre>
+                </figure>
 
                 <div class="info-box important">
                     <div class="info-box-title">Parameterization is not optional — it's a baseline requirement</div>
@@ -685,17 +702,17 @@ em.createQuery(jpql);</code></pre>
                 <div class="info-box important">
                     <div class="info-box-title">🔥 Senior level</div>
                     <details class="qa">
-                        <summary>A query on <code>orders</code> filtering by <code>status</code> and <code>created_at</code> is slow. There's already an index on <code>status</code>. You add an index on <code>created_at</code>. The query is still slow. What do you check next?</summary>
+                        <summary>A query on <code>orders</code> filtering by <code>status</code> and <code>placed_at</code> is slow. There's already an index on <code>status</code>. You add an index on <code>placed_at</code>. The query is still slow. What do you check next?</summary>
                         <p>Run <code>EXPLAIN ANALYZE</code> on the query and look at which index
                     (if any) is being used. Two separate single-column indexes on
-                    <code>status</code> and <code>created_at</code> are not automatically
+                    <code>status</code> and <code>placed_at</code> are not automatically
                     combined — the optimizer must choose one and filter the other in
                     memory, or perform a bitmap index scan that's slower than a composite.
-                    A composite index on <code>(status, created_at)</code> serves a query
+                    A composite index on <code>(status, placed_at)</code> serves a query
                     that filters on both in a single scan. The column order matters: the
                     most selective column (or the one used for equality, not range) should
                     go first. If the optimizer still isn't using the index, check for a
-                    function applied to the column (<code>DATE(created_at)</code>), an
+                    function applied to the column (<code>DATE(placed_at)</code>), an
                     implicit type mismatch, or table statistics that are out of date
                     and causing the planner to underestimate selectivity.</p>
                     </details>
@@ -747,6 +764,7 @@ em.createQuery(jpql);</code></pre>
                     <a href="orms.html" class="related-link"><span class="related-icon">🗃️</span>ORMs</a>
                     <a href="relationships.html" class="related-link"><span class="related-icon">🔗</span>Entity Relationships</a>
                     <a href="transactions.html" class="related-link"><span class="related-icon">🔄</span>Transactions (ACID)</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
