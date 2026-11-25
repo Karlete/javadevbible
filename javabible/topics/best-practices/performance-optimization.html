@@ -118,6 +118,26 @@
                     <li>Optimize the critical path specifically</li>
                     <li>Measure again to confirm the change actually helped</li>
                 </ol>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderHistoryService.java — optimized by intuition</span></figcaption>
+                    <pre><code><span class="comment">// "Streams are slow", so the total was rewritten as an index loop.
+// Gain: a fraction of a millisecond. The endpoint still takes ~1.8 s,
+// because the time was never spent here.</span>
+<span class="class-name">BigDecimal</span> total = <span class="class-name">BigDecimal</span>.ZERO;
+<span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; items.size(); i++) {
+    total = total.add(items.get(i).lineTotal());
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderRepository.java — optimized after measuring</span></figcaption>
+                    <pre><code><span class="comment">// Measured first: the SQL log showed 101 queries per request, one for the
+// orders and one per order for its items (N+1). One fetch join replaces
+// them, and the response time drops by an order of magnitude.</span>
+<span class="annotation">@Query</span>(<span class="string">"SELECT DISTINCT o FROM Order o JOIN FETCH o.items WHERE o.customer.id = :customerId"</span>)
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt; <span class="function">findWithItemsByCustomerId</span>(<span class="class-name">Long</span> customerId);</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -656,6 +676,7 @@ orderRepository.saveAll(orders);</code></pre>
                     <a href="../advanced/garbage-collection.html" class="related-link"><span class="related-icon">🗑️</span>Garbage Collection</a>
                     <a href="../advanced/thread-pools.html" class="related-link"><span class="related-icon">🧵</span>Thread Pools &amp; ExecutorService</a>
                     <a href="../fundamentals/collections.html" class="related-link"><span class="related-icon">📚</span>Collections Framework</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

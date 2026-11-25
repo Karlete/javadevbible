@@ -112,6 +112,27 @@
                     <a href="../security/oauth.html">OAuth 2.0</a>) — where this
                     page touches those topics, it links out rather than repeating
                     them.</p>
+
+                <p>Most of the practices here come down to one rule: data from outside is
+                    never code. The classic violation:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">catalog/ProductSearch.java</span></figcaption>
+                    <pre><code><span class="comment">// The search term becomes part of the SQL. term = "x' OR '1'='1" returns
+// every product; a crafted UNION reads other tables.</span>
+<span class="class-name">String</span> sql = <span class="string">"SELECT id, sku, name, price FROM products WHERE name LIKE '%"</span> + term + <span class="string">"%'"</span>;
+<span class="keyword">return</span> jdbcTemplate.query(sql, productMapper);</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">catalog/ProductSearch.java</span></figcaption>
+                    <pre><code><span class="comment">// The SQL is fixed; the term travels separately as a bind parameter and
+// can only ever be compared as text, never executed.</span>
+<span class="keyword">return</span> jdbcClient.sql(<span class="string">"SELECT id, sku, name, price FROM products WHERE name ILIKE :pattern"</span>)
+        .param(<span class="string">"pattern"</span>, <span class="string">"%"</span> + term + <span class="string">"%"</span>)
+        .query(<span class="class-name">ProductSummary</span>.<span class="keyword">class</span>)
+        .list();</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -659,6 +680,7 @@ log.info(<span class="string">"Customer {} logged in"</span>, username);
                     <a href="../security/password-hashing.html" class="related-link"><span class="related-icon">🔒</span>Password Hashing</a>
                     <a href="../spring/security.html" class="related-link"><span class="related-icon">🍃</span>Spring Security</a>
                     <a href="error-handling-patterns.html" class="related-link"><span class="related-icon">⚠️</span>Error Handling Patterns</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

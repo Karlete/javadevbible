@@ -107,6 +107,32 @@
                     rules, but five different failure modes a codebase actually
                     runs into.</p>
 
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderService.java — one class, every reason to change</span></figcaption>
+                    <pre><code><span class="comment">// Pricing, persistence and e-mail in one method. Changing the e-mail
+// provider, the discount rules or the database all edit this class, and
+// testing the discount means standing up a database and an SMTP server.</span>
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">place</span>(<span class="class-name">Cart</span> cart) {
+    <span class="class-name">BigDecimal</span> total = ...;                                   <span class="comment">// pricing rules inline</span>
+    jdbc.update(<span class="string">"INSERT INTO orders ..."</span>, cart.customerId(), total); <span class="comment">// SQL inline</span>
+    <span class="keyword">new</span> <span class="class-name">SmtpClient</span>(<span class="string">"smtp.example.com"</span>).send(...);        <span class="comment">// e-mail inline</span>
+    <span class="keyword">return</span> ...;
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderService.java — one job, collaborators behind interfaces</span></figcaption>
+                    <pre><code><span class="comment">// OrderService coordinates; each rule lives behind an interface it
+// depends on (S, D). A new notification channel is a new implementation,
+// not an edit here (O). A test passes in fakes through the constructor.</span>
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">place</span>(<span class="class-name">Cart</span> cart) {
+    <span class="class-name">Order</span> order = pricing.price(cart);   <span class="comment">// PricingPolicy</span>
+    orders.save(order);                  <span class="comment">// OrderRepository</span>
+    notifier.orderPlaced(order);         <span class="comment">// OrderNotifier</span>
+    <span class="keyword">return</span> order;
+}</code></pre>
+                </figure>
+
                 <div class="info-box note">
                     <div class="info-box-title">The Five Principles</div>
                     <ul>
@@ -618,6 +644,7 @@
                     <a href="../advanced/design-patterns.html" class="related-link"><span class="related-icon">🧩</span>Design Patterns</a>
                     <a href="../fundamentals/interfaces-abstract.html" class="related-link"><span class="related-icon">🔌</span>Interfaces vs Abstract Classes</a>
                     <a href="../spring/core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
