@@ -110,23 +110,29 @@
                     container (covered on the previous two pages) knows how to unpack and
                     deploy as a running web application.</p>
 
-                <pre><code><span class="comment">// BEFORE — deploying an application as loose files</span>
-<span class="comment">$ scp -r target/classes/ user@server:/opt/myapp/
-$ scp -r target/dependency/ user@server:/opt/myapp/lib/
-$ ssh user@server "cd /opt/myapp && java -cp classes:lib/* com.shop.Main"</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">deploy by copying files</span></figcaption>
+                    <pre><code><span class="comment">// Deploying an application as loose files</span>
+<span class="comment">$ scp -r target/classes/ user@server:/opt/shop/
+$ scp -r target/dependency/ user@server:/opt/shop/lib/
+$ ssh user@server "cd /opt/shop && java -cp classes:lib/* com.javadevbible.shop.ShopApplication"</span>
 <span class="comment">// Every file transferred individually, no single artifact to version, no
-// manifest describing what this even is or how to run it correctly</span>
+// manifest describing what this even is or how to run it correctly</span></code></pre>
+                </figure>
 
-<span class="comment">// AFTER — one artifact, self-describing, single command to run</span>
-<span class="comment">$ scp target/myapp.jar user@server:/opt/myapp/
-$ ssh user@server "java -jar /opt/myapp/myapp.jar"</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">deploy one artifact</span></figcaption>
+                    <pre><code><span class="comment">// One artifact, self-describing, single command to run</span>
+<span class="comment">$ scp target/shop.jar user@server:/opt/shop/
+$ ssh user@server "java -jar /opt/shop/shop.jar"</span>
 <span class="comment">// One file. The manifest inside it already declares the entry point —
 // java -jar reads META-INF/MANIFEST.MF to find Main-Class automatically.</span></code></pre>
+                </figure>
 
                 <pre><code><span class="comment"># A JAR/WAR is a real ZIP file underneath — this always works:</span>
-unzip myapp.jar -d extracted/
-jar -tf myapp.jar        <span class="comment"># list contents</span>
-jar -xf myapp.jar        <span class="comment"># extract contents</span></code></pre>
+unzip shop.jar -d extracted/
+jar -tf shop.jar        <span class="comment"># list contents</span>
+jar -xf shop.jar        <span class="comment"># extract contents</span></code></pre>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -134,7 +140,7 @@ jar -xf myapp.jar        <span class="comment"># extract contents</span></code><
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>JAR Files — Structure and the Manifest</h2>
-                <pre><code>myapp.jar
+                <pre><code>shop.jar
 ├── <span class="keyword">META-INF/</span>
 │   └── MANIFEST.MF          <span class="comment"># metadata: entry point, classpath, version</span>
 ├── <span class="keyword">com/shop/</span>
@@ -146,7 +152,7 @@ jar -xf myapp.jar        <span class="comment"># extract contents</span></code><
 
                 <pre><code><span class="comment"># META-INF/MANIFEST.MF</span>
 Manifest-Version: 1.0
-Main-Class: com.shop.Main
+Main-Class: com.javadevbible.shop.Main
 Class-Path: lib/gson-2.9.0.jar lib/commons-lang3-3.12.0.jar
 Implementation-Title: Shop Catalog Service
 Implementation-Version: 1.0.0</code></pre>
@@ -217,7 +223,7 @@ Implementation-Version: 1.0.0</code></pre>
 &lt;/plugin&gt;
 
 <span class="comment">// The resulting structure is deliberately NOT flattened:</span>
-myapp.jar
+shop.jar
 ├── <span class="keyword">org/springframework/boot/loader/</span>   <span class="comment"># Spring Boot's own bootstrap classloader</span>
 ├── <span class="keyword">BOOT-INF/classes/</span>                  <span class="comment"># YOUR compiled classes, untouched</span>
 └── <span class="keyword">BOOT-INF/lib/</span>                      <span class="comment"># every dependency, as WHOLE, UNMODIFIED jars</span>
@@ -319,7 +325,7 @@ http://localhost:8080/mywebapp/WEB-INF/classes/  ✗ 404
 
                 <h3>JAR — the default, recommended path</h3>
                 <pre><code>&lt;packaging&gt;jar&lt;/packaging&gt;
-<span class="comment"># java -jar myapp-1.0.0.jar — embedded Tomcat included, no external
+<span class="comment"># java -jar shop-1.0.0.jar — embedded Tomcat included, no external
 # container to install or configure, natural fit for a Docker image</span></code></pre>
 
                 <h3>WAR — only when an external container is a hard requirement</h3>
@@ -433,17 +439,17 @@ java -Djarmode=tools -jar shop.jar extract --layers --destination extracted
                 <h2>Common Issues</h2>
 
                 <h3>"no main manifest attribute"</h3>
-                <pre><code><span class="comment">$ java -jar myapp.jar
-no main manifest attribute, in myapp.jar</span>
+                <pre><code><span class="comment">$ java -jar shop.jar
+no main manifest attribute, in shop.jar</span>
 
 <span class="comment">// Cause: the manifest has no Main-Class entry. Fix in pom.xml:</span>
 &lt;manifest&gt;
-    &lt;mainClass&gt;com.shop.Main&lt;/mainClass&gt;
+    &lt;mainClass&gt;com.javadevbible.shop.Main&lt;/mainClass&gt;
 &lt;/manifest&gt;</code></pre>
 
                 <h3><code>ClassNotFoundException</code> in what should be a fat JAR</h3>
                 <pre><code><span class="comment"># Verify what actually got bundled:</span>
-jar -tf myapp.jar | grep gson
+jar -tf shop.jar | grep gson
 <span class="comment"># Nothing printed → dependencies were never included. Check that the
 # repackage/shade execution actually ran during the build (mvn package,
 # not mvn compile), and that the plugin is bound to the "package" phase.</span></code></pre>
@@ -581,6 +587,7 @@ jar -tf myapp.jar | grep gson
                     <a href="tomcat.html" class="related-link"><span class="related-icon">🐱</span>Tomcat Overview</a>
                     <a href="web-xml.html" class="related-link"><span class="related-icon">📄</span>Deployment Descriptors</a>
                     <a href="context.html" class="related-link"><span class="related-icon">🚀</span>Context &amp; Deployment</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

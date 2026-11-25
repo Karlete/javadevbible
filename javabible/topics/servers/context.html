@@ -111,27 +111,33 @@
                     application's, and nothing manages its start/stop lifecycle
                     independently of the rest of the server.</p>
 
-                <pre><code><span class="comment">// BEFORE deployment — compiled classes and a WAR file, addressable by nothing</span>
-target/myapp.war
-<span class="comment">// This file has no URL, no running classloader, no lifecycle. It's inert.</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">target/ — before deployment</span></figcaption>
+                    <pre><code><span class="comment">// Compiled classes and a WAR file, addressable by nothing</span>
+target/shop.war
+<span class="comment">// This file has no URL, no running classloader, no lifecycle. It's inert.</span></code></pre>
+                </figure>
 
-<span class="comment">// AFTER deployment — the container creates a Context from it</span>
-<span class="comment">$ cp target/myapp.war /opt/tomcat/webapps/</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">Tomcat — after deployment</span></figcaption>
+                    <pre><code><span class="comment">// The container creates a Context from it</span>
+<span class="comment">$ cp target/shop.war /opt/tomcat/webapps/</span>
 <span class="comment">// The container now maintains, for this one application specifically:
-//   - a context path:      /myapp
+//   - a context path:      /shop
 //   - an isolated classloader: WEB-INF/classes and WEB-INF/lib resolve
 //     here first, independent of any other deployed application
 //   - a live ServletContext object your code can query at runtime
 //   - a start/stop/reload lifecycle independent of every other Context
-// http://localhost:8080/myapp/products/list is now a real, addressable request</span></code></pre>
+// http://localhost:8080/shop/products/list is now a real, addressable request</span></code></pre>
+                </figure>
 
                 <h3>Reading the context path out of a URL</h3>
-                <pre><code>http://localhost:8080/myapp/products/list
+                <pre><code>http://localhost:8080/shop/products/list
                        └────┬────┘└──┬──┘└──────┬──────┘
                         Host:Port  Context    Path within
                                     Path      the application
 
-<span class="comment"># myapp.war → context path /myapp (the WAR's filename determines this by default)</span></code></pre>
+<span class="comment"># shop.war → context path /shop (the WAR's filename determines this by default)</span></code></pre>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -171,11 +177,11 @@ target/myapp.war
                 <h2>Deployment Methods</h2>
 
                 <h3>WAR drop (most common for a single standalone instance)</h3>
-                <pre><code>cp myapp.war <span class="string">$CATALINA_HOME</span>/webapps/
-<span class="comment"># Detected, extracted to webapps/myapp/, deployed, live at /myapp</span></code></pre>
+                <pre><code>cp shop.war <span class="string">$CATALINA_HOME</span>/webapps/
+<span class="comment"># Detected, extracted to webapps/shop/, deployed, live at /shop</span></code></pre>
 
                 <h3>Exploded directory (development convenience)</h3>
-                <pre><code>webapps/myapp/
+                <pre><code>webapps/shop/
 ├── WEB-INF/{web.xml, classes/, lib/}
 ├── index.html
 └── css/
@@ -183,8 +189,8 @@ target/myapp.war
 # not a pattern to rely on for any real deployment</span></code></pre>
 
                 <h3>Context XML file (per-application configuration, outside <code>web.xml</code>)</h3>
-                <pre><code><span class="comment">&lt;!-- $CATALINA_HOME/conf/Catalina/localhost/myapp.xml --&gt;</span>
-&lt;<span class="keyword">Context</span> docBase=<span class="string">"/path/to/myapp.war"</span> reloadable=<span class="string">"false"</span>&gt;
+                <pre><code><span class="comment">&lt;!-- $CATALINA_HOME/conf/Catalina/localhost/shop.xml --&gt;</span>
+&lt;<span class="keyword">Context</span> docBase=<span class="string">"/path/to/shop.war"</span> reloadable=<span class="string">"false"</span>&gt;
     &lt;<span class="keyword">Resource</span> name=<span class="string">"jdbc/shopDB"</span> auth=<span class="string">"Container"</span> type=<span class="string">"javax.sql.DataSource"</span>
               driverClassName=<span class="string">"org.postgresql.Driver"</span>
               url=<span class="string">"jdbc:postgresql://db.internal:5432/shop"</span>
@@ -197,8 +203,8 @@ target/myapp.war
                 <pre><code><span class="comment"># http://localhost:8080/manager/html — GUI deployment
 # Or the text interface, scriptable from CI:</span>
 curl -u deploy-bot:<span class="string">${MANAGER_PASSWORD}</span> \
-     -T myapp.war \
-     <span class="string">"http://localhost:8080/manager/text/deploy?path=/myapp&amp;update=true"</span>
+     -T shop.war \
+     <span class="string">"http://localhost:8080/manager/text/deploy?path=/shop&amp;update=true"</span>
 <span class="comment"># Credential hardening for this account is covered on Tomcat Overview —
 # narrow role, digest-hashed password, IP-restricted access</span></code></pre>
 
@@ -266,14 +272,14 @@ curl -u deploy-bot:<span class="string">${MANAGER_PASSWORD}</span> \
                 <h2>Production Deployment Strategies</h2>
 
                 <h3>Stop → deploy → start (simple, brief downtime)</h3>
-                <pre><code>curl <span class="string">"http://localhost:8080/manager/text/stop?path=/myapp"</span>
-curl -T myapp.war <span class="string">"http://localhost:8080/manager/text/deploy?path=/myapp&amp;update=true"</span>
-curl <span class="string">"http://localhost:8080/manager/text/start?path=/myapp"</span></code></pre>
+                <pre><code>curl <span class="string">"http://localhost:8080/manager/text/stop?path=/shop"</span>
+curl -T shop.war <span class="string">"http://localhost:8080/manager/text/deploy?path=/shop&amp;update=true"</span>
+curl <span class="string">"http://localhost:8080/manager/text/start?path=/shop"</span></code></pre>
 
                 <h3>Parallel deployment (zero downtime, Tomcat-specific)</h3>
                 <pre><code><span class="comment"># Version-in-filename: appname##version.war
-myapp##001.war   → the currently active version
-myapp##002.war   → the new version, deployed alongside it
+shop##001.war   → the currently active version
+shop##002.war   → the new version, deployed alongside it
 
 # Existing sessions continue on their original version; new sessions go to
 # the newest one; the old version undeploys automatically once its last
@@ -433,7 +439,7 @@ server:
                     <details class="qa">
                         <summary>How does a WAR's filename determine its context path?</summary>
                         <p>By default, the filename (minus the <code>.war</code> extension) becomes
-                    the context path. <code>myapp.war</code> deploys at <code>/myapp</code>;
+                    the context path. <code>shop.war</code> deploys at <code>/shop</code>;
                     <code>ROOT.war</code> deploys at the root path <code>/</code>.</p>
                     </details>
 
@@ -468,7 +474,7 @@ server:
                     </details>
 
                     <details class="qa">
-                        <summary>Why does parallel deployment (<code>myapp##001.war</code> / <code>myapp##002.war</code>) achieve zero downtime without a load balancer, while blue-green deployment requires one?</summary>
+                        <summary>Why does parallel deployment (<code>shop##001.war</code> / <code>shop##002.war</code>) achieve zero downtime without a load balancer, while blue-green deployment requires one?</summary>
                         <p>Parallel deployment relies on the Context mechanism directly: Tomcat
                     treats each version suffix as a distinct Context sharing the same
                     context path, routing existing sessions to whichever version they
@@ -509,6 +515,7 @@ server:
                     <a href="tomcat.html" class="related-link"><span class="related-icon">🐱</span>Tomcat Overview</a>
                     <a href="war-jar.html" class="related-link"><span class="related-icon">🗜️</span>WAR vs JAR Files</a>
                     <a href="web-xml.html" class="related-link"><span class="related-icon">📄</span>Deployment Descriptors</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
