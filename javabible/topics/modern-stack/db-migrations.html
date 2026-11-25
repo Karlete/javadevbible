@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Migrations with Flyway in Spring Boot - JavaDev Bible</title>
+    <meta name="description" content="Versioned database migrations for Spring Boot with Flyway: naming, the history table, expand and contract for zero-downtime changes, and Liquibase.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/db-migrations.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Database Migrations with Flyway in Spring Boot">
+    <meta property="og:description" content="Versioned database migrations for Spring Boot with Flyway: naming, the history table, expand and contract for zero-downtime changes, and Liquibase.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/db-migrations.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Database Migrations: Flyway and Liquibase",
+              "name": "Database Migrations with Flyway in Spring Boot",
+              "description": "Versioned database migrations for Spring Boot with Flyway: naming, the history table, expand and contract for zero-downtime changes, and Liquibase.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/db-migrations.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Database Migrations: Flyway and Liquibase",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/db-migrations.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Database Migrations
+            </nav>
+            <h1>Database Migrations: Flyway and Liquibase</h1>
+            <p class="topic-subtitle">The shop's schema as versioned SQL files in Git, applied in order on every environment — and how to change a table that production is reading and writing while three Pods of two different versions run against it</p>
+            <p class="reviewed-stamp">Checked against Spring Boot 4.2 · Flyway 12 · PostgreSQL 19 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What a Database Migration Is — and Why Hibernate Shouldn't Write Your Schema</h2>
+                <p>A <strong>migration</strong> is one versioned change to the database schema — a
+                    new table, a new column, an index — stored as a file in the codebase. A
+                    migration tool such as <strong>Flyway</strong> applies the files in version
+                    order and records which ones each database has already run, so every
+                    environment, from a developer's laptop to production, reaches the same schema
+                    by the same steps.</p>
+
+                <p>The problem it replaces is schema drift: SQL scripts run by hand and forgotten
+                    on one environment, or Hibernate creating and altering tables on startup. The
+                    latter looks convenient and is how many projects start.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">resources/application.yaml — Hibernate owns the schema</span></figcaption>
+                    <pre><code><span class="attribute">spring</span>:
+  <span class="attribute">jpa</span>:
+    <span class="attribute">hibernate</span>:
+      <span class="attribute">ddl-auto</span>: update   <span class="comment"># "keep the tables in line with the entities"</span>
+<span class="comment"># It adds columns but never drops or renames them, so a renamed field leaves
+# the old column behind with NOT NULL and inserts start failing. It cannot
+# migrate data, there is no record of what changed when, and two Pods
+# starting at once both try to ALTER the same table.</span></code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">resources/db/migration/ + application.yaml</span></figcaption>
+                    <pre><code>db/migration/
+├── V1__create_customers_and_products.sql
+├── V2__create_orders_and_order_items.sql
+├── V3__create_stock_levels.sql
+└── V4__add_placed_at_to_orders.sql      <span class="comment"># reviewed, versioned, applied once per database</span>
+
+<span class="attribute">spring</span>:
+  <span class="attribute">jpa</span>:
+    <span class="attribute">hibernate</span>:
+      <span class="attribute">ddl-auto</span>: validate   <span class="comment"># Hibernate only checks the schema matches the entities</span></code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — HOW FLYWAY WORKS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>How Flyway Works</h2>
+                <p>On startup, before JPA initialises, Spring Boot runs Flyway against the
+                    application's <code>DataSource</code>. Flyway reads the
+                    <code>flyway_schema_history</code> table, compares it with the files in
+                    <code>classpath:db/migration</code>, and applies the missing ones in version
+                    order — each in its own transaction on PostgreSQL, so a failing migration leaves
+                    no half-applied change.</p>
+
+                <table>
+                    <tr><th>File</th><th>Meaning</th></tr>
+                    <tr class="row-highlight"><td><code>V3__create_stock_levels.sql</code></td><td>Versioned: runs exactly once, in version order. Never edited after it has run anywhere</td></tr>
+                    <tr><td><code>V3_1__backfill_stock_levels.sql</code></td><td>Versions can have parts: 3.1 runs after 3 and before 4</td></tr>
+                    <tr><td><code>R__order_summary_view.sql</code></td><td>Repeatable: re-runs whenever its content changes — for views and functions that are replaced as a whole</td></tr>
+                </table>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">An applied migration is immutable</div>
+                    <p>Flyway stores a checksum of every migration it ran. Edit
+                        <code>V3__create_stock_levels.sql</code> after it reached any shared
+                        environment and the next startup fails validation, because that database
+                        was built from the old version. A mistake in an applied migration is fixed
+                        by a new migration, <code>V5__fix_stock_levels_default.sql</code>.</p>
+                </div>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- Spring Boot 4 has a dedicated starter; Flyway 10+ ships database support as
+     separate modules, so PostgreSQL needs its own. Versions come from Boot. --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-flyway&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.flywaydb&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;flyway-database-postgresql&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — THE SHOP'S MIGRATIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>The Shop's Schema as Migrations</h2>
+                <p>Migrations are plain SQL for the database you run, which means they can use
+                    everything PostgreSQL offers — constraints, partial indexes,
+                    <code>CHECK</code>s — that an ORM-generated schema leaves out.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">db/migration/V2__create_orders_and_order_items.sql</span></figcaption>
+                    <pre><code><span class="keyword">CREATE TABLE</span> orders (
+    id           <span class="keyword">BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY</span>,
+    customer_id  <span class="keyword">BIGINT NOT NULL REFERENCES</span> customers (id),
+    status       <span class="keyword">VARCHAR</span>(<span class="number">20</span>) <span class="keyword">NOT NULL CHECK</span> (status <span class="keyword">IN</span> (<span class="string">'PENDING'</span>, <span class="string">'PAID'</span>, <span class="string">'SHIPPED'</span>, <span class="string">'DELIVERED'</span>, <span class="string">'CANCELLED'</span>)),
+    total        <span class="keyword">NUMERIC</span>(<span class="number">12</span>, <span class="number">2</span>) <span class="keyword">NOT NULL</span>
+);
+
+<span class="keyword">CREATE TABLE</span> order_items (
+    id          <span class="keyword">BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY</span>,
+    order_id    <span class="keyword">BIGINT NOT NULL REFERENCES</span> orders (id),
+    product_id  <span class="keyword">BIGINT NOT NULL REFERENCES</span> products (id),
+    quantity    <span class="keyword">INT NOT NULL CHECK</span> (quantity &gt; <span class="number">0</span>),
+    unit_price  <span class="keyword">NUMERIC</span>(<span class="number">12</span>, <span class="number">2</span>) <span class="keyword">NOT NULL</span>,
+    <span class="keyword">UNIQUE</span> (order_id, product_id)
+);
+
+<span class="comment">-- Foreign keys are not indexed automatically in PostgreSQL</span>
+<span class="keyword">CREATE INDEX</span> idx_orders_customer <span class="keyword">ON</span> orders (customer_id);</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — ZERO-DOWNTIME CHANGES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Changing the Schema Without Downtime: Expand and Contract</h2>
+                <p>During a <a href="kubernetes.html">rolling update</a> the old and the new version
+                    of the shop run at the same time against the same database. The migration runs
+                    when the first new Pod starts, so for several minutes the <em>old</em> code is
+                    using the <em>new</em> schema. Every migration therefore has to be compatible
+                    with the version before it — which rules out renaming or dropping anything the
+                    old code still uses.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">V5__rename_total.sql — one step</span></figcaption>
+                    <pre><code><span class="comment">-- The new Pods expect total_amount; the old Pods, still serving traffic for
+-- the rest of the rollout, select total — and every checkout on them fails.</span>
+<span class="keyword">ALTER TABLE</span> orders <span class="keyword">RENAME COLUMN</span> total <span class="keyword">TO</span> total_amount;</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">expand, migrate, contract — over three releases</span></figcaption>
+                    <pre><code><span class="comment">-- Release 1 (expand): add the new column; the code writes both, reads the old</span>
+<span class="keyword">ALTER TABLE</span> orders <span class="keyword">ADD COLUMN</span> total_amount <span class="keyword">NUMERIC</span>(<span class="number">12</span>, <span class="number">2</span>);
+
+<span class="comment">-- Release 2 (migrate): backfill, then the code reads the new column</span>
+<span class="keyword">UPDATE</span> orders <span class="keyword">SET</span> total_amount = total <span class="keyword">WHERE</span> total_amount <span class="keyword">IS NULL</span>;
+<span class="keyword">ALTER TABLE</span> orders <span class="keyword">ALTER COLUMN</span> total_amount <span class="keyword">SET NOT NULL</span>;
+
+<span class="comment">-- Release 3 (contract): no running version uses the old column any more</span>
+<span class="keyword">ALTER TABLE</span> orders <span class="keyword">DROP COLUMN</span> total;</code></pre>
+                </figure>
+
+                <div class="info-box note">
+                    <div class="info-box-title">Watch the locks, not only the syntax</div>
+                    <p>Some statements lock the whole table while they run. On a large
+                        <code>orders</code> table, a plain <code>CREATE INDEX</code> blocks writes —
+                        checkout — until it finishes; <code>CREATE INDEX CONCURRENTLY</code> does not,
+                        but cannot run inside a transaction, so that migration has to be configured
+                        to run outside one. Backfilling millions of rows in one
+                        <code>UPDATE</code> holds locks and bloats the table; do it in batches. The
+                        <a href="../databases/sql.html">SQL page</a> covers which DDL is safe
+                        online.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — WHERE MIGRATIONS RUN
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Where Migrations Run in Production</h2>
+                <table>
+                    <tr><th>Approach</th><th>How</th><th>Trade-off</th></tr>
+                    <tr><td>On application startup</td><td>Spring Boot's default</td><td>Simplest; Flyway takes a database lock so replicas starting together apply each migration once. A long migration delays startup — give the startup probe enough time</td></tr>
+                    <tr class="row-highlight"><td>As a separate step</td><td>A Kubernetes Job or a CI step runs the migrations, then the rollout starts; the app sets <code>spring.flyway.enabled=false</code></td><td>Migrations run once, with their own timeout and logs, and a failure stops the deployment before any Pod changes</td></tr>
+                </table>
+                <p>Either way, the database user the application runs with in production does not
+                    need permission to create or drop tables if a separate, more privileged user
+                    applies the migrations.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — TESTING AND LIQUIBASE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Testing Migrations, and Where Liquibase Fits</h2>
+                <p>Run the real migrations in tests, against the real database engine. With
+                    <a href="testcontainers.html">Testcontainers</a> every integration test starts
+                    from an empty PostgreSQL and applies <code>V1</code> to the latest — the same
+                    path a new environment takes — and <code>ddl-auto: validate</code> fails the test
+                    if an entity and the schema disagree.</p>
+
+                <table>
+                    <tr><th></th><th>Flyway</th><th>Liquibase</th></tr>
+                    <tr><td>Migration format</td><td>Plain SQL (or Java)</td><td>Changelogs in YAML, XML, JSON or SQL; changes described as "changeSets"</td></tr>
+                    <tr><td>Database independence</td><td>None: you write the SQL of your database</td><td>Abstract change types generate SQL for each database</td></tr>
+                    <tr><td>Rollback</td><td>Write a new forward migration</td><td>Rollback blocks per changeSet</td></tr>
+                    <tr><td>Spring Boot starter</td><td><code>spring-boot-starter-flyway</code></td><td><code>spring-boot-starter-liquibase</code></td></tr>
+                    <tr class="row-highlight"><td>Fits</td><td>One database, teams comfortable with SQL — the shop</td><td>Products that ship to several databases, or teams that want declarative changes and rollbacks</td></tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Keep the schema in versioned migrations and set <code>ddl-auto: validate</code></li>
+                        <li>Make every migration compatible with the previous application version; rename and drop with expand and contract</li>
+                        <li>Fix mistakes with a new migration, never by editing an applied one</li>
+                        <li>Review migrations like code, including the locks they take on large tables</li>
+                        <li>Test migrations against the production engine and a realistic amount of data before release</li>
+                        <li>Back up before migrations that move or delete data</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't use <code>ddl-auto: update</code> or <code>create</code> outside throwaway prototypes</li>
+                        <li>Don't rename or drop a column in the same release that stops using it</li>
+                        <li>Don't edit or delete a migration that has run on a shared database</li>
+                        <li>Don't enable <code>flyway clean</code> anywhere near production — it drops every object in the schema</li>
+                        <li>Don't run a migration that rewrites a huge table in one transaction during peak traffic</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What does Flyway do when a Spring Boot application starts?</summary>
+                        <p>It reads the <code>flyway_schema_history</code> table, finds the migration
+                    files in <code>db/migration</code> that have not run yet, and applies them in
+                    version order before JPA starts, recording each one in the history table.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why is ddl-auto=update a bad idea in production?</summary>
+                        <p>Hibernate only adds what is missing: it does not rename or drop columns,
+                    cannot migrate data, leaves no reviewable record of changes, and several
+                    instances may try to alter tables at the same time. Versioned migrations with
+                    <code>validate</code> give control and history instead.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What happens if you edit a migration that has already been applied?</summary>
+                        <p>Flyway detects that its checksum no longer matches the one recorded in the
+                    history table and fails validation on startup. The correct fix is a new migration
+                    that changes the schema further.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>How do you rename a column without downtime in a service deployed with rolling updates?</summary>
+                        <p>With expand and contract over several releases: add the new column and
+                    write to both; backfill and switch reads to the new column; and only when no
+                    running version uses the old column, drop it. Each step stays compatible with the
+                    version deployed just before it, because both run side by side during a
+                    rollout.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Should migrations run on application startup or as a separate deployment step?</summary>
+                        <p>Startup is simplest and Flyway's lock keeps concurrent replicas safe, but a
+                    long migration delays readiness and its failure surfaces as crash-looping Pods. A
+                    separate job runs migrations once, with its own timeout and logs, blocks the
+                    rollout on failure, and allows a more privileged database user than the
+                    application's. Larger systems usually prefer the separate step.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why can a migration that is correct SQL still cause an outage?</summary>
+                        <p>Because of locks and volume. Adding an index without
+                    <code>CONCURRENTLY</code>, rewriting a column type, or updating every row of a
+                    large table can lock it for minutes, blocking the application's writes. Such
+                    changes need online variants, batching, and testing against production-sized
+                    data.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../databases/sql.html" class="related-link"><span class="related-icon">🗄️</span>SQL for Java Developers</a>
+                    <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">💾</span>Spring Data JPA</a>
+                    <a href="testcontainers.html" class="related-link"><span class="related-icon">🧫</span>Testcontainers with Spring Boot</a>
+                    <a href="kubernetes.html" class="related-link"><span class="related-icon">☸️</span>Kubernetes for Spring Boot</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
