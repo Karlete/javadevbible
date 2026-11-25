@@ -109,6 +109,44 @@
                     <a href="dependencies.html">Dependencies Management</a> — this page focuses
                     on the versioning scheme itself and how to manage updates as a deliberate
                     process rather than an accident.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">pom.xml</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- Both declarations resolve to a different artifact depending on the day
+     you build: the range picks up any new 1.x the vendor publishes, the
+     SNAPSHOT changes whenever someone redeploys it. The same commit
+     can pass CI on Monday and fail on Tuesday. --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.parcelexpress&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;parcelexpress-client&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;[1.8,2.0)&lt;/<span class="keyword">version</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.javadevbible&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;catalog&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;1.3.0-SNAPSHOT&lt;/<span class="keyword">version</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">pom.xml</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- Exact release versions, kept in one place. Upgrading is a commit you
+     can review, test and revert — not something that happens to you. --&gt;</span>
+&lt;<span class="keyword">properties</span>&gt;
+    &lt;<span class="keyword">parcelexpress.version</span>&gt;1.8.0&lt;/<span class="keyword">parcelexpress.version</span>&gt;
+&lt;/<span class="keyword">properties</span>&gt;
+
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.parcelexpress&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;parcelexpress-client&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;${parcelexpress.version}&lt;/<span class="keyword">version</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.javadevbible&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;catalog&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;1.3.0&lt;/<span class="keyword">version</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -218,16 +256,18 @@
                     file shared across every module in a multi-project build, with IDE
                     autocomplete and compile-time checking of the references themselves.</p>
 
-                <pre><code><span class="comment">// gradle/libs.versions.toml — one file, the single source of truth</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">gradle/libs.versions.toml</span></figcaption>
+                    <pre><code><span class="comment"># gradle/libs.versions.toml — one file, the single source of truth</span>
 [versions]
-spring-boot = <span class="string">"3.2.0"</span>
-jackson     = <span class="string">"2.16.0"</span>
-junit       = <span class="string">"5.10.0"</span>
+spring-boot   = <span class="string">"4.2.0"</span>
+parcelexpress = <span class="string">"1.8.0"</span>
+junit         = <span class="string">"6.1.3"</span>
 
 [libraries]
-spring-boot-starter-web = { module = <span class="string">"org.springframework.boot:spring-boot-starter-web"</span>, version.ref = <span class="string">"spring-boot"</span> }
-jackson-databind        = { module = <span class="string">"com.fasterxml.jackson.core:jackson-databind"</span>, version.ref = <span class="string">"jackson"</span> }
-junit-jupiter           = { module = <span class="string">"org.junit.jupiter:junit-jupiter"</span>, version.ref = <span class="string">"junit"</span> }
+spring-boot-starter-webmvc = { module = <span class="string">"org.springframework.boot:spring-boot-starter-webmvc"</span>, version.ref = <span class="string">"spring-boot"</span> }
+parcelexpress-client       = { module = <span class="string">"com.parcelexpress:parcelexpress-client"</span>, version.ref = <span class="string">"parcelexpress"</span> }
+junit-jupiter              = { module = <span class="string">"org.junit.jupiter:junit-jupiter"</span>, version.ref = <span class="string">"junit"</span> }
 
 [bundles]
 <span class="comment"># group related libraries under one name, declared together everywhere they're used</span>
@@ -235,21 +275,25 @@ testing = [<span class="string">"junit-jupiter"</span>]
 
 [plugins]
 spring-boot = { id = <span class="string">"org.springframework.boot"</span>, version.ref = <span class="string">"spring-boot"</span> }</code></pre>
+                </figure>
 
-                <pre><code><span class="comment">// build.gradle.kts — reference via the generated type-safe accessor 'libs'</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">build.gradle.kts</span></figcaption>
+                    <pre><code><span class="comment">// build.gradle.kts — reference via the generated type-safe accessor 'libs'</span>
 dependencies {
-    implementation(libs.spring.boot.starter.web)   <span class="comment">// IDE autocompletes this — typo = compile error, not a runtime surprise</span>
-    implementation(libs.jackson.databind)
+    implementation(libs.spring.boot.starter.webmvc)   <span class="comment">// IDE autocompletes this — typo = compile error, not a runtime surprise</span>
+    implementation(libs.parcelexpress.client)
     testImplementation(libs.bundles.testing)
 }
 
 plugins {
     alias(libs.plugins.spring.boot)
 }</code></pre>
+                </figure>
 
                 <div class="info-box tip">
                     <div class="info-box-title">Why this beats a plain val/property approach</div>
-                    <p>A Kotlin <code>val springVersion = "6.1.0"</code> at the top of a
+                    <p>A Kotlin <code>val parcelexpressVersion = "1.8.0"</code> at the top of a
                         <code>build.gradle.kts</code> only helps within that single file. A
                         version catalog is visible and IDE-autocompleted across every module in a
                         multi-project build, and referencing a non-existent entry is a build
@@ -373,6 +417,7 @@ mvn versions:use-latest-releases -DallowMajorUpdates=false -DallowMinorUpdates=f
                     <a href="scopes.html" class="related-link">
                         <span class="related-icon">🎯</span>Dependency Scopes
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

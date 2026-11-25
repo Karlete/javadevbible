@@ -113,15 +113,30 @@
                     For a large codebase, this is the difference between a 3-minute build and a
                     15-second build when you've only touched one file.</p>
 
-                <pre><code><span class="comment">// The headline difference: Gradle SKIPS work Maven would always redo</span>
-./gradlew build
-<span class="comment">// :compileJava UP-TO-DATE   ← nothing changed since last run, skipped entirely</span>
-<span class="comment">// :test UP-TO-DATE          ← test inputs unchanged, skipped</span>
-<span class="comment">// :jar                      ← only this actually ran</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">Maven, second run with nothing changed</span></figcaption>
+                    <pre><code><span class="comment"># mvn package walks the whole lifecycle again. Maven has no record of
+# what the last run produced, so the compiler plugin re-checks every
+# source file and Surefire re-runs every test.</span>
+mvn package
+[INFO] --- compiler:3.14.1:compile (default-compile) @ shop ---
+[INFO] --- surefire:3.6.1:test (default-test) @ shop ---
+[INFO] Tests run: 412, Failures: 0, Errors: 0, Skipped: 0</code></pre>
+                </figure>
 
-<span class="comment">// This page uses Kotlin DSL (build.gradle.kts) — the modern default,
-// statically typed with IDE autocomplete. Groovy DSL (build.gradle) still
-// exists in many legacy projects but Kotlin DSL is what new projects use.</span></code></pre>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">Gradle, second run with nothing changed</span></figcaption>
+                    <pre><code><span class="comment"># Gradle hashed each task's inputs and outputs last time. Same hashes,
+# so the task is skipped — not run quickly, not run at all.</span>
+./gradlew build
+&gt; Task :compileJava UP-TO-DATE
+&gt; Task :test UP-TO-DATE
+BUILD SUCCESSFUL — 12 actionable tasks: 12 up-to-date
+
+<span class="comment"># This page uses Kotlin DSL (build.gradle.kts), the default for new
+# projects: statically typed, with IDE autocomplete. Groovy DSL
+# (build.gradle) is still common in older projects.</span></code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -129,7 +144,7 @@
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>Project Structure</h2>
-                <pre><code>my-project/
+                <pre><code>shop/
 ├── build.gradle.kts      <span class="comment"># build configuration — what THIS project builds</span>
 ├── settings.gradle.kts   <span class="comment"># project name + included subprojects</span>
 ├── gradle/wrapper/        <span class="comment"># pins the exact Gradle version — always commit this</span>
@@ -137,17 +152,19 @@
 └── src/main/java, src/test/java   <span class="comment"># same convention as Maven</span></code></pre>
 
                 <h3>A real Spring Boot build.gradle.kts</h3>
-                <pre><code>plugins {
+                <figure class="code-file">
+                    <figcaption><span class="code-path">build.gradle.kts</span></figcaption>
+                    <pre><code>plugins {
     java
-    id(<span class="string">"org.springframework.boot"</span>) version <span class="string">"3.2.0"</span>
-    id(<span class="string">"io.spring.dependency-management"</span>) version <span class="string">"1.1.4"</span>  <span class="comment">// gives BOM-style version management</span>
+    id(<span class="string">"org.springframework.boot"</span>) version <span class="string">"4.2.0"</span>
+    id(<span class="string">"io.spring.dependency-management"</span>) version <span class="string">"1.1.7"</span>  <span class="comment">// gives BOM-style version management</span>
 }
 
-group = <span class="string">"com.company"</span>
+group = <span class="string">"com.javadevbible"</span>
 version = <span class="string">"0.0.1-SNAPSHOT"</span>
 
 java {
-    toolchain { languageVersion.set(JavaLanguageVersion.of(<span class="number">21</span>)) }
+    toolchain { languageVersion.set(JavaLanguageVersion.of(<span class="number">25</span>)) }
 }
 
 repositories {
@@ -155,10 +172,12 @@ repositories {
 }
 
 dependencies {
-    implementation(<span class="string">"org.springframework.boot:spring-boot-starter-web"</span>)
+    implementation(<span class="string">"org.springframework.boot:spring-boot-starter-webmvc"</span>)
     implementation(<span class="string">"org.springframework.boot:spring-boot-starter-data-jpa"</span>)
     runtimeOnly(<span class="string">"org.postgresql:postgresql"</span>)
-    testImplementation(<span class="string">"org.springframework.boot:spring-boot-starter-test"</span>)
+    <span class="comment">// Boot 4 test starters are per technology and bring spring-boot-starter-test along</span>
+    testImplementation(<span class="string">"org.springframework.boot:spring-boot-starter-webmvc-test"</span>)
+    testImplementation(<span class="string">"org.springframework.boot:spring-boot-starter-data-jpa-test"</span>)
 }
 
 tasks.test { useJUnitPlatform() }
@@ -167,6 +186,7 @@ tasks.test { useJUnitPlatform() }
 //   ./gradlew bootRun          — run the application
 //   ./gradlew bootJar          — build an executable fat jar
 //   ./gradlew bootBuildImage   — build an OCI/Docker image, no Dockerfile needed</span></code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -178,22 +198,26 @@ tasks.test { useJUnitPlatform() }
                     doesn't have: <code>api</code> vs <code>implementation</code>, which matters
                     specifically when your project is itself a library consumed by others.</p>
 
-                <pre><code>dependencies {
-    implementation(<span class="string">"com.google.guava:guava:32.1.3-jre"</span>)  <span class="comment">// standard — compile + runtime</span>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">build.gradle.kts</span></figcaption>
+                    <pre><code>dependencies {
+    implementation(<span class="string">"org.springframework.boot:spring-boot-starter-data-jpa"</span>)  <span class="comment">// standard — compile + runtime</span>
 
-    compileOnly(<span class="string">"org.projectlombok:lombok:1.18.30"</span>)       <span class="comment">// needed to compile, NOT bundled/runtime</span>
-    annotationProcessor(<span class="string">"org.projectlombok:lombok:1.18.30"</span>) <span class="comment">// runs Lombok's code generation</span>
+    compileOnly(<span class="string">"org.projectlombok:lombok"</span>)          <span class="comment">// needed to compile, NOT bundled/runtime</span>
+    annotationProcessor(<span class="string">"org.projectlombok:lombok"</span>)  <span class="comment">// runs Lombok's code generation</span>
 
-    runtimeOnly(<span class="string">"org.postgresql:postgresql:42.6.0"</span>)        <span class="comment">// needed at runtime, NOT to compile your code</span>
+    runtimeOnly(<span class="string">"org.postgresql:postgresql"</span>)  <span class="comment">// needed at runtime, NOT to compile your code</span>
 
-    testImplementation(<span class="string">"org.junit.jupiter:junit-jupiter:5.10.0"</span>)
+    testImplementation(<span class="string">"org.junit.jupiter:junit-jupiter"</span>)
     testRuntimeOnly(<span class="string">"org.junit.platform:junit-platform-launcher"</span>)
 
     <span class="comment">// api vs implementation — ONLY matters if you're building a library
     // consumed by other projects/modules</span>
-    api(<span class="string">"com.company:public-contracts:1.0"</span>)       <span class="comment">// leaks into CONSUMERS' compile classpath</span>
-    implementation(<span class="string">"com.company:internal-utils:1.0"</span>) <span class="comment">// hidden from consumers entirely</span>
+    <span class="comment">// (in the ordering module of a multi-project shop:)</span>
+    api(project(<span class="string">":catalog"</span>))  <span class="comment">// Product appears in ordering's public methods → consumers need it</span>
+    implementation(<span class="string">"com.github.ben-manes.caffeine:caffeine"</span>)  <span class="comment">// ordering's private cache — hidden from consumers</span>
 }</code></pre>
+                </figure>
 
                 <div class="info-box tip">
                     <div class="info-box-title">api vs implementation — why it matters for build speed</div>
@@ -222,7 +246,7 @@ tasks.test { useJUnitPlatform() }
 ./gradlew clean build        <span class="comment"># wipe build/ first</span>
 
 ./gradlew test                          <span class="comment"># run all tests</span>
-./gradlew test --tests "CustomerTest"       <span class="comment"># single class</span>
+./gradlew test --tests "OrderServiceTest"   <span class="comment"># single class</span>
 ./gradlew test --tests "*ServiceTest"   <span class="comment"># pattern match</span>
 
 ./gradlew run                <span class="comment"># run via the 'application' plugin</span>
@@ -230,7 +254,7 @@ tasks.test { useJUnitPlatform() }
 
 <span class="comment"># Diagnostics — the Gradle equivalents of Maven's dependency:tree commands</span>
 ./gradlew dependencies                              <span class="comment"># full dependency tree</span>
-./gradlew dependencyInsight --dependency jackson-core  <span class="comment"># WHY is this version resolved? shows the conflict path</span>
+./gradlew dependencyInsight --dependency httpclient5  <span class="comment"># WHY is this version resolved? shows the conflict path</span>
 
 ./gradlew tasks              <span class="comment"># list all available tasks for this project</span>
 ./gradlew tasks --all        <span class="comment"># include tasks from applied plugins too</span></code></pre>
@@ -247,10 +271,10 @@ tasks.test { useJUnitPlatform() }
                     <code>UP-TO-DATE</code> and genuinely skipped — not just fast, but not
                     executed at all.</p>
 
-                <pre><code><span class="comment">// gradle.properties — performance tuning that actually matters in CI</span>
-org.gradle.parallel=true              <span class="comment">// build independent subprojects concurrently</span>
-org.gradle.caching=true               <span class="comment">// reuse task outputs across builds/machines (build cache)</span>
-org.gradle.configuration-cache=true   <span class="comment">// cache the build configuration phase itself, not just tasks</span>
+                <pre><code><span class="comment"># gradle.properties — performance tuning that actually matters in CI</span>
+org.gradle.parallel=true              <span class="comment"># build independent subprojects concurrently</span>
+org.gradle.caching=true               <span class="comment"># reuse task outputs across builds/machines (build cache)</span>
+org.gradle.configuration-cache=true   <span class="comment"># cache the build configuration phase itself, not just tasks</span>
 org.gradle.jvmargs=-Xmx2g
 
 <span class="comment"># Command-line equivalents for a one-off run</span>
@@ -277,20 +301,20 @@ org.gradle.jvmargs=-Xmx2g
             <section class="content-section">
                 <h2>Multi-Project Builds</h2>
                 <pre><code><span class="comment">// settings.gradle.kts — declares which subprojects exist</span>
-rootProject.name = <span class="string">"my-project"</span>
-include(<span class="string">"api"</span>, <span class="string">"service"</span>, <span class="string">"web"</span>)
+rootProject.name = <span class="string">"shop"</span>
+include(<span class="string">"catalog"</span>, <span class="string">"ordering"</span>, <span class="string">"app"</span>)
 
 <span class="comment">// Root build.gradle.kts — shared config applied to every subproject</span>
 subprojects {
     apply(plugin = <span class="string">"java"</span>)
     repositories { mavenCentral() }
-    java { toolchain { languageVersion.set(JavaLanguageVersion.of(<span class="number">21</span>)) } }
+    java { toolchain { languageVersion.set(JavaLanguageVersion.of(<span class="number">25</span>)) } }
 }
 
 <span class="comment">// Project-specific dependency, including a project-to-project dependency</span>
-project(<span class="string">":service"</span>) {
+project(<span class="string">":ordering"</span>) {
     dependencies {
-        implementation(project(<span class="string">":api"</span>))  <span class="comment">// depends on the sibling 'api' module's output directly</span>
+        implementation(project(<span class="string">":catalog"</span>))  <span class="comment">// depends on the sibling 'catalog' module's output directly</span>
     }
 }</code></pre>
                 <p>Gradle computes the build order from these project-to-project dependencies
@@ -324,7 +348,7 @@ tasks.register&lt;Copy&gt;(<span class="string">"copyDocs"</span>) {
 <span class="comment">// Configuring an existing task (from a plugin) rather than creating a new one</span>
 tasks.named&lt;Jar&gt;(<span class="string">"jar"</span>) {
     manifest {
-        attributes(<span class="string">"Main-Class"</span> to <span class="string">"com.company.Main"</span>)
+        attributes(<span class="string">"Main-Class"</span> to <span class="string">"com.javadevbible.shop.ShopApplication"</span>)
     }
 }</code></pre>
             </section>
@@ -335,7 +359,7 @@ tasks.named&lt;Jar&gt;(<span class="string">"jar"</span>) {
             <section class="content-section">
                 <h2>The Gradle Wrapper</h2>
                 <pre><code><span class="comment"># Generate/update the wrapper to pin a specific Gradle version</span>
-gradle wrapper --gradle-version 8.5
+gradle wrapper --gradle-version 9.9.2
 
 <span class="comment"># Everyone — devs and CI — uses the wrapper, never a locally-installed gradle</span>
 ./gradlew build      <span class="comment"># Unix/Mac</span>
@@ -437,6 +461,7 @@ gradlew.bat build    <span class="comment"># Windows</span></code></pre>
                     <a href="scopes.html" class="related-link">
                         <span class="related-icon">🎯</span>Dependency Scopes
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

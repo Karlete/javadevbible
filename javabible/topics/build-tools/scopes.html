@@ -108,6 +108,41 @@
                     <code>NoClassDefFoundError</code> at runtime because something needed was
                     scoped out.</p>
 
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">pom.xml</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- No scopes anywhere, so everything is compile scope: order code can
+     import org.postgresql classes by accident, and JUnit and the H2
+     test database end up inside the production jar. --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.postgresql&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;postgresql&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-jpa-test&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.h2database&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;h2&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">pom.xml</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- Each dependency visible exactly where it is used. The driver exists
+     only at runtime; test libraries exist only for src/test. --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.postgresql&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;postgresql&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-jpa-test&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;</code></pre>
+                </figure>
+
                 <table>
                     <tr>
                         <th>Scope</th>
@@ -152,9 +187,8 @@
 
                 <h3>compile — the default, used for almost everything</h3>
                 <pre><code>&lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;org.springframework&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;spring-core&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;6.1.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-jpa&lt;/<span class="keyword">artifactId</span>&gt;
     <span class="comment">&lt;!-- no &lt;scope&gt; needed — compile is the default --&gt;</span>
 &lt;/<span class="keyword">dependency</span>&gt;
 <span class="comment">// Use for: anything your code imports and calls directly — Spring, Jackson, Guava</span></code></pre>
@@ -163,8 +197,8 @@
                 <pre><code>&lt;<span class="keyword">dependency</span>&gt;
     &lt;<span class="keyword">groupId</span>&gt;jakarta.servlet&lt;/<span class="keyword">groupId</span>&gt;
     &lt;<span class="keyword">artifactId</span>&gt;jakarta.servlet-api&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;6.0.0&lt;/<span class="keyword">version</span>&gt;
-    &lt;<span class="keyword">scope</span>&gt;provided&lt;/<span class="keyword">scope</span>&gt;  <span class="comment">&lt;!-- Tomcat already has this on its classpath --&gt;</span>
+    &lt;<span class="keyword">version</span>&gt;6.1.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">scope</span>&gt;provided&lt;/<span class="keyword">scope</span>&gt;  <span class="comment">&lt;!-- an external Tomcat 11 already has this on its classpath --&gt;</span>
 &lt;/<span class="keyword">dependency</span>&gt;
 
 &lt;<span class="keyword">dependency</span>&gt;
@@ -184,29 +218,29 @@
 <span class="comment">// You code against the standard JDBC interface, never import org.postgresql.* directly</span>
 <span class="keyword">import</span> java.sql.Connection;
 <span class="keyword">import</span> java.sql.DriverManager;
-<span class="class-name">Connection</span> conn = <span class="class-name">DriverManager</span>.getConnection(<span class="string">"jdbc:postgresql://localhost/db"</span>, <span class="string">"u"</span>, <span class="string">"p"</span>);
+<span class="class-name">Connection</span> conn = <span class="class-name">DriverManager</span>.getConnection(<span class="string">"jdbc:postgresql://localhost:5432/shop"</span>, user, password);
 <span class="comment">// The actual driver is discovered at runtime via java.util.ServiceLoader —
 // this is WHY it compiles fine without the driver on the compile classpath.</span></code></pre>
 
                 <h3>test — never leaves src/test, never packaged</h3>
                 <pre><code>&lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;org.junit.jupiter&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;junit-jupiter&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-webmvc-test&lt;/<span class="keyword">artifactId</span>&gt;
     &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;
 &lt;/<span class="keyword">dependency</span>&gt;
-<span class="comment">// Use for: JUnit, Mockito, AssertJ, H2/Testcontainers, spring-boot-starter-test
+<span class="comment">// Use for: JUnit, Mockito, AssertJ, Testcontainers, the spring-boot-starter-*-test starters
 // Try importing org.junit in src/main/java — it won't compile. That's the point.</span></code></pre>
 
                 <h3>system — avoid, always</h3>
                 <pre><code><span class="comment">// ❌ Hardcoded absolute path — breaks on every other machine and in CI</span>
 &lt;<span class="keyword">dependency</span>&gt;
     &lt;<span class="keyword">scope</span>&gt;system&lt;/<span class="keyword">scope</span>&gt;
-    &lt;<span class="keyword">systemPath</span>&gt;${project.basedir}/lib/proprietary-lib.jar&lt;/<span class="keyword">systemPath</span>&gt;
+    &lt;<span class="keyword">systemPath</span>&gt;${project.basedir}/lib/parcelexpress-client.jar&lt;/<span class="keyword">systemPath</span>&gt;
 &lt;/<span class="keyword">dependency</span>&gt;
 
 <span class="comment">// ✅ Install the JAR properly into a repository instead</span>
-mvn install:install-file -Dfile=lib/proprietary-lib.jar \
-    -DgroupId=com.company -DartifactId=proprietary-lib -Dversion=1.0 -Dpackaging=jar
+mvn install:install-file -Dfile=lib/parcelexpress-client.jar \
+    -DgroupId=com.parcelexpress -DartifactId=parcelexpress-client -Dversion=1.8.0 -Dpackaging=jar
 <span class="comment">// Or better: push it to a private Nexus/Artifactory so the whole team can resolve it normally</span></code></pre>
             </section>
 
@@ -249,11 +283,11 @@ mvn install:install-file -Dfile=lib/proprietary-lib.jar \
                     <code>provided</code> nor <code>test</code> scoped dependencies of a
                     dependency propagate at all, regardless of your own declared scope.</em></p>
 
-                <pre><code><span class="comment">// Real example: spring-boot-starter-web (compile scope, your declaration)
+                <pre><code><span class="comment">// Real example: spring-boot-starter-webmvc (compile scope, your declaration)
 //   transitively depends on spring-core (compile scope, declared by the starter)
 //   → spring-core ends up COMPILE scope in YOUR project — direct mapping
 
-// Real example: spring-boot-starter-test (test scope, your declaration)
+// Real example: spring-boot-starter-webmvc-test (test scope, your declaration)
 //   transitively depends on mockito-core (compile scope, declared by the starter)
 //   → mockito-core ends up TEST scope in YOUR project — demoted to match your scope
 
@@ -298,22 +332,24 @@ mvn install:install-file -Dfile=lib/proprietary-lib.jar \
                  SECTION 4 — REAL PATTERN: SPRING BOOT WEB APP
             ════════════════════════════════════════════ -->
             <section class="content-section">
-                <h2>Real Pattern: A Typical Spring Boot Web App</h2>
-                <pre><code>&lt;<span class="keyword">dependencies</span>&gt;
+                <h2>Real Pattern: The Shop's Dependencies</h2>
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml</span></figcaption>
+                    <pre><code>&lt;<span class="keyword">dependencies</span>&gt;
     <span class="comment">&lt;!-- compile (default) — used directly throughout the codebase --&gt;</span>
-    &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-web&lt;/<span class="keyword">artifactId</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-webmvc&lt;/<span class="keyword">artifactId</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
     &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-jpa&lt;/<span class="keyword">artifactId</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
-
-    <span class="comment">&lt;!-- provided — code generation only, irrelevant after compilation --&gt;</span>
-    &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;lombok&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;provided&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-kafka&lt;/<span class="keyword">artifactId</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
 
     <span class="comment">&lt;!-- runtime — concrete implementation behind a standard interface --&gt;</span>
     &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;postgresql&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;runtime&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
 
-    <span class="comment">&lt;!-- test — JUnit, assertions, in-memory test DB --&gt;</span>
-    &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-test&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;h2&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+    <span class="comment">&lt;!-- test — one starter per technology under test; each brings JUnit,
+         AssertJ and Mockito through spring-boot-starter-test --&gt;</span>
+    &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-webmvc-test&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-jpa-test&lt;/<span class="keyword">artifactId</span>&gt;&lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
 &lt;/<span class="keyword">dependencies</span>&gt;</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -403,6 +439,7 @@ mvn install:install-file -Dfile=lib/proprietary-lib.jar \
                     <a href="versions.html" class="related-link">
                         <span class="related-icon">🔢</span>Version Management
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

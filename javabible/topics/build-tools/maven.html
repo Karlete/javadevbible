@@ -113,9 +113,27 @@
                     developer who knows Maven can clone a Maven project and immediately know
                     where the source lives, how to build it, and how to run its tests.</p>
 
-                <pre><code><span class="comment">// Without Maven: manual JAR management, custom scripts, inconsistent structure</span>
-<span class="comment">// With Maven: declare what you need in pom.xml, run one command</span>
-mvn clean install</code></pre>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">build.sh</span></figcaption>
+                    <pre><code><span class="comment"># Every JAR downloaded by hand into lib/, every transitive dependency
+# tracked by hand, a classpath string nobody dares to touch, and no
+# tests run unless someone remembers to add a line for them.</span>
+javac -d out -cp "lib/spring-webmvc-7.1.0.jar:lib/spring-web-7.1.0.jar:lib/..." \
+    $(find src -name "*.java")
+jar cf shop.jar -C out .</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">pom.xml</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- Declare what the shop needs; Maven downloads it, resolves what IT needs,
+     compiles, runs the tests and packages — the same way on every machine. --&gt;</span>
+&lt;<span class="keyword">dependency</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-webmvc&lt;/<span class="keyword">artifactId</span>&gt;
+&lt;/<span class="keyword">dependency</span>&gt;
+
+<span class="comment">&lt;!-- then: mvn clean install --&gt;</span></code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -123,11 +141,11 @@ mvn clean install</code></pre>
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>Standard Project Structure</h2>
-                <pre><code>my-project/
+                <pre><code>shop/
 ├── pom.xml                    <span class="comment"># Project Object Model — the single source of truth</span>
 ├── src/
 │   ├── main/
-│   │   ├── java/               <span class="comment"># application source</span>
+│   │   ├── java/               <span class="comment"># com/javadevbible/shop/... — application source</span>
 │   │   └── resources/          <span class="comment"># config files, properties, copied to classpath root</span>
 │   └── test/
 │       ├── java/               <span class="comment"># test source</span>
@@ -135,20 +153,22 @@ mvn clean install</code></pre>
 └── target/                    <span class="comment"># generated — never commit, always in .gitignore</span>
     ├── classes/
     ├── test-classes/
-    └── my-project-1.0.0.jar</code></pre>
+    └── shop-1.0.0.jar</code></pre>
 
                 <h3>Minimal pom.xml</h3>
-                <pre><code>&lt;<span class="keyword">project</span> xmlns="http://maven.apache.org/POM/4.0.0"&gt;
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml</span></figcaption>
+                    <pre><code>&lt;<span class="keyword">project</span> xmlns="http://maven.apache.org/POM/4.0.0"&gt;
     &lt;<span class="keyword">modelVersion</span>&gt;4.0.0&lt;/<span class="keyword">modelVersion</span>&gt;
 
     <span class="comment">&lt;!-- groupId:artifactId:version — uniquely identifies this artifact in any repository --&gt;</span>
-    &lt;<span class="keyword">groupId</span>&gt;com.company&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;my-app&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.javadevbible&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;shop&lt;/<span class="keyword">artifactId</span>&gt;
     &lt;<span class="keyword">version</span>&gt;1.0.0&lt;/<span class="keyword">version</span>&gt;
     &lt;<span class="keyword">packaging</span>&gt;jar&lt;/<span class="keyword">packaging</span>&gt;  <span class="comment">&lt;!-- jar, war, pom (parent/aggregator) --&gt;</span>
 
     &lt;<span class="keyword">properties</span>&gt;
-        &lt;<span class="keyword">java.version</span>&gt;21&lt;/<span class="keyword">java.version</span>&gt;
+        &lt;<span class="keyword">java.version</span>&gt;25&lt;/<span class="keyword">java.version</span>&gt;
         &lt;<span class="keyword">maven.compiler.release</span>&gt;${java.version}&lt;/<span class="keyword">maven.compiler.release</span>&gt;  <span class="comment">&lt;!-- prefer 'release' over source/target --&gt;</span>
         &lt;<span class="keyword">project.build.sourceEncoding</span>&gt;UTF-8&lt;/<span class="keyword">project.build.sourceEncoding</span>&gt;
     &lt;/<span class="keyword">properties</span>&gt;
@@ -157,11 +177,12 @@ mvn clean install</code></pre>
         &lt;<span class="keyword">dependency</span>&gt;
             &lt;<span class="keyword">groupId</span>&gt;org.junit.jupiter&lt;/<span class="keyword">groupId</span>&gt;
             &lt;<span class="keyword">artifactId</span>&gt;junit-jupiter&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;5.10.0&lt;/<span class="keyword">version</span>&gt;
+            &lt;<span class="keyword">version</span>&gt;6.1.3&lt;/<span class="keyword">version</span>&gt;
             &lt;<span class="keyword">scope</span>&gt;test&lt;/<span class="keyword">scope</span>&gt;  <span class="comment">&lt;!-- not bundled in the final jar --&gt;</span>
         &lt;/<span class="keyword">dependency</span>&gt;
     &lt;/<span class="keyword">dependencies</span>&gt;
 &lt;/<span class="keyword">project</span>&gt;</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">Where do all the defaults come from? The Super POM</div>
@@ -208,7 +229,7 @@ mvn clean install</code></pre>
     &lt;<span class="keyword">sourceDirectory</span>&gt;${basedir}/src/main/java&lt;/<span class="keyword">sourceDirectory</span>&gt;
     &lt;<span class="keyword">testSourceDirectory</span>&gt;${basedir}/src/test/java&lt;/<span class="keyword">testSourceDirectory</span>&gt;
     &lt;<span class="keyword">outputDirectory</span>&gt;${basedir}/target/classes&lt;/<span class="keyword">outputDirectory</span>&gt;
-    &lt;<span class="keyword">finalName</span>&gt;${artifactId}-${version}&lt;/<span class="keyword">finalName</span>&gt;  <span class="comment">&lt;!-- explains the my-app-1.0.0.jar naming --&gt;</span>
+    &lt;<span class="keyword">finalName</span>&gt;${artifactId}-${version}&lt;/<span class="keyword">finalName</span>&gt;  <span class="comment">&lt;!-- explains the shop-1.0.0.jar naming --&gt;</span>
 &lt;/<span class="keyword">build</span>&gt;
 
 &lt;<span class="keyword">repositories</span>&gt;
@@ -317,7 +338,7 @@ mvn deploy</code></pre>
             &lt;<span class="keyword">activeByDefault</span>&gt;true&lt;/<span class="keyword">activeByDefault</span>&gt;  <span class="comment">&lt;!-- runs if no profile is explicitly requested --&gt;</span>
         &lt;/<span class="keyword">activation</span>&gt;
         &lt;<span class="keyword">properties</span>&gt;
-            &lt;<span class="keyword">db.url</span>&gt;jdbc:h2:mem:devdb&lt;/<span class="keyword">db.url</span>&gt;
+            &lt;<span class="keyword">db.url</span>&gt;jdbc:postgresql://localhost:5432/shop&lt;/<span class="keyword">db.url</span>&gt;
             &lt;<span class="keyword">log.level</span>&gt;DEBUG&lt;/<span class="keyword">log.level</span>&gt;
         &lt;/<span class="keyword">properties</span>&gt;
     &lt;/<span class="keyword">profile</span>&gt;
@@ -325,7 +346,7 @@ mvn deploy</code></pre>
     &lt;<span class="keyword">profile</span>&gt;
         &lt;<span class="keyword">id</span>&gt;prod&lt;/<span class="keyword">id</span>&gt;
         &lt;<span class="keyword">properties</span>&gt;
-            &lt;<span class="keyword">db.url</span>&gt;jdbc:postgresql://prod-db:5432/app&lt;/<span class="keyword">db.url</span>&gt;
+            &lt;<span class="keyword">db.url</span>&gt;jdbc:postgresql://prod-db:5432/shop&lt;/<span class="keyword">db.url</span>&gt;
             &lt;<span class="keyword">log.level</span>&gt;WARN&lt;/<span class="keyword">log.level</span>&gt;
         &lt;/<span class="keyword">properties</span>&gt;
         &lt;<span class="keyword">build</span>&gt;
@@ -384,17 +405,18 @@ mvn help:active-profiles</code></pre>
 mvn dependency:tree
 
 <span class="comment"># Output looks like:</span>
-[INFO] com.company:my-app:jar:1.0.0
-[INFO] +- org.springframework.boot:spring-boot-starter-web:jar:3.2.0:compile
-[INFO] |  +- org.springframework:spring-web:jar:6.1.0:compile
-[INFO] |  \- com.fasterxml.jackson.core:jackson-databind:jar:2.15.3:compile
-[INFO] +- com.legacy:old-utils:jar:1.2.0:compile
-[INFO] |  \- com.fasterxml.jackson.core:jackson-databind:jar:2.9.8:compile  <span class="comment">(version conflict!)</span>
+[INFO] com.javadevbible:shop:jar:1.0.0
+[INFO] +- org.springframework.boot:spring-boot-starter-webmvc:jar:4.2.0:compile
+[INFO] |  \- ...
+[INFO] +- com.ledgerline:ledgerline-tax-client:jar:2.3.0:compile
+[INFO] |  \- org.apache.httpcomponents.client5:httpclient5:jar:5.4.1:compile
+[INFO] +- com.parcelexpress:parcelexpress-client:jar:1.8.0:compile
+[INFO] |  \- org.apache.httpcomponents.client5:httpclient5:jar:5.1.3:compile  <span class="comment">(version conflict!)</span>
 [INFO] \- (resolved: 2.15.3 wins — "nearest definition" wins by default)
 
 <span class="comment"># Filter to find exactly where a specific library is coming from —
 # essential when you spot a wrong version at runtime and need the source</span>
-mvn dependency:tree -Dincludes=com.fasterxml.jackson.core
+mvn dependency:tree -Dincludes=org.apache.httpcomponents.client5
 
 <span class="comment"># Show only CONFLICTS — the ones Maven had to resolve, fastest way
 # to spot the problem without reading the whole tree</span>
@@ -404,23 +426,23 @@ mvn dependency:tree -Dverbose | grep -i "conflict\|omitted"</code></pre>
                 <pre><code><span class="comment">// Scenario: a library pulls in an old, vulnerable, or conflicting version
 // of a dependency you need a different version of</span>
 &lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;com.legacy&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;old-utils&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;1.2.0&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;com.parcelexpress&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;parcelexpress-client&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;1.8.0&lt;/<span class="keyword">version</span>&gt;
     &lt;<span class="keyword">exclusions</span>&gt;
         &lt;<span class="keyword">exclusion</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.core&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;jackson-databind&lt;/<span class="keyword">artifactId</span>&gt;
+            &lt;<span class="keyword">groupId</span>&gt;org.apache.httpcomponents.client5&lt;/<span class="keyword">groupId</span>&gt;
+            &lt;<span class="keyword">artifactId</span>&gt;httpclient5&lt;/<span class="keyword">artifactId</span>&gt;
         &lt;/<span class="keyword">exclusion</span>&gt;
     &lt;/<span class="keyword">exclusions</span>&gt;
 &lt;/<span class="keyword">dependency</span>&gt;
 
 <span class="comment">// You're now responsible for declaring the version you actually want —
-// without this, jackson-databind disappears entirely from the classpath</span>
+// without this, httpclient5 disappears entirely from the classpath</span>
 &lt;<span class="keyword">dependency</span>&gt;
-    &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.core&lt;/<span class="keyword">groupId</span>&gt;
-    &lt;<span class="keyword">artifactId</span>&gt;jackson-databind&lt;/<span class="keyword">artifactId</span>&gt;
-    &lt;<span class="keyword">version</span>&gt;2.15.3&lt;/<span class="keyword">version</span>&gt;
+    &lt;<span class="keyword">groupId</span>&gt;org.apache.httpcomponents.client5&lt;/<span class="keyword">groupId</span>&gt;
+    &lt;<span class="keyword">artifactId</span>&gt;httpclient5&lt;/<span class="keyword">artifactId</span>&gt;
+    &lt;<span class="keyword">version</span>&gt;5.4.1&lt;/<span class="keyword">version</span>&gt;
 &lt;/<span class="keyword">dependency</span>&gt;</code></pre>
 
                 <h3>Pinning a version globally — dependencyManagement</h3>
@@ -429,9 +451,9 @@ mvn dependency:tree -Dverbose | grep -i "conflict\|omitted"</code></pre>
 &lt;<span class="keyword">dependencyManagement</span>&gt;
     &lt;<span class="keyword">dependencies</span>&gt;
         &lt;<span class="keyword">dependency</span>&gt;
-            &lt;<span class="keyword">groupId</span>&gt;com.fasterxml.jackson.core&lt;/<span class="keyword">groupId</span>&gt;
-            &lt;<span class="keyword">artifactId</span>&gt;jackson-databind&lt;/<span class="keyword">artifactId</span>&gt;
-            &lt;<span class="keyword">version</span>&gt;2.15.3&lt;/<span class="keyword">version</span>&gt;  <span class="comment">&lt;!-- this version wins, everywhere, no exclusions needed --&gt;</span>
+            &lt;<span class="keyword">groupId</span>&gt;org.apache.httpcomponents.client5&lt;/<span class="keyword">groupId</span>&gt;
+            &lt;<span class="keyword">artifactId</span>&gt;httpclient5&lt;/<span class="keyword">artifactId</span>&gt;
+            &lt;<span class="keyword">version</span>&gt;5.4.1&lt;/<span class="keyword">version</span>&gt;  <span class="comment">&lt;!-- this version wins, everywhere, no exclusions needed --&gt;</span>
         &lt;/<span class="keyword">dependency</span>&gt;
     &lt;/<span class="keyword">dependencies</span>&gt;
 &lt;/<span class="keyword">dependencyManagement</span>&gt;
@@ -492,8 +514,9 @@ mvn deploy -Pprod   <span class="comment"># builds and uploads — this is what 
                 <div class="info-box warning">
                     <div class="info-box-title">SNAPSHOT vs release versions</div>
                     <p><code>1.0.0-SNAPSHOT</code> means "in development, can change" — Maven
-                        re-checks the remote repository for updates on every build (unless you
-                        use <code>-o</code> offline mode). A release version
+                        re-checks the remote repository for a newer copy, by default at most
+                        once a day (the repository's <code>updatePolicy</code>, which
+                        <code>-U</code> overrides and <code>-o</code> offline mode skips). A release version
                         (<code>1.0.0</code>) is immutable once published — re-deploying the same
                         version number to a release repository is normally rejected by the
                         repository manager. Never ship SNAPSHOT dependencies to production; CI
@@ -558,10 +581,10 @@ target/
                 <div class="info-box warning">
                     <div class="info-box-title">Hardcoding versions in every dependency</div>
                     <pre><code><span class="comment">// ❌ Update Spring Boot? Now you're hunting 15 version numbers</span>
-&lt;<span class="keyword">version</span>&gt;3.1.4&lt;/<span class="keyword">version</span>&gt;  <span class="comment">&lt;!-- repeated in every &lt;dependency&gt; --&gt;</span>
+&lt;<span class="keyword">version</span>&gt;4.2.0&lt;/<span class="keyword">version</span>&gt;  <span class="comment">&lt;!-- repeated in every &lt;dependency&gt; --&gt;</span>
 
 <span class="comment">// ✅ Centralise via properties or a parent BOM</span>
-&lt;<span class="keyword">properties</span>&gt;&lt;<span class="keyword">spring-boot.version</span>&gt;3.2.0&lt;/<span class="keyword">spring-boot.version</span>&gt;&lt;/<span class="keyword">properties</span>&gt;
+&lt;<span class="keyword">properties</span>&gt;&lt;<span class="keyword">spring-boot.version</span>&gt;4.2.0&lt;/<span class="keyword">spring-boot.version</span>&gt;&lt;/<span class="keyword">properties</span>&gt;
 &lt;<span class="keyword">version</span>&gt;${spring-boot.version}&lt;/<span class="keyword">version</span>&gt;</code></pre>
                 </div>
 
@@ -672,6 +695,7 @@ mvn clean install -U   <span class="comment"># forces a check against the remote
                     <a href="scopes.html" class="related-link">
                         <span class="related-icon">🎯</span>Dependency Scopes
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
