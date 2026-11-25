@@ -117,7 +117,9 @@
                     them is not encrypted — TLS is not one security feature among several,
                     it is the precondition that makes the others meaningful.</p>
 
-                <pre><code><span class="comment">// BEFORE — checkout form posts over plain HTTP</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/CheckoutController.java</span></figcaption>
+                    <pre><code><span class="comment">// Checkout form posts over plain HTTP</span>
 <span class="annotation">@PostMapping</span>(<span class="string">"/checkout"</span>)
 <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">OrderConfirmation</span>&gt; <span class="function">checkout</span>(<span class="annotation">@RequestBody</span> <span class="class-name">CheckoutRequest</span> request) {
     <span class="comment">// The session cookie, the JWT in the Authorization header, and the card
@@ -125,13 +127,16 @@
     // Any router, ISP, or Wi-Fi eavesdropper between browser and server can
     // read every one of them — no exploit required, just a packet capture.</span>
     <span class="keyword">return</span> orderService.<span class="function">process</span>(request);
-}
+}</code></pre>
+                </figure>
 
-<span class="comment">// AFTER — the channel itself is the control, enforced at the security layer</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">security/SecurityConfig.java</span></figcaption>
+                    <pre><code><span class="comment">// The channel itself is the control, enforced at the security layer</span>
 <span class="annotation">@Bean</span>
 <span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
     <span class="keyword">return</span> http
-        .<span class="function">requiresChannel</span>(channel -> channel.<span class="function">anyRequest</span>().<span class="function">requiresSecure</span>())
+        .<span class="function">redirectToHttps</span>(<span class="class-name">Customizer</span>.withDefaults())
         .<span class="function">headers</span>(headers -> headers.<span class="function">httpStrictTransportSecurity</span>(hsts -> hsts
             .<span class="function">includeSubDomains</span>(<span class="keyword">true</span>)
             .<span class="function">maxAgeInSeconds</span>(<span class="number">31536000</span>)))
@@ -139,6 +144,7 @@
     <span class="comment">// Now the same checkout endpoint rejects plain HTTP outright, and every
     // subsequent visit is told by HSTS to never even attempt HTTP again.</span>
 }</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -313,7 +319,7 @@ server:
                         server reachable directly from the public internet (bypassing the
                         load balancer), a client can forge <code>X-Forwarded-Proto:
                         https</code> and trick the app into treating an actually-insecure
-                        connection as secure, silently defeating <code>requiresSecure()</code>
+                        connection as secure, silently defeating <code>redirectToHttps()</code>
                         and Secure-flagged cookies. Only enable it on servers that are
                         network-unreachable except through the trusted proxy.</p>
                 </div>
@@ -326,9 +332,11 @@ server:
     <span class="annotation">@Bean</span>
     <span class="keyword">public</span> <span class="class-name">SecurityFilterChain</span> <span class="function">filterChain</span>(<span class="class-name">HttpSecurity</span> http) <span class="keyword">throws</span> <span class="class-name">Exception</span> {
         <span class="keyword">return</span> http
-            <span class="comment">// Reject any request that didn't arrive over HTTPS (or a trusted
-            // X-Forwarded-Proto: https from the load balancer)</span>
-            .<span class="function">requiresChannel</span>(channel -> channel.<span class="function">anyRequest</span>().<span class="function">requiresSecure</span>())
+            <span class="comment">// Redirect any request that didn't arrive over HTTPS (or with a trusted
+            // X-Forwarded-Proto: https from the load balancer) to its https:// URL.
+            // Replaces requiresChannel(...).requiresSecure(), deprecated since
+            // Spring Security 6.5.</span>
+            .<span class="function">redirectToHttps</span>(<span class="class-name">Customizer</span>.withDefaults())
 
             <span class="comment">// HSTS tells the browser to never attempt plain HTTP for this domain
             // again, for the given max-age — this closes the window where a
@@ -415,7 +423,7 @@ server:
                         </tr>
                         <tr>
                             <td><strong>Trusting <code>X-Forwarded-Proto</code> from an untrusted network</strong></td>
-                            <td><code>requiresSecure()</code> and Secure cookies silently pass even over a real plaintext connection</td>
+                            <td><code>redirectToHttps()</code> and Secure cookies silently pass even over a real plaintext connection</td>
                             <td>Only enable <code>server.request.header.forwarded.strategy</code> on servers unreachable except via the trusted proxy</td>
                         </tr>
                         <tr>
@@ -436,7 +444,7 @@ server:
                 <div class="best-practices">
                     <h3>✅ Do</h3>
                     <ul>
-                        <li>Enforce HTTPS at the security layer (<code>requiresSecure()</code>), don't rely on "we just don't link to the HTTP version"</li>
+                        <li>Enforce HTTPS at the security layer (<code>redirectToHttps()</code> plus HSTS), don't rely on "we just don't link to the HTTP version"</li>
                         <li>Enable HSTS with a realistic <code>max-age</code> (1 year) and <code>includeSubDomains</code> once you're confident every subdomain also serves HTTPS</li>
                         <li>Automate certificate renewal and alert on expiry well in advance — a manual renewal process will eventually be forgotten</li>
                         <li>Serve the full certificate chain (leaf + intermediate), and verify it with an external tool, not just your own browser's cache</li>
@@ -534,7 +542,7 @@ server:
                         <p>Any client that reaches the service directly can forge an
                     <code>X-Forwarded-Proto: https</code> header on a genuinely plaintext
                     HTTP request. The framework will treat the connection as secure — Spring
-                    Security's <code>requiresSecure()</code> check passes, cookies marked
+                    Security's <code>redirectToHttps()</code> check passes, cookies marked
                     <code>Secure</code> get set and sent over that "internally trusted"
                     plaintext connection, and the entire channel-security guarantee is
                     silently defeated. The fix isn't in application code at all: the
@@ -556,6 +564,7 @@ server:
                     <a href="jwt.html" class="related-link"><span class="related-icon">🔑</span>JWT (JSON Web Tokens)</a>
                     <a href="oauth.html" class="related-link"><span class="related-icon">🔗</span>OAuth 2.0</a>
                     <a href="../web-concepts/sessions-cookies.html" class="related-link"><span class="related-icon">🌐</span>Sessions &amp; Cookies — Secure/HttpOnly/SameSite</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
