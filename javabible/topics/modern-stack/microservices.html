@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microservices with Spring Boot: Boundaries &amp; Sagas - JavaDev Bible</title>
+    <meta name="description" content="When to split a Spring Boot application into microservices and how: Spring Modulith first, data per service, HTTP service clients, events, outbox and sagas.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/microservices.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Microservices with Spring Boot: Boundaries &amp; Sagas">
+    <meta property="og:description" content="When to split a Spring Boot application into microservices and how: Spring Modulith first, data per service, HTTP service clients, events, outbox and sagas.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/microservices.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Microservices with Spring Boot",
+              "name": "Microservices with Spring Boot: Boundaries & Sagas",
+              "description": "When to split a Spring Boot application into microservices and how: Spring Modulith first, data per service, HTTP service clients, events, outbox and sagas.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/microservices.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Microservices with Spring Boot",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/microservices.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Microservices
+            </nav>
+            <h1>Microservices with Spring Boot</h1>
+            <p class="topic-subtitle">Splitting the shop into order, inventory, payment and notification services — when it pays off, why a modular monolith comes first, and how services that no longer share a database or a transaction still agree on what happened to an order</p>
+            <p class="reviewed-stamp">Checked against Spring Boot 4.2 · Spring Modulith 2.2 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What Microservices Are — and the Problem They Actually Solve</h2>
+                <p>A <strong>microservice architecture</strong> splits one application into
+                    several, each deployed on its own, owning its own data, and talking to the
+                    others only over the network — HTTP calls or events. The shop would become an
+                    order service, an inventory service, a payment service and a notification
+                    service instead of one <code>ShopApplication</code>.</p>
+
+                <p>The problem it solves is organisational before it is technical: several teams
+                    changing one codebase block each other's releases. Separate services let the
+                    inventory team ship on Tuesday without waiting for the checkout team. The
+                    price is that every call between them can now fail, be slow, or arrive twice,
+                    and that nothing spans two services in one transaction. Split badly, you pay
+                    the price and get none of the benefit:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order-service — a distributed monolith</span></figcaption>
+                    <pre><code><span class="comment">// Four deployables, one shared database, and a chain of synchronous calls.
+// Inventory can't change its tables without breaking order-service; if
+// payment-service is slow, checkout is slow; if notification is down,
+// nobody can place an order. Every release still needs every team.</span>
+<span class="annotation">@Transactional</span>
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">place</span>(<span class="class-name">Cart</span> cart) {
+    jdbc.update(<span class="string">"UPDATE stock_levels SET quantity = quantity - ? WHERE product_id = ?"</span>, ...);   <span class="comment">// inventory's table</span>
+    <span class="class-name">Order</span> order = orders.save(<span class="class-name">Order</span>.from(cart));
+    paymentClient.capture(order);          <span class="comment">// blocks for the payment provider</span>
+    notificationClient.sendConfirmation(order);
+    <span class="keyword">return</span> order;
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order-service — owns its data, announces what happened</span></figcaption>
+                    <pre><code><span class="comment">// Stock is reserved through inventory's API, never its tables. The order is
+// saved PENDING with an event in the same transaction; payment and
+// notification react to the event on their own time. Each service can be
+// released, scaled or down without stopping checkout.</span>
+<span class="annotation">@Transactional</span>
+<span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">place</span>(<span class="class-name">Cart</span> cart) {
+    inventory.reserve(<span class="keyword">new</span> <span class="class-name">ReservationRequest</span>(cart.lines()));   <span class="comment">// HTTP, with a timeout</span>
+    <span class="class-name">Order</span> order = orders.save(<span class="class-name">Order</span>.pending(cart));
+    events.publishEvent(<span class="class-name">OrderPlacedEvent</span>.of(order));       <span class="comment">// stored with the order, sent after commit</span>
+    <span class="keyword">return</span> order;
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — MODULAR MONOLITH FIRST
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Start With a Modular Monolith</h2>
+                <p>The hard part of microservices is finding boundaries that hold: if the
+                    services you cut keep needing each other's data, you built a distributed
+                    monolith. Boundaries are much cheaper to get wrong inside one application.
+                    The shop is already organised by feature — <code>order</code>,
+                    <code>inventory</code>, <code>payment</code>, <code>notification</code> — and
+                    <strong>Spring Modulith</strong> turns those packages into modules with
+                    enforced rules.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">test/…/ModularityTests.java</span></figcaption>
+                    <pre><code><span class="comment">// Fails the build if one module reaches into another's internal packages
+// or if modules depend on each other in a cycle — the coupling that makes a
+// later split impossible is caught while it is one line to fix.</span>
+<span class="keyword">class</span> <span class="class-name">ModularityTests</span> {
+
+    <span class="annotation">@Test</span>
+    <span class="keyword">void</span> <span class="function">modulesRespectTheirBoundaries</span>() {
+        <span class="class-name">ApplicationModules</span>.of(<span class="class-name">ShopApplication</span>.<span class="keyword">class</span>).verify();
+    }
+}</code></pre>
+                </figure>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">notification/OrderConfirmationListener.java</span></figcaption>
+                    <pre><code><span class="comment">// Modules talk through events. @ApplicationModuleListener is asynchronous,
+// runs in its own transaction and only after the publishing transaction
+// committed — the same semantics a Kafka consumer will have after a split.</span>
+<span class="annotation">@Component</span>
+<span class="keyword">class</span> <span class="class-name">OrderConfirmationListener</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">ConfirmationMailer</span> mailer;
+
+    <span class="class-name">OrderConfirmationListener</span>(<span class="class-name">ConfirmationMailer</span> mailer) {
+        <span class="keyword">this</span>.mailer = mailer;
+    }
+
+    <span class="annotation">@ApplicationModuleListener</span>
+    <span class="keyword">void</span> <span class="function">on</span>(<span class="class-name">OrderPlacedEvent</span> event) {
+        mailer.sendConfirmation(event.customerEmail(), event.orderId());
+    }
+}</code></pre>
+                </figure>
+
+                <p>If a module later needs its own release cycle or its own scaling, it can be
+                    lifted out with its tables and its events, and its listeners become Kafka
+                    consumers. Many teams never need that step — a well-modularised monolith is
+                    a fine end state.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — WHERE TO CUT
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Where to Cut: Each Service Owns Its Data</h2>
+                <p>A service boundary is a data boundary. Each service owns its tables — no other
+                    service reads or writes them — and exposes what others need through its API
+                    or its events. That is what makes independent releases possible: inventory
+                    can rename a column without coordinating with anyone.</p>
+
+                <table>
+                    <tr><th>Service</th><th>Owns</th><th>Offers</th><th>Reacts to</th></tr>
+                    <tr><td><strong>order</strong></td><td><code>orders</code>, <code>order_items</code></td><td><code>/api/orders</code>; <code>OrderPlaced</code>, <code>OrderCancelled</code></td><td><code>PaymentCaptured</code>, <code>PaymentFailed</code></td></tr>
+                    <tr><td><strong>inventory</strong></td><td><code>stock_levels</code></td><td><code>POST /api/reservations</code></td><td><code>OrderCancelled</code> (release the stock)</td></tr>
+                    <tr><td><strong>payment</strong></td><td>payment attempts</td><td><code>PaymentCaptured</code>, <code>PaymentFailed</code></td><td><code>OrderPlaced</code></td></tr>
+                    <tr><td><strong>notification</strong></td><td>sent-message log</td><td>—</td><td><code>OrderPlaced</code>, <code>OrderShipped</code></td></tr>
+                </table>
+
+                <p>Data another service needs often is copied, not fetched: notification keeps
+                    the customer's e-mail address it received in <code>OrderPlaced</code> instead
+                    of calling a customer service for every message. That copy can be slightly
+                    out of date, and the design has to accept it.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — SYNCHRONOUS CALLS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Synchronous Calls: HTTP Service Clients</h2>
+                <p>Some answers are needed immediately — checkout cannot accept an order without
+                    knowing the stock was reserved. Spring Framework 7 declares such a client as
+                    an interface, and Spring Boot creates and configures the implementation.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/inventory/InventoryClient.java</span></figcaption>
+                    <pre><code><span class="annotation">@HttpExchange</span>(<span class="string">"/api/reservations"</span>)
+<span class="keyword">public interface</span> <span class="class-name">InventoryClient</span> {
+
+    <span class="annotation">@PostExchange</span>
+    <span class="class-name">ReservationResponse</span> <span class="function">reserve</span>(<span class="annotation">@RequestBody</span> <span class="class-name">ReservationRequest</span> request);
+}
+
+<span class="comment">// One registration per remote service ("group"); Boot builds the client</span>
+<span class="annotation">@Configuration</span>
+<span class="annotation">@ImportHttpServices</span>(group = <span class="string">"inventory"</span>, types = <span class="class-name">InventoryClient</span>.<span class="keyword">class</span>)
+<span class="keyword">class</span> <span class="class-name">HttpClientsConfig</span> {
+}</code></pre>
+                </figure>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">resources/application.yaml</span></figcaption>
+                    <pre><code><span class="attribute">spring</span>:
+  <span class="attribute">http</span>:
+    <span class="attribute">serviceclient</span>:
+      <span class="attribute">inventory</span>:
+        <span class="attribute">base-url</span>: http://inventory   <span class="comment"># the Kubernetes Service name — no discovery server needed</span>
+        <span class="attribute">connect-timeout</span>: 1s
+        <span class="attribute">read-timeout</span>: 2s           <span class="comment"># never wait forever on another service</span></code></pre>
+                </figure>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Every synchronous call multiplies failure</div>
+                    <p>If checkout calls three services that are each available 99.9% of the
+                        time, checkout is available about 99.7% of the time — before counting its
+                        own bugs. Keep synchronous chains short, give every call a timeout, and
+                        decide what happens when it fails: retry, fall back, or fail fast. That is
+                        what <strong>Resilience4j</strong> adds, on the next page of this
+                        category.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — EVENTS AND THE OUTBOX
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Asynchronous Events and the Outbox</h2>
+                <p>Everything that does not need an immediate answer travels as an event: the
+                    order service announces <code>OrderPlaced</code>, and payment and notification
+                    react when they can. The <a href="kafka.html">Kafka page</a> explains the
+                    dual-write problem — saving the order and publishing the event are two writes
+                    that can half-fail — and builds a transactional outbox by hand. Spring
+                    Modulith provides the same guarantee with its event publication registry:
+                    the event is stored in the order's transaction and published to Kafka after
+                    commit, retried until it succeeds.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">order/OrderPlacedEvent.java</span></figcaption>
+                    <pre><code><span class="comment">// With spring-modulith-events-kafka on the classpath, @Externalized sends the
+// event to the orders.placed topic, keyed by order id so all events of one
+// order land in the same partition, in order.</span>
+<span class="annotation">@Externalized</span>(<span class="string">"orders.placed::#{#this.orderId()}"</span>)
+<span class="keyword">public record</span> <span class="class-name">OrderPlacedEvent</span>(
+        <span class="class-name">UUID</span> eventId,
+        <span class="class-name">Long</span> orderId,
+        <span class="class-name">Long</span> customerId,
+        <span class="class-name">String</span> customerEmail,
+        <span class="class-name">BigDecimal</span> total,
+        <span class="class-name">Instant</span> placedAt) {
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — SAGAS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>When a Step Fails: Sagas Instead of Distributed Transactions</h2>
+                <p>Placing an order now touches three services, and there is no transaction that
+                    spans them. A <strong>saga</strong> replaces it: a sequence of local
+                    transactions, each publishing an event that triggers the next, with a
+                    <em>compensating action</em> for every step that has to be undone when a
+                    later one fails. The shop's order lifecycle is already one.</p>
+
+                <table>
+                    <tr><th>Step</th><th>Service and local transaction</th><th>If a later step fails</th></tr>
+                    <tr><td>1</td><td>inventory: reserve stock (synchronous, during checkout)</td><td>Release the reservation on <code>OrderCancelled</code></td></tr>
+                    <tr><td>2</td><td>order: save the order as <code>PENDING</code>, publish <code>OrderPlaced</code></td><td>Mark it <code>CANCELLED</code>, publish <code>OrderCancelled</code></td></tr>
+                    <tr><td>3</td><td>payment: capture the payment, publish <code>PaymentCaptured</code> or <code>PaymentFailed</code></td><td>— (the last step that can fail)</td></tr>
+                    <tr class="row-highlight"><td>4</td><td>order: on <code>PaymentCaptured</code> → <code>PAID</code>; on <code>PaymentFailed</code> → <code>CANCELLED</code></td><td>Compensation runs backwards: inventory releases the stock</td></tr>
+                </table>
+
+                <p>Between steps the system is briefly inconsistent: an order can be
+                    <code>PENDING</code> while its payment is already captured. That is visible
+                    and has to be designed for — the order page shows "processing payment"
+                    rather than pretending the order is complete. Every listener must also be
+                    idempotent, because events can be delivered twice.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — PLATFORM
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Discovery, Gateway and Configuration on Kubernetes</h2>
+                <p>Earlier Spring Cloud setups ran a discovery server, a config server and a
+                    client-side load balancer. On <a href="kubernetes.html">Kubernetes</a> the
+                    platform already provides most of it:</p>
+
+                <table>
+                    <tr><th>Need</th><th>Classic Spring Cloud</th><th>On Kubernetes</th></tr>
+                    <tr><td>Find another service</td><td>Eureka + client-side load balancing</td><td>A Service name: <code>http://inventory</code></td></tr>
+                    <tr><td>Configuration</td><td>Config Server</td><td>ConfigMaps and Secrets (or a config server, if already in place)</td></tr>
+                    <tr><td>Single entry point for clients</td><td>Spring Cloud Gateway</td><td>Ingress / Gateway API, or Spring Cloud Gateway when routing needs code (auth, aggregation)</td></tr>
+                    <tr><td>Tracing a request across services</td><td colspan="2">Micrometer Tracing and OpenTelemetry — the observability page in this category</td></tr>
+                </table>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 7 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Start with a modular monolith and enforce the module boundaries (Spring Modulith's <code>verify()</code>)</li>
+                        <li>Split along business capabilities that already change independently, with one team owning each service</li>
+                        <li>Give every service its own data; share it only through APIs and events</li>
+                        <li>Prefer events for anything that does not need an immediate answer, published through an outbox</li>
+                        <li>Put a timeout on every synchronous call and decide in advance how a failure is handled</li>
+                        <li>Model multi-service workflows as sagas with explicit compensations and idempotent listeners</li>
+                        <li>Trace requests across services from the first day</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't split a small application maintained by one team — you take on network failures and eventual consistency for no gain</li>
+                        <li>Don't let services read each other's tables or share one database schema</li>
+                        <li>Don't build long chains of synchronous calls on the request path</li>
+                        <li>Don't use distributed (XA) transactions across services</li>
+                        <li>Don't publish events with <code>kafkaTemplate.send()</code> inside the business transaction and hope both succeed</li>
+                        <li>Don't share a "common" library of domain classes between services — it couples their releases again</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 8 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What is the main benefit of microservices, and what is the main cost?</summary>
+                        <p>The benefit is independence: teams can change, release and scale their
+                    service without coordinating with everyone else. The cost is that calls
+                    between services go over the network — they can fail, time out or be
+                    duplicated — and there is no transaction across services, so data is only
+                    eventually consistent.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why should each microservice have its own database?</summary>
+                        <p>If two services share tables, neither can change its schema without the
+                    other, and their releases become coupled again — the main benefit is lost.
+                    Owning the data means other services go through the API or events, which
+                    the owning team can keep stable while changing the tables underneath.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>When would you use a synchronous HTTP call between services, and when an event?</summary>
+                        <p>A synchronous call when the caller needs the answer to continue — checkout
+                    needs to know the stock was reserved. An event when other services only need
+                    to know that something happened — sending a confirmation or capturing a
+                    payment can happen after the order is saved.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>What is a distributed monolith, and how do you recognise one?</summary>
+                        <p>A system split into several deployables that still cannot change
+                    independently: services share a database, call each other in long
+                    synchronous chains, or share domain libraries. The symptoms are releases that
+                    need several services deployed together, one slow service slowing every
+                    request, and an outage in a peripheral service stopping the core flow.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>How do you keep data consistent across services without distributed transactions?</summary>
+                        <p>Each service commits its own local transaction and publishes an event
+                    through a transactional outbox, so the state change and the event either both
+                    happen or neither does. Workflows across services become sagas: a sequence of
+                    those local steps with compensating actions — cancel the order, release the
+                    stock — when a later step fails. Consumers are idempotent because events can
+                    be redelivered.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why recommend a modular monolith before microservices, and what does Spring Modulith add?</summary>
+                        <p>Boundaries are the hard part and are cheap to fix inside one codebase.
+                    A modular monolith with enforced module rules, communicating through events,
+                    gives most of the structural benefit without the operational cost. Spring
+                    Modulith verifies module dependencies in a test, provides
+                    <code>@ApplicationModuleListener</code> for transactional, asynchronous
+                    event handling, keeps an event publication registry so events are not lost,
+                    and can externalise events to Kafka when a module is later extracted.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why is availability lower for a request that calls several services synchronously, and what do you do about it?</summary>
+                        <p>Availability multiplies: three dependencies at 99.9% give about 99.7%
+                    for the request, and latency adds up the same way. Shorten the chain, replace
+                    calls that don't need an immediate answer with events, cache what can be
+                    cached, and protect each remaining call with timeouts, limited retries and
+                    circuit breakers so one slow dependency does not exhaust every thread.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="kafka.html" class="related-link"><span class="related-icon">📨</span>Apache Kafka with Spring Boot</a>
+                    <a href="kubernetes.html" class="related-link"><span class="related-icon">☸️</span>Kubernetes for Spring Boot</a>
+                    <a href="../jakarta-ee/transactions.html" class="related-link"><span class="related-icon">🔄</span>JTA Transactions</a>
+                    <a href="../best-practices/solid-principles.html" class="related-link"><span class="related-icon">🧱</span>SOLID Principles</a>
+                    <a href="../web-concepts/rest-principles.html" class="related-link"><span class="related-icon">🌐</span>RESTful API Principles</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
