@@ -599,7 +599,7 @@ if [[ ! -f "$SITEMAP" ]]; then
   fail "sitemap.xml not found"
 else
   grep -o '<loc>[^<]*</loc>' "$SITEMAP" | sed "s|<loc>$CANON_BASE||; s|</loc>||" | sort -u > "$TMP/sitemap.txt"
-  { printf 'index.html\nabout.html\n'; cat "$TMP/disk.txt"; } | sort -u > "$TMP/pages.txt"
+  { printf 'index.html\nabout.html\nproject.html\n'; cat "$TMP/disk.txt"; } | sort -u > "$TMP/pages.txt"
   { comm -23 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/ghost:   /'
     comm -13 "$TMP/sitemap.txt" "$TMP/pages.txt" | sed 's/^/missing: /'
     grep '<loc>' "$SITEMAP" | grep -v '<lastmod>' | sed 's/.*<loc>\([^<]*\)<\/loc>.*/no lastmod: \1/'

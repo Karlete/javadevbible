@@ -37,7 +37,7 @@ lastmod() {
     else
       printf '  <url><loc>%s%s</loc></url>\n' "$BASE" "$rel"
     fi
-  done < <({ printf 'index.html\nabout.html\n'; find "$SITE_ROOT/topics" -name '*.html' | sed "s|^$SITE_ROOT/||" | sort; })
+  done < <({ printf 'index.html\nabout.html\nproject.html\n'; find "$SITE_ROOT/topics" -name '*.html' | sed "s|^$SITE_ROOT/||" | sort; })
   printf '</urlset>\n'
 } > "$OUT"
 
