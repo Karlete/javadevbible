@@ -110,14 +110,37 @@
                     error-prone and hard to keep in sync. Annotations put configuration directly
                     next to what it configures, type-checked by the compiler.</p>
 
-                <pre><code><span class="annotation">@AnnotationName</span>
-<span class="keyword">public class</span> <span class="class-name">MyClass</span> {
-    <span class="annotation">@AnnotationName</span>
-    <span class="keyword">private</span> <span class="class-name">String</span> field;
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">resources/catalog/Product.hbm.xml</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- The mapping lives in a different file from the class it maps.
+     Rename the Java field "price" and nothing fails until runtime. --&gt;</span>
+&lt;hibernate-mapping package="com.javadevbible.shop.catalog"&gt;
+    &lt;class name="Product" table="products"&gt;
+        &lt;id name="id" column="id"&gt;&lt;generator class='identity'/&gt;&lt;/id&gt;
+        &lt;property name="sku"   column="sku"   not-null="true" unique="true"/&gt;
+        &lt;property name="price" column="price" not-null="true"/&gt;
+    &lt;/class&gt;
+&lt;/hibernate-mapping&gt;</code></pre>
+                </figure>
 
-    <span class="annotation">@AnnotationName</span>
-    <span class="keyword">public void</span> <span class="function">method</span>() { }
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">catalog/Product.java</span></figcaption>
+                    <pre><code><span class="comment">// The same metadata, attached to the elements it describes. The compiler
+// checks the annotation names and attribute types; a renamed field takes
+// its mapping with it.</span>
+<span class="annotation">@Entity</span>
+<span class="annotation">@Table</span>(name = <span class="string">"products"</span>)
+<span class="keyword">public class</span> <span class="class-name">Product</span> {
+    <span class="annotation">@Id</span> <span class="annotation">@GeneratedValue</span>(strategy = GenerationType.IDENTITY)
+    <span class="keyword">private</span> <span class="class-name">Long</span> id;
+
+    <span class="annotation">@Column</span>(nullable = <span class="keyword">false</span>, unique = <span class="keyword">true</span>)
+    <span class="keyword">private</span> <span class="class-name">String</span> sku;
+
+    <span class="annotation">@Column</span>(nullable = <span class="keyword">false</span>, precision = <span class="number">10</span>, scale = <span class="number">2</span>)
+    <span class="keyword">private</span> <span class="class-name">BigDecimal</span> price;
 }</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -137,7 +160,7 @@
 
 <span class="comment">// @Deprecated — warns callers, doesn't break compilation</span>
 <span class="annotation">@Deprecated</span>(since = <span class="string">"2.0"</span>, forRemoval = <span class="keyword">true</span>)  <span class="comment">// since/forRemoval added Java 9+</span>
-<span class="keyword">public int</span> <span class="function">add</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) { <span class="keyword">return</span> a + b; }
+<span class="keyword">public double</span> <span class="function">totalWithTax</span>(<span class="keyword">double</span> net) { ... }  <span class="comment">// replaced by the BigDecimal overload</span>
 
 <span class="comment">// @SuppressWarnings — silences specific compiler warnings, scope it tightly</span>
 <span class="annotation">@SuppressWarnings</span>(<span class="string">"unchecked"</span>)
@@ -145,8 +168,8 @@
 
 <span class="comment">// @FunctionalInterface — compiler enforces exactly one abstract method</span>
 <span class="annotation">@FunctionalInterface</span>
-<span class="keyword">public interface</span> <span class="class-name">Calculator</span> {
-    <span class="keyword">int</span> <span class="function">calculate</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b);  <span class="comment">// adding a 2nd abstract method = compile error</span>
+<span class="keyword">public interface</span> <span class="class-name">PriceRule</span> {
+    <span class="class-name">BigDecimal</span> <span class="function">apply</span>(<span class="class-name">BigDecimal</span> price);  <span class="comment">// adding a 2nd abstract method = compile error</span>
 }
 
 <span class="comment">// @SafeVarargs — asserts the varargs array isn't misused (heap pollution)</span>
@@ -225,7 +248,7 @@
                     <p>If you omit <code>@Retention</code>, your annotation is discarded by
                         the JVM at class-load time — invisible to reflection. This is the most
                         common mistake when writing a first custom annotation: it compiles fine,
-                        but <code>method.getAnnotation(MyAnnotation.class)</code> always returns
+                        but <code>method.getAnnotation(Audited.class)</code> always returns
                         <code>null</code>.</p>
                 </div>
 
@@ -263,9 +286,11 @@
     <span class="keyword">int</span>    iterations() <span class="keyword">default</span> <span class="number">1000</span>;
 }
 
-<span class="keyword">public class</span> <span class="class-name">Calculator</span> {
-    <span class="annotation">@Benchmark</span>(description = <span class="string">"addition"</span>, iterations = <span class="number">10_000</span>)
-    <span class="keyword">public int</span> <span class="function">add</span>(<span class="keyword">int</span> a, <span class="keyword">int</span> b) { <span class="keyword">return</span> a + b; }
+<span class="keyword">public class</span> <span class="class-name">CartPricingBenchmarks</span> {
+    <span class="keyword">private final</span> <span class="class-name">ShoppingCart</span> cart = <span class="class-name">ShoppingCart</span>.withItems(<span class="number">50</span>);
+
+    <span class="annotation">@Benchmark</span>(description = <span class="string">"cart total, 50 lines"</span>, iterations = <span class="number">10_000</span>)
+    <span class="keyword">public</span> <span class="class-name">BigDecimal</span> <span class="function">cartTotal</span>() { <span class="keyword">return</span> cart.total(); }
 }
 
 <span class="comment">// A minimal annotation processor — exactly how JUnit and benchmarking tools work</span>
@@ -278,7 +303,7 @@
 
             <span class="class-name">Benchmark</span> b = m.getAnnotation(<span class="class-name">Benchmark</span>.<span class="keyword">class</span>);
             <span class="keyword">long</span> start = <span class="class-name">System</span>.nanoTime();
-            <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; b.iterations(); i++) m.invoke(instance, <span class="number">5</span>, <span class="number">3</span>);
+            <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; b.iterations(); i++) m.invoke(instance);
             <span class="keyword">long</span> elapsedMs = (<span class="class-name">System</span>.nanoTime() - start) / <span class="number">1_000_000</span>;
 
             <span class="class-name">System</span>.out.printf(<span class="string">"%s: %d iterations in %dms%n"</span>, b.description(), b.iterations(), elapsedMs);
@@ -322,30 +347,32 @@ method.getAnnotationsByType(<span class="class-name">Schedule</span>.<span class
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
     <span class="annotation">@Column</span>(name = <span class="string">"full_name"</span>, nullable = <span class="keyword">false</span>)
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="keyword">private</span> <span class="class-name">String</span> fullName;
 }
 
 <span class="comment">// Bean Validation (Jakarta) — declarative constraints checked by a validator</span>
-<span class="keyword">public class</span> <span class="class-name">RegisterRequest</span> {
-    <span class="annotation">@NotNull</span> <span class="annotation">@Size</span>(min = <span class="number">3</span>, max = <span class="number">50</span>)
-    <span class="keyword">private</span> <span class="class-name">String</span> username;
-    <span class="annotation">@Email</span>
-    <span class="keyword">private</span> <span class="class-name">String</span> email;
+<span class="keyword">public record</span> <span class="class-name">RegisterCustomerRequest</span>(
+        <span class="annotation">@NotBlank</span> <span class="annotation">@Email</span>                <span class="class-name">String</span> email,
+        <span class="annotation">@NotBlank</span> <span class="annotation">@Size</span>(max = <span class="number">100</span>)        <span class="class-name">String</span> fullName) {
 }
 
 <span class="comment">// JUnit 5 — test discovery and lifecycle</span>
-<span class="keyword">class</span> <span class="class-name">CalculatorTest</span> {
+<span class="keyword">class</span> <span class="class-name">OrderTest</span> {
     <span class="annotation">@BeforeEach</span> <span class="keyword">void</span> <span class="function">setUp</span>() { ... }
-    <span class="annotation">@Test</span> <span class="keyword">void</span> <span class="function">shouldAdd</span>() { assertEquals(<span class="number">5</span>, <span class="number">2</span> + <span class="number">3</span>); }
-    <span class="annotation">@Test</span> <span class="annotation">@Disabled</span>(<span class="string">"flaky in CI"</span>) <span class="keyword">void</span> <span class="function">shouldDivide</span>() { ... }
+    <span class="annotation">@Test</span> <span class="keyword">void</span> <span class="function">totalIsTheSumOfItsLines</span>() { ... }
+    <span class="annotation">@Test</span> <span class="annotation">@Disabled</span>(<span class="string">"flaky in CI"</span>) <span class="keyword">void</span> <span class="function">cannotShipAnUnpaidOrder</span>() { ... }
 }
 
-<span class="comment">// Lombok — compile-time code generation, not reflection-based
-// @Data alone generates getters, setters, toString, equals, hashCode</span>
-<span class="annotation">@Data</span> <span class="annotation">@NoArgsConstructor</span> <span class="annotation">@AllArgsConstructor</span>
-<span class="keyword">public class</span> <span class="class-name">Product</span> {
-    <span class="keyword">private</span> <span class="class-name">Long</span> id; <span class="keyword">private</span> <span class="class-name">String</span> name; <span class="keyword">private double</span> price;
-}</code></pre>
+<span class="comment">// Lombok — compile-time code generation, not reflection-based.
+// The getters, toString and constructor are written into the .class file;
+// nothing reads these annotations at runtime.</span>
+<span class="annotation">@Getter</span> <span class="annotation">@ToString</span> <span class="annotation">@RequiredArgsConstructor</span>
+<span class="keyword">public class</span> <span class="class-name">ShippingQuote</span> {
+    <span class="keyword">private final</span> <span class="class-name">String</span> carrier;
+    <span class="keyword">private final</span> <span class="class-name">BigDecimal</span> cost;
+}
+<span class="comment">// Never put @Data on a JPA entity: its equals/hashCode/toString walk lazy
+// associations. For a plain value like this one, a record is simpler still.</span></code></pre>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -361,8 +388,8 @@ method.getAnnotationsByType(<span class="class-name">Schedule</span>.<span class
                 <pre><code><span class="comment">// An annotation processor implements Processor (usually via AbstractProcessor)
 // and is registered via META-INF/services/javax.annotation.processing.Processor</span>
 
-<span class="annotation">@SupportedAnnotationTypes</span>(<span class="string">"com.app.GenerateBuilder"</span>)
-<span class="annotation">@SupportedSourceVersion</span>(SourceVersion.RELEASE_21)
+<span class="annotation">@SupportedAnnotationTypes</span>(<span class="string">"com.javadevbible.shop.codegen.GenerateBuilder"</span>)
+<span class="annotation">@SupportedSourceVersion</span>(SourceVersion.RELEASE_25)
 <span class="keyword">public class</span> <span class="class-name">BuilderProcessor</span> <span class="keyword">extends</span> <span class="class-name">AbstractProcessor</span> {
 
     <span class="annotation">@Override</span>
@@ -411,13 +438,13 @@ method.getAnnotationsByType(<span class="class-name">Schedule</span>.<span class
                 <div class="info-box warning">
                     <div class="info-box-title">Forgetting @Retention(RUNTIME)</div>
                     <pre><code><span class="comment">// ❌ No @Retention → defaults to CLASS → invisible to reflection</span>
-<span class="keyword">public @interface</span> <span class="class-name">MyAnnotation</span> { }
+<span class="keyword">public @interface</span> <span class="class-name">Audited</span> { }
 
-method.getAnnotation(<span class="class-name">MyAnnotation</span>.<span class="keyword">class</span>);  <span class="comment">// always null, even if present in source</span>
+method.getAnnotation(<span class="class-name">Audited</span>.<span class="keyword">class</span>);  <span class="comment">// always null, even if present in source</span>
 
 <span class="comment">// ✅ Explicit RUNTIME retention</span>
 <span class="annotation">@Retention</span>(RetentionPolicy.RUNTIME)
-<span class="keyword">public @interface</span> <span class="class-name">MyAnnotation</span> { }</code></pre>
+<span class="keyword">public @interface</span> <span class="class-name">Audited</span> { }</code></pre>
                 </div>
 
                 <div class="info-box warning">
@@ -532,6 +559,7 @@ method.getAnnotation(<span class="class-name">MyAnnotation</span>.<span class="k
                     <a href="../fundamentals/interfaces-abstract.html" class="related-link">
                         <span class="related-icon">📐</span>Interfaces &amp; Abstract Classes
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

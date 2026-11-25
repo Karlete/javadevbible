@@ -114,18 +114,25 @@
                     this is possible with static method calls — the framework code is compiled
                     before your classes even exist.</p>
 
-                <pre><code><span class="keyword">class</span> <span class="class-name">Person</span> {
-    <span class="keyword">private</span> <span class="class-name">String</span> name = <span class="string">"Alice"</span>;
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">compile-time access</span></figcaption>
+                    <pre><code><span class="keyword">public class</span> <span class="class-name">Customer</span> {
+    <span class="keyword">private</span> <span class="class-name">String</span> fullName = <span class="string">"Ada Lovelace"</span>;
 }
 
-<span class="comment">// Normal Java: compile-time access only</span>
-<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
-<span class="comment">// p.name;   ❌ compile error — private, not accessible</span>
+<span class="class-name">Customer</span> customer = <span class="keyword">new</span> <span class="class-name">Customer</span>();
+customer.fullName;   <span class="comment">// compile error: private. And a framework compiled years
+                     // before Customer existed could not even name the type.</span></code></pre>
+                </figure>
 
-<span class="comment">// Reflection: runtime access by name, bypassing access control</span>
-<span class="class-name">Field</span> nameField = p.getClass().getDeclaredField(<span class="string">"name"</span>);
-nameField.setAccessible(<span class="keyword">true</span>);
-<span class="class-name">String</span> name = (<span class="class-name">String</span>) nameField.get(p);  <span class="comment">// "Alice" — read via reflection</span></code></pre>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">runtime access by name</span></figcaption>
+                    <pre><code><span class="comment">// The field is found by its name at runtime, on whatever object is passed in.
+// This is the same call Jackson or Hibernate makes on a class it never saw.</span>
+<span class="class-name">Field</span> field = customer.getClass().getDeclaredField(<span class="string">"fullName"</span>);
+field.setAccessible(<span class="keyword">true</span>);                       <span class="comment">// bypasses "private" (see modules below)</span>
+<span class="class-name">String</span> fullName = (<span class="class-name">String</span>) field.get(customer);   <span class="comment">// "Ada Lovelace"</span></code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -135,13 +142,13 @@ nameField.setAccessible(<span class="keyword">true</span>);
                 <h2>Inspecting Classes</h2>
 
                 <pre><code><span class="comment">// Three ways to get a Class object</span>
-<span class="class-name">Class</span>&lt;?&gt; c1 = p.getClass();                       <span class="comment">// from an instance</span>
-<span class="class-name">Class</span>&lt;?&gt; c2 = <span class="class-name">Person</span>.<span class="keyword">class</span>;                       <span class="comment">// class literal — preferred, type-checked</span>
-<span class="class-name">Class</span>&lt;?&gt; c3 = <span class="class-name">Class</span>.forName(<span class="string">"com.app.Person"</span>); <span class="comment">// by name — for dynamic loading (plugins)</span>
+<span class="class-name">Class</span>&lt;?&gt; c1 = customer.getClass();                       <span class="comment">// from an instance</span>
+<span class="class-name">Class</span>&lt;?&gt; c2 = <span class="class-name">Customer</span>.<span class="keyword">class</span>;                     <span class="comment">// class literal — preferred, type-checked</span>
+<span class="class-name">Class</span>&lt;?&gt; c3 = <span class="class-name">Class</span>.forName(<span class="string">"com.javadevbible.shop.customer.Customer"</span>); <span class="comment">// by name — for dynamic loading (plugins)</span>
 
-<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
-clazz.getName();              <span class="comment">// "com.app.Person"</span>
-clazz.getSimpleName();        <span class="comment">// "Person"</span>
+<span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Customer</span>.<span class="keyword">class</span>;
+clazz.getName();              <span class="comment">// "com.javadevbible.shop.customer.Customer"</span>
+clazz.getSimpleName();        <span class="comment">// "Customer"</span>
 clazz.getSuperclass();        <span class="comment">// parent class</span>
 clazz.getInterfaces();        <span class="comment">// implemented interfaces</span>
 clazz.isInterface();          <span class="comment">// false</span>
@@ -159,30 +166,31 @@ clazz.isAnnotationPresent(<span class="class-name">Entity</span>.<span class="ke
                 <h2>Fields, Methods, and Constructors</h2>
 
                 <h3>Fields</h3>
-                <pre><code><span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Person</span>.<span class="keyword">class</span>;
-<span class="class-name">Person</span> p = <span class="keyword">new</span> <span class="class-name">Person</span>();
+                <pre><code><span class="class-name">Class</span>&lt;?&gt; clazz = <span class="class-name">Product</span>.<span class="keyword">class</span>;
+<span class="class-name">Product</span> product = <span class="keyword">new</span> <span class="class-name">Product</span>();
 
 clazz.getDeclaredFields();    <span class="comment">// ALL fields of THIS class (any access level)</span>
 clazz.getFields();            <span class="comment">// only PUBLIC fields (this class + inherited)</span>
 
-<span class="class-name">Field</span> ageField = clazz.getDeclaredField(<span class="string">"age"</span>);
-ageField.setAccessible(<span class="keyword">true</span>);     <span class="comment">// required to read/write private fields</span>
-<span class="keyword">int</span> age = (<span class="keyword">int</span>) ageField.get(p);
-ageField.set(p, <span class="number">30</span>);              <span class="comment">// mutate even a private/final field (with caveats)</span></code></pre>
+<span class="class-name">Field</span> priceField = clazz.getDeclaredField(<span class="string">"price"</span>);
+priceField.setAccessible(<span class="keyword">true</span>);   <span class="comment">// required to read/write private fields</span>
+<span class="class-name">BigDecimal</span> price = (<span class="class-name">BigDecimal</span>) priceField.get(product);
+priceField.set(product, <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"19.99"</span>));  <span class="comment">// no setter, no validation: the invariant is yours to keep</span></code></pre>
 
                 <h3>Methods</h3>
                 <pre><code><span class="comment">// getMethod: must specify exact parameter types — finds public methods (incl. inherited)</span>
-<span class="class-name">Method</span> add = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
-<span class="class-name">Object</span> result = add.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);   <span class="comment">// returns Object — caller must cast</span>
+<span class="class-name">Class</span>&lt;?&gt; calcClass = <span class="class-name">PriceCalculator</span>.<span class="keyword">class</span>;
+<span class="class-name">Method</span> totalFor = calcClass.getMethod(<span class="string">"totalFor"</span>, <span class="class-name">Order</span>.<span class="keyword">class</span>);
+<span class="class-name">Object</span> result = totalFor.invoke(calculator, order);   <span class="comment">// returns Object — caller must cast</span>
 
 <span class="comment">// getDeclaredMethod: finds ANY method declared on this class (incl. private)</span>
-<span class="class-name">Method</span> privateMethod = clazz.getDeclaredMethod(<span class="string">"multiply"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
+<span class="class-name">Method</span> privateMethod = calcClass.getDeclaredMethod(<span class="string">"applyDiscount"</span>, <span class="class-name">BigDecimal</span>.<span class="keyword">class</span>);
 privateMethod.setAccessible(<span class="keyword">true</span>);
-result = privateMethod.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
+result = privateMethod.invoke(calculator, order.getTotal());
 
 <span class="comment">// Exceptions are wrapped — always unwrap the real cause</span>
 <span class="keyword">try</span> {
-    add.invoke(calc, <span class="string">"not"</span>, <span class="string">"ints"</span>);
+    totalFor.invoke(calculator, (<span class="class-name">Order</span>) <span class="keyword">null</span>);  <span class="comment">// totalFor() throws NullPointerException inside</span>
 } <span class="keyword">catch</span> (<span class="class-name">InvocationTargetException</span> e) {
     <span class="class-name">Throwable</span> realCause = e.getCause();  <span class="comment">// the ACTUAL exception thrown inside</span>
 }</code></pre>
@@ -192,8 +200,8 @@ result = privateMethod.invoke(calc, <span class="number">5</span>, <span class="
 <span class="class-name">Object</span> p2 = clazz.getDeclaredConstructor().newInstance();
 
 <span class="comment">// With parameters</span>
-<span class="class-name">Constructor</span>&lt;?&gt; ctor = clazz.getConstructor(<span class="class-name">String</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
-<span class="class-name">Object</span> p3 = ctor.newInstance(<span class="string">"Alice"</span>, <span class="number">25</span>);
+<span class="class-name">Constructor</span>&lt;?&gt; ctor = clazz.getConstructor(<span class="class-name">String</span>.<span class="keyword">class</span>, <span class="class-name">String</span>.<span class="keyword">class</span>, <span class="class-name">BigDecimal</span>.<span class="keyword">class</span>);
+<span class="class-name">Object</span> p3 = ctor.newInstance(<span class="string">"KB-104"</span>, <span class="string">"Mechanical keyboard"</span>, <span class="keyword">new</span> <span class="class-name">BigDecimal</span>(<span class="string">"89.00"</span>));
 
 <span class="comment">// Fully dynamic: load a class by name and instantiate it — the foundation
 // of plugin architectures and dependency injection containers</span>
@@ -210,23 +218,26 @@ result = privateMethod.invoke(calc, <span class="number">5</span>, <span class="
                     this demystifies "magic" annotations and helps you debug framework
                     behaviour.</p>
 
-                <pre><code><span class="comment">// Spring: @Autowired fields are populated via reflection</span>
+                <pre><code><span class="comment">// Spring: beans are created through their constructor, found via reflection</span>
 <span class="annotation">@Service</span>
-<span class="keyword">public class</span> <span class="class-name">CustomerController</span> {
-    <span class="annotation">@Autowired</span>
-    <span class="keyword">private</span> <span class="class-name">CustomerService</span> customerService;
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+    <span class="keyword">private final</span> <span class="class-name">OrderRepository</span> orders;
+
+    <span class="keyword">public</span> <span class="function">OrderService</span>(<span class="class-name">OrderRepository</span> orders) { <span class="keyword">this</span>.orders = orders; }
 }
-<span class="comment">// At startup, Spring: scans for @Autowired fields via reflection,
-// resolves the bean, calls field.setAccessible(true), then field.set(controller, bean)</span>
+<span class="comment">// At startup, Spring: clazz.getDeclaredConstructors(), reads each parameter
+// type, resolves a bean for it, then constructor.newInstance(beans...).
+// Field injection works the same way with field.set(), which is why it can
+// fill a private field — and why the object is incomplete until it does.</span>
 
 <span class="comment">// Jackson: serialises by reading every field via reflection</span>
-<span class="class-name">String</span> json = objectMapper.writeValueAsString(person);
-<span class="comment">// Internally: getDeclaredFields(), setAccessible(true) on each, field.get(person),
-// build a JSON tree from the (name, value) pairs</span>
+<span class="class-name">String</span> json = objectMapper.writeValueAsString(order);
+<span class="comment">// Internally: finds getters (or a record's accessors) and fields via reflection,
+// caches them per class, then reads each value and writes (name, value) pairs</span>
 
 <span class="comment">// JUnit: finds and invokes @Test methods</span>
-<span class="keyword">public class</span> <span class="class-name">MyTest</span> {
-    <span class="annotation">@Test</span> <span class="keyword">void</span> <span class="function">shouldWork</span>() { ... }
+<span class="keyword">class</span> <span class="class-name">OrderTest</span> {
+    <span class="annotation">@Test</span> <span class="keyword">void</span> <span class="function">totalIsTheSumOfItsLines</span>() { ... }
 }
 <span class="comment">// JUnit: clazz.getDeclaredMethods(), filters by isAnnotationPresent(Test.class),
 // creates a test instance via no-arg constructor, invokes each test method</span>
@@ -235,7 +246,7 @@ result = privateMethod.invoke(calc, <span class="number">5</span>, <span class="
 <span class="annotation">@Entity</span>
 <span class="keyword">public class</span> <span class="class-name">Customer</span> {
     <span class="annotation">@Id</span> <span class="keyword">private</span> <span class="class-name">Long</span> id;
-    <span class="annotation">@Column</span> <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="annotation">@Column</span> <span class="keyword">private</span> <span class="class-name">String</span> fullName;
 }
 <span class="comment">// Hibernate: reads @Entity/@Id/@Column via reflection at startup, builds
 // a mapping, then uses reflection to populate fields from ResultSet rows</span></code></pre>
@@ -251,18 +262,18 @@ result = privateMethod.invoke(calc, <span class="number">5</span>, <span class="
 
 <span class="comment">// ❌ WORST: look up the Method every single call</span>
 <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">1_000</span>; i++) {
-    <span class="class-name">Method</span> m = clazz.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);  <span class="comment">// expensive lookup</span>
-    m.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);
+    <span class="class-name">Method</span> m = calcClass.getMethod(<span class="string">"totalFor"</span>, <span class="class-name">Order</span>.<span class="keyword">class</span>);  <span class="comment">// expensive lookup</span>
+    m.invoke(calculator, order);
 }
 
 <span class="comment">// ✅ BETTER: cache the Method/Field/Constructor lookup once</span>
-<span class="keyword">private static final</span> <span class="class-name">Method</span> ADD_METHOD;
+<span class="keyword">private static final</span> <span class="class-name">Method</span> TOTAL_FOR;
 <span class="keyword">static</span> {
-    <span class="keyword">try</span> { <span class="class-name">ADD_METHOD</span> = <span class="class-name">Calculator</span>.<span class="keyword">class</span>.getMethod(<span class="string">"add"</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>); }
+    <span class="keyword">try</span> { <span class="class-name">TOTAL_FOR</span> = <span class="class-name">PriceCalculator</span>.<span class="keyword">class</span>.getMethod(<span class="string">"totalFor"</span>, <span class="class-name">Order</span>.<span class="keyword">class</span>); }
     <span class="keyword">catch</span> (<span class="class-name">NoSuchMethodException</span> e) { <span class="keyword">throw new</span> <span class="class-name">ExceptionInInitializerError</span>(e); }
 }
 <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">1_000</span>; i++) {
-    <span class="class-name">ADD_METHOD</span>.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);  <span class="comment">// no lookup cost, still has invocation overhead</span>
+    <span class="class-name">TOTAL_FOR</span>.invoke(calculator, order);  <span class="comment">// no lookup cost, still has invocation overhead</span>
 }
 
 <span class="comment">// This is exactly why Spring, Hibernate, and Jackson cache reflective
@@ -283,16 +294,16 @@ result = privateMethod.invoke(calc, <span class="number">5</span>, <span class="
 <span class="comment">// ❌ Without an opens declaration, this throws InaccessibleObjectException:</span>
 field.setAccessible(<span class="keyword">true</span>);
 <span class="comment">// java.lang.reflect.InaccessibleObjectException: Unable to make field
-// private java.lang.String com.app.Secret.value accessible:
-// module com.app does not "opens com.app" to module spring.core</span>
+// private java.lang.String com.javadevbible.shop.customer.Customer.fullName accessible:
+// module com.javadevbible.shop does not "opens com.javadevbible.shop.customer" to module org.hibernate.orm.core</span>
 
 <span class="comment">// ✅ Fix 1: declare opens in module-info.java</span>
-<span class="keyword">module</span> com.app {
-    <span class="keyword">opens</span> com.app <span class="keyword">to</span> spring.core, com.fasterxml.jackson.databind;
+<span class="keyword">module</span> com.javadevbible.shop {
+    <span class="keyword">opens</span> com.javadevbible.shop.customer <span class="keyword">to</span> org.hibernate.orm.core, spring.core;
 }
 
 <span class="comment">// ✅ Fix 2: JVM flag (workaround, common during Java 9-17 migrations)</span>
-<span class="comment">// java --add-opens com.app/com.app=ALL-UNNAMED MyApp</span>
+<span class="comment">// java --add-opens com.javadevbible.shop/com.javadevbible.shop.customer=ALL-UNNAMED ...</span>
 
 <span class="comment">// This is precisely why Spring Boot, Hibernate, and Jackson required
 // migration work when projects moved past Java 8 — they all rely
@@ -300,14 +311,15 @@ field.setAccessible(<span class="keyword">true</span>);
 
                 <h3>MethodHandles — the modern, faster alternative</h3>
                 <pre><code><span class="comment">// java.lang.invoke.MethodHandle (Java 7+) offers near-direct-call performance
-// after JIT warms up — the JVM can inline through a MethodHandle, but NOT
-// through reflective Method.invoke().</span>
+// after JIT warms up. Since JDK 18 (JEP 416) Method.invoke() is itself built on
+// method handles, but only a handle held in a static final field is a constant
+// the JIT can inline through — keep it there.</span>
 
 <span class="class-name">MethodHandles</span>.<span class="class-name">Lookup</span> lookup = <span class="class-name">MethodHandles</span>.lookup();
-<span class="class-name">MethodType</span> type = <span class="class-name">MethodType</span>.methodType(<span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>, <span class="keyword">int</span>.<span class="keyword">class</span>);
-<span class="class-name">MethodHandle</span> addHandle = lookup.findVirtual(<span class="class-name">Calculator</span>.<span class="keyword">class</span>, <span class="string">"add"</span>, type);
+<span class="class-name">MethodType</span> type = <span class="class-name">MethodType</span>.methodType(<span class="class-name">BigDecimal</span>.<span class="keyword">class</span>, <span class="class-name">Order</span>.<span class="keyword">class</span>);
+<span class="class-name">MethodHandle</span> totalFor = lookup.findVirtual(<span class="class-name">PriceCalculator</span>.<span class="keyword">class</span>, <span class="string">"totalFor"</span>, type);
 
-<span class="keyword">int</span> result = (<span class="keyword">int</span>) addHandle.invoke(calc, <span class="number">5</span>, <span class="number">3</span>);  <span class="comment">// type-checked at the invoke() call</span>
+<span class="class-name">BigDecimal</span> total = (<span class="class-name">BigDecimal</span>) totalFor.invoke(calculator, order);  <span class="comment">// type-checked at the invoke() call</span>
 
 <span class="comment">/*
  *  Reflection vs MethodHandle:
@@ -486,6 +498,7 @@ f.setAccessible(<span class="keyword">true</span>);
                     <a href="../fundamentals/access-modifiers.html" class="related-link">
                         <span class="related-icon">🔒</span>Access Modifiers
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

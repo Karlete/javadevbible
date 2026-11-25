@@ -135,6 +135,40 @@
                         <td>Observer, Strategy, Command</td>
                     </tr>
                 </table>
+
+                <p>What a pattern buys you is easiest to see in code that grew without one.
+                    Here checkout picks a payment provider with a conditional; every new
+                    provider means editing, retesting and redeploying the class that places
+                    orders.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/CheckoutService.java</span></figcaption>
+                    <pre><code><span class="keyword">public void</span> <span class="function">checkout</span>(<span class="class-name">Order</span> order, <span class="class-name">String</span> method) {
+    <span class="keyword">if</span> (<span class="string">"CARD"</span>.equals(method)) {
+        stripe.charge(order.getId(), order.getTotal());
+    } <span class="keyword">else if</span> (<span class="string">"PAYPAL"</span>.equals(method)) {
+        payPal.createPayment(order.getTotal(), order.getId().toString());
+    } <span class="keyword">else</span> {
+        <span class="keyword">throw new</span> <span class="class-name">IllegalArgumentException</span>(<span class="string">"Unknown payment method: "</span> + method);
+    }
+    order.markPaid();
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/CheckoutService.java</span></figcaption>
+                    <pre><code><span class="comment">// Strategy: each provider implements one interface. Checkout no longer knows
+// which providers exist, so adding one touches no existing class.</span>
+<span class="keyword">public interface</span> <span class="class-name">PaymentGateway</span> {
+    <span class="class-name">PaymentMethod</span> <span class="function">method</span>();
+    <span class="class-name">PaymentResult</span> <span class="function">charge</span>(<span class="class-name">Order</span> order);
+}
+
+<span class="keyword">public void</span> <span class="function">checkout</span>(<span class="class-name">Order</span> order, <span class="class-name">PaymentMethod</span> method) {
+    gateways.get(method).charge(order);   <span class="comment">// Map&lt;PaymentMethod, PaymentGateway&gt; built from the injected beans</span>
+    order.markPaid();
+}</code></pre>
+                </figure>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -240,47 +274,66 @@
                 <p><strong>Problem:</strong> an existing class's interface doesn't match what
                     your code expects, and you can't (or shouldn't) modify it.</p>
 
-                <pre><code><span class="keyword">class</span> <span class="class-name">LegacyPrinter</span> { <span class="comment">// third-party, can't modify</span>
-    <span class="keyword">void</span> <span class="function">printOldFormat</span>(<span class="class-name">String</span> text) { <span class="class-name">System</span>.out.println(<span class="string">"[LEGACY] "</span> + text); }
+                <pre><code><span class="comment">// Third-party carrier SDK: can't modify it, and its types are not ours</span>
+<span class="keyword">class</span> <span class="class-name">ParcelExpressClient</span> {
+    <span class="keyword">long</span> <span class="function">quoteCents</span>(<span class="class-name">String</span> postcode, <span class="class-name">String</span> country, <span class="keyword">int</span> grams) { ... }
 }
 
-<span class="keyword">interface</span> <span class="class-name">Printer</span> { <span class="keyword">void</span> <span class="function">print</span>(<span class="class-name">String</span> text); }  <span class="comment">// what your code expects</span>
-
-<span class="keyword">class</span> <span class="class-name">LegacyPrinterAdapter</span> <span class="keyword">implements</span> <span class="class-name">Printer</span> {
-    <span class="keyword">private final</span> <span class="class-name">LegacyPrinter</span> legacy;
-    <span class="function">LegacyPrinterAdapter</span>(<span class="class-name">LegacyPrinter</span> legacy) { <span class="keyword">this</span>.legacy = legacy; }
-    <span class="annotation">@Override</span> <span class="keyword">public void</span> <span class="function">print</span>(<span class="class-name">String</span> text) { legacy.printOldFormat(text); }
+<span class="keyword">interface</span> <span class="class-name">ShippingRates</span> {   <span class="comment">// what the order module expects</span>
+    <span class="class-name">BigDecimal</span> <span class="function">rateFor</span>(<span class="class-name">ShippingAddress</span> address, <span class="keyword">int</span> weightGrams);
 }
+
+<span class="keyword">class</span> <span class="class-name">ParcelExpressRates</span> <span class="keyword">implements</span> <span class="class-name">ShippingRates</span> {
+    <span class="keyword">private final</span> <span class="class-name">ParcelExpressClient</span> client;
+    <span class="function">ParcelExpressRates</span>(<span class="class-name">ParcelExpressClient</span> client) { <span class="keyword">this</span>.client = client; }
+
+    <span class="annotation">@Override</span> <span class="keyword">public</span> <span class="class-name">BigDecimal</span> <span class="function">rateFor</span>(<span class="class-name">ShippingAddress</span> address, <span class="keyword">int</span> weightGrams) {
+        <span class="keyword">long</span> cents = client.quoteCents(address.postcode(), address.country(), weightGrams);
+        <span class="keyword">return</span> <span class="class-name">BigDecimal</span>.valueOf(cents, <span class="number">2</span>);   <span class="comment">// the conversion lives here, nowhere else</span>
+    }
+}
+<span class="comment">// Swapping carriers later means writing another adapter, not touching orders.</span>
 
 <span class="comment">// java.util.Arrays.asList() is a textbook Adapter — wraps an array as a List</span>
-<span class="class-name">String</span>[] arr = {<span class="string">"a"</span>, <span class="string">"b"</span>};
-<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; list = <span class="class-name">Arrays</span>.asList(arr);  <span class="comment">// array adapted to the List interface</span></code></pre>
+<span class="class-name">String</span>[] skus = {<span class="string">"KB-104"</span>, <span class="string">"MS-220"</span>};
+<span class="class-name">List</span>&lt;<span class="class-name">String</span>&gt; list = <span class="class-name">Arrays</span>.asList(skus);  <span class="comment">// array adapted to the List interface</span></code></pre>
 
                 <h3>Decorator — add behaviour dynamically</h3>
                 <p><strong>Problem:</strong> you want to add features to an object at runtime
                     without subclass explosion (every combination needing its own class).</p>
 
-                <pre><code><span class="keyword">interface</span> <span class="class-name">Coffee</span> { <span class="class-name">String</span> <span class="function">description</span>(); <span class="keyword">double</span> <span class="function">cost</span>(); }
+                <pre><code><span class="keyword">interface</span> <span class="class-name">PaymentGateway</span> { <span class="class-name">PaymentResult</span> <span class="function">charge</span>(<span class="class-name">Order</span> order); }
 
-<span class="keyword">class</span> <span class="class-name">SimpleCoffee</span> <span class="keyword">implements</span> <span class="class-name">Coffee</span> {
-    <span class="annotation">@Override</span> <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">description</span>() { <span class="keyword">return</span> <span class="string">"Coffee"</span>; }
-    <span class="annotation">@Override</span> <span class="keyword">public double</span> <span class="function">cost</span>() { <span class="keyword">return</span> <span class="number">2.0</span>; }
+<span class="keyword">class</span> <span class="class-name">StripeGateway</span> <span class="keyword">implements</span> <span class="class-name">PaymentGateway</span> {
+    <span class="annotation">@Override</span> <span class="keyword">public</span> <span class="class-name">PaymentResult</span> <span class="function">charge</span>(<span class="class-name">Order</span> order) { <span class="comment">/* HTTP call to Stripe */</span> }
 }
 
-<span class="keyword">abstract class</span> <span class="class-name">CoffeeDecorator</span> <span class="keyword">implements</span> <span class="class-name">Coffee</span> {
-    <span class="keyword">protected final</span> <span class="class-name">Coffee</span> base;
-    <span class="function">CoffeeDecorator</span>(<span class="class-name">Coffee</span> base) { <span class="keyword">this</span>.base = base; }
+<span class="comment">// Each decorator implements the same interface and wraps another instance</span>
+<span class="keyword">class</span> <span class="class-name">LoggingGateway</span> <span class="keyword">implements</span> <span class="class-name">PaymentGateway</span> {
+    <span class="keyword">private final</span> <span class="class-name">PaymentGateway</span> next;
+    <span class="function">LoggingGateway</span>(<span class="class-name">PaymentGateway</span> next) { <span class="keyword">this</span>.next = next; }
+
+    <span class="annotation">@Override</span> <span class="keyword">public</span> <span class="class-name">PaymentResult</span> <span class="function">charge</span>(<span class="class-name">Order</span> order) {
+        log.info(<span class="string">"Charging order {} for {}"</span>, order.getId(), order.getTotal());
+        <span class="keyword">return</span> next.charge(order);
+    }
 }
 
-<span class="keyword">class</span> <span class="class-name">MilkDecorator</span> <span class="keyword">extends</span> <span class="class-name">CoffeeDecorator</span> {
-    <span class="function">MilkDecorator</span>(<span class="class-name">Coffee</span> base) { <span class="keyword">super</span>(base); }
-    <span class="annotation">@Override</span> <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">description</span>() { <span class="keyword">return</span> base.description() + <span class="string">", Milk"</span>; }
-    <span class="annotation">@Override</span> <span class="keyword">public double</span> <span class="function">cost</span>() { <span class="keyword">return</span> base.cost() + <span class="number">0.5</span>; }
+<span class="keyword">class</span> <span class="class-name">RetryingGateway</span> <span class="keyword">implements</span> <span class="class-name">PaymentGateway</span> {
+    <span class="keyword">private final</span> <span class="class-name">PaymentGateway</span> next;
+    <span class="function">RetryingGateway</span>(<span class="class-name">PaymentGateway</span> next) { <span class="keyword">this</span>.next = next; }
+
+    <span class="annotation">@Override</span> <span class="keyword">public</span> <span class="class-name">PaymentResult</span> <span class="function">charge</span>(<span class="class-name">Order</span> order) {
+        <span class="comment">// only safe because charge() sends the order id as an idempotency key</span>
+        <span class="keyword">for</span> (<span class="keyword">int</span> attempt = <span class="number">1</span>; ; attempt++) {
+            <span class="keyword">try</span> { <span class="keyword">return</span> next.charge(order); }
+            <span class="keyword">catch</span> (<span class="class-name">GatewayTimeoutException</span> e) { <span class="keyword">if</span> (attempt == <span class="number">3</span>) <span class="keyword">throw</span> e; }
+        }
+    }
 }
 
-<span class="comment">// Stack decorators at runtime — any combination, no new classes needed</span>
-<span class="class-name">Coffee</span> order = <span class="keyword">new</span> <span class="class-name">MilkDecorator</span>(<span class="keyword">new</span> <span class="class-name">SimpleCoffee</span>());
-<span class="comment">// order.cost() == 2.5</span>
+<span class="comment">// Stack decorators at runtime — any combination, no subclass per combination</span>
+<span class="class-name">PaymentGateway</span> gateway = <span class="keyword">new</span> <span class="class-name">LoggingGateway</span>(<span class="keyword">new</span> <span class="class-name">RetryingGateway</span>(<span class="keyword">new</span> <span class="class-name">StripeGateway</span>()));
 
 <span class="comment">// Java's own I/O is the canonical real-world Decorator:</span>
 <span class="class-name">BufferedReader</span> reader = <span class="keyword">new</span> <span class="class-name">BufferedReader</span>(      <span class="comment">// adds buffering</span>
@@ -291,20 +344,28 @@
                 <p><strong>Problem:</strong> a subsystem has many interacting parts; most callers
                     only need a simple high-level operation.</p>
 
-                <pre><code><span class="keyword">class</span> <span class="class-name">ComputerFacade</span> {
-    <span class="keyword">private final</span> <span class="class-name">CPU</span> cpu = <span class="keyword">new</span> <span class="class-name">CPU</span>();
-    <span class="keyword">private final</span> <span class="class-name">Memory</span> memory = <span class="keyword">new</span> <span class="class-name">Memory</span>();
-    <span class="keyword">private final</span> <span class="class-name">HardDrive</span> disk = <span class="keyword">new</span> <span class="class-name">HardDrive</span>();
+                <pre><code><span class="comment">// Placing an order touches four modules. Controllers call one method.</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">CheckoutFacade</span> {
+    <span class="keyword">private final</span> <span class="class-name">InventoryService</span> inventory;
+    <span class="keyword">private final</span> <span class="class-name">PaymentService</span> payments;
+    <span class="keyword">private final</span> <span class="class-name">InvoiceService</span> invoices;
+    <span class="keyword">private final</span> <span class="class-name">NotificationService</span> notifications;
 
-    <span class="keyword">public void</span> <span class="function">start</span>() {  <span class="comment">// hides the orchestration of 3 subsystems</span>
-        cpu.freeze();
-        memory.load(<span class="number">0</span>, disk.read(<span class="number">0</span>, <span class="number">1024</span>));
-        cpu.jump(<span class="number">0</span>);
-        cpu.execute();
+    <span class="comment">// constructor omitted: all four injected</span>
+
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public</span> <span class="class-name">Invoice</span> <span class="function">placeOrder</span>(<span class="class-name">Order</span> order) {
+        inventory.reserve(order.getItems());   <span class="comment">// throws if any SKU is short</span>
+        payments.charge(order);
+        <span class="class-name">Invoice</span> invoice = invoices.issue(order);
+        notifications.orderConfirmed(order);
+        <span class="keyword">return</span> invoice;
     }
 }
-<span class="comment">// Spring's JdbcTemplate is a Facade over raw JDBC's Connection/Statement/ResultSet
-// lifecycle management — one method call instead of try/catch/finally boilerplate.</span></code></pre>
+<span class="comment">// The order of the four steps is a business rule; the facade keeps it in one
+// place instead of in every caller. Spring's JdbcTemplate is the same idea over
+// JDBC's Connection/Statement/ResultSet lifecycle.</span></code></pre>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -329,7 +390,7 @@
 <span class="comment">// Modern Java: java.beans.PropertyChangeSupport, or simply functional listeners</span>
 <span class="class-name">List</span>&lt;<span class="class-name">Consumer</span>&lt;<span class="class-name">String</span>&gt;&gt; listeners = <span class="keyword">new</span> <span class="class-name">ArrayList</span>&lt;&gt;();
 listeners.add(event -&gt; <span class="class-name">System</span>.out.println(<span class="string">"Got: "</span> + event));
-listeners.forEach(l -&gt; l.accept(<span class="string">"new video"</span>));
+listeners.forEach(l -&gt; l.accept(<span class="string">"OrderPlaced:1042"</span>));
 
 <span class="comment">// At scale, this becomes a message broker (Kafka, RabbitMQ) — Observer is the
 // conceptual ancestor of every pub/sub architecture in distributed systems.</span></code></pre>
@@ -351,28 +412,27 @@ cart.setStrategy(amount -&gt; chargeStripe(amount));   <span class="comment">// 
 cart.setStrategy(amount -&gt; chargePayPal(amount));
 
 <span class="comment">// Comparator.comparing() IS the Strategy pattern, built into the JDK:</span>
-customers.sort(<span class="class-name">Comparator</span>.comparing(<span class="class-name">Customer</span>::lastName));         <span class="comment">// strategy: sort by name</span>
-customers.sort(<span class="class-name">Comparator</span>.comparing(<span class="class-name">Customer</span>::age).reversed()); <span class="comment">// strategy: sort by age desc</span></code></pre>
+customers.sort(<span class="class-name">Comparator</span>.comparing(<span class="class-name">Customer</span>::getFullName));             <span class="comment">// strategy: by name</span>
+customers.sort(<span class="class-name">Comparator</span>.comparing(<span class="class-name">Customer</span>::getCreatedAt).reversed()); <span class="comment">// strategy: newest first</span></code></pre>
 
                 <h3>Command — encapsulate a request as an object</h3>
                 <p><strong>Problem:</strong> you want to parameterise an action, queue it, log
                     it, or support undo — none of which is possible with a bare method call.</p>
 
-                <pre><code><span class="keyword">interface</span> <span class="class-name">Command</span> { <span class="keyword">void</span> <span class="function">execute</span>(); <span class="keyword">void</span> <span class="function">undo</span>(); }
+                <pre><code><span class="keyword">interface</span> <span class="class-name">CartCommand</span> { <span class="keyword">void</span> <span class="function">execute</span>(); <span class="keyword">void</span> <span class="function">undo</span>(); }
 
-<span class="keyword">class</span> <span class="class-name">ToggleLightCommand</span> <span class="keyword">implements</span> <span class="class-name">Command</span> {
-    <span class="keyword">private final</span> <span class="class-name">Light</span> light;
-    <span class="function">ToggleLightCommand</span>(<span class="class-name">Light</span> light) { <span class="keyword">this</span>.light = light; }
-    <span class="annotation">@Override</span> <span class="keyword">public void</span> <span class="function">execute</span>() { light.turnOn(); }
-    <span class="annotation">@Override</span> <span class="keyword">public void</span> <span class="function">undo</span>()    { light.turnOff(); }
+<span class="keyword">record</span> <span class="class-name">AddItem</span>(<span class="class-name">ShoppingCart</span> cart, <span class="class-name">Product</span> product, <span class="keyword">int</span> quantity) <span class="keyword">implements</span> <span class="class-name">CartCommand</span> {
+    <span class="annotation">@Override</span> <span class="keyword">public void</span> <span class="function">execute</span>() { cart.add(product, quantity); }
+    <span class="annotation">@Override</span> <span class="keyword">public void</span> <span class="function">undo</span>()    { cart.remove(product, quantity); }
 }
 
-<span class="keyword">class</span> <span class="class-name">RemoteControl</span> {
-    <span class="keyword">private final</span> <span class="class-name">Deque</span>&lt;<span class="class-name">Command</span>&gt; history = <span class="keyword">new</span> <span class="class-name">ArrayDeque</span>&lt;&gt;();
-    <span class="keyword">void</span> <span class="function">press</span>(<span class="class-name">Command</span> cmd) { cmd.execute(); history.push(cmd); }
-    <span class="keyword">void</span> <span class="function">undoLast</span>()        { <span class="keyword">if</span> (!history.isEmpty()) history.pop().undo(); }
+<span class="keyword">class</span> <span class="class-name">CartEditor</span> {
+    <span class="keyword">private final</span> <span class="class-name">Deque</span>&lt;<span class="class-name">CartCommand</span>&gt; history = <span class="keyword">new</span> <span class="class-name">ArrayDeque</span>&lt;&gt;();
+    <span class="keyword">void</span> <span class="function">apply</span>(<span class="class-name">CartCommand</span> cmd) { cmd.execute(); history.push(cmd); }
+    <span class="keyword">void</span> <span class="function">undoLast</span>()            { <span class="keyword">if</span> (!history.isEmpty()) history.pop().undo(); }
 }
-<span class="comment">// Spring Batch's Tasklet, and any job queue (Quartz, Spring's @Async with a
+<span class="comment">// Because the action is an object, it can also be logged, queued or replayed.
+// Spring Batch's Tasklet, and any job queue (Quartz, Spring's @Async with a
 // Runnable payload), is fundamentally the Command pattern: an action, packaged
 // as an object, that can be scheduled, retried, or logged independently of
 // who triggered it.</span></code></pre>
@@ -590,9 +650,9 @@ customers.sort(<span class="class-name">Comparator</span>.comparing(<span class=
                     <details class="qa">
                         <summary>When would you use Decorator instead of inheritance?</summary>
                         <p>When you need to combine independent features at runtime, and subclassing
-                    every combination would cause class explosion (a Coffee with milk, caramel,
-                    and whipped cream, in any combination, would need 8 subclasses for 3 binary
-                    options). Decorator wraps objects to add behaviour without modifying the
+                    every combination would cause class explosion (a payment gateway with logging,
+                    retries and metrics, in any combination, would need 8 subclasses for 3
+                    optional features). Decorator wraps objects to add behaviour without modifying the
                     original class or creating a combinatorial hierarchy.</p>
                     </details>
 
@@ -670,6 +730,7 @@ customers.sort(<span class="class-name">Comparator</span>.comparing(<span class=
                     <a href="../best-practices/solid-principles.html" class="related-link">
                         <span class="related-icon">📏</span>SOLID Principles
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

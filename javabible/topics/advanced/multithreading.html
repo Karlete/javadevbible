@@ -112,18 +112,27 @@
                     the CPU do useful work while I/O is in flight, and distributes CPU-bound work
                     across cores.</p>
 
-                <pre><code><span class="comment">// Single-threaded: sequential, each task blocks until complete</span>
-<span class="class-name">Customer</span>    customer    = db.findCustomer(id);       <span class="comment">// 50ms — CPU waits</span>
-<span class="class-name">Account</span> account = db.findAccount(id);   <span class="comment">// 50ms — CPU waits</span>
-<span class="class-name">Orders</span>  orders  = db.findOrders(id);    <span class="comment">// 50ms — CPU waits</span>
-<span class="comment">// Total: ~150ms</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">customer/AccountPageService.java</span></figcaption>
+                    <pre><code><span class="comment">// Three independent queries, one after the other. The thread spends
+// almost all of these 150ms blocked on the network, doing nothing.</span>
+<span class="class-name">Customer</span>              customer  = db.findCustomer(id);      <span class="comment">// 50ms</span>
+<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt;           orders    = db.findRecentOrders(id);  <span class="comment">// 50ms</span>
+<span class="class-name">List</span>&lt;<span class="class-name">ShippingAddress</span>&gt; addresses = db.findAddresses(id);     <span class="comment">// 50ms</span>
+<span class="comment">// Total: ~150ms — the sum of all three</span></code></pre>
+                </figure>
 
-<span class="comment">// Concurrent: all three queries in flight simultaneously</span>
-<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Customer</span>&gt;    fu = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findCustomer(id));
-<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Account</span>&gt; fa = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findAccount(id));
-<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Orders</span>&gt;  fo = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findOrders(id));
-<span class="class-name">CompletableFuture</span>.allOf(fu, fa, fo).join();
-<span class="comment">// Total: ~50ms — limited by the slowest, not the sum</span></code></pre>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">customer/AccountPageService.java</span></figcaption>
+                    <pre><code><span class="comment">// The queries do not depend on each other, so all three are in flight at
+// once. The page waits for the slowest one instead of the sum.</span>
+<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">Customer</span>&gt;              fc = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findCustomer(id), ioPool);
+<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">Order</span>&gt;&gt;           fo = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findRecentOrders(id), ioPool);
+<span class="class-name">CompletableFuture</span>&lt;<span class="class-name">List</span>&lt;<span class="class-name">ShippingAddress</span>&gt;&gt; fa = <span class="class-name">CompletableFuture</span>.supplyAsync(() -&gt; db.findAddresses(id), ioPool);
+<span class="class-name">CompletableFuture</span>.allOf(fc, fo, fa).join();
+<span class="comment">// Total: ~50ms. ioPool is a dedicated executor: blocking I/O must not run
+// on ForkJoinPool.commonPool(), which is sized for CPU work.</span></code></pre>
+                </figure>
 
                 <pre><code><span class="comment">/*
  *  Concurrency vs Parallelism:
@@ -594,28 +603,32 @@ future
                  SECTION 8 — STRUCTURED CONCURRENCY (JAVA 21)
             ════════════════════════════════════════════ -->
             <section class="content-section">
-                <h2>Structured Concurrency (Java 21 Preview)</h2>
+                <h2>Structured Concurrency (Preview in Java 25)</h2>
                 <p>Structured concurrency treats a group of concurrent tasks as a single unit of
                     work — if any task fails, the others are cancelled. This prevents the "lost
                     thread" problem where a subtask fails silently while the parent continues.</p>
 
                 <pre><code><span class="comment">// Classic problem: manual subtask management is error-prone</span>
-<span class="class-name">Future</span>&lt;<span class="class-name">Customer</span>&gt;    fu = exec.submit(() -&gt; fetchCustomer(id));
-<span class="class-name">Future</span>&lt;<span class="class-name">Product</span>&gt; fp = exec.submit(() -&gt; fetchProduct(id));
+<span class="class-name">Future</span>&lt;<span class="class-name">Customer</span>&gt; fc = exec.submit(() -&gt; fetchCustomer(customerId));
+<span class="class-name">Future</span>&lt;<span class="class-name">Product</span>&gt;  fp = exec.submit(() -&gt; fetchProduct(productId));
 <span class="comment">// If fetchCustomer() throws, fetchProduct() keeps running — wasted resources</span>
 
-<span class="comment">// Structured concurrency: tasks live and die together</span>
-<span class="keyword">try</span> (<span class="keyword">var</span> scope = <span class="keyword">new</span> <span class="class-name">StructuredTaskScope</span>.<span class="class-name">ShutdownOnFailure</span>()) {
-    <span class="class-name">Subtask</span>&lt;<span class="class-name">Customer</span>&gt;    su = scope.fork(() -&gt; fetchCustomer(id));
-    <span class="class-name">Subtask</span>&lt;<span class="class-name">Product</span>&gt; sp = scope.fork(() -&gt; fetchProduct(id));
+<span class="comment">// Structured concurrency (JDK 25, JEP 505 — needs --enable-preview):
+// subtasks live and die with the scope that forked them</span>
+<span class="keyword">try</span> (<span class="keyword">var</span> scope = <span class="class-name">StructuredTaskScope</span>.open()) {
+    <span class="class-name">Subtask</span>&lt;<span class="class-name">Customer</span>&gt; sc = scope.fork(() -&gt; fetchCustomer(customerId));
+    <span class="class-name">Subtask</span>&lt;<span class="class-name">Product</span>&gt;  sp = scope.fork(() -&gt; fetchProduct(productId));
 
-    scope.join();           <span class="comment">// wait for all subtasks</span>
-    scope.throwIfFailed();  <span class="comment">// propagate first failure, cancels remaining</span>
+    scope.join();   <span class="comment">// default policy: wait for all to succeed; the first failure
+                    // cancels the others and join() throws FailedException</span>
 
-    <span class="class-name">Customer</span>    customer    = su.get();
-    <span class="class-name">Product</span> product = sp.get();
+    <span class="class-name">Customer</span> customer = sc.get();
+    <span class="class-name">Product</span>  product  = sp.get();
 }
-<span class="comment">// Scope closes: any running subtasks are automatically cancelled</span></code></pre>
+<span class="comment">// Scope closes: no subtask can outlive this block.
+// Java 21-24 previews used new StructuredTaskScope.ShutdownOnFailure() and
+// throwIfFailed(); those classes were removed in JDK 25 in favour of open()
+// plus a Joiner (e.g. Joiner.anySuccessfulResultOrThrow() for a race).</span></code></pre>
             </section>
 
             <!-- ═══════════════════════════════════════════
@@ -737,6 +750,7 @@ future
                     <a href="jvm-internals.html" class="related-link">
                         <span class="related-icon">🔬</span>JVM Internals
                     </a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
