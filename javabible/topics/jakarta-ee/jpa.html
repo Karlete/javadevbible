@@ -116,7 +116,10 @@
                     implement, the same way JDBC gave database vendors a common contract for
                     drivers.</p>
 
-                <pre><code><span class="comment">// BEFORE JPA — raw JDBC: you manage the connection, the mapping, and cleanup</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">customer/CustomerDao.java — JDBC</span></figcaption>
+                    <pre><code><span class="comment">// Connection, mapping and cleanup by hand — and an exception before the last
+// line leaks the connection, because nothing here is in a try-with-resources</span>
 <span class="class-name">Connection</span> conn = DriverManager.getConnection(url);
 <span class="class-name">PreparedStatement</span> stmt = conn.prepareStatement(
     <span class="string">"SELECT * FROM customers WHERE id = ?"</span>);
@@ -126,12 +129,16 @@ stmt.setLong(<span class="number">1</span>, customerId);
 <span class="keyword">if</span> (rs.next()) {
     customer = <span class="keyword">new</span> <span class="class-name">Customer</span>();
     customer.setId(rs.getLong(<span class="string">"id"</span>));
-    customer.setName(rs.getString(<span class="string">"full_name"</span>));
+    customer.setFullName(rs.getString(<span class="string">"full_name"</span>));
 }
-rs.close(); stmt.close(); conn.close();
+rs.close(); stmt.close(); conn.close();</code></pre>
+                </figure>
 
-<span class="comment">// AFTER JPA — mapping, connection handling, and resource cleanup are gone</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">customer/CustomerDao.java — JPA</span></figcaption>
+                    <pre><code><span class="comment">// The provider writes the SELECT, maps the row and manages the connection</span>
 <span class="class-name">Customer</span> customer = em.find(Customer.<span class="keyword">class</span>, customerId);</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">JPA is a specification, not a library you can run</div>
@@ -201,7 +208,9 @@ rs.close(); stmt.close(); conn.close();
                     on the class, and violating any of them either fails at startup or fails
                     silently at runtime in ways that are painful to debug.</p>
 
-                <pre><code><span class="keyword">import</span> jakarta.persistence.*;
+                <figure class="code-file">
+                    <figcaption><span class="code-path">customer/Customer.java</span></figcaption>
+                    <pre><code><span class="keyword">import</span> jakarta.persistence.*;
 
 <span class="annotation">@Entity</span>
 <span class="annotation">@Table</span>(name = <span class="string">"customers"</span>)
@@ -212,7 +221,7 @@ rs.close(); stmt.close(); conn.close();
     <span class="keyword">private</span> <span class="class-name">Long</span> id;
 
     <span class="annotation">@Column</span>(name = <span class="string">"full_name"</span>, length = <span class="number">100</span>, nullable = <span class="keyword">false</span>)
-    <span class="keyword">private</span> <span class="class-name">String</span> name;
+    <span class="keyword">private</span> <span class="class-name">String</span> fullName;
 
     <span class="annotation">@Column</span>(unique = <span class="keyword">true</span>, nullable = <span class="keyword">false</span>)
     <span class="keyword">private</span> <span class="class-name">String</span> email;
@@ -225,17 +234,18 @@ rs.close(); stmt.close(); conn.close();
     <span class="comment">// populating fields — you never call this yourself.</span>
     <span class="keyword">protected</span> <span class="function">Customer</span>() { }
 
-    <span class="keyword">public</span> <span class="function">Customer</span>(<span class="class-name">String</span> name, <span class="class-name">String</span> email) {
-        <span class="keyword">this</span>.name = name;
+    <span class="keyword">public</span> <span class="function">Customer</span>(<span class="class-name">String</span> fullName, <span class="class-name">String</span> email) {
+        <span class="keyword">this</span>.fullName = fullName;
         <span class="keyword">this</span>.email = email;
         <span class="keyword">this</span>.createdAt = <span class="class-name">Instant</span>.now();
     }
 
     <span class="keyword">public</span> <span class="class-name">Long</span> <span class="function">getId</span>() { <span class="keyword">return</span> id; }
-    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getName</span>() { <span class="keyword">return</span> name; }
-    <span class="keyword">public void</span> <span class="function">setName</span>(<span class="class-name">String</span> name) { <span class="keyword">this</span>.name = name; }
+    <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getFullName</span>() { <span class="keyword">return</span> fullName; }
+    <span class="keyword">public void</span> <span class="function">setFullName</span>(<span class="class-name">String</span> fullName) { <span class="keyword">this</span>.fullName = fullName; }
     <span class="keyword">public</span> <span class="class-name">String</span> <span class="function">getEmail</span>() { <span class="keyword">return</span> email; }
 }</code></pre>
+                </figure>
 
                 <div class="info-box warning">
                     <div class="info-box-title">An entity must never be a <code>record</code></div>
@@ -322,7 +332,7 @@ rs.close(); stmt.close(); conn.close();
 
     <span class="keyword">public void</span> <span class="function">renameCustomer</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> newName) {
         <span class="class-name">Customer</span> customer = em.find(Customer.<span class="keyword">class</span>, id);
-        customer.setName(newName);                  <span class="comment">// no em.update() — dirty checking</span>
+        customer.setFullName(newName);              <span class="comment">// no em.update() — dirty checking</span>
     }                                                <span class="comment">// detects the change and issues UPDATE at flush time</span>
 
     <span class="keyword">public void</span> <span class="function">deleteCustomer</span>(<span class="class-name">Long</span> id) {
@@ -556,12 +566,12 @@ Deleted from the database</code></pre>
                     associations at all:</p>
 
                 <pre><code><span class="comment">// DTO projection: no entity, no lazy loading, no OSIV dependency.</span>
-<span class="keyword">public record</span> <span class="class-name">CustomerSummary</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> name, <span class="keyword">long</span> orderCount) {}
+<span class="keyword">public record</span> <span class="class-name">CustomerSummary</span>(<span class="class-name">Long</span> id, <span class="class-name">String</span> fullName, <span class="keyword">long</span> orderCount) {}
 
 <span class="annotation">@Query</span>(<span class="string">"""
-    SELECT new com.example.CustomerSummary(c.id, c.name, COUNT(o))
+    SELECT new com.javadevbible.shop.customer.CustomerSummary(c.id, c.fullName, COUNT(o))
     FROM Customer c LEFT JOIN c.orders o
-    GROUP BY c.id, c.name
+    GROUP BY c.id, c.fullName
     """</span>)
 <span class="class-name">List</span>&lt;<span class="class-name">CustomerSummary</span>&gt; <span class="function">summarize</span>();</code></pre>
             </section>
@@ -798,6 +808,7 @@ query.select(root)
                     <a href="overview.html" class="related-link"><span class="related-icon">🏢</span>Jakarta EE Overview</a>
                     <a href="../databases/orms.html" class="related-link"><span class="related-icon">💾</span>ORMs</a>
                     <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">🍃</span>Spring Data JPA</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

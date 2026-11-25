@@ -99,7 +99,7 @@
                  SECTION 0 — WHAT IS EJB AND WHY IT MATTERS
             ════════════════════════════════════════════ -->
             <section class="content-section">
-                <h2>What is EJB — and Why Does It Matter in 2025?</h2>
+                <h2>What is EJB — and Why Does It Still Matter?</h2>
                 <p><strong>EJB (Enterprise JavaBeans)</strong> is a server-side component
                     model that was the dominant way to build enterprise Java applications from
                     roughly 1999 to 2010. An EJB is a CDI bean with additional container-
@@ -114,6 +114,50 @@
                     developer entering one of those environments without knowing what
                     <code>@Stateless</code>, <code>@TransactionAttribute</code>, or
                     <code>@MessageDriven</code> mean is walking in blind.</p>
+
+                <p>The most common task with an EJB today is reading one well enough to
+                    migrate it. The two versions below do the same thing; the annotations map
+                    almost one to one:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderService.java — EJB on an application server</span></figcaption>
+                    <pre><code><span class="comment">// The container provides pooling, a JTA transaction per call (REQUIRED is
+// the default) and role checks — but only inside a Jakarta EE server.</span>
+<span class="annotation">@Stateless</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="annotation">@PersistenceContext</span>
+    <span class="keyword">private</span> <span class="class-name">EntityManager</span> em;
+
+    <span class="annotation">@RolesAllowed</span>(<span class="string">"CUSTOMER"</span>)
+    <span class="annotation">@TransactionAttribute</span>(TransactionAttributeType.REQUIRED)
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">place</span>(<span class="class-name">Order</span> order) {
+        em.persist(order);
+        <span class="keyword">return</span> order;
+    }
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderService.java — the same service in Spring Boot</span></figcaption>
+                    <pre><code><span class="comment">// A plain singleton bean with constructor injection: transactions come from
+// Spring's proxy, the role check from Spring Security — on embedded Tomcat.</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> <span class="class-name">OrderService</span> {
+
+    <span class="keyword">private final</span> <span class="class-name">OrderRepository</span> orders;
+
+    <span class="class-name">OrderService</span>(<span class="class-name">OrderRepository</span> orders) {
+        <span class="keyword">this</span>.orders = orders;
+    }
+
+    <span class="annotation">@PreAuthorize</span>(<span class="string">"hasRole('CUSTOMER')"</span>)
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public</span> <span class="class-name">Order</span> <span class="function">place</span>(<span class="class-name">Order</span> order) {
+        <span class="keyword">return</span> orders.save(order);
+    }
+}</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">EJB vs Spring — the same problem, different answers</div>
@@ -497,6 +541,33 @@
             </section>
 
             <!-- ═══════════════════════════════════════════
+                 BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices</h2>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">✅ Do</div>
+                    <ul>
+                        <li>When maintaining EJB code, learn the defaults before changing anything: <code>@Stateless</code> methods are <code>REQUIRED</code> transactions and only unchecked exceptions roll back</li>
+                        <li>Migrate EJBs to CDI beans with <code>@Transactional</code> (or to Spring) one service at a time, keeping the public interface stable</li>
+                        <li>Replace <code>@Schedule</code> and <code>@Asynchronous</code> with Jakarta Concurrency (<code>ManagedScheduledExecutorService</code>) or the Spring equivalents when you migrate</li>
+                        <li>Use <code>@ApplicationException(rollback = true)</code> on checked business exceptions that must roll back</li>
+                    </ul>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">❌ Don't</div>
+                    <ul>
+                        <li>Don't start a new project on EJB; CDI plus <code>@Transactional</code> covers the same needs with less container coupling</li>
+                        <li>Don't call an EJB method through <code>this</code> and expect its transaction attribute to apply — like Spring proxies, the container only intercepts calls that come through the proxy</li>
+                        <li>Don't keep conversational state in a <code>@Stateless</code> bean's fields; instances are pooled and shared between clients</li>
+                        <li>Don't use remote EJB interfaces for new service-to-service calls — HTTP or messaging is the interoperable choice</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
                  SECTION 7 — INTERVIEW QUESTIONS
             ════════════════════════════════════════════ -->
             <section class="content-section">
@@ -584,6 +655,7 @@
                     <a href="overview.html" class="related-link"><span class="related-icon">🏢</span>Jakarta EE Overview</a>
                     <a href="../spring/core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
                     <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">🍃</span>Spring Data JPA</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

@@ -131,6 +131,38 @@
  * Understanding Servlets = understanding what's running underneath Spring.
  */</span></code></pre>
 
+                <p>Before front controllers, every URL got its own servlet and its own entry
+                    in <code>web.xml</code>. Spring MVC registers <em>one</em> servlet and does
+                    the routing itself:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">WEB-INF/web.xml</span></figcaption>
+                    <pre><code><span class="comment">&lt;!-- One servlet class and two XML entries per URL. Adding an endpoint means
+     editing XML; shared concerns (auth, JSON, errors) are copied into each
+     servlet or bolted on as filters. --&gt;</span>
+&lt;<span class="keyword">servlet</span>&gt;
+    &lt;<span class="keyword">servlet-name</span>&gt;orders&lt;/<span class="keyword">servlet-name</span>&gt;
+    &lt;<span class="keyword">servlet-class</span>&gt;com.javadevbible.shop.order.OrderServlet&lt;/<span class="keyword">servlet-class</span>&gt;
+&lt;/<span class="keyword">servlet</span>&gt;
+&lt;<span class="keyword">servlet-mapping</span>&gt;
+    &lt;<span class="keyword">servlet-name</span>&gt;orders&lt;/<span class="keyword">servlet-name</span>&gt;
+    &lt;<span class="keyword">url-pattern</span>&gt;/api/orders/*&lt;/<span class="keyword">url-pattern</span>&gt;
+&lt;/<span class="keyword">servlet-mapping</span>&gt;
+<span class="comment">&lt;!-- ...and again for /api/customers, /api/products, ... --&gt;</span></code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderController.java</span></figcaption>
+                    <pre><code><span class="comment">// Spring Boot registers DispatcherServlet once, mapped to "/". It is the
+// only servlet; routing to this method is done by Spring, not by web.xml.</span>
+<span class="annotation">@RestController</span>
+<span class="annotation">@RequestMapping</span>(<span class="string">"/api/orders"</span>)
+<span class="keyword">class</span> <span class="class-name">OrderController</span> {
+    <span class="annotation">@GetMapping</span>(<span class="string">"/{id}"</span>)
+    <span class="class-name">OrderResponse</span> <span class="function">find</span>(<span class="annotation">@PathVariable</span> <span class="class-name">Long</span> id) { ... }
+}</code></pre>
+                </figure>
+
                 <div class="info-box note">
                     <div class="info-box-title">When you actually write a raw Servlet today</div>
                     <p>In new Spring Boot projects, you almost never write a raw
@@ -239,7 +271,7 @@
     <span class="class-name">String</span> name   = request.getParameter(<span class="string">"name"</span>);        <span class="comment">// query param or form field</span>
     <span class="class-name">String</span> auth   = request.getHeader(<span class="string">"Authorization"</span>);  <span class="comment">// request header</span>
     <span class="class-name">String</span> method = request.getMethod();                  <span class="comment">// "GET", "POST", etc.</span>
-    <span class="class-name">String</span> uri    = request.getRequestURI();              <span class="comment">// "/myapp/customers"</span>
+    <span class="class-name">String</span> uri    = request.getRequestURI();              <span class="comment">// "/shop/api/customers"</span>
     <span class="class-name">String</span> body   = request.getReader().lines()           <span class="comment">// raw body as string</span>
         .collect(java.util.stream.Collectors.joining());
 
@@ -363,7 +395,7 @@
 
 &lt;%-- JSTL (the "clean" JSP way) — still JSP, but at least no scriptlets --%&gt;
 &lt;c:forEach var="customer" items="${customers}"&gt;
-    &lt;p&gt;&lt;c:out value="${user.name}"/&gt;&lt;/p&gt;  &lt;%-- c:out escapes HTML --%&gt;
+    &lt;p&gt;&lt;c:out value="${customer.fullName}"/&gt;&lt;/p&gt;  &lt;%-- c:out escapes HTML --%&gt;
 &lt;/c:forEach&gt;
 
 &lt;/body&gt;&lt;/html&gt;</code></pre>
@@ -389,7 +421,7 @@
                     </ul>
                     <p>You will encounter JSP in legacy systems. You should understand how it
                         works, recognise the XSS risks of raw scriptlets, and know how to
-                        migrate it — not write new JSP in 2025.</p>
+                        migrate it — not write new JSP today.</p>
                 </div>
 
                 <h3>The MVC Pattern with Servlets + JSP</h3>
@@ -532,6 +564,33 @@
             </section>
 
             <!-- ═══════════════════════════════════════════
+                 BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices</h2>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">✅ Do</div>
+                    <ul>
+                        <li>Implement cross-cutting HTTP concerns (correlation IDs, request logging, CORS) as a <code>Filter</code> — or Spring's <code>OncePerRequestFilter</code> — so they apply before any controller runs</li>
+                        <li>Treat servlets as stateless and shared: one instance serves every request thread</li>
+                        <li>Escape all output in views (<code>&lt;c:out&gt;</code>, Thymeleaf's <code>th:text</code>) — never write request data into HTML unescaped</li>
+                        <li>Read <code>HttpServletRequest</code> attributes and headers through the framework where one exists, and drop to the servlet API only for what the framework does not expose</li>
+                    </ul>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">❌ Don't</div>
+                    <ul>
+                        <li>Don't store per-request data in servlet instance fields — concurrent requests overwrite each other</li>
+                        <li>Don't write new JSP; use a modern template engine or a separate front end</li>
+                        <li>Don't read the request body twice; the input stream can be consumed only once unless you wrap the request</li>
+                        <li>Don't register extra servlets in a Spring Boot application for something a controller or a filter can do</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
                  SECTION 7 — INTERVIEW QUESTIONS
             ════════════════════════════════════════════ -->
             <section class="content-section">
@@ -624,6 +683,7 @@
                     <a href="../spring/security.html" class="related-link"><span class="related-icon">🔒</span>Spring Security</a>
                     <a href="../web-concepts/sessions-cookies.html" class="related-link"><span class="related-icon">🍪</span>Sessions &amp; Cookies</a>
                     <a href="../web-concepts/http.html" class="related-link"><span class="related-icon">📡</span>HTTP Protocol &amp; Methods</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

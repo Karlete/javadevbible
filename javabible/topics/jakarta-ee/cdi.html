@@ -117,13 +117,20 @@
                     <code>@Inject</code> from <code>jakarta.inject</code> as an alternative to
                     <code>@Autowired</code>.</p>
 
-                <pre><code><span class="comment">// BEFORE: tight coupling — impossible to test without a real Database</span>
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderService.java</span></figcaption>
+                    <pre><code><span class="comment">// OrderService builds its own collaborators: a test cannot swap in a fake
+// payment provider, so every test run would try to charge a real card</span>
 <span class="keyword">public class</span> <span class="class-name">OrderService</span> {
     <span class="keyword">private</span> <span class="class-name">PaymentService</span> payment = <span class="keyword">new</span> <span class="class-name">PaymentService</span>();  <span class="comment">// hard dependency</span>
     <span class="keyword">private</span> <span class="class-name">EmailService</span>   email   = <span class="keyword">new</span> <span class="class-name">EmailService</span>();    <span class="comment">// another hard dependency</span>
-}
+}</code></pre>
+                </figure>
 
-<span class="comment">// AFTER CDI: loose coupling — container injects; test can inject mocks</span>
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderService.java</span></figcaption>
+                    <pre><code><span class="comment">// The container creates OrderService and passes in what it needs; a test
+// passes a fake PaymentService to the same constructor, no container needed</span>
 <span class="annotation">@ApplicationScoped</span>
 <span class="keyword">public class</span> <span class="class-name">OrderService</span> {
 
@@ -136,6 +143,7 @@
         <span class="keyword">this</span>.email   = email;
     }
 }</code></pre>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">CDI vs Spring DI — the real differences, not the surface ones</div>
@@ -598,14 +606,44 @@
                 </table>
 
                 <div class="info-box note">
-                    <div class="info-box-title">No beans.xml at all — implicit bean archive in CDI 4.0+</div>
-                    <p>In CDI 4.0 (Jakarta EE 11), the absence of <code>beans.xml</code>
-                        means the archive is treated as an <em>implicit bean archive</em> with
-                        <code>annotated</code> discovery mode — same as having an empty
-                        <code>beans.xml</code> with <code>bean-discovery-mode="annotated"</code>.
+                    <div class="info-box-title">No beans.xml at all — an implicit bean archive</div>
+                    <p>Since CDI 1.1, an archive without <code>beans.xml</code> is an
+                        <em>implicit bean archive</em> with <code>annotated</code> discovery.
+                        CDI 4.0 (Jakarta EE 10) made an <em>empty</em> <code>beans.xml</code>
+                        mean the same thing — before 4.0 it meant <code>all</code> — so in
+                        CDI 4.x (Jakarta EE 11 ships CDI 4.1) both behave like
+                        <code>bean-discovery-mode="annotated"</code>.
                         An explicit <code>beans.xml</code> is only required when you need
                         <code>all</code> mode or <code>none</code>, or when you need to include
                         portable extensions and interceptors via XML.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices</h2>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">✅ Do</div>
+                    <ul>
+                        <li>Inject through the constructor and keep the fields <code>final</code> — the same rule as in Spring, and for the same reason: the dependencies are visible and a test can build the object with <code>new</code></li>
+                        <li>Choose the narrowest scope that is correct: <code>@ApplicationScoped</code> for stateless services, <code>@RequestScoped</code> for per-request state</li>
+                        <li>Disambiguate with type-safe qualifier annotations (<code>@Express</code>, <code>@Standard</code>) rather than <code>@Named</code> strings</li>
+                        <li>Use CDI events (<code>Event&lt;OrderPlaced&gt;</code> and <code>@Observes</code>) to decouple packages, as the shop does between <code>order</code> and <code>notification</code></li>
+                        <li>Keep the default <code>annotated</code> discovery mode</li>
+                    </ul>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">❌ Don't</div>
+                    <ul>
+                        <li>Don't use field injection outside tests; a <code>private</code> field that only the container can fill hides a dependency</li>
+                        <li>Don't make a bean <code>@Dependent</code> by accident when it holds expensive state — a new instance is created for every injection point</li>
+                        <li>Don't put mutable per-user state in an <code>@ApplicationScoped</code> bean: one instance is shared by every request thread</li>
+                        <li>Don't switch to <code>bean-discovery-mode="all"</code> to make an unannotated class injectable; annotate the class or produce it with <code>@Produces</code></li>
+                    </ul>
                 </div>
             </section>
 
@@ -678,7 +716,7 @@
                     utility classes, and value objects — which causes slower startup, unexpected
                     bean resolution conflicts, and proxying attempts on classes that can't be
                     proxied. <code>annotated</code> is the explicit, predictable default and
-                    is the CDI 4.0 implicit mode when no <code>beans.xml</code> exists.</p>
+                    is what CDI 4.x uses when <code>beans.xml</code> is missing or empty.</p>
                     </details>
                 </div>
             </section>
@@ -694,6 +732,7 @@
                     <a href="../spring/core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
                     <a href="../spring/security.html" class="related-link"><span class="related-icon">🔒</span>Spring Security</a>
                     <a href="../fundamentals/interfaces-abstract.html" class="related-link"><span class="related-icon">📚</span>Interfaces vs Abstract Classes</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

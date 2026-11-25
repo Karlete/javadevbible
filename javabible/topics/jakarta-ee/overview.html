@@ -116,6 +116,29 @@
                     implements or builds on top of them. Understanding Jakarta EE is
                     understanding the foundations Spring sits on.</p>
 
+                <p>What a specification buys you is code that does not belong to one vendor.
+                    Persistence code written against the vendor's own API stays tied to that
+                    vendor's release cycle; the same code against the specification runs on
+                    any compliant implementation:</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">order/OrderRepository.java — vendor API</span></figcaption>
+                    <pre><code><span class="comment">// Hibernate's own API: every import is org.hibernate.*, so this class can
+// only ever run on Hibernate — and save() no longer exists in Hibernate 7.</span>
+<span class="class-name">Session</span> session = sessionFactory.getCurrentSession();
+session.save(order);</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">order/OrderRepository.java — specification API</span></figcaption>
+                    <pre><code><span class="comment">// jakarta.persistence: the contract Hibernate, EclipseLink and every
+// Jakarta EE server implement. Spring Data JPA is built on the same one.</span>
+<span class="annotation">@PersistenceContext</span>
+<span class="class-name">EntityManager</span> em;
+
+em.persist(order);</code></pre>
+                </figure>
+
                 <div class="info-box note">
                     <div class="info-box-title">Jakarta EE vs Spring — not competing, layered</div>
                     <table>
@@ -159,7 +182,9 @@
  * 2019  Jakarta EE 8 — identical to Java EE 8, just new governance
  * 2020  Jakarta EE 9 — THE BREAKING CHANGE: javax.* → jakarta.*
  * 2022  Jakarta EE 10 — Java 11+, CDI Lite, Core Profile
- * 2024  Jakarta EE 11 — Java 21+, Virtual Threads, JPA 3.2
+ * 2025  Jakarta EE 11 — Java 17+ (virtual threads on 21+), Persistence 3.2,
+ *                      CDI 4.1, Jakarta Data 1.0; Managed Beans removed
+ * 202x  Jakarta EE 12 — in development: Java 21+, Persistence 4.0, CDI 5.0
  */</span></code></pre>
 
                 <div class="info-box important">
@@ -296,8 +321,9 @@
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>Jakarta EE Specifications You Already Use in Spring Boot</h2>
-                <p>The following Jakarta EE specs are active in every standard Spring Boot 3.x
-                    project — not optionally, by default. This is the concrete answer to "why
+                <p>The following Jakarta EE specs are active in every standard Spring Boot 4
+                    project — not optionally, by default. Spring Boot 4 is built on the Jakarta
+                    EE 11 versions of them. This is the concrete answer to "why
                     does this topic matter if I'm a Spring developer":</p>
 
                 <table>
@@ -308,12 +334,12 @@
                         <td>Every HTTP request — <code>DispatcherServlet</code> is a <code>HttpServlet</code></td>
                     </tr>
                     <tr>
-                        <td>JPA 3.2</td>
+                        <td>Persistence (JPA) 3.2</td>
                         <td><code>jakarta.persistence.*</code></td>
                         <td><code>@Entity</code>, <code>@Id</code>, <code>EntityManager</code> — Hibernate implements it</td>
                     </tr>
                     <tr>
-                        <td>Bean Validation 3.0</td>
+                        <td>Validation 3.1</td>
                         <td><code>jakarta.validation.*</code></td>
                         <td><code>@NotBlank</code>, <code>@Email</code>, <code>@Valid</code> — Hibernate Validator implements it</td>
                     </tr>
@@ -325,7 +351,7 @@
                     <tr>
                         <td>Transactions (JTA)</td>
                         <td><code>jakarta.transaction.*</code></td>
-                        <td><code>@Transactional</code> — Spring's transaction manager implements JTA semantics</td>
+                        <td><code>jakarta.transaction.Transactional</code> is honoured by Spring as an alternative to its own <code>@Transactional</code>; a real JTA transaction manager is only used when one is configured</td>
                     </tr>
                 </table>
 
@@ -359,8 +385,8 @@
  * SPRING BOOT — embedded server model:
  *
  *   [Your JAR]
- *       └── contains an embedded Tomcat/Jetty/Undertow
- *       └── java -jar myapp.jar → app starts its own server
+ *       └── contains an embedded Tomcat or Jetty
+ *       └── java -jar shop.jar → app starts its own server
  *       └── one app per JVM process (the 12-factor way)
  *       └── no external server dependency at runtime
  */</span></code></pre>
@@ -512,6 +538,33 @@
             </section>
 
             <!-- ═══════════════════════════════════════════
+                 BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices</h2>
+
+                <div class="info-box tip">
+                    <div class="info-box-title">✅ Do</div>
+                    <ul>
+                        <li>Import from <code>jakarta.*</code> specification packages when an equivalent exists, and reach for the vendor API (<code>org.hibernate.*</code>) only for features the spec does not have</li>
+                        <li>Know which spec version your platform implements: Spring Boot 4 and Jakarta EE 11 servers share Servlet 6.1, Persistence 3.2 and Validation 3.1</li>
+                        <li>Treat a <code>javax.*</code> import in a modern codebase as a migration item — it cannot run on a Jakarta EE 9+ runtime</li>
+                        <li>Run new Jakarta EE code on Java 21 or later even though EE 11 accepts Java 17: virtual threads in Concurrency 3.1 and the EE 12 baseline both need it</li>
+                    </ul>
+                </div>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">❌ Don't</div>
+                    <ul>
+                        <li>Don't mix <code>javax.persistence</code> and <code>jakarta.persistence</code> classes in one application — they are different, incompatible types</li>
+                        <li>Don't pick a full application server just to get one specification; Spring Boot or a Core Profile runtime ships the pieces you use</li>
+                        <li>Don't assume Jakarta EE means EJB: EJB is one specification among more than thirty, and the one least likely to appear in new code</li>
+                        <li>Don't confuse the specification with its implementation when reading docs — Hibernate features are not JPA features</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
                  SECTION 7 — INTERVIEW QUESTIONS
             ════════════════════════════════════════════ -->
             <section class="content-section">
@@ -554,7 +607,7 @@
                     <div class="info-box-title">🔥 Senior level</div>
                     <details class="qa">
                         <summary>A Spring Boot developer says "I don't need to know Jakarta EE." What's the precise technical counter-argument?</summary>
-                        <p>Every Spring Boot 3.x project uses Jakarta EE specs directly:
+                        <p>Every Spring Boot 3 and 4 project uses Jakarta EE specs directly:
                     <code>jakarta.servlet.*</code> for HTTP processing,
                     <code>jakarta.persistence.*</code> for JPA entities,
                     <code>jakarta.validation.*</code> for Bean Validation, and
@@ -606,6 +659,7 @@
                     <a href="../spring/core.html" class="related-link"><span class="related-icon">🍃</span>Spring Core (IoC &amp; DI)</a>
                     <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">🍃</span>Spring Data JPA</a>
                     <a href="../tools/jackson.html" class="related-link"><span class="related-icon">🔧</span>Jackson — JSON in Java</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 

@@ -99,7 +99,7 @@
                  SECTION 0 — WHAT IS JAX-RS AND WHY IT MATTERS
             ════════════════════════════════════════════ -->
             <section class="content-section">
-                <h2>What is JAX-RS — and Why Does It Matter in 2025?</h2>
+                <h2>What is JAX-RS — and Why Does It Still Matter?</h2>
                 <p><strong>JAX-RS (Jakarta RESTful Web Services)</strong> is a
                     <em>specification</em> — a set of annotations and interfaces in
                     <code>jakarta.ws.rs.*</code> that standardizes how to map HTTP requests to
@@ -113,30 +113,31 @@
                     vendor-specific XML configuration. JAX-RS gave Jakarta EE a vendor-neutral
                     model that still ships inside every certified application server today.</p>
 
-                <table>
-                    <tr><th>Without JAX-RS (raw Servlet)</th><th>With JAX-RS</th></tr>
-                    <tr>
-                        <td>
-<pre><code><span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> res) {
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">catalog/ProductServlet.java</span></figcaption>
+                    <pre><code><span class="comment">// Raw Servlet: parameter parsing, status codes and JSON are all manual,
+// and one servlet per URL pattern does its own routing on getMethod()</span>
+<span class="keyword">protected void</span> <span class="function">doGet</span>(<span class="class-name">HttpServletRequest</span> req, <span class="class-name">HttpServletResponse</span> res) {
     <span class="class-name">String</span> id = req.getParameter(<span class="string">"id"</span>);
     <span class="keyword">if</span> (id == <span class="keyword">null</span>) { res.sendError(<span class="number">400</span>); <span class="keyword">return</span>; }
-    <span class="class-name">Product</span> p = service.findById(<span class="class-name">Long</span>.parseLong(id));
+    <span class="class-name">Product</span> p = catalog.findById(<span class="class-name">Long</span>.parseLong(id));
     <span class="keyword">if</span> (p == <span class="keyword">null</span>) { res.sendError(<span class="number">404</span>); <span class="keyword">return</span>; }
     res.setContentType(<span class="string">"application/json"</span>);
-    <span class="comment">// manual JSON serialization...</span>
+    <span class="comment">// ...and write the JSON by hand</span>
 }</code></pre>
-                        </td>
-                        <td>
-<pre><code><span class="annotation">@GET</span>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">catalog/ProductResource.java</span></figcaption>
+                    <pre><code><span class="comment">// JAX-RS: the method declares what it needs and returns a value; the
+// runtime parses the path, picks the method by HTTP verb and writes JSON</span>
+<span class="annotation">@GET</span>
 <span class="annotation">@Path</span>(<span class="string">"/{id}"</span>)
 <span class="annotation">@Produces</span>(MediaType.APPLICATION_JSON)
-<span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(
-        <span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
-    <span class="keyword">return</span> service.findById(id);  <span class="comment">// 404 on null via mapper</span>
+<span class="keyword">public</span> <span class="class-name">Product</span> <span class="function">getProduct</span>(<span class="annotation">@PathParam</span>(<span class="string">"id"</span>) <span class="class-name">Long</span> id) {
+    <span class="keyword">return</span> catalog.findById(id);   <span class="comment">// a NotFoundException becomes a 404</span>
 }</code></pre>
-                        </td>
-                    </tr>
-                </table>
+                </figure>
 
                 <div class="info-box note">
                     <div class="info-box-title">JAX-RS vs Spring MVC — why this page still matters if you write Spring Boot</div>
@@ -155,7 +156,7 @@
                         <tr>
                             <td>Where you'll find it</td>
                             <td>WildFly, Payara, WebSphere, Quarkus — any Jakarta EE server</td>
-                            <td>Spring Boot, embedded Tomcat/Undertow</td>
+                            <td>Spring Boot, embedded Tomcat or Jetty</td>
                         </tr>
                         <tr>
                             <td>JSON binding</td>
@@ -168,7 +169,7 @@
                             <td><code>@ExceptionHandler</code> / <code>@ControllerAdvice</code></td>
                         </tr>
                         <tr>
-                            <td>Greenfield choice in 2025</td>
+                            <td>Greenfield choice today</td>
                             <td>Quarkus (excellent JAX-RS via RESTEasy Reactive), Helidon</td>
                             <td>Spring Boot (still dominant in enterprise)</td>
                         </tr>
@@ -335,6 +336,15 @@
                     <tr><td><code>@Context</code></td><td>JAX-RS context objects (<code>UriInfo</code>, <code>HttpHeaders</code>, <code>Request</code>, <code>SecurityContext</code>)</td><td>Never null — always injected by the container</td></tr>
                 </table>
 
+                <div class="info-box note">
+                    <div class="info-box-title"><code>@Context</code> is deprecated in Jakarta REST 4.0</div>
+                    <p>Jakarta EE 11 ships RESTful Web Services 4.0, which deprecates
+                        <code>@Context</code> in favour of CDI <code>@Inject</code> for the same
+                        objects. It still works and you will see it everywhere in existing
+                        code, which is why this page shows it; in new code on an EE 11 runtime,
+                        prefer <code>@Inject UriInfo uriInfo</code>.</p>
+                </div>
+
                 <h3><code>@BeanParam</code> — grouping parameters to avoid long parameter lists</h3>
                 <pre><code><span class="comment">// Instead of 5 @QueryParam parameters on the method signature:</span>
 <span class="keyword">public class</span> <span class="class-name">ProductSearchParams</span> {
@@ -452,8 +462,13 @@
     <span class="keyword">public</span> <span class="class-name">Long</span> <span class="function">getOrderId</span>() { <span class="keyword">return</span> orderId; }
 }
 
-<span class="comment">// Error response body — a record is perfect here</span>
-<span class="keyword">public record</span> <span class="class-name">ErrorResponse</span>(<span class="class-name">String</span> error, <span class="class-name">String</span> message, <span class="class-name">String</span> path) {}
+<span class="comment">// Error body in the RFC 9457 "problem details" shape. Jakarta REST has no
+// built-in type for it (Spring's ProblemDetail is Spring-only), so a record
+// with the standard members, sent as application/problem+json, is the
+// portable equivalent — clients that understand RFC 9457 need nothing else.</span>
+<span class="keyword">public record</span> <span class="class-name">Problem</span>(<span class="class-name">String</span> type, <span class="class-name">String</span> title, <span class="keyword">int</span> status, <span class="class-name">String</span> detail, <span class="class-name">String</span> instance) {
+    <span class="keyword">static final</span> <span class="class-name">String</span> MEDIA_TYPE = <span class="string">"application/problem+json"</span>;
+}
 
 <span class="comment">// The mapper: discovered automatically thanks to @Provider</span>
 <span class="annotation">@Provider</span>
@@ -466,8 +481,11 @@
     <span class="annotation">@Override</span>
     <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">toResponse</span>(<span class="class-name">OrderNotFoundException</span> ex) {
         <span class="keyword">return</span> <span class="class-name">Response</span>.status(<span class="class-name">Response.Status</span>.NOT_FOUND)
-                       .entity(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(
-                           <span class="string">"NOT_FOUND"</span>,
+                       .type(<span class="class-name">Problem</span>.MEDIA_TYPE)
+                       .entity(<span class="keyword">new</span> <span class="class-name">Problem</span>(
+                           <span class="string">"about:blank"</span>,
+                           <span class="string">"Order not found"</span>,
+                           <span class="number">404</span>,
                            ex.getMessage(),
                            uriInfo.getPath()))
                        .build();
@@ -483,8 +501,11 @@
     <span class="keyword">public</span> <span class="class-name">Response</span> <span class="function">toResponse</span>(<span class="class-name">Exception</span> ex) {
         <span class="comment">// Never leak internal exception details to clients in production</span>
         <span class="keyword">return</span> <span class="class-name">Response</span>.serverError()
-                       .entity(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(
-                           <span class="string">"INTERNAL_ERROR"</span>,
+                       .type(<span class="class-name">Problem</span>.MEDIA_TYPE)
+                       .entity(<span class="keyword">new</span> <span class="class-name">Problem</span>(
+                           <span class="string">"about:blank"</span>,
+                           <span class="string">"Internal Server Error"</span>,
+                           <span class="number">500</span>,
                            <span class="string">"An unexpected error occurred"</span>,
                            <span class="keyword">null</span>))
                        .build();
@@ -505,7 +526,8 @@
         <span class="keyword">return</span> wae.getResponse();   <span class="comment">// let JAX-RS handle its own exceptions</span>
     }
     <span class="keyword">return</span> <span class="class-name">Response</span>.serverError()
-                   .entity(<span class="keyword">new</span> <span class="class-name">ErrorResponse</span>(<span class="string">"INTERNAL_ERROR"</span>, <span class="string">"..."</span>, <span class="keyword">null</span>))
+                   .type(<span class="class-name">Problem</span>.MEDIA_TYPE)
+                   .entity(<span class="keyword">new</span> <span class="class-name">Problem</span>(<span class="string">"about:blank"</span>, <span class="string">"Internal Server Error"</span>, <span class="number">500</span>, <span class="string">"..."</span>, <span class="keyword">null</span>))
                    .build();
 }</code></pre>
                 </div>
@@ -558,7 +580,7 @@
     <span class="keyword">public void</span> <span class="function">filter</span>(<span class="class-name">ContainerRequestContext</span> req,
                       <span class="class-name">ContainerResponseContext</span> res) {
         <span class="keyword">var</span> headers = res.getHeaders();
-        headers.add(<span class="string">"Access-Control-Allow-Origin"</span>,  <span class="string">"https://myapp.example.com"</span>);
+        headers.add(<span class="string">"Access-Control-Allow-Origin"</span>,  <span class="string">"https://shop.example.com"</span>);
         headers.add(<span class="string">"Access-Control-Allow-Methods"</span>, <span class="string">"GET, POST, PUT, PATCH, DELETE, OPTIONS"</span>);
         headers.add(<span class="string">"Access-Control-Allow-Headers"</span>, <span class="string">"Authorization, Content-Type"</span>);
         headers.add(<span class="string">"Access-Control-Max-Age"</span>,       <span class="string">"86400"</span>);
@@ -889,6 +911,7 @@
                     <a href="overview.html" class="related-link"><span class="related-icon">🏢</span>Jakarta EE Overview</a>
                     <a href="../spring/rest.html" class="related-link"><span class="related-icon">🍃</span>Spring REST</a>
                     <a href="../web-concepts/rest-principles.html" class="related-link"><span class="related-icon">🌐</span>RESTful API Principles</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
                 </div>
             </section>
 
