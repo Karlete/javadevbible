@@ -397,8 +397,9 @@ Retry-After: 30                    <span class="comment">// paired with 429 or 5
                         IP, <code>X-Forwarded-Proto</code> carries whether the original
                         request was HTTP or HTTPS. Spring Boot must be explicitly told to
                         trust and use them:</p>
-                    <pre><code><span class="comment"># application.properties</span>
-server.forward-headers-strategy=native</code></pre>
+                    <pre><code><span class="comment"># application.properties (Spring Boot 4.2+; before 4.2 this was
+# server.forward-headers-strategy=native, now deprecated)</span>
+server.request.header.forwarded.strategy=web-server</code></pre>
                     <p>Without this, <code>request.getRemoteAddr()</code> returns the
                         proxy's IP for every single request, and
                         <code>request.isSecure()</code> incorrectly reports <code>false</code>
@@ -429,7 +430,7 @@ server.forward-headers-strategy=native</code></pre>
                         controller (an AWS ALB, an Nginx instance, a Kubernetes Ingress),
                         and the traffic from there to your JVM runs as plain HTTP inside a
                         private network. Your application code needs
-                        <code>server.forward-headers-strategy=native</code> (Section 4)
+                        <code>server.request.header.forwarded.strategy=web-server</code> (Section 4)
                         far more often than it needs a keystore.</p>
                 </div>
 
@@ -437,7 +438,7 @@ server.forward-headers-strategy=native</code></pre>
                 <pre><code><span class="comment"># application.properties — the app itself speaks plain HTTP</span>
 <span class="comment"># and trusts the proxy's X-Forwarded-* headers</span>
 server.port=<span class="number">8080</span>
-server.forward-headers-strategy=native</code></pre>
+server.request.header.forwarded.strategy=web-server</code></pre>
 
                 <h3>Option B — TLS Terminated by the JVM Itself</h3>
                 <p>Legitimate when there's no proxy in front of you at all — an internal
@@ -542,7 +543,7 @@ curl -o /dev/null -s -w <span class="string">"DNS: %{time_namelookup}s  Connect:
                         <li>Return <code>ProblemDetail</code> (RFC 9457) for errors — structured, machine-parseable, and built into Spring Boot 3.x with no extra dependency</li>
                         <li>Use 401 for "I don't know who you are" and 403 for "I know exactly who you are and the answer is no" — never the reverse</li>
                         <li>Design PATCH payloads to be idempotent whenever a client might retry after a timeout without knowing the outcome</li>
-                        <li>Set <code>server.forward-headers-strategy=native</code> the moment your app runs behind any reverse proxy or load balancer</li>
+                        <li>Set <code>server.request.header.forwarded.strategy=web-server</code> the moment your app runs behind any reverse proxy or load balancer</li>
                         <li>Return a <code>Location</code> header on every 201 response so clients don't have to guess or reconstruct the created resource's URL</li>
                     </ul>
 
@@ -609,7 +610,7 @@ curl -o /dev/null -s -w <span class="string">"DNS: %{time_namelookup}s  Connect:
                     IP and scheme. If Spring Boot isn't told to trust and translate those
                     headers, every request appears to come from the load balancer itself,
                     over plain HTTP, from the servlet container's point of view. Setting
-                    <code>server.forward-headers-strategy=native</code> makes Spring
+                    <code>server.request.header.forwarded.strategy=web-server</code> makes Spring
                     translate those headers so <code>getRemoteAddr()</code> and
                     <code>isSecure()</code> reflect the original client's connection, not
                     the hop from the ALB.</p>

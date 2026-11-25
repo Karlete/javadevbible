@@ -365,33 +365,34 @@ http://localhost:8080/mywebapp/WEB-INF/classes/  ✗ 404
                     dependency on every deploy, even though your dependencies almost never
                     change between builds. Since Spring Boot 2.3, the executable JAR
                     supports being split into <strong>layers</strong> along exactly this
-                    boundary.</p>
+                    boundary. The extraction is done by the <code>tools</code> jar mode; the
+                    older <code>layertools</code> mode was deprecated in 3.3 and removed in
+                    Spring Boot 4.1.</p>
 
                 <pre><code><span class="comment"># Extract the JAR into its constituent layers</span>
-java -Djarmode=layertools -jar myapp.jar extract
-<span class="comment"># Produces (typically): dependencies/, spring-boot-loader/,
+java -Djarmode=tools -jar shop.jar extract --layers --destination extracted
+<span class="comment"># Produces extracted/dependencies/, spring-boot-loader/,
 # snapshot-dependencies/, application/ — ordered from LEAST to MOST
 # frequently changing</span></code></pre>
 
                 <pre><code><span class="comment"># Multi-stage Dockerfile using the extracted layers</span>
-<span class="keyword">FROM</span> eclipse-temurin:21-jdk <span class="keyword">AS</span> builder
-<span class="keyword">WORKDIR</span> /app
-<span class="keyword">COPY</span> target/myapp.jar app.jar
-<span class="keyword">RUN</span> java -Djarmode=layertools -jar app.jar extract
+<span class="keyword">FROM</span> eclipse-temurin:25-jre <span class="keyword">AS</span> builder
+<span class="keyword">WORKDIR</span> /builder
+<span class="keyword">COPY</span> target/shop.jar application.jar
+<span class="keyword">RUN</span> java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
-<span class="keyword">FROM</span> eclipse-temurin:21-jre
-<span class="keyword">WORKDIR</span> /app
+<span class="keyword">FROM</span> eclipse-temurin:25-jre
+<span class="keyword">WORKDIR</span> /application
 <span class="comment"># Copied in order: layers that rarely change first, so Docker can reuse
 # these cached layers across builds where only your own code changed</span>
-<span class="keyword">COPY</span> --from=builder /app/dependencies/ ./
-<span class="keyword">COPY</span> --from=builder /app/spring-boot-loader/ ./
-<span class="keyword">COPY</span> --from=builder /app/snapshot-dependencies/ ./
-<span class="keyword">COPY</span> --from=builder /app/application/ ./
-<span class="keyword">ENTRYPOINT</span> [<span class="string">"java"</span>, <span class="string">"org.springframework.boot.loader.launch.JarLauncher"</span>]
-<span class="comment"># Check your Spring Boot version's own documentation for the exact
-# launcher class name — it moved packages between major versions, and
-# getting this wrong is a common source of a container that builds fine
-# but fails immediately on "docker run"</span></code></pre>
+<span class="keyword">COPY</span> --from=builder /builder/extracted/dependencies/ ./
+<span class="keyword">COPY</span> --from=builder /builder/extracted/spring-boot-loader/ ./
+<span class="keyword">COPY</span> --from=builder /builder/extracted/snapshot-dependencies/ ./
+<span class="keyword">COPY</span> --from=builder /builder/extracted/application/ ./
+<span class="comment"># The tools mode leaves a thin application.jar whose manifest points at the
+# extracted dependency JARs, so plain java -jar works — no launcher class name
+# to hard-code, and none to break when Boot moves it between versions</span>
+<span class="keyword">ENTRYPOINT</span> [<span class="string">"java"</span>, <span class="string">"-jar"</span>, <span class="string">"application.jar"</span>]</code></pre>
 
                 <div class="info-box note">
                     <div class="info-box-title">The dependency ordering is the entire point</div>
@@ -559,7 +560,7 @@ jar -tf myapp.jar | grep gson
                     invalidated by even a one-line code change, since Docker has no way to
                     see "inside" the JAR to know only a small part of it actually changed.
                     The fix is extracting the JAR into Spring Boot's layered structure
-                    (<code>java -Djarmode=layertools -jar app.jar extract</code>) and
+                    (<code>java -Djarmode=tools -jar app.jar extract --layers</code>) and
                     copying each resulting layer into the image with separate
                     <code>COPY</code> instructions, ordered from least to most frequently
                     changing — dependencies first, your own compiled application last. Docker

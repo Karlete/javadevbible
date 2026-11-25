@@ -142,7 +142,7 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
 - Stylesheets: `main.css`, `syntax-highlighting.css`, `toc.css`.
 - Scripts at the end of `<body>`: `navigation.js`, `toc.js` on topic pages. `index.html` additionally loads `search.js`. A page with an interactive demo (`<figure data-demo="…" hidden>`, see `js/demos.js`; first one: the N+1 demo in `topics/databases/relationships.html`) also loads `demos.js` last; without JS the placeholder stays hidden and the page reads as before. The home hero is deliberately static: no animated gradient, particles or typing effect (removed 2026-11-24 because they made the site read as a generic template).
 - TOC sidebar (`<aside class="toc-sidebar" id="toc-sidebar">`) — copy the exact markup from a reference page below. Do not hand-roll it.
-- **Review stamp** (optional, `verify.sh` check 16): `<p class="reviewed-stamp">Checked against Java 25 · Spring Boot 4.0 — <time datetime="YYYY-MM-DD">Month YYYY</time></p>` right after the subtitle. Add or update it **only** when the page's content was actually checked against the versions it names, with that day's date. Never derive it from git: a footer edit touches every page. Copy it from `topics/modern-stack/docker.html`.
+- **Review stamp** (optional, `verify.sh` check 16): `<p class="reviewed-stamp">Checked against Java 25 · Spring Boot 4.2 — <time datetime="YYYY-MM-DD">Month YYYY</time></p>` right after the subtitle. Add or update it **only** when the page's content was actually checked against the versions it names, with that day's date. Never derive it from git: a footer edit touches every page. Copy it from `topics/modern-stack/docker.html`.
 - **Code review comment** (optional, at most one per page): `<aside class="review-note" aria-label="Code review comment">` with a `<p class="review-note-label">Code review comment</p>`, a 2–4 line `<pre><code>` diff using `line-del`/`line-add`, and one `<p>` written as a reviewer would write it on a pull request: short, direct, with the reason. It describes a typical mistake, not a personal anecdote — never title it "Seen in code review" or imply the author witnessed it. Pilots: `topics/databases/relationships.html`, `topics/spring/rest.html`.
 - Tables need **no class**. `main.css` styles `<table>` globally. Use `<tr class="row-highlight">` to emphasise a row.
 - **Code blocks are hand-highlighted HTML.** There is no highlighter library. Inside `<pre><code>`, every literal `<`, `>` and `&` must be written `&lt;`, `&gt;`, `&amp;` — an unescaped `<pid>` or `List<Order>` is parsed as a tag and silently disappears from the page. Token classes are `keyword`, `class-name`, `annotation`, `comment`, `string`, `function`, `number`, `attribute`; every `<span>` must be closed on the line it means to end. `verify.sh` catches tags inside `<pre>` that are not `span`/`mark`/`b`/`strong`/`em`/`code`.
@@ -164,7 +164,11 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
 
 ### Required Java/Spring conventions in every code sample
 
-- Spring Boot 4.x / Java 17–25 baseline. Java 25 is the current LTS (September 2025); Java 25 recommended for all new projects.
+- **Spring Boot 4.2** (Spring Framework 7.1) / Java 17–25 baseline. Java 25 is the current LTS (September 2025); Java 25 recommended for all new projects. Spring Boot 4.0's OSS support ends 2026-12-31: version numbers in samples follow the newest GA (4.2.0 on 2026-11-19), not 4.0.
+- Spring Boot 4 starter names: `spring-boot-starter-webmvc` (not `-web`, deprecated), per-technology test starters `spring-boot-starter-<technology>-test` (they bring `spring-boot-starter-test`), `spring-boot-starter-kafka`. Undertow is gone; Jetty and Tomcat remain. Jackson 3 lives under `tools.jackson` (except `jackson-annotations`).
+- `RestClient`, never `RestTemplate` (deprecated for removal in Spring Framework 7.1 / Boot 4.2), and `RestTestClient`, not `TestRestTemplate`.
+- `server.request.header.forwarded.strategy` (`web-server` / `framework` / `none`), not `server.forward-headers-strategy` (deprecated in 4.2; setting both fails startup).
+- Layered JARs: `java -Djarmode=tools -jar app.jar extract --layers`; `layertools` was removed in Boot 4.1.
 - `jakarta.*`, never `javax.*` — unless the code is explicitly illustrating pre-Jakarta-EE-9 legacy behaviour. (`javax.sql` and `javax.annotation.processing` are Java SE packages and were never renamed; they are correct.)
 - **Constructor injection always** in application code. Never `@Autowired` field injection. Never `@Autowired` on a single constructor (unnecessary since Spring 4.3). **Exception:** fields in test classes (`@SpringBootTest`, `@WebMvcTest`, `@DataJpaTest`) may use `@Autowired` — the Spring TestContext framework does not inject test constructors without either `@Autowired` or extra configuration, and field injection is the documented idiom there.
 - `record` for all DTOs.
@@ -178,7 +182,7 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
 
 ## MCP server (`mcp/`)
 
-- Spring Boot 4.0 + Spring AI 2.0, Java 17, STDIO transport, `web-application-type=none`. Stdout is the protocol channel: never print to it. Logs go to `javadevbible-mcp.log`.
+- Spring Boot 4.2 + Spring AI 2.1, Java 17, STDIO transport, `web-application-type=none`. Stdout is the protocol channel: never print to it. Logs go to `javadevbible-mcp.log`.
 - Tools: `search_topics`, `get_topic_content`, `list_categories`. All read `javabible/` from disk (`JAVABIBLE_ROOT` env var, else `../javabible`, else `./javabible`).
 - `search_topics` must rank exactly like `search.js`: every word must match (AND), plurals also match their singular, one-character words are dropped when longer ones exist, ties sort by title. When one changes, the other changes in the same commit, and `JavaBibleToolsTest` gets a case for it.
 - `mcp/README.md` is included in `verify.sh`'s count check, so its "N topic pages" must be exact.

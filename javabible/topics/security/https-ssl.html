@@ -289,7 +289,12 @@ server:
 <span class="comment"># application.yml — tell Spring the original request was HTTPS even though
 # the connection it actually received was plain HTTP from the load balancer</span>
 server:
-  forward-headers-strategy: framework   <span class="comment"># trusts X-Forwarded-Proto / X-Forwarded-For</span></code></pre>
+  request:
+    header:
+      forwarded:
+        strategy: framework   <span class="comment"># trusts X-Forwarded-Proto / X-Forwarded-For</span>
+<span class="comment"># Spring Boot 4.2 name. Before 4.2: server.forward-headers-strategy (now
+# deprecated); setting both fails startup.</span></code></pre>
 
                 <div class="info-box important">
                     <div class="info-box-title">"TLS terminates at the load balancer" does not mean the data is protected end-to-end</div>
@@ -302,7 +307,7 @@ server:
                         run the internal hop over TLS as well (re-encryption at the load
                         balancer), or use <strong>mutual TLS</strong> between internal
                         services so both ends authenticate each other, not just encrypt.
-                        Also: <code>server.forward-headers-strategy=framework</code> means
+                        Also: <code>server.request.header.forwarded.strategy=framework</code> means
                         Spring will trust an <code>X-Forwarded-Proto</code> header from
                         <em>whatever sent the request</em> — if that setting is enabled on a
                         server reachable directly from the public internet (bypassing the
@@ -411,7 +416,7 @@ server:
                         <tr>
                             <td><strong>Trusting <code>X-Forwarded-Proto</code> from an untrusted network</strong></td>
                             <td><code>requiresSecure()</code> and Secure cookies silently pass even over a real plaintext connection</td>
-                            <td>Only enable <code>forward-headers-strategy</code> on servers unreachable except via the trusted proxy</td>
+                            <td>Only enable <code>server.request.header.forwarded.strategy</code> on servers unreachable except via the trusted proxy</td>
                         </tr>
                         <tr>
                             <td><strong>Legacy protocol/cipher still enabled</strong></td>
@@ -525,7 +530,7 @@ server:
                     </details>
 
                     <details class="qa">
-                        <summary>A Spring Boot service sets <code>server.forward-headers-strategy=framework</code> so it can trust <code>X-Forwarded-Proto</code> from its load balancer. What goes wrong if that same service is also reachable directly, bypassing the load balancer?</summary>
+                        <summary>A Spring Boot service sets <code>server.request.header.forwarded.strategy=framework</code> so it can trust <code>X-Forwarded-Proto</code> from its load balancer. What goes wrong if that same service is also reachable directly, bypassing the load balancer?</summary>
                         <p>Any client that reaches the service directly can forge an
                     <code>X-Forwarded-Proto: https</code> header on a genuinely plaintext
                     HTTP request. The framework will treat the connection as secure — Spring
