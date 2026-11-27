@@ -485,6 +485,11 @@ fi
 #     Only ┌ is checked on purpose: └──┘ └──┘ on its own is an underline brace
 #     annotating the parts of a single line above it (JWT segments, URL parts),
 #     not a box — the first version of this check flagged three of those in CI.
+#   - Columns inside a box: a top edge with a column divider (┌──┬──┐) that
+#     starts inside another box (│ earlier on the line). The first rule missed
+#     these because the outer box has only one ┌ per line; three survived
+#     (heap generations, JVM runtime areas, a stack frame). A standalone
+#     ┌──┬──┐ is a query-result grid in sql.html and is left alone.
 #
 # LC_ALL=C.UTF-8 makes grep treat ┌ as ONE character everywhere. Under the C
 # locale (Git Bash's default) [^┐] is byte-wise, also excludes the bytes of ─,
@@ -496,6 +501,7 @@ grep -rn 'style="' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
   | sed "s|^$REPO_ROOT/||" | cut -c1-140 > "$TMP/forbidden.txt" || true
 LC_ALL=C.UTF-8 grep -rnE '┌[^┌┐]*┐.*┌' --include='*.html' "$TOPICS_DIR" 2>/dev/null \
   | sed "s|^$REPO_ROOT/||" | cut -c1-140 | sed 's/^/side-by-side boxes: /' >> "$TMP/forbidden.txt" || true
+LC_ALL=C.UTF-8 grep -rnE '│[^┌]*┌[^┐]*┬' --include='*.html' "$TOPICS_DIR" 2>/dev/null   | sed "s|^$REPO_ROOT/||" | cut -c1-140 | sed 's/^/columns inside a box: /' >> "$TMP/forbidden.txt" || true
 
 FORBID_N=$(grep -c . "$TMP/forbidden.txt" || true)
 if [[ "$FORBID_N" -eq 0 ]]; then

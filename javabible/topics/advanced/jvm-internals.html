@@ -17,7 +17,7 @@
     <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="../../css/main.css?v=8b390022">
+    <link rel="stylesheet" href="../../css/main.css?v=7737cba8">
     <link rel="stylesheet" href="../../css/syntax-highlighting.css?v=ebda796d">
     <link rel="stylesheet" href="../../css/toc.css?v=9afa30c0">
     <script type="application/ld+json">
@@ -289,50 +289,20 @@ javap -verbose <span class="class-name">MyClass</span>.class <span class="commen
             ════════════════════════════════════════════ -->
             <section class="content-section">
                 <h2>JVM Memory Areas</h2>
-                <pre><code><span class="comment">/*
- *  JVM MEMORY LAYOUT
- *  ═══════════════════════════════════════════════════════════════
- *
- *  ┌─────────────────────────────────────────────────────────────┐
- *  │  METASPACE  (native memory — not in heap)                   │
- *  │  Class metadata, method bytecode, constant pools,           │
- *  │  static variables, vtables.                                 │
- *  │  No fixed limit by default (can grow to exhaust native RAM).│
- *  │  -XX:MaxMetaspaceSize=256m to cap it.                       │
- *  │  Replaced PermGen (Java 7 and earlier).                     │
- *  └─────────────────────────────────────────────────────────────┘
- *
- *  ┌─────────────────────────────────────────────────────────────┐
- *  │  HEAP  (GC-managed, shared by all threads)                  │
- *  │                                                             │
- *  │  ┌───────────────────────┬─────────────────────────────┐   │
- *  │  │  YOUNG GENERATION     │  OLD GENERATION (Tenured)   │   │
- *  │  │                       │                             │   │
- *  │  │  ┌──────┬──────┬────┐ │  Long-lived objects         │   │
- *  │  │  │ Eden │ S0   │ S1 │ │  that survived many GCs     │   │
- *  │  │  └──────┴──────┴────┘ │                             │   │
- *  │  │  New objects born here│                             │   │
- *  │  │  Minor GC runs here   │  Major/Full GC runs here    │   │
- *  │  └───────────────────────┴─────────────────────────────┘   │
- *  │                                                             │
- *  │  -Xms = initial heap size    -Xmx = max heap size          │
- *  └─────────────────────────────────────────────────────────────┘
- *
- *  ┌──────────────────────────────┐  (one per thread)
- *  │  THREAD STACK                │
- *  │  Stack frames (one per call) │
- *  │  Local variables             │
- *  │  Operand stack               │
- *  │  Return address              │
- *  │  -Xss = stack size per thread│
- *  └──────────────────────────────┘
- *
- *  ┌────────────────────────────────────────────────────────────┐
- *  │  CODE CACHE  (native memory)                               │
- *  │  JIT-compiled native code — kept here for fast reuse       │
- *  │  -XX:ReservedCodeCacheSize=256m to size it                 │
- *  └────────────────────────────────────────────────────────────┘
- */</span></code></pre>
+                <p>A running JVM splits its memory into areas with different
+                    owners and lifetimes. Only the heap is managed by the garbage
+                    collector; the rest is native memory that the JVM sizes and frees
+                    itself. A container's memory limit covers all of them, which is
+                    why <code>-Xmx</code> alone never tells you how much a JVM uses.</p>
+
+                <table>
+                    <tr><th>Area</th><th>Shared or per thread</th><th>Holds</th><th>Sized with</th></tr>
+                    <tr><td><strong>Heap — Young Gen</strong><br>Eden, Survivor S0 and S1</td><td>Shared; GC-managed</td><td>New objects. Minor GCs collect it often and cheaply</td><td><code>-Xmn</code> or <code>-XX:NewRatio</code></td></tr>
+                    <tr><td><strong>Heap — Old Gen</strong> (Tenured)</td><td>Shared; GC-managed</td><td>Objects that survived several minor GCs. Collected less often, at a higher cost</td><td><code>-Xms</code> / <code>-Xmx</code> or <code>-XX:MaxRAMPercentage</code> for the whole heap</td></tr>
+                    <tr><td><strong>Metaspace</strong></td><td>Shared; native memory</td><td>Class metadata, method bytecode, constant pools. Replaced PermGen in Java 8; static fields moved to the heap with their <code>Class</code> object</td><td><code>-XX:MaxMetaspaceSize</code> — unbounded by default</td></tr>
+                    <tr><td><strong>Thread stack</strong></td><td>One per thread; native memory</td><td>One frame per method call: local variables, operand stack, return address. Virtual threads keep their frames on the heap instead</td><td><code>-Xss</code></td></tr>
+                    <tr><td><strong>Code cache</strong></td><td>Shared; native memory</td><td>Machine code produced by the JIT compiler</td><td><code>-XX:ReservedCodeCacheSize</code></td></tr>
+                </table>
 
                 <h3>The call stack in detail</h3>
                 <pre><code><span class="comment">// Each method call creates a new stack frame.
