@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis Caching in Spring Boot: @Cacheable &amp; TTL - JavaDev Bible</title>
+    <meta name="description" content="Caching a Spring Boot service with Redis: @Cacheable and @CacheEvict, JSON instead of Java serialization, TTLs, invalidation across replicas, and pitfalls.">
+    <link rel="canonical" href="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/redis-caching.html">
+    <meta property="og:type" content="article">
+    <meta property="og:site_name" content="JavaDev Bible">
+    <meta property="og:title" content="Redis Caching in Spring Boot: @Cacheable &amp; TTL">
+    <meta property="og:description" content="Caching a Spring Boot service with Redis: @Cacheable and @CacheEvict, JSON instead of Java serialization, TTLs, invalidation across replicas, and pitfalls.">
+    <meta property="og:url" content="https://karlete.github.io/javadevbible/javabible/topics/modern-stack/redis-caching.html">
+    <meta property="og:image" content="https://karlete.github.io/javadevbible/javabible/img/og-card.jpg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="../../css/main.css">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
+    <link rel="stylesheet" href="../../css/toc.css">
+    <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "TechArticle",
+              "headline": "Caching with Redis in Spring Boot",
+              "name": "Redis Caching in Spring Boot: @Cacheable & TTL",
+              "description": "Caching a Spring Boot service with Redis: @Cacheable and @CacheEvict, JSON instead of Java serialization, TTLs, invalidation across replicas, and pitfalls.",
+              "url": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/redis-caching.html",
+              "image": "https://karlete.github.io/javadevbible/javabible/img/og-card.jpg",
+              "inLanguage": "en",
+              "articleSection": "Modern Spring Stack",
+              "isPartOf": {
+                "@type": "WebSite",
+                "name": "JavaDev Bible",
+                "url": "https://karlete.github.io/javadevbible/javabible/index.html"
+              }
+            },
+            {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": "Modern Spring Stack",
+                  "item": "https://karlete.github.io/javadevbible/javabible/index.html#modern-stack"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 3,
+                  "name": "Caching with Redis in Spring Boot",
+                  "item": "https://karlete.github.io/javadevbible/javabible/topics/modern-stack/redis-caching.html"
+                }
+              ]
+            }
+          ]
+        }
+    </script>
+</head>
+<body class="topic-page">
+    <header class="topic-header">
+        <div class="header-content">
+            <nav class="breadcrumb">
+                <a href="../../index.html">Home</a> /
+                <a href="../../index.html#modern-stack">Modern Spring Stack</a> /
+                Redis Caching
+            </nav>
+            <h1>Caching with Redis in Spring Boot</h1>
+            <p class="topic-subtitle">The product page is read thousands of times for every time a product changes. Caching it in Redis takes that load off PostgreSQL — and brings the two hard questions with it: when does a cached product stop being true, and how do three replicas agree on it</p>
+            <p class="reviewed-stamp">Checked against Spring Boot 4.2 · Spring Data Redis 4.2 · Redis 8 — <time datetime="2026-11-25">November 2026</time></p>
+            <a href="../../index.html#modern-stack" class="back-btn">&larr; Back to Index</a>
+        </div>
+    </header>
+
+    <div class="topic-layout">
+
+        <aside class="toc-sidebar" id="toc-sidebar" aria-label="Table of contents">
+            <div class="toc-header">
+                <span class="toc-title">📋 Contents</span>
+                <button class="toc-toggle" id="toc-toggle" aria-expanded="true" aria-controls="toc-nav"
+                    aria-label="Collapse table of contents" title="Collapse / Expand">
+                    <span class="toc-icon" aria-hidden="true">▲</span>
+                </button>
+            </div>
+            <nav class="toc-nav" id="toc-nav" aria-label="In-page navigation"></nav>
+        </aside>
+
+        <main class="topic-content">
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 0 — WHAT IS THIS AND WHY
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What a Cache Is — and Why the Shop Needs a Shared One</h2>
+                <p>A <strong>cache</strong> keeps the result of an expensive operation so the next
+                    request can reuse it instead of repeating the work. <strong>Redis</strong> is an
+                    in-memory key-value store, reached over the network, that every replica of the
+                    shop can share. Spring's <strong>cache abstraction</strong> lets a method say
+                    "cache my result" with an annotation, and Spring Boot plugs Redis in behind
+                    it.</p>
+
+                <p>The problem it solves is repeated work on data that changes far less often
+                    than it is read: product details, category listings, prices. The usual first
+                    attempt is a map inside the service — which works on one instance and quietly
+                    breaks on three.</p>
+
+                <figure class="code-file is-before">
+                    <figcaption><span class="code-label">Before</span> <span class="code-path">catalog/ProductService.java — a map in each Pod</span></figcaption>
+                    <pre><code><span class="comment">// Each of the three replicas has its own copy. A price change evicts it on
+// the replica that handled the update; the other two keep serving the old
+// price until they restart. The map also grows forever — no size limit,
+// no expiry.</span>
+<span class="keyword">private final</span> <span class="class-name">Map</span>&lt;<span class="class-name">String</span>, <span class="class-name">ProductDetails</span>&gt; cache = <span class="keyword">new</span> <span class="class-name">ConcurrentHashMap</span>&lt;&gt;();
+
+<span class="keyword">public</span> <span class="class-name">ProductDetails</span> <span class="function">details</span>(<span class="class-name">String</span> sku) {
+    <span class="keyword">return</span> cache.computeIfAbsent(sku, <span class="keyword">this</span>::loadFromDatabase);
+}</code></pre>
+                </figure>
+
+                <figure class="code-file is-after">
+                    <figcaption><span class="code-label">After</span> <span class="code-path">catalog/ProductService.java — one shared cache with an expiry</span></figcaption>
+                    <pre><code><span class="comment">// All replicas read and evict the same Redis entries, which expire on their
+// own after the configured TTL. The method body only runs on a miss.</span>
+<span class="annotation">@Cacheable</span>(cacheNames = <span class="string">"products"</span>, key = <span class="string">"#sku"</span>)
+<span class="keyword">public</span> <span class="class-name">ProductDetails</span> <span class="function">details</span>(<span class="class-name">String</span> sku) {
+    <span class="keyword">return</span> loadFromDatabase(sku);
+}
+
+<span class="annotation">@CacheEvict</span>(cacheNames = <span class="string">"products"</span>, key = <span class="string">"#product.sku()"</span>)
+<span class="keyword">public void</span> <span class="function">update</span>(<span class="class-name">ProductDetails</span> product) {
+    save(product);   <span class="comment">// the next read on any replica loads the new version</span>
+}</code></pre>
+                </figure>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 1 — SETUP
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Setting Up the Cache</h2>
+                <p>Two starters and one annotation: <code>@EnableCaching</code> switches the
+                    abstraction on, and with Redis on the classpath Spring Boot auto-configures a
+                    <code>RedisCacheManager</code> as the cache behind it.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">pom.xml + resources/application.yaml</span></figcaption>
+                    <pre><code>&lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-cache&lt;/<span class="keyword">artifactId</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+&lt;<span class="keyword">dependency</span>&gt;&lt;<span class="keyword">groupId</span>&gt;org.springframework.boot&lt;/<span class="keyword">groupId</span>&gt;&lt;<span class="keyword">artifactId</span>&gt;spring-boot-starter-data-redis&lt;/<span class="keyword">artifactId</span>&gt;&lt;/<span class="keyword">dependency</span>&gt;
+
+<span class="attribute">spring</span>:
+  <span class="attribute">data</span>:
+    <span class="attribute">redis</span>:
+      <span class="attribute">host</span>: redis
+      <span class="attribute">port</span>: 6379
+  <span class="attribute">cache</span>:
+    <span class="attribute">cache-names</span>: products,categories
+    <span class="attribute">redis</span>:
+      <span class="attribute">time-to-live</span>: 10m       <span class="comment"># every entry expires; without this, entries live forever</span></code></pre>
+                </figure>
+
+                <p>For local development, add Redis to the <a href="docker.html">Compose file</a>
+                    (<code>redis:8.12</code>); for tests, start it with
+                    <a href="testcontainers.html">Testcontainers</a> and
+                    <code>@ServiceConnection</code>, as with PostgreSQL. Valkey, the open-source
+                    fork of Redis, speaks the same protocol and works with the same client.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 2 — SERIALISATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Store JSON, Not Java Serialization</h2>
+                <p>By default the Redis cache stores values with Java's built-in serialization.
+                    That requires every cached class to implement <code>Serializable</code>, ties the
+                    stored bytes to the exact class version — so a deployment that adds a field
+                    can fail to read what the previous version cached — and the Spring Data Redis
+                    documentation warns that Java deserialization of untrusted data can lead to
+                    remote code execution. JSON avoids all three.</p>
+
+                <figure class="code-file">
+                    <figcaption><span class="code-path">config/CacheConfig.java</span></figcaption>
+                    <pre><code><span class="annotation">@Configuration</span>
+<span class="annotation">@EnableCaching</span>
+<span class="keyword">class</span> <span class="class-name">CacheConfig</span> {
+
+    <span class="comment">// Replaces the default configuration Spring Boot would use: values as JSON
+    // with type information (so a ProductDetails record comes back as one),
+    // still with the TTL from spring.cache.redis.time-to-live unless set here.</span>
+    <span class="annotation">@Bean</span>
+    <span class="class-name">RedisCacheConfiguration</span> <span class="function">redisCacheConfiguration</span>() {
+        <span class="keyword">return</span> <span class="class-name">RedisCacheConfiguration</span>.defaultCacheConfig()
+                .entryTtl(<span class="class-name">Duration</span>.ofMinutes(<span class="number">10</span>))
+                .serializeValuesWith(<span class="class-name">SerializationPair</span>.fromSerializer(<span class="class-name">RedisSerializer</span>.json()));
+    }
+
+    <span class="comment">// Different data, different staleness: categories change rarely</span>
+    <span class="annotation">@Bean</span>
+    <span class="class-name">RedisCacheManagerBuilderCustomizer</span> <span class="function">perCacheTtl</span>(<span class="class-name">RedisCacheConfiguration</span> base) {
+        <span class="keyword">return</span> builder -&gt; builder.withCacheConfiguration(<span class="string">"categories"</span>, base.entryTtl(<span class="class-name">Duration</span>.ofHours(<span class="number">6</span>)));
+    }
+}</code></pre>
+                </figure>
+
+                <aside class="review-note" aria-label="Code review comment">
+                    <p class="review-note-label">Code review comment</p>
+                    <pre><code><span class="line-del">@Cacheable(cacheNames = "products", key = "#sku")</span>
+<span class="line-del">public Product findEntity(String sku) { ... }</span>
+<span class="line-add">@Cacheable(cacheNames = "products", key = "#sku")</span>
+<span class="line-add">public ProductDetails details(String sku) { ... }</span></code></pre>
+                    <p>Let's not cache the JPA entity. It drags Hibernate proxies and lazy
+                        collections into the serializer, and whatever comes back from the cache is a
+                        detached object that looks managed. Cache the record the API returns — it is
+                        smaller, immutable and exactly what the next caller needs.</p>
+                </aside>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 3 — INVALIDATION
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Keeping the Cache True</h2>
+                <p>Every cache answers one question: how stale may this data be? A TTL gives an
+                    upper bound; eviction on change makes the common case fresh. They complement each
+                    other — the TTL catches every change that bypassed the eviction, such as a SQL
+                    fix run directly against the database.</p>
+
+                <table>
+                    <tr><th>Strategy</th><th>How</th><th>Staleness</th></tr>
+                    <tr><td>TTL only</td><td><code>time-to-live</code></td><td>Up to the TTL after every change</td></tr>
+                    <tr class="row-highlight"><td>Evict on write + TTL</td><td><code>@CacheEvict</code> where the data changes</td><td>Near zero for changes made through the service; TTL as a safety net</td></tr>
+                    <tr><td>Evict on event</td><td>Another service publishes <code>ProductUpdated</code>; the cache owner evicts</td><td>The event's delivery delay — the option when the change happens in a different service</td></tr>
+                </table>
+
+                <div class="info-box warning">
+                    <div class="info-box-title">Evict after the database commits</div>
+                    <p><code>@CacheEvict</code> runs when the method returns — which, inside a
+                        <code>@Transactional</code> method, is before the transaction commits. A read
+                        on another replica in that gap misses the cache, loads the
+                        <em>old</em> row from the database and caches it again for the full TTL. Make
+                        the evicting method the transaction boundary's caller, or evict from a
+                        listener that runs after commit (<code>@TransactionalEventListener</code>), or
+                        let Spring's transaction-aware cache decorator delay the eviction until
+                        commit.</p>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 4 — WHAT NOT TO CACHE
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>What to Cache — and What Never to Cache</h2>
+                <table>
+                    <tr><th>Data</th><th>Cache it?</th><th>Why</th></tr>
+                    <tr><td>Product details, categories</td><td>Yes</td><td>Read constantly, changed rarely, a few seconds of staleness is harmless</td></tr>
+                    <tr><td>Prices</td><td>For display, with a short TTL</td><td>Checkout recalculates from the database — the charged price never comes from the cache</td></tr>
+                    <tr class="row-highlight"><td>Stock levels</td><td>No</td><td>Correctness depends on the current value; a cached "3 in stock" sells items that are gone</td></tr>
+                    <tr><td>Per-customer data (cart, addresses)</td><td>Rarely</td><td>Low reuse; keys must include the customer, or one customer sees another's data</td></tr>
+                </table>
+
+                <p>Two failure modes to design for: a <strong>stampede</strong>, when a popular
+                    entry expires and hundreds of requests reload it at once
+                    (<code>@Cacheable(sync = true)</code> lets only one load per instance), and Redis
+                    itself being <strong>unavailable</strong> — the shop should fall back to the
+                    database, slower, rather than fail, which a custom
+                    <code>CacheErrorHandler</code> can arrange.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 5 — BEST PRACTICES
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Best Practices and Common Pitfalls</h2>
+
+                <div class="best-practices">
+                    <h3>✅ Do</h3>
+                    <ul>
+                        <li>Measure first: cache where reads are frequent, data changes rarely and the load is real</li>
+                        <li>Give every cache a TTL that matches how stale its data may be</li>
+                        <li>Store values as JSON and cache response records, not entities</li>
+                        <li>Evict where the data changes, after the transaction commits</li>
+                        <li>Build keys from every input that changes the result (sku, locale, currency)</li>
+                        <li>Monitor the hit ratio; a cache with a low hit ratio is only extra latency and memory</li>
+                    </ul>
+
+                    <h3>❌ Don't</h3>
+                    <ul>
+                        <li>Don't cache data whose correctness depends on freshness — stock, balances, payment state</li>
+                        <li>Don't use per-instance maps as a cache for data that several replicas serve</li>
+                        <li>Don't rely on Java serialization for cached values</li>
+                        <li>Don't call a <code>@Cacheable</code> method from the same class — the proxy is bypassed and nothing is cached</li>
+                        <li>Don't let a Redis outage take the shop down with it</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════
+                 SECTION 6 — INTERVIEW QUESTIONS
+            ════════════════════════════════════════════ -->
+            <section class="content-section">
+                <h2>Interview Questions</h2>
+
+                <div class="info-box note">
+                    <div class="info-box-title">🎓 Junior level</div>
+                    <details class="qa">
+                        <summary>What do @Cacheable and @CacheEvict do?</summary>
+                        <p><code>@Cacheable</code> returns the cached result for the method's key when
+                    there is one and only runs the method on a miss, storing its result.
+                    <code>@CacheEvict</code> removes an entry, usually from the method that changes
+                    the underlying data, so the next read loads the new version.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why use Redis instead of an in-memory map when the application has several replicas?</summary>
+                        <p>Each replica's map is separate: an eviction on one leaves the others serving
+                    stale data, and each fills its own memory. Redis is one shared cache that every
+                    replica reads and evicts, with expiry and memory limits built in.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What is a TTL, and why should every cache have one?</summary>
+                        <p>Time to live: how long an entry is kept before it expires. It bounds how
+                    stale cached data can get even when an eviction is missed, and stops the cache
+                    from keeping entries that nobody reads any more.</p>
+                    </details>
+                </div>
+
+                <div class="info-box important">
+                    <div class="info-box-title">🔥 Senior level</div>
+                    <details class="qa">
+                        <summary>Why can @CacheEvict on a @Transactional method leave stale data in the cache?</summary>
+                        <p>The eviction happens when the method returns, before the transaction
+                    commits. A concurrent read in between misses the cache, reads the old committed
+                    row and caches it again for the full TTL. Evicting after commit — from a
+                    transactional event listener, a transaction-aware cache, or a caller outside the
+                    transaction — closes the gap.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>What is a cache stampede, and how do you prevent it?</summary>
+                        <p>When a popular entry expires, many concurrent requests miss at once and all
+                    hit the database to rebuild it. Mitigations: <code>@Cacheable(sync = true)</code>
+                    so one request per instance loads while the others wait, randomised TTLs so
+                    entries don't expire together, and refreshing hot entries before they
+                    expire.</p>
+                    </details>
+
+                    <details class="qa">
+                        <summary>Why is the default Java serialization a poor choice for a Redis cache?</summary>
+                        <p>It forces cached classes to be <code>Serializable</code>, breaks when a class
+                    changes between deployments so the new version cannot read the old entries, is
+                    opaque when inspecting Redis, and Java deserialization of data an attacker can
+                    influence is a known remote-code-execution vector. JSON with explicit types
+                    avoids all of these.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- RELATED TOPICS -->
+            <section class="related-topics">
+                <h3>Related Topics</h3>
+                <p class="related-intro">Continue your Java journey:</p>
+                <div class="related-links">
+                    <a href="../spring/data-jpa.html" class="related-link"><span class="related-icon">💾</span>Spring Data JPA</a>
+                    <a href="../best-practices/performance-optimization.html" class="related-link"><span class="related-icon">⚡</span>Performance Optimization</a>
+                    <a href="testcontainers.html" class="related-link"><span class="related-icon">🧫</span>Testcontainers with Spring Boot</a>
+                    <a href="kubernetes.html" class="related-link"><span class="related-icon">☸️</span>Kubernetes for Spring Boot</a>
+                    <a href="../../project.html" class="related-link"><span class="related-icon">🛒</span>The Shop Project</a>
+                </div>
+            </section>
+
+        </main>
+
+    </div><!-- /.topic-layout -->
+
+    <footer class="site-footer">
+        <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
+    </footer>
+
+    <script src="../../js/navigation.js"></script>
+    <script src="../../js/toc.js"></script>
+</body>
+</html>
