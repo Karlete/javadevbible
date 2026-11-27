@@ -850,9 +850,10 @@ pre code {
     outline-offset: 2px;
 }
 
-/* Interactive SQL demo (js/demos.js). Same dark frame as a .code-file so it
-   reads as "what the database sees"; only the buttons are light. */
-.sql-demo {
+/* Interactive demos (js/demos.js): N+1 SQL log, GC generations, thread
+   states. Same dark frame as a .code-file so they read as "what the machine
+   sees"; only the buttons are light. */
+.demo {
     margin: 1.5rem 0;
     border-radius: var(--radius);
     background: var(--code-bg);
@@ -860,7 +861,7 @@ pre code {
     overflow: hidden;
 }
 
-.sql-demo > figcaption {
+.demo > figcaption {
     padding: 0.6rem 1rem;
     background: #2A2D2E;
     border-bottom: 1px solid #3A3D3E;
@@ -869,14 +870,14 @@ pre code {
     color: #C5C8C6;
 }
 
-.sql-demo-controls {
+.demo-controls {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     padding: 1rem 1rem 0;
 }
 
-.sql-demo-button {
+.demo-button {
     padding: 0.45rem 0.85rem;
     font: inherit;
     font-size: 0.85rem;
@@ -887,51 +888,68 @@ pre code {
     cursor: pointer;
 }
 
-.sql-demo-button:hover {
+.demo-button:hover {
     border-color: #8A8D8E;
 }
 
-.sql-demo-button[aria-pressed="true"] {
+.demo-button[aria-pressed="true"] {
     background: var(--accent-color);
     border-color: var(--accent-color);
     color: var(--dark-bg);
     font-weight: 600;
 }
 
-.sql-demo-button:focus-visible {
+.demo-button.is-code {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    text-align: left;
+}
+
+.demo-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.demo-button:disabled:hover {
+    border-color: #4A4D4E;
+}
+
+.demo-button:focus-visible {
     outline: 2px solid var(--light-accent);
     outline-offset: 2px;
 }
 
-.content-section .sql-demo-counter {
+.content-section .demo-counter {
     margin: 0.85rem 1rem 0.5rem;
     font-family: var(--font-mono);
     font-size: 0.85rem;
     color: var(--accent-color);
 }
 
-.content-section .sql-demo-log {
+.content-section .demo-log {
     list-style: none;
     margin: 0;
     padding: 0 1rem;
     counter-reset: query;
 }
 
-.sql-demo-row {
+.demo-row {
     display: grid;
     grid-template-columns: 2.25rem 1fr;
     gap: 0.1rem 0.5rem;
     padding: 0.4rem 0;
     border-top: 1px solid #2F3233;
-    animation: sql-row-in 0.18s ease-out;
+    animation: demo-row-in 0.18s ease-out;
 }
 
-/* Only real queries are numbered; persistence-context hits are not. */
-.sql-demo-row:not(.is-cached) {
+/* Only rows that change something are numbered: in the N+1 log, real
+   queries (persistence-context hits are muted); in the thread log, real
+   state transitions. */
+.demo-row:not(.is-muted) {
     counter-increment: query;
 }
 
-.sql-demo-row::before {
+.demo-row::before {
     content: counter(query);
     grid-row: span 2;
     font-family: var(--font-mono);
@@ -940,30 +958,30 @@ pre code {
     text-align: right;
 }
 
-.sql-demo-row.is-cached::before {
+.demo-row.is-muted::before {
     content: "\2014";              /* — */
 }
 
-.sql-demo-row > code {
+.demo-row > code {
     font-size: 0.82rem;
     color: #DCDCAA;
     overflow-wrap: anywhere;
 }
 
-.sql-demo-row.is-cached > code {
+.demo-row.is-muted > code {
     color: #8A8D8E;
 }
 
-.sql-demo-note {
+.demo-note {
     font-size: 0.8rem;
     color: #9DA5AB;
 }
 
-.sql-demo-row.is-cached .sql-demo-note {
+.demo-row.is-muted .demo-note {
     color: #7EE2A8;
 }
 
-.content-section .sql-demo-summary {
+.content-section .demo-summary {
     margin: 0;
     padding: 0.85rem 1rem 1rem;
     font-size: 0.9rem;
@@ -971,7 +989,128 @@ pre code {
     color: #E3EEF4;
 }
 
-@keyframes sql-row-in {
+.demo-row.is-error > code,
+.demo-row.is-error .demo-note {
+    color: #F48771;
+}
+
+.content-section .demo-summary + .demo-log {
+    padding-bottom: 1rem;
+}
+
+/* GC generations: four heap regions that wrap to one column on a phone. */
+.demo-heap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.75rem;
+    padding: 0 1rem;
+}
+
+.demo-region {
+    padding: 0.6rem;
+    border: 1px solid #3A3D3E;
+    border-radius: 4px;
+}
+
+.content-section .demo-region-name {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: #E3EEF4;
+}
+
+.demo-region-note {
+    font-weight: 400;
+    color: #8A8D8E;
+}
+
+.content-section .demo-cells,
+.content-section .demo-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.content-section .demo-legend {
+    flex-direction: column;
+    padding: 0.75rem 1rem 0;
+    font-size: 0.8rem;
+    color: #9DA5AB;
+}
+
+.content-section .demo-legend li {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.demo-cell {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #1E1E1E;
+}
+
+.demo-legend .demo-cell {
+    min-width: 1rem;
+    height: 1rem;
+}
+
+.demo-cell.is-request { background: #9DA5AB; }
+.demo-cell.is-cart    { background: #DCDCAA; }
+.demo-cell.is-cache   { background: #05BFDB; }
+
+.demo-cell.is-empty {
+    padding: 0 0.4rem;
+    font-weight: 400;
+    color: #6A6D6E;
+    border: 1px dashed #4A4D4E;
+}
+
+.demo-cell.is-fresh {
+    animation: demo-row-in 0.25s ease-out;
+}
+
+/* Thread states: the six Thread.State values, the current one lit. */
+.content-section .demo-states {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 1rem 1rem 0;
+    list-style: none;
+}
+
+.demo-state {
+    padding: 0.3rem 0.6rem;
+    border: 1px solid #3A3D3E;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: #8A8D8E;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.demo-state.is-current {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: var(--dark-bg);
+    font-weight: 600;
+}
+
+@keyframes demo-row-in {
     from {
         opacity: 0;
         transform: translateY(-4px);

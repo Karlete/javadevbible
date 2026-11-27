@@ -2,7 +2,7 @@
 
 Context for Claude Code and any other Claude instance working in this repo. Read this before editing anything.
 
-**Last reviewed against the repository: 2026-11-24.** If that date is more than a few months old, treat every claim below as a hypothesis and check it against the code before relying on it.
+**Last reviewed against the repository: 2026-11-27.** If that date is more than a few months old, treat every claim below as a hypothesis and check it against the code before relying on it.
 
 A machine-readable architecture map lives in `docs/architecture.json` (human version: `docs/architecture.html`). It is a snapshot; this file and the code win when they disagree.
 
@@ -36,7 +36,9 @@ bash tools/verify.sh
 
 The checks it runs are listed in the header comment of `tools/verify.sh` — that header is the source of truth, not this file. It exits non-zero on failure and runs in CI on every push and pull request.
 
-**Run it after any change that touches a filename, a link, the search index, a code block, a `<head>`, or `js/`.** It exists because a restructure once left 22 broken links, 16 index entries pointing at deleted files, and 11 pages that no search could reach — none of which anything caught. It is the closest thing this project has to a compiler.
+**Run it after any change that touches a filename, a link, the search index, a code block, a `<head>`, `css/` or `js/`.** It exists because a restructure once left 22 broken links, 16 index entries pointing at deleted files, and 11 pages that no search could reach — none of which anything caught. It is the closest thing this project has to a compiler.
+
+After editing anything in `css/` or `js/`, run `bash tools/assets.sh` before `verify.sh`: every page references assets as `main.css?v=<checksum>` so browsers drop a cached copy when the file changes, and check 17 fails on a stale `?v=`.
 
 It does **not** verify behaviour. A page can pass every check and still be visually broken. Anything touching CSS or JS needs a browser:
 
@@ -72,6 +74,7 @@ If you changed `mcp/` **or the search index / search algorithm**, also run `cd m
 
 /tools/verify.sh                   integrity checker
 /tools/sitemap.sh                  regenerates javabible/sitemap.xml with git-based <lastmod>
+/tools/assets.sh                   stamps every css/ and js/ reference with ?v=<CRC of the file> (cache busting)
 /.github/workflows/verify.yml      runs it on every push and PR
 /mcp/                              optional MCP server (see "MCP server" below)
 /docs/                             architecture map (architecture.html / architecture.json)
@@ -139,8 +142,8 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
   - **Description**: one complete sentence, 70–160 characters (120–160 is the target).
   - **Canonical**, `og:url` and every JSON-LD URL are absolute under `https://karlete.github.io/javadevbible/javabible/`. `og:image` is always `img/og-card.jpg`.
   - **JSON-LD**: an `@graph` with a `TechArticle` (headline = `<h1>`, name = search title, description, url, image, `inLanguage`, `articleSection` = category, `isPartOf` the WebSite) and a `BreadcrumbList` Home → category (`index.html#anchor`) → this page. Escape `</` as `<\/` inside it. No dates and no author: nothing keeps them true, and a wrong `dateModified` is worse than none — freshness comes from the sitemap's `<lastmod>`.
-- Stylesheets: `main.css`, `syntax-highlighting.css`, `toc.css`.
-- Scripts at the end of `<body>`: `navigation.js`, `toc.js` on topic pages. `index.html` additionally loads `search.js`. A page with an interactive demo (`<figure data-demo="…" hidden>`, see `js/demos.js`; first one: the N+1 demo in `topics/databases/relationships.html`) also loads `demos.js` last; without JS the placeholder stays hidden and the page reads as before. The home hero is deliberately static: no animated gradient, particles or typing effect (removed 2026-11-24 because they made the site read as a generic template).
+- Stylesheets: `main.css`, `syntax-highlighting.css`, `toc.css`. Every `css/` and `js/` reference carries `?v=<checksum>`; never type it by hand — copy the tag without it and run `bash tools/assets.sh`.
+- Scripts at the end of `<body>`: `navigation.js`, `toc.js` on topic pages. `index.html` additionally loads `search.js`. A page with an interactive demo (`<figure class="demo" data-demo="…" hidden>`, see `js/demos.js`: `n-plus-one` in `topics/databases/relationships.html`, `gc-generations` in `topics/advanced/jvm-internals.html`, `thread-states` in `topics/advanced/multithreading.html`) also loads `demos.js` last; without JS the placeholder stays hidden and the page reads as before. The home hero is deliberately static: no animated gradient, particles or typing effect (removed 2026-11-24 because they made the site read as a generic template).
 - TOC sidebar (`<aside class="toc-sidebar" id="toc-sidebar">`) — copy the exact markup from a reference page below. Do not hand-roll it.
 - **Review stamp** (optional, `verify.sh` check 16): `<p class="reviewed-stamp">Checked against Java 25 · Spring Boot 4.2 — <time datetime="YYYY-MM-DD">Month YYYY</time></p>` right after the subtitle. Add or update it **only** when the page's content was actually checked against the versions it names, with that day's date. Never derive it from git: a footer edit touches every page. Copy it from `topics/modern-stack/docker.html`.
 - **Code review comment** (optional, at most one per page): `<aside class="review-note" aria-label="Code review comment">` with a `<p class="review-note-label">Code review comment</p>`, a 2–4 line `<pre><code>` diff using `line-del`/`line-add`, and one `<p>` written as a reviewer would write it on a pull request: short, direct, with the reason. It describes a typical mistake, not a personal anecdote — never title it "Seen in code review" or imply the author witnessed it. Pilots: `topics/databases/relationships.html`, `topics/spring/rest.html`.
@@ -151,7 +154,7 @@ Every topic page follows this structure. Deviating from it is a defect, not a st
   - A before/after pair is two figures: `class="code-file is-before"` (label `Before`) and `class="code-file is-after"` (label `After`). Do not also write `// BAD` / `// CORRECT` comments — the label says it.
   - Line-level changes: `<span class="line-del">…</span>` and `<span class="line-add">…</span>`, one per line, closed before the newline. The −/+ markers come from CSS; the Copy button copies the code without the deleted lines.
   - `navigation.js` puts the Copy button in the figcaption. A bare `<pre>` still works and gets a floating button.
-  - File paths are provisional until the shared example project (redesign phase 2) is fixed; do not roll the headers out site-wide before that.
+  - Paths are relative to the shop's base package `com.javadevbible.shop` (`order/Order.java`), package-by-feature, as laid out in `javabible/project.html`. Check that page before inventing a path or a field.
 
 ### Required JavaScript conventions (`javabible/js/`)
 

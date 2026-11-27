@@ -30,6 +30,8 @@
 #                               questions, and none left in the old <p><strong>Q: form
 #  16. Review stamp           — optional "Checked against …" stamp: well formed, one per
 #                               page, not future-dated, month text matches datetime
+#  17. Asset versions         — every css/ and js/ reference carries ?v=<checksum of the
+#                               file as it is now> (regenerate with tools/assets.sh)
 #
 # Usage:
 #   bash tools/verify.sh            run all checks
@@ -164,6 +166,7 @@ while IFS= read -r -d '' html_file; do
     esac
 
     target="${href%%\#*}"          # strip fragment: page.html#x → page.html
+    target="${target%%\?*}"        # strip query: main.css?v=… → main.css
     [[ -z "$target" ]] && continue
 
     LINKS_TOTAL=$((LINKS_TOTAL + 1))
@@ -728,6 +731,52 @@ if [[ "$STAMP_N" -eq 0 ]]; then
 else
   fail "$STAMP_N problem(s) with review stamps"
   show_capped "$(cat "$TMP/stamp.txt")"
+fi
+
+# ─── Check 17: Asset versions ─────────────────────────────────────────────────
+#
+# Browsers cache CSS and JS. A deploy that changes main.css without changing
+# its URL serves returning readers new HTML with an old stylesheet. Every
+# reference carries ?v=<CRC of the file>; editing the file without running
+# tools/assets.sh leaves a stale ?v= that this check reports. It also catches
+# a <script src> pointing at a file that does not exist, which check 1 (href
+# only) does not see.
+
+header "17. Asset versions"
+
+: > "$TMP/assets.txt"
+declare -A ASSET_VER=()
+while IFS= read -r -d '' asset; do
+  crc="$(cksum < "$asset" | cut -d' ' -f1)"
+  ASSET_VER["${asset#"$SITE_ROOT/"}"]="$(printf '%08x' "$crc")"
+done < <(find "$SITE_ROOT/css" "$SITE_ROOT/js" -type f \( -name '*.css' -o -name '*.js' \) -print0)
+
+ASSET_REFS=0
+while IFS= read -r -d '' page; do
+  while IFS= read -r ref; do
+    [[ -z "$ref" ]] && continue
+    ASSET_REFS=$((ASSET_REFS + 1))
+    path="${ref%%\?*}"
+    dir="${path%/*}"; key="${dir##*/}/${path##*/}"     # ../../css/main.css → css/main.css
+    want="${ASSET_VER[$key]:-}"
+    rel="${page#"$REPO_ROOT/"}"
+    if [[ -z "$want" ]]; then
+      printf '%s  →  %s does not exist in javabible/%s
+' "$rel" "$ref" "$key" >> "$TMP/assets.txt"
+    elif [[ "$ref" != *"?v=$want" ]]; then
+      printf '%s  →  %s (current: ?v=%s)
+' "$rel" "$ref" "$want" >> "$TMP/assets.txt"
+    fi
+  done < <(grep -oE '(href|src)="[^"]*(css|js)/[^"/]+\.(css|js)[^"]*"' "$page" | sed -E 's/^(href|src)="//; s/"$//')
+done < <(find "$SITE_ROOT" -name '*.html' -not -path '*/features/*' -print0; printf '%s ' "$REPO_ROOT/404.html")
+
+ASSETS_N=$(grep -c . "$TMP/assets.txt" || true)
+if [[ "$ASSETS_N" -eq 0 ]]; then
+  pass "$ASSET_REFS stylesheet/script references, all versioned with the current checksum"
+else
+  fail "$ASSETS_N stale or missing asset version(s)"
+  show_capped "$(cat "$TMP/assets.txt")"
+  hint 'fix: bash tools/assets.sh'
 fi
 
 # ─── Summary ──────────────────────────────────────────────────────────────────

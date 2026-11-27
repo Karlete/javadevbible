@@ -17,9 +17,9 @@
     <meta property="og:image:alt" content="JavaDev Bible — Java developer knowledge base">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="../../css/main.css">
-    <link rel="stylesheet" href="../../css/syntax-highlighting.css">
-    <link rel="stylesheet" href="../../css/toc.css">
+    <link rel="stylesheet" href="../../css/main.css?v=8b390022">
+    <link rel="stylesheet" href="../../css/syntax-highlighting.css?v=ebda796d">
+    <link rel="stylesheet" href="../../css/toc.css?v=9afa30c0">
     <script type="application/ld+json">
         {
           "@context": "https://schema.org",
@@ -207,7 +207,7 @@ Response 2: 200 OK  [{id: 9001, status: "SHIPPED"}, ...]   <span class="comment"
     <span class="keyword">if</span> (sessionId == <span class="keyword">null</span>) {
         <span class="keyword">throw new</span> <span class="class-name">UnauthorizedException</span>(<span class="string">"No session"</span>);
     }
-    <span class="keyword">return</span> sessionService.getUser(sessionId);
+    <span class="keyword">return</span> sessionService.currentCustomer(sessionId);
 }
 
 <span class="comment">// Deleting — set Max-Age to 0 with the same path as when it was created</span>
@@ -243,7 +243,7 @@ Response 2: 200 OK  [{id: 9001, status: "SHIPPED"}, ...]   <span class="comment"
 <span class="annotation">@PostMapping</span>(<span class="string">"/login"</span>)
 <span class="keyword">public</span> <span class="class-name">ResponseEntity</span>&lt;<span class="class-name">Void</span>&gt; <span class="function">login</span>(<span class="annotation">@Valid</span> <span class="annotation">@RequestBody</span> <span class="class-name">LoginRequest</span> request,
                                     <span class="class-name">HttpServletRequest</span> httpRequest) {
-    <span class="class-name">User</span> user = authService.authenticate(request);   <span class="comment">// throws UnauthorizedException on failure</span>
+    <span class="class-name">Customer</span> customer = authService.authenticate(request);   <span class="comment">// throws UnauthorizedException on failure</span>
 
     <span class="comment">// Session fixation prevention: invalidate any pre-login session,</span>
     <span class="comment">// then create a fresh one with a new ID. Without this, an attacker</span>
@@ -252,20 +252,19 @@ Response 2: 200 OK  [{id: 9001, status: "SHIPPED"}, ...]   <span class="comment"
     <span class="keyword">if</span> (old != <span class="keyword">null</span>) old.invalidate();
 
     <span class="class-name">HttpSession</span> session = httpRequest.getSession(<span class="keyword">true</span>);
-    session.setAttribute(<span class="string">"userId"</span>, user.getId());        <span class="comment">// store the ID, not the whole entity</span>
-    session.setAttribute(<span class="string">"roles"</span>, user.getRoles());
+    session.setAttribute(<span class="string">"customerId"</span>, customer.getId());   <span class="comment">// the ID, not the whole entity</span>
     session.setMaxInactiveInterval(<span class="number">30</span> * <span class="number">60</span>);              <span class="comment">// 30 min inactivity timeout</span>
 
     <span class="keyword">return</span> <span class="class-name">ResponseEntity</span>.ok().build();
 }
 
-<span class="annotation">@GetMapping</span>(<span class="string">"/dashboard"</span>)
-<span class="keyword">public</span> <span class="class-name">DashboardResponse</span> <span class="function">getDashboard</span>(<span class="class-name">HttpSession</span> session) {
-    <span class="class-name">Long</span> userId = (<span class="class-name">Long</span>) session.getAttribute(<span class="string">"userId"</span>);
-    <span class="keyword">if</span> (userId == <span class="keyword">null</span>) {
+<span class="annotation">@GetMapping</span>(<span class="string">"/account"</span>)
+<span class="keyword">public</span> <span class="class-name">AccountOverview</span> <span class="function">getAccount</span>(<span class="class-name">HttpSession</span> session) {
+    <span class="class-name">Long</span> customerId = (<span class="class-name">Long</span>) session.getAttribute(<span class="string">"customerId"</span>);
+    <span class="keyword">if</span> (customerId == <span class="keyword">null</span>) {
         <span class="keyword">throw new</span> <span class="class-name">UnauthorizedException</span>(<span class="string">"No active session"</span>);
     }
-    <span class="keyword">return</span> dashboardService.forUser(userId);
+    <span class="keyword">return</span> accountService.overviewFor(customerId);   <span class="comment">// recent orders, addresses — read fresh</span>
 }
 
 <span class="annotation">@PostMapping</span>(<span class="string">"/logout"</span>)
@@ -275,15 +274,14 @@ Response 2: 200 OK  [{id: 9001, status: "SHIPPED"}, ...]   <span class="comment"
 }</code></pre>
 
                 <div class="info-box important">
-                    <div class="info-box-title">Store only the user ID in the session, never the whole entity</div>
-                    <p>Storing a full <code>User</code> JPA entity in the session means
-                        the session serializes a snapshot of the user at login time.
-                        If that user's role changes, their email is updated, or they're
-                        deactivated, the session still holds the old snapshot — and
-                        unless the session is explicitly invalidated, they keep operating
-                        with stale data. Store only the <code>userId</code> and
-                        <code>roles</code>, and fetch a fresh entity from the database
-                        when you need the full user.</p>
+                    <div class="info-box-title">Store only the customer ID in the session, never the whole entity</div>
+                    <p>Storing a full <code>Customer</code> JPA entity in the session means
+                        the session serializes a snapshot of the customer at login time.
+                        If their email changes or the account is blocked, the session
+                        still holds the old snapshot — and unless the session is
+                        explicitly invalidated, they keep operating with stale data.
+                        Store only the <code>customerId</code>, and load a fresh entity
+                        from the database when you need the full customer.</p>
                 </div>
 
                 <h3>The Horizontal Scaling Problem — and Its Fix</h3>
@@ -446,14 +444,14 @@ server.servlet.session.cookie.same-site=lax</code></pre>
                 <pre><code><span class="comment">// Session-based flow</span>
 Browser ──── Cookie: JSESSIONID=abc123 ────▶ Server
                                               └─▶ Redis: look up "abc123"
-                                              └─▶ Returns: {userId: 42, roles: ["ADMIN"]}
+                                              └─▶ Returns: {customerId: 42, roles: ["CUSTOMER"]}
 <span class="comment">// One network hop to Redis per request under the session path.</span>
 <span class="comment">// Revocation: delete the key from Redis → session is dead immediately.</span>
 
 <span class="comment">// JWT-based flow</span>
 Client ──── Authorization: Bearer eyJhbGci... ────▶ Server
                                                     └─▶ Verifies cryptographic signature (local)
-                                                    └─▶ Reads: {userId: 42, roles: ["ADMIN"], exp: ...}
+                                                    └─▶ Reads: {customerId: 42, roles: ["CUSTOMER"], exp: ...}
 <span class="comment">// Zero network hops for verification — just CPU (signature check).</span>
 <span class="comment">// Revocation: the token is valid until its exp claim, period.</span>
 <span class="comment">// If you need to revoke before expiry, you need a blocklist — which means</span>
@@ -504,14 +502,14 @@ Client ──── Authorization: Bearer eyJhbGci... ────▶ Server
         <span class="class-name">HttpServletRequest</span> httpRequest,
         <span class="class-name">HttpServletResponse</span> httpResponse) {
 
-    <span class="class-name">User</span> user = authService.authenticate(request);
+    <span class="class-name">Customer</span> customer = authService.authenticate(request);
 
     <span class="class-name">HttpSession</span> old = httpRequest.getSession(<span class="keyword">false</span>);
     <span class="keyword">if</span> (old != <span class="keyword">null</span>) old.invalidate();   <span class="comment">// session fixation prevention</span>
-    httpRequest.getSession(<span class="keyword">true</span>).setAttribute(<span class="string">"userId"</span>, user.getId());
+    httpRequest.getSession(<span class="keyword">true</span>).setAttribute(<span class="string">"customerId"</span>, customer.getId());
 
     <span class="keyword">if</span> (rememberMe) {
-        <span class="class-name">String</span> token = rememberMeService.createToken(user);   <span class="comment">// stored hashed in DB</span>
+        <span class="class-name">String</span> token = rememberMeService.createToken(customer);   <span class="comment">// stored hashed in DB</span>
         <span class="class-name">ResponseCookie</span> persistent = <span class="class-name">ResponseCookie</span>.from(<span class="string">"remember_me"</span>, token)
             .httpOnly(<span class="keyword">true</span>)
             .secure(<span class="keyword">true</span>)
@@ -548,7 +546,7 @@ Client ──── Authorization: Bearer eyJhbGci... ────▶ Server
                     <ul>
                         <li>Set <code>HttpOnly</code>, <code>Secure</code>, and an explicit <code>SameSite</code> on every authentication-related cookie — never leave any of the three unset</li>
                         <li>Invalidate the pre-login session and create a new one on successful authentication — session fixation is exploitable and the fix is two lines</li>
-                        <li>Store only the <code>userId</code> (and minimal role info) in the session — never a full JPA entity or a serialized object that can become stale</li>
+                        <li>Store only the <code>customerId</code> (and minimal role info) in the session — never a full JPA entity or a serialized object that can become stale</li>
                         <li>Use Spring Session (Redis or JDBC) the moment you have more than one instance — sticky sessions are a deployment fragility, not a scaling strategy</li>
                         <li>Choose sessions over JWT when you need instant revocation — "logout means logout" without a blocklist requires sessions</li>
                     </ul>
@@ -682,8 +680,8 @@ Client ──── Authorization: Bearer eyJhbGci... ────▶ Server
         <p>&copy; 2026 JavaDev Bible · <a href="../../about.html">About</a></p>
     </footer>
 
-    <script src="../../js/navigation.js"></script>
-    <script src="../../js/toc.js"></script>
+    <script src="../../js/navigation.js?v=bf7439b7"></script>
+    <script src="../../js/toc.js?v=6601a61f"></script>
 </body>
 </html>
 

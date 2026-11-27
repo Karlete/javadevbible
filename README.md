@@ -222,7 +222,9 @@ mcp/                        MCP server — exposes content to AI assistants
 ├── README.md               setup and troubleshooting
 └── src/
 
-tools/verify.sh             integrity checker — 6 checks, pure bash
+tools/verify.sh             integrity checker — 17 checks, pure bash
+tools/sitemap.sh            regenerates the sitemap with git-based <lastmod>
+tools/assets.sh             versions css/js references with ?v=<checksum>
 .github/workflows/          runs it on every push
 CLAUDE.md                   the conventions every page must satisfy
 ```
